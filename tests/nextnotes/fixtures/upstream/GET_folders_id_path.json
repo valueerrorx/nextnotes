@@ -1,0 +1,9 @@
+{
+    "route": "GET /folders/{id}/path",
+    "status": 200,
+    "body": {
+        "depth": "int",
+        "path": "string",
+        "success": "bool"
+    }
+}

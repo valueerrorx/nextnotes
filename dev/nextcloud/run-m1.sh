@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: 2026 Thomas Weissel
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# run-m1.sh [env…]: Done M1 auf allen Umgebungen; Exit 0 nur wenn alles grün. KEEP=1 lässt die letzte Umgebung stehen.
+# run-m1.sh [env…]: Done M1 auf allen Umgebungen; Exit 0 nur wenn alles grün. KEEP=1 lässt bei Fehlschlag die Umgebung stehen.
 set -euo pipefail
 dir="$(dirname "${BASH_SOURCE[0]}")"
 source "$dir/env.sh"
 
 envs=("$@"); [[ ${#envs[@]} -gt 0 ]] || envs=("${NN_ENVS[@]}")
-[[ "${KEEP:-0}" == 1 ]] || trap '"$dir/down.sh" all >/dev/null 2>&1 || true' EXIT
+trap 'rc=$?; [[ "${KEEP:-0}" == 1 && $rc -ne 0 ]] || "$dir/down.sh" all >/dev/null 2>&1 || true' EXIT
 
 "$dir/validate-info.sh"
 for env in "${envs[@]}"; do

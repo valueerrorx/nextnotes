@@ -1,0 +1,10 @@
+{
+    "route": "GET /folders/{id}/notes",
+    "status": 200,
+    "body": {
+        "count": "int",
+        "direct_count": "int",
+        "subfolder_count": "int",
+        "success": "bool"
+    }
+}

@@ -1,0 +1,10 @@
+{
+    "route": "PUT /folders/{id}/icon",
+    "status": 200,
+    "body": {
+        "icon": "string",
+        "icon_color": "string",
+        "message": "string",
+        "success": "bool"
+    }
+}

@@ -1,0 +1,14 @@
+{
+    "route": "GET /folders/counts",
+    "status": 200,
+    "body": {
+        "counts": {
+            "2": "int",
+            "3": "int",
+            "4": "int",
+            "Favorites": "int",
+            "uncategorized": "int"
+        },
+        "success": "bool"
+    }
+}

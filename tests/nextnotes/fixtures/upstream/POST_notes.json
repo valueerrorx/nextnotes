@@ -1,0 +1,16 @@
+{
+    "route": "POST /notes",
+    "status": 201,
+    "body": {
+        "note": {
+            "created": "string",
+            "folder_id": "int",
+            "heading": "string",
+            "id": "int",
+            "type": "string",
+            "workspace": "string"
+        },
+        "share_delta": "int",
+        "success": "bool"
+    }
+}

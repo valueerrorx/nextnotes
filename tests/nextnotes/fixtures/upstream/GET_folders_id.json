@@ -1,0 +1,20 @@
+{
+    "route": "GET /folders/{id}",
+    "status": 200,
+    "body": {
+        "folder": {
+            "color": "null",
+            "color_hex": "null",
+            "created": "string",
+            "display_order": "int",
+            "icon": "null",
+            "icon_color": "null",
+            "id": "int",
+            "name": "string",
+            "parent_id": "null",
+            "path": "string",
+            "workspace": "string"
+        },
+        "success": "bool"
+    }
+}

@@ -1,0 +1,16 @@
+{
+    "route": "POST /folders/reorder",
+    "status": 200,
+    "body": {
+        "folder": {
+            "id": "int",
+            "name": "string",
+            "parent_id": "null",
+            "position": "string",
+            "target_folder_id": "int",
+            "workspace": "string"
+        },
+        "message": "string",
+        "success": "bool"
+    }
+}

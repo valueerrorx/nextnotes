@@ -1,0 +1,8 @@
+{
+    "route": "POST /notes/{id}/beacon",
+    "status": 200,
+    "body": {
+        "id": "int",
+        "success": "bool"
+    }
+}

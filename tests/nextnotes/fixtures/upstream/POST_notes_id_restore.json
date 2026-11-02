@@ -1,0 +1,12 @@
+{
+    "route": "POST /notes/{id}/restore",
+    "status": 200,
+    "body": {
+        "message": "string",
+        "note": {
+            "heading": "string",
+            "id": "int"
+        },
+        "success": "bool"
+    }
+}

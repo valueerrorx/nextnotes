@@ -1,0 +1,17 @@
+{
+    "route": "POST /folders/{id}/archive",
+    "status": 200,
+    "body": {
+        "created_folders": [],
+        "folder_id": "int",
+        "folder_path": "string",
+        "merged": "bool",
+        "message": "string",
+        "note_ids": [],
+        "old_folder_id": "int",
+        "old_workspace": "string",
+        "success": "bool",
+        "workspace": "string",
+        "workspace_created": "bool"
+    }
+}

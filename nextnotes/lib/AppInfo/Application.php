@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\AppInfo;
 
+use OCA\NextNotes\Middleware\ApiExceptionMiddleware;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
@@ -22,6 +23,7 @@ class Application extends App implements IBootstrap {
 	}
 
 	public function register(IRegistrationContext $context): void {
+		$context->registerMiddleware(ApiExceptionMiddleware::class);
 	}
 
 	public function boot(IBootContext $context): void {

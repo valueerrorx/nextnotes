@@ -1,0 +1,9 @@
+{
+    "route": "POST /notes/{id}/kanban-completed",
+    "status": 200,
+    "body": {
+        "completed": "bool",
+        "note_id": "int",
+        "success": "bool"
+    }
+}

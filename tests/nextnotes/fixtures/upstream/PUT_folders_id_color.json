@@ -1,0 +1,10 @@
+{
+    "route": "PUT /folders/{id}/color",
+    "status": 200,
+    "body": {
+        "color": "string",
+        "color_hex": "string",
+        "message": "string",
+        "success": "bool"
+    }
+}

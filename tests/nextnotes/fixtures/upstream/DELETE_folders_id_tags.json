@@ -1,0 +1,17 @@
+{
+    "route": "DELETE /folders/{id}/tags",
+    "status": 200,
+    "body": {
+        "include_subfolders": "bool",
+        "message": "string",
+        "note_ids": [
+            "int"
+        ],
+        "notes_count": "int",
+        "success": "bool",
+        "tags": [
+            "string"
+        ],
+        "updated_count": "int"
+    }
+}

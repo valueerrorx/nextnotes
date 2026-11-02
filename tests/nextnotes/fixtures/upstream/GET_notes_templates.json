@@ -1,0 +1,9 @@
+{
+    "route": "GET /notes/templates",
+    "status": 200,
+    "body": {
+        "count": "int",
+        "notes": [],
+        "success": "bool"
+    }
+}

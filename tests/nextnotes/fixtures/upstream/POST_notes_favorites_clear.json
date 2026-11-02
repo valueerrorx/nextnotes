@@ -1,0 +1,9 @@
+{
+    "route": "POST /notes/favorites/clear",
+    "status": 200,
+    "body": {
+        "folders": "int",
+        "notes": "int",
+        "success": "bool"
+    }
+}

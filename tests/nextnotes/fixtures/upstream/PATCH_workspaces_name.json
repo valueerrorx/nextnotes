@@ -1,0 +1,11 @@
+{
+    "route": "PATCH /workspaces/{name}",
+    "status": 200,
+    "body": {
+        "color": "null",
+        "new_name": "string",
+        "old_name": "string",
+        "success": "bool",
+        "tags": "null"
+    }
+}

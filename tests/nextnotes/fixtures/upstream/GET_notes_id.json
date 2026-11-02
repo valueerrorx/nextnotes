@@ -1,0 +1,33 @@
+{
+    "route": "GET /notes/{id}",
+    "status": 200,
+    "body": {
+        "note": {
+            "color": "null",
+            "color_hex": "null",
+            "content": "string",
+            "content_width": "null",
+            "created": "string",
+            "dashboard_order": "int",
+            "display_order": "int",
+            "favorite": "int",
+            "folder": "null",
+            "folder_id": "int",
+            "heading": "string",
+            "icon": "string",
+            "icon_color": "null",
+            "id": "int",
+            "linked_note_id": "null",
+            "reminder_at": "null",
+            "state_hash": "null",
+            "tags": "string",
+            "title_color": "null",
+            "title_size": "null",
+            "type": "string",
+            "updated": "string",
+            "version": "string",
+            "workspace": "string"
+        },
+        "success": "bool"
+    }
+}

@@ -1,0 +1,12 @@
+{
+    "route": "PUT /notes/{id}/tags",
+    "status": 200,
+    "body": {
+        "message": "string",
+        "note": {
+            "id": "int",
+            "tags": "string"
+        },
+        "success": "bool"
+    }
+}

@@ -12,7 +12,8 @@ if [[ "$target" == all ]]; then
 else
 	check_env "$target"
 	# Nur Dienste und Volumes dieses Profils; Netz bleibt für andere Profile
-	mapfile -t svcs < <(dc "$target" config --services)
+	svcs="$(dc "$target" config --services)"
+	mapfile -t svcs <<<"$svcs"
 	dc "$target" rm -sfv "${svcs[@]}"
 	for v in $(vols_for "$target"); do docker volume rm -f "nextnotes-dev_$v" >/dev/null; done
 fi

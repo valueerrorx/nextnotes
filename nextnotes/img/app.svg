@@ -1,2 +1,1 @@
-<!-- SPDX-FileCopyrightText: 2026 Thomas Weissel --><!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path fill="#fff" d="M7 3h13l7 7v17a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm12 2v6h6zM9 15v2h14v-2zm0 5v2h14v-2zm0 5v2h9v-2z"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><!-- SPDX-FileCopyrightText: 2026 Thomas Weissel --><!-- SPDX-License-Identifier: AGPL-3.0-or-later --><path fill="#fff" d="M7 3h13l7 7v17a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm12 2v6h6zM9 15v2h14v-2zm0 5v2h14v-2zm0 5v2h9v-2z"/></svg>

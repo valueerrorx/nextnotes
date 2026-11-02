@@ -1,0 +1,14 @@
+{
+    "route": "DELETE /notes/{id}",
+    "status": 200,
+    "body": {
+        "message": "string",
+        "note": {
+            "action": "string",
+            "deleted_linked_count": "int",
+            "heading": "string",
+            "id": "int"
+        },
+        "success": "bool"
+    }
+}

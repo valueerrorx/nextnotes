@@ -1,0 +1,16 @@
+{
+    "route": "POST /folders/{id}/move",
+    "status": 200,
+    "body": {
+        "folder": {
+            "display_order": "int",
+            "id": "int",
+            "name": "string",
+            "parent_id": "int",
+            "path": "string",
+            "workspace": "string"
+        },
+        "message": "string",
+        "success": "bool"
+    }
+}

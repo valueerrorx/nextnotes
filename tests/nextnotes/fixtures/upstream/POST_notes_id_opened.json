@@ -1,0 +1,8 @@
+{
+    "route": "POST /notes/{id}/opened",
+    "status": 200,
+    "body": {
+        "note_id": "int",
+        "success": "bool"
+    }
+}

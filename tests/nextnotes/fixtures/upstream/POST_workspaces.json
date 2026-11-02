@@ -1,0 +1,10 @@
+{
+    "route": "POST /workspaces",
+    "status": 201,
+    "body": {
+        "color": "null",
+        "name": "string",
+        "success": "bool",
+        "tags": []
+    }
+}

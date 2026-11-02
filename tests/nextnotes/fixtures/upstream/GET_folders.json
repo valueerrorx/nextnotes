@@ -1,0 +1,25 @@
+{
+    "route": "GET /folders",
+    "status": 200,
+    "body": {
+        "folders": [
+            {
+                "children": [],
+                "color": "null",
+                "color_hex": "null",
+                "created": "string",
+                "display_order": "int",
+                "icon": "null",
+                "icon_color": "null",
+                "id": "int",
+                "is_diary": "bool",
+                "name": "string",
+                "parent_id": "null",
+                "path": "string"
+            }
+        ],
+        "hierarchical": "bool",
+        "success": "bool",
+        "workspace": "string"
+    }
+}

@@ -1,0 +1,9 @@
+{
+    "route": "PUT /folders/{id}/pinned",
+    "status": 200,
+    "body": {
+        "message": "string",
+        "pinned": "bool",
+        "success": "bool"
+    }
+}

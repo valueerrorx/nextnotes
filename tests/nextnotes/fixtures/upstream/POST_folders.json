@@ -1,0 +1,18 @@
+{
+    "route": "POST /folders",
+    "status": 201,
+    "body": {
+        "folder": {
+            "id": "int",
+            "is_diary": "bool",
+            "name": "string",
+            "parent_id": "null",
+            "workspace": "string"
+        },
+        "folder_id": "int",
+        "folder_name": "string",
+        "message": "string",
+        "parent_id": "null",
+        "success": "bool"
+    }
+}

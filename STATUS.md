@@ -1,6 +1,6 @@
 # Status Nextcloud-Port „Next Notes“
 
-**Aktueller Meilenstein:** M2 – Backend-Kern (noch nicht begonnen); M1 fertig
+**Aktueller Meilenstein:** M2 – Backend-Kern (M2a fertig, weiter M2b); M1 fertig
 
 ## Erledigte Slices
 - Setup: Branch `nextcloud-port`, Agenten unter `.claude/agents/`, `UPSTREAM.md`
@@ -43,10 +43,21 @@
 - M1b erledigt: Compose-Profile mariadb/pgsql/nginx, `run-m1.sh`, URL-Spike (ADR 0004: bestanden, kein Fallback), CSP-Prüfung per Playwright mit Selbsttest. Review `M1b-diff-r1` (FREIGABE, 5 Hinweise).
   Testnachweis (tester, frische Instanzen, NC 35.0.2): `run-m1.sh` (sqlite, mariadb, pgsql je Apache; nginx/fpm) Exit 0; unabhängig je Umgebung: `app:list` aktiv, `check-schema.php --db=…` 0, Seite 200/303, Spike 4×200 per curl, CSP-Gegenprobe (`tests/nextnotes/csp/csp-gegenprobe.mjs`, 3 provozierte Verletzungen erkannt) 0, Lebenszyklus 0; Fehlerfälle (kaputte Erwartung, fehlendes Chromium) → Exit 1 mit Aufräumen; `down.sh all` 0.
 
+## Entscheidungen Thomas zu M2 (2026-11-02)
+- Plan-O5: Standard-Workspace heißt „Notizen“ (lokalisiert), keine Willkommensnotiz
+- M2a-diff-r1 Blocker 1: Workspace löschen verschiebt Inhalte nur in einen eigenen, nicht geteilten Workspace (sonst Standard-Workspace anlegen) – nie in geteilte
+
+## M2 (laufend)
+- Plan `docs/slices/M2-plan.md` r1: Slices M2a (Gerüst, Rechte, Notizen/Ordner/Workspaces/Tags/Papierkorb, M1-Nacharbeit), M2b (Anhänge, Snapshots, Suche, Sperre, Unified Search), M2c (Tasks, Mentions, Erinnerungen, Settings, Konvertierung), M2d (Kontolöschung, Abschlusslauf 3 DBs)
+
+- Plan-Review `M2-plan-r1` (BLOCKER: Middleware 401/412, UID-Wiederverwendung, Body-IDs, Erinnerungen, Sperre vs. ADR 0005) → `M2-plan-r2` (FREIGABE). Lead: ADR 0005 gilt (409/423, Übernahme nur selbe Sitzung, Upstream-Abweichung B13); Netz einmalig für composer/Fixture-Build, Fixtures eingecheckt.
+- M2a erledigt: Nacharbeit M1, Grundgerüst (AccessService, Fehler-Middleware, HtmlSanitizer, InputValidator, Workspace-Schlüssel), 53 Routen (Notizen, Ordner, Workspaces, Tags, Papierkorb), PHPUnit-Setup, Upstream-Fixtures. Review `M2a-diff-r1` (BLOCKER: Workspace-Löschen verschob in geteilte Workspaces → Thomas-Entscheid) → `M2a-diff-r2` (FREIGABE, N1 umgesetzt). SPEC §11.2 B12–B20.
+  Lead: fremde IDs in `POST /notes/reorder` (`scope=kanban`, `visible_order`) und `linked_note_id` bei `PATCH /notes/{id}` werden ignoriert (200, kein Leck, A unverändert, wie Upstream) – akzeptiert.
+  Testnachweis (tester, frische Instanzen NC 35.0.2): `run-m2.sh sqlite mariadb pgsql` Exit 0, je 110 Tests/2173 Assertions; `mysql.utf8mb4`=true; `check-forbidden-sql.sh` 0 Treffer (Selbsttest ok); Gegenprobe (`requireNote` für `linked_note_id` entfernt → Isolationstest rot, Code zurückgesetzt); `down.sh all` 0.
+- Offen für M3: `requesttoken` im Beacon-FormData (B4); Sperr-Banner bei gleichem Konto in zweitem Tab (R11); Escaping von Tags mit `'` im Frontend.
+
 ## Nacharbeit (vor/mit M2)
-- Favicon 404: `nextnotes/img/app.svg`/`app-dark.svg` beginnen mit SPDX-Kommentar → theming erkennt kein SVG; Kommentar ins `<svg>` oder `<?xml …?>` voranstellen (tester M1b)
-- `nginx:stable-alpine` auf Versionstag pinnen, getestete Versionen notieren (M1b-diff-r1 H1)
-- `down.sh:14` `mapfile < <(…)` Fehler wird nicht erkannt (H2); `KEEP=1`-Kommentar in `run-m1.sh`/README korrigieren (H3)
+- erledigt in M2a
 
 ## Nächster Schritt
-M2 – Backend-Kern (SPEC §13 M2): architekt plant Slice(s) inkl. Nacharbeit oben → speccritic → Umsetzung.
+M2b – Anhänge, Snapshots, Suche, Sperre, Unified Search (Plan §2 M2b): architekt setzt um → tester + speccritic.

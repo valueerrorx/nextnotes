@@ -1,0 +1,13 @@
+{
+    "route": "POST /folders/restore",
+    "status": 201,
+    "body": {
+        "folder_id": "int",
+        "folder_id_map": {
+            "4": "int"
+        },
+        "message": "string",
+        "restored_notes": "int",
+        "success": "bool"
+    }
+}

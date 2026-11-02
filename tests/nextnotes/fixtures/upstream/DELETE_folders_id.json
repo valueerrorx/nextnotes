@@ -1,0 +1,28 @@
+{
+    "route": "DELETE /folders/{id}",
+    "status": 200,
+    "body": {
+        "message": "string",
+        "restore_snapshot": {
+            "folder_id": "int",
+            "folders": [
+                {
+                    "color": "null",
+                    "display_order": "int",
+                    "favorite": "int",
+                    "icon": "null",
+                    "icon_color": "null",
+                    "id": "int",
+                    "kanban_enabled": "int",
+                    "name": "string",
+                    "parent_id": "null",
+                    "pinned": "int",
+                    "sort_setting": "null"
+                }
+            ],
+            "notes": [],
+            "workspace": "string"
+        },
+        "success": "bool"
+    }
+}

@@ -1,0 +1,9 @@
+{
+    "route": "PUT /folders/{id}/favorite",
+    "status": 200,
+    "body": {
+        "favorite": "bool",
+        "message": "string",
+        "success": "bool"
+    }
+}

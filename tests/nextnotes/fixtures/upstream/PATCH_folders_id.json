@@ -1,0 +1,13 @@
+{
+    "route": "PATCH /folders/{id}",
+    "status": 200,
+    "body": {
+        "folder": {
+            "id": "int",
+            "name": "string",
+            "old_name": "string"
+        },
+        "message": "string",
+        "success": "bool"
+    }
+}

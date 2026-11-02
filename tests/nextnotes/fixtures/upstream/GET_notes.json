@@ -1,0 +1,35 @@
+{
+    "route": "GET /notes",
+    "status": 200,
+    "body": {
+        "count": "int",
+        "has_more": "bool",
+        "limit": "null",
+        "notes": [
+            {
+                "color": "null",
+                "color_hex": "null",
+                "content_width": "null",
+                "created": "string",
+                "dashboard_order": "int",
+                "display_order": "int",
+                "favorite": "int",
+                "folder": "null",
+                "folder_id": "null",
+                "heading": "string",
+                "icon": "string",
+                "icon_color": "null",
+                "id": "int",
+                "tags": "string",
+                "title_color": "null",
+                "title_size": "null",
+                "type": "string",
+                "updated": "string",
+                "workspace": "string"
+            }
+        ],
+        "offset": "int",
+        "success": "bool",
+        "total": "int"
+    }
+}

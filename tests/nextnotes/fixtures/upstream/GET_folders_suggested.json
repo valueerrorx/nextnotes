@@ -1,0 +1,13 @@
+{
+    "route": "GET /folders/suggested",
+    "status": 200,
+    "body": {
+        "folders": [
+            {
+                "id": "int",
+                "name": "string"
+            }
+        ],
+        "success": "bool"
+    }
+}

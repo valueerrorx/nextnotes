@@ -1,0 +1,11 @@
+{
+    "route": "POST /folders/move-files",
+    "status": 200,
+    "body": {
+        "message": "string",
+        "moved_count": "int",
+        "share_delta": "int",
+        "success": "bool",
+        "target_workspace": "string"
+    }
+}

@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2026 Thomas Weissel
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Upstream-Poznote (Stand UPSTREAM.md) nur für Fixture-Aufnahmen (SPEC/Plan M2 §3.4); Port 8090
+name: nextnotes-upstream
+services:
+  poznote:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: default
+    image: nextnotes-upstream-poznote:6.136.2
+    environment:
+      SQLITE_DATABASE: /var/www/html/data/database/poznote.db
+    ports:
+      - "127.0.0.1:8090:80"
+    volumes:
+      - data:/var/www/html/data
+volumes:
+  data:

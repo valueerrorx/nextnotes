@@ -1,0 +1,8 @@
+{
+    "route": "PATCH /tags/{tag}",
+    "status": 200,
+    "body": {
+        "success": "bool",
+        "updated": "int"
+    }
+}

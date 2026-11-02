@@ -23,7 +23,7 @@ services:
 
   db-mariadb:
     profiles: [mariadb]
-    image: mariadb:11.4
+    image: mariadb:11.4.13
     pull_policy: missing
     command: --transaction-isolation=READ-COMMITTED
     environment:
@@ -57,7 +57,7 @@ services:
 
   db-pgsql:
     profiles: [pgsql]
-    image: postgres:17-alpine
+    image: postgres:17.11-alpine
     pull_policy: missing
     environment:
       POSTGRES_DB: nextcloud
@@ -100,7 +100,7 @@ services:
 
   web-nginx:
     profiles: [nginx]
-    image: nginx:stable-alpine
+    image: nginx:1.30.6-alpine
     pull_policy: missing
     depends_on: [nc-fpm]
     ports: ["127.0.0.1:8084:80"]

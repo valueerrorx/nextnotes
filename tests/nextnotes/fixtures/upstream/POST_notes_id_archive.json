@@ -1,0 +1,23 @@
+{
+    "route": "POST /notes/{id}/archive",
+    "status": 200,
+    "body": {
+        "created_folders": [
+            {
+                "id": "int",
+                "name": "string"
+            }
+        ],
+        "folder": "string",
+        "folder_id": "int",
+        "folder_path": "string",
+        "message": "string",
+        "note_id": "int",
+        "old_folder": "null",
+        "old_folder_id": "int",
+        "old_workspace": "string",
+        "success": "bool",
+        "workspace": "string",
+        "workspace_created": "bool"
+    }
+}

@@ -1,0 +1,26 @@
+{
+    "route": "GET /trash",
+    "status": 200,
+    "body": {
+        "count": "int",
+        "filters": {
+            "search": "null",
+            "workspace": "string"
+        },
+        "notes": [
+            {
+                "created": "string",
+                "folder": "null",
+                "folder_id": "null",
+                "heading": "string",
+                "id": "int",
+                "tags": "string",
+                "type": "string",
+                "updated": "string",
+                "workspace": "string"
+            }
+        ],
+        "success": "bool",
+        "total": "int"
+    }
+}

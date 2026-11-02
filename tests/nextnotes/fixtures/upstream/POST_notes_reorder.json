@@ -1,0 +1,18 @@
+{
+    "route": "POST /notes/reorder",
+    "status": 200,
+    "body": {
+        "message": "string",
+        "note": {
+            "display_order": "int",
+            "folder": "null",
+            "folder_id": "null",
+            "id": "int",
+            "position": "string",
+            "target_note_id": "int",
+            "workspace": "string"
+        },
+        "share_delta": "int",
+        "success": "bool"
+    }
+}

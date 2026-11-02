@@ -1,0 +1,9 @@
+{
+    "route": "POST /notes/{id}/remove-folder",
+    "status": 200,
+    "body": {
+        "message": "string",
+        "share_delta": "int",
+        "success": "bool"
+    }
+}

@@ -1,0 +1,7 @@
+{
+    "route": "DELETE /workspaces/{name}",
+    "status": 200,
+    "body": {
+        "success": "bool"
+    }
+}

@@ -1,0 +1,8 @@
+{
+    "route": "POST /notes/{id}/favorite",
+    "status": 200,
+    "body": {
+        "is_favorite": "int",
+        "success": "bool"
+    }
+}

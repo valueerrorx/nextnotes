@@ -1,0 +1,15 @@
+{
+    "route": "POST /notes/{id}/folder",
+    "status": 200,
+    "body": {
+        "message": "string",
+        "new_folder": "string",
+        "new_folder_id": "int",
+        "new_workspace": "string",
+        "old_folder": "null",
+        "old_folder_id": "int",
+        "old_workspace": "string",
+        "share_delta": "int",
+        "success": "bool"
+    }
+}

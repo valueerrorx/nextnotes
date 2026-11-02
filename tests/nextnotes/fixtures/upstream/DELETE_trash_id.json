@@ -1,0 +1,8 @@
+{
+    "route": "DELETE /trash/{id}",
+    "status": 200,
+    "body": {
+        "message": "string",
+        "success": "bool"
+    }
+}

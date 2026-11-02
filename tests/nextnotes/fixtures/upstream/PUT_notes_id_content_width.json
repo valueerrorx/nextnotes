@@ -1,0 +1,9 @@
+{
+    "route": "PUT /notes/{id}/content-width",
+    "status": 200,
+    "body": {
+        "content_width": "int",
+        "message": "string",
+        "success": "bool"
+    }
+}

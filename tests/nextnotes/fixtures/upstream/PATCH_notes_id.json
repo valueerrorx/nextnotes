@@ -1,0 +1,14 @@
+{
+    "route": "PATCH /notes/{id}",
+    "status": 200,
+    "body": {
+        "note": {
+            "heading": "string",
+            "id": "int",
+            "updated": "string",
+            "updated_display": "string",
+            "version": "string"
+        },
+        "success": "bool"
+    }
+}

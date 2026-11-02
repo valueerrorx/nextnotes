@@ -1,0 +1,18 @@
+{
+    "route": "GET /workspaces",
+    "status": 200,
+    "body": {
+        "acting_as": "null",
+        "success": "bool",
+        "username": "string",
+        "workspaces": [
+            {
+                "color": "null",
+                "color_hex": "null",
+                "created": "string",
+                "name": "string",
+                "tags": []
+            }
+        ]
+    }
+}

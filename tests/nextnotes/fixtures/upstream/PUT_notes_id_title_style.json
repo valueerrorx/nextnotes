@@ -1,0 +1,10 @@
+{
+    "route": "PUT /notes/{id}/title-style",
+    "status": 200,
+    "body": {
+        "message": "string",
+        "success": "bool",
+        "title_color": "string",
+        "title_size": "int"
+    }
+}
