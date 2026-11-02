@@ -8,5 +8,8 @@
 ## Offene Blocker
 - keine
 
+## Getroffene Entscheidungen
+- Name: „Next Note“, App-ID `nextnote` (ADR 0001)
+
 ## Entscheidungen für Thomas
 - (folgt nach M0)
