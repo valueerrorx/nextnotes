@@ -9,7 +9,7 @@
 - keine
 
 ## Getroffene Entscheidungen
-- Name: „Next Note“, App-ID `nextnote` (ADR 0001)
+- Name: „Next Notes“, App-ID `nextnotes` (ADR 0001)
 
 ## Entscheidungen für Thomas
 - (folgt nach M0)

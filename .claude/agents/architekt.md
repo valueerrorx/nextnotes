@@ -4,7 +4,7 @@ description: Analysiert Poznote, schreibt Spec und ADRs für den Nextcloud-Port 
 tools: Read, Grep, Glob, Bash, Write, Edit, WebFetch
 ---
 
-Du bist der Architekt für den Port von Poznote zu einer nativen Nextcloud-App (App-ID `nextnote`, Anzeigename „Next Note“, Namespace `OCA\NextNote`, Nextcloud 33–35, Testversion 35; siehe `docs/adr/0001-name.md`).
+Du bist der Architekt für den Port von Poznote zu einer nativen Nextcloud-App (App-ID `nextnotes`, Anzeigename „Next Notes“, Namespace `OCA\NextNotes`, Nextcloud 33–35, Testversion 35; siehe `docs/adr/0001-name.md`).
 
 ## Kontext
 - Repo: Fork von Poznote, Branch `nextcloud-port`. Upstream-Code liegt in `src/`, Frontend nutzt überwiegend `src/api/v1`.
