@@ -96,6 +96,8 @@ abstract class ApiTestCase extends TestCase {
 			'attachments' => self::rows('nextnotes_attachments', 'note_id', $noteIds),
 			'snapshots' => self::rows('nextnotes_snapshots', 'note_id', $noteIds),
 			'locks' => self::rows('nextnotes_locks', 'note_id', $noteIds, 'note_id'),
+			'reminders' => self::rows('nextnotes_reminders', 'note_id', $noteIds),
+			'mentions' => self::rows('nextnotes_mentions_handled', 'note_id', $noteIds),
 			'shares' => self::rows('nextnotes_ws_shares', 'workspace_id', $ws),
 			'prefs' => $qb->executeQuery()->fetchAllAssociative(),
 		];
@@ -110,7 +112,7 @@ abstract class ApiTestCase extends TestCase {
 				->where($qb->expr()->in('workspace_id', $qb->createNamedParameter($ws, IQueryBuilder::PARAM_INT_ARRAY)));
 			$noteIds = array_map('intval', $qb->executeQuery()->fetchFirstColumn());
 			if ($noteIds !== []) {
-				foreach (['nextnotes_note_tags', 'nextnotes_attachments', 'nextnotes_snapshots', 'nextnotes_locks'] as $t) {
+				foreach (['nextnotes_note_tags', 'nextnotes_attachments', 'nextnotes_snapshots', 'nextnotes_locks', 'nextnotes_reminders', 'nextnotes_mentions_handled'] as $t) {
 					$qb = $db->getQueryBuilder();
 					$qb->delete($t)->where($qb->expr()->in('note_id', $qb->createNamedParameter($noteIds, IQueryBuilder::PARAM_INT_ARRAY)))->executeStatement();
 				}
@@ -124,6 +126,10 @@ abstract class ApiTestCase extends TestCase {
 		}
 		$qb = $db->getQueryBuilder();
 		$qb->delete('nextnotes_ws_shares')->where($qb->expr()->eq('share_with', $qb->createNamedParameter($uid)))->executeStatement();
+		foreach (['nextnotes_reminders', 'nextnotes_mentions_handled'] as $t) {
+			$qb = $db->getQueryBuilder();
+			$qb->delete($t)->where($qb->expr()->eq('user_id', $qb->createNamedParameter($uid)))->executeStatement();
+		}
 	}
 
 	protected static function q(array $params): string {

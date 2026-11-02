@@ -1,0 +1,8 @@
+{
+    "route": "POST /mentions/{ownerId}/{noteId}/handled",
+    "status": 404,
+    "body": {
+        "error": "string",
+        "success": "bool"
+    }
+}

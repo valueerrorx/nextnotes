@@ -1,0 +1,9 @@
+{
+    "route": "GET /system/i18n",
+    "status": 200,
+    "body": {
+        "lang": "string",
+        "strings": "string",
+        "success": "bool"
+    }
+}

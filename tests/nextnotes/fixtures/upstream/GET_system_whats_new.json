@@ -1,0 +1,11 @@
+{
+    "route": "GET /system/whats-new",
+    "status": 200,
+    "body": {
+        "current_version": "string",
+        "more": "int",
+        "releases": [],
+        "show": "bool",
+        "success": "bool"
+    }
+}

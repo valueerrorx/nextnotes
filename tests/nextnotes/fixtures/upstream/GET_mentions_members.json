@@ -1,0 +1,9 @@
+{
+    "route": "GET /mentions/members",
+    "status": 200,
+    "body": {
+        "members": [],
+        "success": "bool",
+        "workspace": "string"
+    }
+}

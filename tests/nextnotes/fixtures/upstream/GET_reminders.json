@@ -1,0 +1,22 @@
+{
+    "route": "GET /reminders",
+    "status": 200,
+    "body": {
+        "notifications": [
+            {
+                "created": "string",
+                "id": "int",
+                "is_read": "int",
+                "message": "string",
+                "note_heading": "string",
+                "note_id": "int",
+                "recurrence": "null",
+                "trigger_at": "string",
+                "type": "string"
+            }
+        ],
+        "success": "bool",
+        "total_count": "int",
+        "unread_count": "int"
+    }
+}

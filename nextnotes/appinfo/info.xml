@@ -26,6 +26,7 @@ Based on Poznote by Timothé Poznanski (MIT).]]></description>
 	<background-jobs>
 		<job>OCA\NextNotes\BackgroundJob\LockCleanupJob</job>
 		<job>OCA\NextNotes\BackgroundJob\SnapshotRetentionJob</job>
+		<job>OCA\NextNotes\BackgroundJob\ReminderJob</job>
 	</background-jobs>
 	<navigations>
 		<navigation>

@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OCA\NextNotes\AppInfo;
 
 use OCA\NextNotes\Middleware\ApiExceptionMiddleware;
+use OCA\NextNotes\Notification\Notifier;
 use OCA\NextNotes\Search\NotesProvider;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
@@ -26,6 +27,7 @@ class Application extends App implements IBootstrap {
 	public function register(IRegistrationContext $context): void {
 		$context->registerMiddleware(ApiExceptionMiddleware::class);
 		$context->registerSearchProvider(NotesProvider::class);
+		$context->registerNotifierService(Notifier::class);
 	}
 
 	public function boot(IBootContext $context): void {

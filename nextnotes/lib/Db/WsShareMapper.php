@@ -52,6 +52,16 @@ class WsShareMapper extends QBMapper {
 			->executeStatement();
 	}
 
+	/** @return string[] UIDs der Benutzerfreigaben eines Workspace */
+	public function recipients(int $workspaceId): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('share_with')->from(self::TABLE)
+			->where($qb->expr()->eq('workspace_id', $qb->createNamedParameter($workspaceId, IQueryBuilder::PARAM_INT)))
+			->andWhere($qb->expr()->eq('share_type', $qb->createNamedParameter('user')))
+			->orderBy('id', 'ASC');
+		return array_map('strval', $qb->executeQuery()->fetchFirstColumn());
+	}
+
 	public function deleteForWorkspace(int $workspaceId): void {
 		$qb = $this->db->getQueryBuilder();
 		$qb->delete(self::TABLE)

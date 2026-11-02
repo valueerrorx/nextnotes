@@ -1,0 +1,26 @@
+{
+    "route": "GET /notes/{id}/tasks",
+    "status": 200,
+    "body": {
+        "heading": "string",
+        "note_id": "int",
+        "success": "bool",
+        "tasks": [
+            {
+                "completed": "bool",
+                "dueAt": "string",
+                "dueReminder": "bool",
+                "id": "float",
+                "important": "bool",
+                "subtasks": [
+                    {
+                        "completed": "bool",
+                        "id": "float",
+                        "text": "string"
+                    }
+                ],
+                "text": "string"
+            }
+        ]
+    }
+}

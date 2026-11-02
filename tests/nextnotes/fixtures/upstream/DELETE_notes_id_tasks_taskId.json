@@ -1,0 +1,9 @@
+{
+    "route": "DELETE /notes/{id}/tasks/{taskId}",
+    "status": 200,
+    "body": {
+        "note_id": "int",
+        "success": "bool",
+        "task_id": "string"
+    }
+}

@@ -1,0 +1,11 @@
+{
+    "route": "POST /notes/{id}/reminder",
+    "status": 200,
+    "body": {
+        "email_enabled": "bool",
+        "note_id": "int",
+        "recurrence": "null",
+        "reminder_at": "string",
+        "success": "bool"
+    }
+}

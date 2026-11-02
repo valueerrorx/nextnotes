@@ -1,0 +1,8 @@
+{
+    "route": "GET /users/lookup/{username}",
+    "status": 200,
+    "body": {
+        "id": "int",
+        "username": "string"
+    }
+}

@@ -180,6 +180,22 @@ class NoteMapper extends QBMapper {
 			->executeStatement();
 	}
 
+	// Zeilensperre bis zum Ende der Transaktion (Update ohne Wertänderung, DB-neutral)
+	public function lockRow(int $id): void {
+		$qb = $this->db->getQueryBuilder();
+		$qb->update(self::TABLE)->set('id', 'id')
+			->where($qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT)))
+			->executeStatement();
+	}
+
+	/** @return int[] alle Notiz-IDs eines Workspace (jede Rolle, auch Papierkorb) */
+	public function idsInWorkspace(int $workspaceId): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('id')->from(self::TABLE)
+			->where($qb->expr()->eq('workspace_id', $qb->createNamedParameter($workspaceId, IQueryBuilder::PARAM_INT)));
+		return array_map('intval', $qb->executeQuery()->fetchFirstColumn());
+	}
+
 	/** @param int[] $ids */
 	public function deleteByIds(array $ids): void {
 		foreach (array_chunk(array_values(array_unique($ids)), 1000) as $chunk) {

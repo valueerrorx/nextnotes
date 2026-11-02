@@ -12,7 +12,9 @@ namespace OCA\NextNotes\Service;
 use OCA\NextNotes\AppInfo\Application;
 use OCA\NextNotes\Db\Folder;
 use OCA\NextNotes\Db\FolderMapper;
+use OCA\NextNotes\Db\MentionHandledMapper;
 use OCA\NextNotes\Db\NoteMapper;
+use OCA\NextNotes\Db\ReminderMapper;
 use OCA\NextNotes\Db\Workspace;
 use OCA\NextNotes\Db\WorkspaceMapper;
 use OCA\NextNotes\Db\WsShareMapper;
@@ -43,6 +45,8 @@ class WorkspaceService {
 		private ITimeFactory $time,
 		private IUserManager $userManager,
 		private IFactory $l10nFactory,
+		private ReminderMapper $reminders,
+		private MentionHandledMapper $mentions,
 	) {
 	}
 
@@ -327,9 +331,15 @@ class WorkspaceService {
 		$this->reset();
 	}
 
+	// Entzug löscht Erinnerungen und Mention-Status des Empfängers zu Notizen dieses Workspace (SPEC §6)
 	public function unshare(string $ownerUid, int $workspaceId, string $targetUid): void {
 		$ws = $this->access->requireWorkspace($ownerUid, $workspaceId, 'manage');
-		$this->shares->deleteUserShare((int)$ws->getId(), $targetUid);
+		$this->tx->run(function () use ($ws, $targetUid) {
+			$this->shares->deleteUserShare((int)$ws->getId(), $targetUid);
+			$noteIds = $this->notes->idsInWorkspace((int)$ws->getId());
+			$this->reminders->deleteForNotes($noteIds, $targetUid);
+			$this->mentions->deleteForNotes($noteIds, $targetUid);
+		});
 		$this->reset();
 	}
 

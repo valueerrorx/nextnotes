@@ -218,4 +218,15 @@ class InputValidator {
 		}
 		return $value;
 	}
+
+	// Kalenderdatum und Uhrzeit (Stunde 0–23, Minute/Sekunde 0–59) am Anfang von $raw gültig; ohne Treffer true (Format prüft der Aufrufer)
+	public static function validDateTime(string $raw): bool {
+		if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?/', trim($raw), $m)) {
+			return true;
+		}
+		if (!checkdate((int)$m[2], (int)$m[3], (int)$m[1])) {
+			return false;
+		}
+		return (int)($m[4] ?? 0) <= 23 && (int)($m[5] ?? 0) <= 59 && (int)($m[6] ?? 0) <= 59;
+	}
 }

@@ -1,6 +1,6 @@
 # Status Nextcloud-Port „Next Notes“
 
-**Aktueller Meilenstein:** M2 – Backend-Kern (M2a, M2b fertig, weiter M2c); M1 fertig
+**Aktueller Meilenstein:** M2 – Backend-Kern (M2a–M2c fertig, weiter M2d); M1 fertig
 
 ## Erledigte Slices
 - Setup: Branch `nextcloud-port`, Agenten unter `.claude/agents/`, `UPSTREAM.md`
@@ -20,7 +20,11 @@
 - Lead: ADR 0004, 0005, 0006, 0007, 0011, 0012, 0015; Teilentscheidungen in 0003 (Verwaisen nur per Event/Orphan-Check, Einfrieren ohne Teams-App)
 
 ## Entscheidungen für Thomas
-- keine offen
+Vorläufig vom Lead entschieden, zur Durchsicht (M2c):
+- Erinnerungen nur als NC-Benachrichtigung, keine E-Mail
+- Mentions über NC-Benutzer-ID (`@uid`), Benutzersuche nur nach NC-Sichtbarkeitsregeln
+- Aufgaben-Erinnerung: Markierung für alle sichtbar, Benachrichtigung nur an den, der sie gesetzt hat
+- „Was ist neu“ (Poznote-Releases) wird nie angezeigt
 
 ## Entscheidungen Thomas zu M0 (2026-11-02)
 - ADR 0002, 0003, 0010, 0014 angenommen
@@ -59,6 +63,9 @@
 - M2b erledigt: Anhänge (IAppData, Quote je Workspace-Besitzer mit Sperre in Transaktion, Inline-Regel B22), Snapshots, Suche, Sperre (ADR 0005, B13), indirekte Lesepfade, Unified Search, LockCleanup-/SnapshotRetentionJob. Review `M2b-diff-r1` (BLOCKER: Doku Anhang-Auslieferung, B13) → `M2b-diff-r2` (FREIGABE).
   Testnachweis (tester, frische Instanzen NC 35.0.2): `run-m2.sh sqlite mariadb pgsql` Exit 0, je 153 Tests; `check-forbidden-sql.sh` 0; Gegenprobe (Leserecht in `AttachmentService::download`, `holder_uid` in `LockMapper::takeOver` entfernt → Isolation/Lock/Attachment/IndirectRead rot, zurückgesetzt); `down.sh all` 0.
   Lead: PDF-Anhänge behalten NC-Standard-CSP (`frame-ancestors 'none'`); falls M3 PDF im iFrame zeigt, dort `'self'` ergänzen (ADR 0012 prüfen).
+- M2c erledigt: Tasks, Mentions, Erinnerungen (ReminderJob, Notifier, Leserecht, Wiederholung in Benutzerzeitzone, max. 1000 offen/Benutzer), Settings (lazy, Sperrliste, Limits), System, Users, Konvertierung 501; alle 112 API-Routen registriert. Review `M2c-diff-r1` (BLOCKER: task_id ungeprüft, Schreibpfad ohne Schreibrecht im Job) → `M2c-diff-r2` (FREIGABE). SPEC B23–B25.
+  Testnachweis: tester (frische Instanzen NC 35.0.2) je DB 222 Tests, nur `testInvalidDueAtTimeOfDay` rot (Uhrzeit ungeprüft); Gegenprobe (`canRead` in `Notifier::prepare` entfernt → 2 Tests rot, zurückgesetzt). Nach Fix (`InputValidator::validDateTime`, Limit auch in `syncReminder`) Endlauf durch architekt mit unveränderten tester-Tests: `run-m2.sh` einzeln frisch sqlite/mariadb/pgsql rc=0, je 222 Tests/7075 Assertions, ohne Warnung; `down.sh all`.
+  DNS-Warnung im Test: Ursache NC-App `password_policy` (HIBP-Abfrage beim Anlegen von Testbenutzern), nicht Next Notes; Testumgebung setzt `has_internet_connection=false`.
 - Offen für M3: PDF-Vorschau im iFrame (CSP, s. o.); `requesttoken` im Beacon-FormData (B4); Sperr-Banner bei gleichem Konto in zweitem Tab (R11); Escaping von Tags mit `'` im Frontend.
 
 ## Nacharbeit (vor/mit M2)
@@ -66,4 +73,4 @@
 - M2d: SQLite-Schreibsperre bei parallelen Uploads liefert 500 (LockWaitTimeoutException) → sauber als 503 mit Retry-After abbilden; Workspace/Summe vor Transaktion lesen, `lockOwner` als erste Anweisung (M2b-diff-r2)
 
 ## Nächster Schritt
-M2c – Tasks, Mentions, Erinnerungen/ReminderJob, Settings, System, Users, Konvertierung (501) (Plan §2 M2c): architekt setzt um → tester + speccritic.
+M2d – Kontolöschung (Listener synchron + UserDataDeletionJob), Nacharbeit SQLite-503, Abschlusslauf M2 auf 3 DBs (Plan §2 M2d): architekt → tester + speccritic.

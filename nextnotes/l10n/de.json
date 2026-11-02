@@ -1,7 +1,11 @@
 {
  "translations": {
   "Notes": "Notizen",
-  "New note": "Neue Notiz"
+  "New note": "Neue Notiz",
+  "Next Notes": "Next Notes",
+  "Untitled note": "Unbenannte Notiz",
+  "Reminder: {note}": "Erinnerung: {note}",
+  "Task reminder in {note}": "Aufgaben-Erinnerung in {note}"
  },
  "pluralForm": "nplurals=2; plural=(n != 1);"
 }

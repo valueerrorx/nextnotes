@@ -1,0 +1,10 @@
+{
+    "route": "POST /notes/{id}/convert",
+    "status": 200,
+    "body": {
+        "id": "string",
+        "message": "string",
+        "success": "bool",
+        "type": "string"
+    }
+}

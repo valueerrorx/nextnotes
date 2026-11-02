@@ -1,0 +1,9 @@
+{
+    "route": "GET /shared",
+    "status": 200,
+    "body": {
+        "shared_folders": [],
+        "shared_notes": [],
+        "success": "bool"
+    }
+}

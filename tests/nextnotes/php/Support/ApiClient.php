@@ -84,12 +84,13 @@ final class ApiClient {
 		return $out;
 	}
 
-	/** Mehrere Anfragen gleichzeitig (curl_multi), Reihenfolge der Antworten = Eingabe */
+	/** Mehrere Anfragen gleichzeitig (curl_multi); $requests = [[Verb, Pfad, ?JSON-Body], …], Reihenfolge der Antworten = Eingabe */
 	public function parallel(array $requests): array {
 		$mh = curl_multi_init();
 		$handles = [];
-		foreach ($requests as $i => [$method, $path]) {
-			$handles[$i] = self::handle($method, self::baseUrl() . self::PREFIX . $path, null, $this->extraHeaders, $this->uid . ':' . $this->secret);
+		foreach ($requests as $i => $req) {
+			[$method, $path] = $req;
+			$handles[$i] = self::handle($method, self::baseUrl() . self::PREFIX . $path, $req[2] ?? null, $this->extraHeaders, $this->uid . ':' . $this->secret);
 			curl_multi_add_handle($mh, $handles[$i]);
 		}
 		do {

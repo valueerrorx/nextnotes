@@ -1,0 +1,8 @@
+{
+    "route": "DELETE /notes/{id}/reminder",
+    "status": 200,
+    "body": {
+        "note_id": "int",
+        "success": "bool"
+    }
+}

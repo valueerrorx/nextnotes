@@ -1,0 +1,9 @@
+{
+    "route": "PUT /settings/{key}",
+    "status": 200,
+    "body": {
+        "key": "string",
+        "success": "bool",
+        "value": "string"
+    }
+}

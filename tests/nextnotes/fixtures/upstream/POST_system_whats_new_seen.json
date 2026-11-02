@@ -1,0 +1,8 @@
+{
+    "route": "POST /system/whats-new/seen",
+    "status": 200,
+    "body": {
+        "seen_version": "string",
+        "success": "bool"
+    }
+}

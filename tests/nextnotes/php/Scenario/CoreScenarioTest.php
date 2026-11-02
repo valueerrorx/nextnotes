@@ -12,11 +12,12 @@ namespace OCA\NextNotes\Tests\Scenario;
 use OCA\NextNotes\Tests\Support\ApiClient;
 use OCA\NextNotes\Tests\Support\ApiTestCase;
 use OCA\NextNotes\Tests\Support\Response;
+use OCA\NextNotes\Service\TaskService;
 use OCP\App\IAppManager;
 use OCP\Config\IUserConfig;
 use OCP\Server;
 
-// Done M2a 4, M2b 2 / SPEC §13 M2.3 (Teil M2a+M2b): Kern-Szenario, A und B parallel; JSON-Schlüssel = Upstream-Fixtures (Plan §3.4)
+// Done M2a 4, M2b 2, M2c 4 / SPEC §13 M2.3: Kern-Szenario, A und B parallel; JSON-Schlüssel = Upstream-Fixtures (Plan §3.4)
 final class CoreScenarioTest extends ApiTestCase {
 	/** @var array<string, Response> Route → erste 2xx-Antwort (sonst letzte) */
 	private array $recorded = [];
@@ -167,7 +168,8 @@ final class CoreScenarioTest extends ApiTestCase {
 		self::assertArrayHasKey('restore_snapshot', $snap);
 		$this->rec('POST /folders/restore', $a->call('POST', '/folders/restore', $snap['restore_snapshot']));
 
-		$this->m2bSteps($a, $ws2, (int)$f1);
+		$m1 = $this->m2bSteps($a, $ws2, (int)$f1);
+		$this->m2cSteps($a, $b, $ws2, $m1);
 
 		$n4 = self::ok($a->call('POST', '/notes', ['heading' => 'Archiv', 'content' => '<p>a</p>', 'workspace' => $ws2, 'folder_id' => $f1]), 'n4')['note']['id'];
 		$this->rec('POST /notes/{id}/archive', $a->call('POST', "/notes/$n4/archive"));
@@ -187,7 +189,7 @@ final class CoreScenarioTest extends ApiTestCase {
 	}
 
 	// M2b: Suche, Links, Anhänge, Sperre, Snapshots, Duplizieren (gleiche Schritte wie dev/upstream/capture.php)
-	private function m2bSteps(ApiClient $a, string $ws2, int $f1): void {
+	private function m2bSteps(ApiClient $a, string $ws2, int $f1): int {
 		$q = self::q(['workspace' => $ws2]);
 		$m1 = self::ok($a->call('POST', '/notes', ['heading' => 'Mehr eins', 'content' => '<p>Suchwort Kaffee Écoute</p>', 'workspace' => $ws2, 'folder_id' => $f1]), 'm1')['note']['id'];
 		$m2 = self::ok($a->call('POST', '/notes', ['heading' => 'Mehr zwei', 'content' => '<p><a href="index.php?note=' . $m1 . '">eins</a></p>', 'workspace' => $ws2]), 'm2')['note']['id'];
@@ -241,6 +243,74 @@ final class CoreScenarioTest extends ApiTestCase {
 		$this->rec('DELETE /notes/{id}/snapshot', $a->call('DELETE', "/notes/$m1/snapshot" . self::q(['snapshot_key' => $key])));
 		$this->rec('POST /notes/{id}/duplicate', $a->call('POST', "/notes/$m1/duplicate", ['workspace' => $ws2]));
 		$this->rec('POST /folders/{id}/duplicate', $a->call('POST', "/folders/$f1/duplicate$q", []));
+		return (int)$m1;
+	}
+
+	// Antwort aufzeichnen, ohne 2xx zu verlangen (erwartete Fehlerstatus)
+	private function recAny(string $route, Response $r, int $status): array {
+		$this->recorded[$route] ??= $r;
+		self::assertSame($status, $r->status, "$route: " . $r->describe());
+		$j = $r->json();
+		return is_array($j) ? $j : [];
+	}
+
+	// M2c: gleiche Schritte wie dev/upstream/capture.php
+	private function m2cSteps(ApiClient $a, ApiClient $b, string $ws2, int $m1): void {
+		$q = self::q(['workspace' => $ws2]);
+		$tl = self::ok($a->call('POST', '/notes', ['heading' => 'Aufgaben', 'type' => 'tasklist', 'content' => '[]', 'workspace' => $ws2]), 'tl')['note']['id'];
+		self::ok($a->call('POST', '/notes', ['heading' => 'Check', 'type' => 'markdown', 'content' => "- [ ] eins\n- [x] zwei", 'workspace' => $ws2]), 'check');
+		$t1 = $this->rec('POST /notes/{id}/tasks', $a->call('POST', "/notes/$tl/tasks", ['text' => 'Eins', 'due_at' => '2030-01-02', 'reminder' => true]))['task']['id'];
+		$t1s = json_encode($t1);
+		self::ok($a->call('POST', "/notes/$tl/tasks", ['text' => 'Zwei']), 'task zwei');
+		$upd = $this->rec('PATCH /notes/{id}/tasks/{taskId}', $a->call('PATCH', "/notes/$tl/tasks/$t1s", ['text' => 'Eins b', 'important' => true]));
+		self::assertSame('Eins b', $upd['task']['text']);
+		$s1 = $this->rec('POST /notes/{id}/tasks/{taskId}/subtasks', $a->call('POST', "/notes/$tl/tasks/$t1s/subtasks", ['text' => 'Unter']))['subtask']['id'];
+		$s1s = json_encode($s1);
+		$this->rec('PATCH /notes/{id}/tasks/{taskId}/subtasks/{subtaskId}', $a->call('PATCH', "/notes/$tl/tasks/$t1s/subtasks/$s1s", ['completed' => true]));
+		self::ok($a->call('POST', "/notes/$tl/tasks/$t1s/subtasks", ['text' => 'Unter zwei']), 'sub zwei');
+		$tasks = $this->rec('GET /notes/{id}/tasks', $a->call('GET', "/notes/$tl/tasks"))['tasks'];
+		self::assertSame(['Eins b', 'Zwei'], array_column($tasks, 'text'), 'wichtige Aufgabe zuerst');
+		self::assertCount(2, $tasks[0]['subtasks']);
+		$all = $this->rec('GET /tasks', $a->call('GET', '/tasks' . $q));
+		self::assertSame(['eins', 'zwei'], array_column($all['checklists'][0]['tasks'], 'text'));
+		$this->rec('DELETE /notes/{id}/tasks/{taskId}/subtasks/{subtaskId}', $a->call('DELETE', "/notes/$tl/tasks/$t1s/subtasks/$s1s"));
+		$this->rec('DELETE /notes/{id}/tasks/{taskId}', $a->call('DELETE', "/notes/$tl/tasks/$t1s"));
+		self::assertSame(['Zwei'], array_column(self::ok($a->call('GET', "/notes/$tl/tasks"), 'tasks')['tasks'], 'text'));
+
+		$this->rec('POST /notes/{id}/reminder', $a->call('POST', "/notes/$m1/reminder", ['reminder_at' => '2020-01-01T08:00:00Z']));
+		self::assertSame('2020-01-01 08:00:00', $this->rec('GET /notes/{id}/reminder', $a->call('GET', "/notes/$m1/reminder"))['reminder_at']);
+		$this->rec('GET /reminders', $a->call('GET', '/reminders' . $q));
+		$this->rec('GET /reminders/count', $a->call('GET', '/reminders/count' . $q));
+		$this->rec('POST /reminders/{id}/read', $a->call('POST', '/reminders/1/read'));
+		$this->rec('POST /reminders/{id}/dismiss', $a->call('POST', '/reminders/1/dismiss'));
+		$this->rec('POST /reminders/dismiss-all', $a->call('POST', '/reminders/dismiss-all'));
+		self::ok($a->call('POST', "/notes/$m1/reminder", ['reminder_at' => '2030-01-01T08:00:00Z']), 'reminder neu');
+		$this->rec('DELETE /notes/{id}/reminder', $a->call('DELETE', "/notes/$m1/reminder"));
+		self::assertNull(self::ok($a->call('GET', "/notes/$m1/reminder"), 'reminder weg')['reminder_at']);
+		$t2 = TaskService::idString(self::ok($a->call('GET', "/notes/$tl/tasks"), 'tasks')['tasks'][0]['id']);
+		$this->rec('POST /notes/{id}/task-reminder', $a->call('POST', "/notes/$tl/task-reminder", ['task_id' => $t2, 'reminder_at' => '2030-01-01T08:00:00Z']));
+		$this->rec('DELETE /notes/{id}/task-reminder', $a->call('DELETE', "/notes/$tl/task-reminder" . self::q(['task_id' => $t2])));
+
+		$this->rec('GET /mentions', $a->call('GET', '/mentions'));
+		$this->rec('GET /mentions/members', $a->call('GET', '/mentions/members' . $q));
+		$this->recAny('POST /mentions/{ownerId}/{noteId}/handled', $a->call('POST', "/mentions/1/$m1/handled"), 404);
+		$this->recAny('DELETE /mentions/{ownerId}/{noteId}/handled', $a->call('DELETE', "/mentions/1/$m1/handled"), 404);
+
+		$this->rec('GET /settings', $a->call('GET', '/settings'));
+		$this->rec('PUT /settings/{key}', $a->call('PUT', '/settings/note_list_sort', ['value' => 'heading_asc']));
+		self::assertSame('heading_asc', $this->rec('GET /settings/{key}', $a->call('GET', '/settings/note_list_sort'))['value']);
+		self::assertSame(400, $a->call('PUT', '/settings/note_list_sort', ['value' => '<script>'])->status, 'ungültiger Wert');
+		$this->rec('GET /system/version', $a->call('GET', '/system/version'));
+		self::assertFalse($this->rec('GET /system/whats-new', $a->call('GET', '/system/whats-new'))['show']);
+		$this->rec('POST /system/whats-new/seen', $a->call('POST', '/system/whats-new/seen'));
+		$this->rec('GET /system/i18n', $a->call('GET', '/system/i18n?lang=de'));
+		$this->rec('GET /shared/with-me', $a->call('GET', '/shared/with-me'));
+		$this->rec('GET /shared', $a->call('GET', '/shared' . $q));
+		self::assertSame($a->uid, $this->rec('GET /users/me', $a->call('GET', '/users/me'))['username']);
+		self::assertSame($b->uid, $this->rec('GET /users/lookup/{username}', $a->call('GET', '/users/lookup/' . self::enc($b->uid)))['username']);
+		$this->recAny('POST /notes/{id}/convert', $a->call('POST', "/notes/$m1/convert", ['target' => 'markdown']), 501);
+		$this->recAny('POST /convert-html', $a->call('POST', '/convert-html', ['html' => '<p><b>x</b></p>']), 501);
+		$this->recAny('POST /convert-markdown', $a->call('POST', '/convert-markdown', ['markdown' => '**x**']), 501);
 	}
 
 	private function compareFixtures(): void {

@@ -7,7 +7,7 @@ declare(strict_types=1);
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-// Nur Tests: spielt das Kern-Szenario M2a+M2b ab und speichert je Route den JSON-Schlüsselbaum (Werte → Typname).
+// Nur Tests: spielt das Kern-Szenario M2a–M2c ab und speichert je Route den JSON-Schlüsselbaum (Werte → Typname).
 // php capture.php upstream <out-dir>            Upstream auf 127.0.0.1:8090 (legt zwei Konten an)
 // php capture.php nextnotes <out-dir> <base> <userA:pass> <userB:pass>   Next Notes (Basic-Auth)
 
@@ -66,9 +66,16 @@ function shape(mixed $v): mixed {
 }
 
 $routes = [];
+$names = [];
+// Datenschlüssel (Wörterbuch, gespeicherte Einstellungen) sind kein Format: nur der Typ zählt
+const DATA_KEYS = ['GET /system/i18n' => 'strings', 'GET /settings' => 'settings'];
 function rec(string $route, array $res): mixed {
 	global $routes;
 	[$status, $body] = $res;
+	if (isset(DATA_KEYS[$route]) && $body instanceof stdClass && isset($body->{DATA_KEYS[$route]})) {
+		$body = clone $body;
+		$body->{DATA_KEYS[$route]} = 'object';
+	}
 	if (!isset($routes[$route]) || ($routes[$route]['status'] >= 300 && $status < 300)) {
 		$routes[$route] = ['route' => $route, 'status' => $status, 'body' => shape($body)];
 	}
@@ -88,12 +95,14 @@ if ($mode === 'upstream') {
 		$st === 201 || exit("Konto $name: $st\n");
 		$admin->call('POST', "/admin/users/{$u->id}/reset-password", ['action' => 'set_password', 'new_password' => 'Fx-pass-2026!x']);
 		$clients[$p] = new Client($base, $name, 'Fx-pass-2026!x', (int)$u->id);
+		$names[$p] = $name;
 	}
 } elseif ($mode === 'nextnotes' && $argc === 6) {
 	$base = rtrim($argv[3], '/') . '/index.php/apps/nextnotes/api/v1';
 	foreach (['a' => $argv[4], 'b' => $argv[5]] as $p => $cred) {
 		[$u, $pw] = explode(':', $cred, 2);
 		$clients[$p] = new Client($base, $u, $pw);
+		$names[$p] = $u;
 	}
 } else {
 	exit("unbekannter Modus\n");
@@ -195,6 +204,53 @@ rec('POST /notes/{id}/snapshot/restore', $A->call('POST', "/notes/$m1/snapshot/r
 rec('DELETE /notes/{id}/snapshot', $A->call('DELETE', "/notes/$m1/snapshot?snapshot_key=" . rawurlencode($key)));
 rec('POST /notes/{id}/duplicate', $A->call('POST', "/notes/$m1/duplicate", ['workspace' => $ws2]));
 rec('POST /folders/{id}/duplicate', $A->call('POST', "/folders/$f1/duplicate$q", []));
+
+// M2c: Aufgaben, Checklisten, Erinnerungen, Mentions, Einstellungen, System, Benutzer, Konvertierung
+$tl = $A->call('POST', '/notes', ['heading' => 'Aufgaben', 'type' => 'tasklist', 'content' => '[]', 'workspace' => $ws2])[1]->note->id;
+$A->call('POST', '/notes', ['heading' => 'Check', 'type' => 'markdown', 'content' => "- [ ] eins\n- [x] zwei", 'workspace' => $ws2]);
+$t1 = rec('POST /notes/{id}/tasks', $A->call('POST', "/notes/$tl/tasks", ['text' => 'Eins', 'due_at' => '2030-01-02', 'reminder' => true]))->task->id;
+$t1s = json_encode($t1);
+$t2s = json_encode($A->call('POST', "/notes/$tl/tasks", ['text' => 'Zwei'])[1]->task->id);
+rec('PATCH /notes/{id}/tasks/{taskId}', $A->call('PATCH', "/notes/$tl/tasks/$t1s", ['text' => 'Eins b', 'important' => true]));
+$s1 = rec('POST /notes/{id}/tasks/{taskId}/subtasks', $A->call('POST', "/notes/$tl/tasks/$t1s/subtasks", ['text' => 'Unter']))->subtask->id;
+$s1s = json_encode($s1);
+rec('PATCH /notes/{id}/tasks/{taskId}/subtasks/{subtaskId}', $A->call('PATCH', "/notes/$tl/tasks/$t1s/subtasks/$s1s", ['completed' => true]));
+$A->call('POST', "/notes/$tl/tasks/$t1s/subtasks", ['text' => 'Unter zwei']);
+rec('GET /notes/{id}/tasks', $A->call('GET', "/notes/$tl/tasks"));
+rec('GET /tasks', $A->call('GET', '/tasks' . $q));
+rec('DELETE /notes/{id}/tasks/{taskId}/subtasks/{subtaskId}', $A->call('DELETE', "/notes/$tl/tasks/$t1s/subtasks/$s1s"));
+rec('DELETE /notes/{id}/tasks/{taskId}', $A->call('DELETE', "/notes/$tl/tasks/$t1s"));
+rec('POST /notes/{id}/reminder', $A->call('POST', "/notes/$m1/reminder", ['reminder_at' => '2020-01-01T08:00:00Z']));
+rec('GET /notes/{id}/reminder', $A->call('GET', "/notes/$m1/reminder"));
+$list = rec('GET /reminders', $A->call('GET', '/reminders' . $q));
+rec('GET /reminders/count', $A->call('GET', '/reminders/count' . $q));
+$rid = $list->notifications[0]->id ?? 1;
+rec('POST /reminders/{id}/read', $A->call('POST', "/reminders/$rid/read"));
+rec('POST /reminders/{id}/dismiss', $A->call('POST', "/reminders/$rid/dismiss"));
+rec('POST /reminders/dismiss-all', $A->call('POST', '/reminders/dismiss-all'));
+$A->call('POST', "/notes/$m1/reminder", ['reminder_at' => '2030-01-01T08:00:00Z']);
+rec('DELETE /notes/{id}/reminder', $A->call('DELETE', "/notes/$m1/reminder"));
+rec('POST /notes/{id}/task-reminder', $A->call('POST', "/notes/$tl/task-reminder", ['task_id' => $t2s, 'reminder_at' => '2030-01-01T08:00:00Z']));
+rec('DELETE /notes/{id}/task-reminder', $A->call('DELETE', "/notes/$tl/task-reminder?task_id=" . rawurlencode($t2s)));
+rec('GET /mentions', $A->call('GET', '/mentions'));
+rec('GET /mentions/members', $A->call('GET', '/mentions/members' . $q));
+rec('POST /mentions/{ownerId}/{noteId}/handled', $A->call('POST', "/mentions/1/$m1/handled"));
+rec('DELETE /mentions/{ownerId}/{noteId}/handled', $A->call('DELETE', "/mentions/1/$m1/handled"));
+rec('GET /settings', $A->call('GET', '/settings'));
+rec('PUT /settings/{key}', $A->call('PUT', '/settings/note_list_sort', ['value' => 'heading_asc']));
+rec('GET /settings/{key}', $A->call('GET', '/settings/note_list_sort'));
+rec('GET /system/version', $A->call('GET', '/system/version'));
+rec('GET /system/whats-new', $A->call('GET', '/system/whats-new'));
+rec('POST /system/whats-new/seen', $A->call('POST', '/system/whats-new/seen'));
+rec('GET /system/i18n', $A->call('GET', '/system/i18n?lang=de'));
+rec('GET /shared/with-me', $A->call('GET', '/shared/with-me'));
+rec('GET /shared', $A->call('GET', '/shared' . $q));
+rec('GET /users/me', $A->call('GET', '/users/me'));
+// Upstream: nur Admin
+rec('GET /users/lookup/{username}', ($admin ?? $A)->call('GET', '/users/lookup/' . rawurlencode($names['b'])));
+rec('POST /notes/{id}/convert', $A->call('POST', "/notes/$m1/convert", ['target' => 'markdown']));
+rec('POST /convert-html', $A->call('POST', '/convert-html', ['html' => '<p><b>x</b></p>']));
+rec('POST /convert-markdown', $A->call('POST', '/convert-markdown', ['markdown' => '**x**']));
 
 $n4 = $A->call('POST', '/notes', ['heading' => 'Archiv', 'content' => '<p>a</p>', 'workspace' => $ws2, 'folder_id' => $f1])[1]->note->id;
 rec('POST /notes/{id}/archive', $A->call('POST', "/notes/$n4/archive"));

@@ -1,0 +1,8 @@
+{
+    "route": "POST /convert-html",
+    "status": 200,
+    "body": {
+        "markdown": "string",
+        "success": "bool"
+    }
+}

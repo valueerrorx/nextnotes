@@ -1,0 +1,8 @@
+{
+    "route": "GET /settings",
+    "status": 200,
+    "body": {
+        "settings": "string",
+        "success": "bool"
+    }
+}

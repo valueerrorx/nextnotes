@@ -1,0 +1,8 @@
+{
+    "route": "POST /reminders/{id}/read",
+    "status": 200,
+    "body": {
+        "id": "int",
+        "success": "bool"
+    }
+}

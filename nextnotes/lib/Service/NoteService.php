@@ -9,12 +9,15 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Service;
 
+use OCA\NextNotes\AppInfo\Application;
 use OCA\NextNotes\Db\Folder;
 use OCA\NextNotes\Db\FolderMapper;
 use OCA\NextNotes\Db\Note;
 use OCA\NextNotes\Db\NoteMapper;
 use OCA\NextNotes\Db\NoteTagMapper;
 use OCA\NextNotes\Db\LockMapper;
+use OCA\NextNotes\Db\MentionHandledMapper;
+use OCA\NextNotes\Db\ReminderMapper;
 use OCA\NextNotes\Db\SnapshotMapper;
 use OCA\NextNotes\Db\Workspace;
 use OCA\NextNotes\Service\Exception\BadRequestException;
@@ -24,11 +27,12 @@ use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\IDateTimeZone;
 use OCP\IL10N;
+use OCP\Notification\IManager as INotificationManager;
 
 // Notizen (Upstream NotesController + notizbezogene Routen aus FoldersController)
 class NoteService {
 	public const MAX_PAGE = 1000;
-	private const OPENED_KEY = 'recently_opened_notes';
+	private const OPENED_KEY = SettingsService::OPENED_KEY;
 	private const OPENED_LIMIT = 50;
 	private const TEMPLATE_NAMES = ['templates', 'template', 'modèles', 'modèle', 'modeles', 'modele', 'vorlagen', 'vorlage',
 		'plantillas', 'plantilla', 'modelos', 'modelo', 'шаблоны', 'шаблон', '模板', '템플릿', 'テンプレート', 'plantilles'];
@@ -56,6 +60,9 @@ class NoteService {
 		private SnapshotMapper $snapshotRows,
 		private LockService $locks,
 		private LockMapper $lockRows,
+		private ReminderMapper $reminders,
+		private MentionHandledMapper $mentions,
+		private INotificationManager $notifications,
 	) {
 	}
 
@@ -391,32 +398,37 @@ class NoteService {
 
 	/** @return array<string, mixed> PATCH /notes/{id} */
 	public function update(string $uid, int $id, array $in, string $ifMatch, string $session): array {
-		$note = $this->access->requireNote($uid, $id, 'write');
+		$this->access->requireNote($uid, $id, 'write');
 		// ADR 0005: gültige Sperre einer anderen Sitzung → 423, danach Versionsprüfung → 409
 		$this->locks->assertCanSave($uid, $id, $session);
 		$expected = trim((string)($in['if_version'] ?? ''));
 		if ($expected === '' && $ifMatch !== '') {
 			$expected = trim(str_starts_with($ifMatch, 'W/') ? substr($ifMatch, 2) : $ifMatch, '" ');
+			$expected = explode('-', $expected, 2)[0];
 		}
-		$current = NoteSerializer::version($note);
-		if ($expected !== '' && $expected !== '*' && !hash_equals($current, $expected)) {
-			throw new ConflictException('Version conflict: the note was modified since the version you provided', [
-				'code' => 'version_conflict',
-				'current' => [
-					'version' => $current,
-					'updated' => NoteSerializer::date($note->getUpdatedAt()),
-					'heading' => $note->getHeading(),
-					'content' => $this->urls->toClient((string)$note->getContent()),
-				],
-			]);
-		}
-		$oldHeading = (string)$note->getHeading();
-		$heading = array_key_exists('heading', $in) && is_scalar($in['heading']) ? $this->validator->heading((string)$in['heading']) : $oldHeading;
+		$newHeading = array_key_exists('heading', $in) && is_scalar($in['heading']) ? $this->validator->heading((string)$in['heading']) : null;
 		$content = $in['content'] ?? $in['entry'] ?? null;
 		$tagList = array_key_exists('tags', $in) ? $this->validator->noteTags($in['tags']) : null;
 		$stateHash = (isset($in['state_hash']) && is_string($in['state_hash']) && preg_match('/^[0-9a-f-]{1,80}$/', $in['state_hash'])) ? $in['state_hash'] : null;
 
-		return $this->tx->run(function () use ($uid, $note, $in, $heading, $oldHeading, $content, $tagList, $stateHash) {
+		return $this->tx->run(function () use ($uid, $id, $in, $expected, $newHeading, $content, $tagList, $stateHash) {
+			// Versionsprüfung und Schreiben unter Zeilensperre (wie Aufgaben): keine verlorene Änderung
+			$this->notes->lockRow($id);
+			$note = $this->notes->find($id);
+			$current = NoteSerializer::version($note);
+			if ($expected !== '' && $expected !== '*' && !hash_equals($current, $expected)) {
+				throw new ConflictException('Version conflict: the note was modified since the version you provided', [
+					'code' => 'version_conflict',
+					'current' => [
+						'version' => $current,
+						'updated' => NoteSerializer::date($note->getUpdatedAt()),
+						'heading' => $note->getHeading(),
+						'content' => $this->urls->toClient((string)$note->getContent()),
+					],
+				]);
+			}
+			$oldHeading = (string)$note->getHeading();
+			$heading = $newHeading ?? $oldHeading;
 			if ($content !== null || $heading !== $oldHeading || $tagList !== null) {
 				$this->snapshots->autoBefore($note, $uid);
 			}
@@ -612,7 +624,7 @@ class NoteService {
 		return ['message' => 'Note restored successfully', 'note' => ['id' => $id, 'heading' => $note->getHeading()]];
 	}
 
-	// Endgültig löschen: Tags, Anhänge (Dateien nach dem Commit), Snapshots, Sperren; M2c ergänzt Erinnerungen
+	// Endgültig löschen: Tags, Anhänge (Dateien nach dem Commit), Snapshots, Sperren, Erinnerungen, Mention-Status, Benachrichtigungen
 	/** @param int[] $ids */
 	public function purge(array $ids): void {
 		$ids = array_values(array_unique(array_map('intval', $ids)));
@@ -624,7 +636,27 @@ class NoteService {
 			$this->attachments->purge($ids);
 			$this->snapshotRows->deleteForNotes($ids);
 			$this->lockRows->deleteForNotes($ids);
+			$this->reminders->deleteForNotes($ids);
+			$this->mentions->deleteForNotes($ids);
 			$this->notes->deleteByIds($ids);
+		});
+		foreach ($ids as $id) {
+			$n = $this->notifications->createNotification();
+			$n->setApp(Application::APP_ID)->setObject('note', (string)$id);
+			$this->notifications->markProcessed($n);
+		}
+	}
+
+	// Inhalt aus der Aufgaben-API bzw. dem Erinnerungsjob speichern; Rechte prüft der Aufrufer
+	public function saveContent(Note $note, string $content, ?string $uid): void {
+		$this->tx->run(function () use ($note, $content, $uid) {
+			if ($uid !== null) {
+				$this->snapshots->autoBefore($note, $uid);
+				$note->setUpdatedBy($uid);
+			}
+			$this->applyContent($note, $content);
+			$note->setUpdatedAt($this->now());
+			$this->notes->update($note);
 		});
 	}
 
@@ -743,6 +775,21 @@ class NoteService {
 			}
 		}
 		return $out;
+	}
+
+	// Wert der Einstellung recently_opened_notes wie Upstream: [[id, Workspace-Schlüssel], …], gefiltert
+	public function openedSetting(string $uid): string {
+		$pairs = [];
+		foreach ($this->notes->findByIds($this->openedNoteIds($uid)) as $n) {
+			$pairs[(int)$n->getId()] = [(int)$n->getId(), (string)$this->workspaces->keyFor($uid, (int)$n->getWorkspaceId())];
+		}
+		$out = [];
+		foreach ($this->openedNoteIds($uid) as $id) {
+			if (isset($pairs[$id])) {
+				$out[] = $pairs[$id];
+			}
+		}
+		return (string)json_encode($out, JSON_UNESCAPED_UNICODE);
 	}
 
 	/** @return array{notes: int, folders: int} */

@@ -1,0 +1,17 @@
+{
+    "route": "PATCH /notes/{id}/tasks/{taskId}",
+    "status": 200,
+    "body": {
+        "note_id": "int",
+        "success": "bool",
+        "task": {
+            "completed": "bool",
+            "dueAt": "string",
+            "dueReminder": "bool",
+            "id": "float",
+            "important": "bool",
+            "noteId": "int",
+            "text": "string"
+        }
+    }
+}

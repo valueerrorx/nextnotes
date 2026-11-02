@@ -9,12 +9,15 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Controller;
 
+use OCA\NextNotes\Service\AccessService;
 use OCA\NextNotes\Service\AttachmentService;
 use OCA\NextNotes\Service\ChangesService;
 use OCA\NextNotes\Service\DuplicateService;
 use OCA\NextNotes\Service\Exception\BadRequestException;
+use OCA\NextNotes\Service\Exception\NotImplementedException;
 use OCA\NextNotes\Service\InputValidator;
 use OCA\NextNotes\Service\LockService;
+use OCA\NextNotes\Service\NoteSerializer;
 use OCA\NextNotes\Service\NoteService;
 use OCA\NextNotes\Service\SearchService;
 use OCA\NextNotes\Service\WorkspaceService;
@@ -36,6 +39,7 @@ class NotesApiController extends ApiController {
 		private LockService $locks,
 		private DuplicateService $duplicates,
 		private AttachmentService $attachments,
+		private AccessService $access,
 	) {
 		parent::__construct($request, $userSession, $workspaces);
 	}
@@ -123,12 +127,12 @@ class NotesApiController extends ApiController {
 		return $this->ok($this->notes->index($this->uid(), $this->input()));
 	}
 
-	// ETag = Version; NotModifiedMiddleware antwortet bei passendem If-None-Match mit 304
+	// ETag = Version + Antwort-Prüfsumme; NotModifiedMiddleware antwortet bei passendem If-None-Match mit 304
 	#[NoAdminRequired]
 	public function show(int $id): JSONResponse {
 		[$note, $version] = $this->notes->show($this->uid(), $id, $this->param('workspace'));
 		$response = $this->ok(['note' => $note]);
-		$response->setETag($version);
+		$response->setETag(NoteSerializer::etag($version, $note));
 		return $response;
 	}
 
@@ -143,7 +147,7 @@ class NotesApiController extends ApiController {
 		unset($in['id']);
 		$data = $this->notes->update($this->uid(), $id, $in, (string)$this->request->getHeader('If-Match'), $this->editorSession());
 		$response = $this->ok($data);
-		$response->setETag($data['note']['version']);
+		$response->setETag(NoteSerializer::etag($data['note']['version'], $data['note']));
 		return $response;
 	}
 
@@ -257,5 +261,24 @@ class NotesApiController extends ApiController {
 		}
 		$this->notes->setKanbanCompleted($this->uid(), $id, $completed);
 		return $this->ok(['note_id' => $id, 'completed' => $completed]);
+	}
+
+	// Konvertierung folgt mit dem Export in M4 (SPEC §1.2.5); Rechte wie Upstream vorher geprüft
+	#[NoAdminRequired]
+	public function convert(int $id): JSONResponse {
+		$this->access->requireNote($this->uid(), $id, 'write');
+		throw new NotImplementedException('not_implemented');
+	}
+
+	#[NoAdminRequired]
+	public function convertHtml(): JSONResponse {
+		$this->uid();
+		throw new NotImplementedException('not_implemented');
+	}
+
+	#[NoAdminRequired]
+	public function convertMarkdown(): JSONResponse {
+		$this->uid();
+		throw new NotImplementedException('not_implemented');
 	}
 }

@@ -1,0 +1,9 @@
+{
+    "route": "GET /mentions",
+    "status": 200,
+    "body": {
+        "mentions": [],
+        "open": "int",
+        "success": "bool"
+    }
+}

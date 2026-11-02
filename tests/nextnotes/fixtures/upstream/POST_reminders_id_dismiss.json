@@ -1,0 +1,9 @@
+{
+    "route": "POST /reminders/{id}/dismiss",
+    "status": 200,
+    "body": {
+        "id": "int",
+        "next_reminder_at": "null",
+        "success": "bool"
+    }
+}

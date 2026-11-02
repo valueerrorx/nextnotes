@@ -26,6 +26,8 @@ up_one() {
 		[[ $i -eq 60 ]] && die "$env: Webserver antwortet nicht"
 		sleep 1
 	done
+	# Kein externer Abruf aus der Testumgebung (z. B. password_policy-HIBP beim Anlegen von Testbenutzern)
+	occ "$env" config:system:set has_internet_connection --type=boolean --value=false >/dev/null
 	if ! occ "$env" user:info "$NN_TEST_USER" >/dev/null 2>&1; then
 		dc "$env" exec -T -u www-data -e OC_PASS="$NN_TEST_PASS" "$svc" \
 			php occ user:add --password-from-env "$NN_TEST_USER" >/dev/null

@@ -1,0 +1,9 @@
+{
+    "route": "GET /reminders/count",
+    "status": 200,
+    "body": {
+        "success": "bool",
+        "total_count": "int",
+        "unread_count": "int"
+    }
+}

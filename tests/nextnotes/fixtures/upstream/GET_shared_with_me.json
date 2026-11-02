@@ -1,0 +1,9 @@
+{
+    "route": "GET /shared/with-me",
+    "status": 200,
+    "body": {
+        "items": [],
+        "shared_workspaces": [],
+        "success": "bool"
+    }
+}

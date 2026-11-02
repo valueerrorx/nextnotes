@@ -12,6 +12,7 @@ namespace OCA\NextNotes\Service;
 use OCA\NextNotes\Db\FolderMapper;
 use OCA\NextNotes\Db\Note;
 use OCA\NextNotes\Db\NoteTagMapper;
+use OCA\NextNotes\Db\ReminderMapper;
 use OCP\AppFramework\Db\DoesNotExistException;
 
 // Notizen im Upstream-JSON (NotesController::index/show)
@@ -27,6 +28,7 @@ class NoteSerializer {
 		private NoteTagMapper $tags,
 		private InputValidator $validator,
 		private ContentUrlRewriter $urls,
+		private ReminderMapper $reminders,
 	) {
 	}
 
@@ -37,6 +39,11 @@ class NoteSerializer {
 	// Upstream poznoteNoteVersion: md5(updated|heading|md5(content))
 	public static function version(Note $note): string {
 		return md5((string)self::date($note->getUpdatedAt()) . '|' . (string)($note->getHeading() ?? '') . '|' . md5((string)($note->getContent() ?? '')));
+	}
+
+	// ETag = Inhaltsversion + Prüfsumme der ganzen Antwort (reminder_at, Tags, Favorit …); If-Match nutzt nur den Teil vor '-'
+	public static function etag(string $version, array $note): string {
+		return $version . '-' . substr(md5((string)json_encode($note)), 0, 12);
 	}
 
 	public function tagString(array $tags): string {
@@ -112,8 +119,8 @@ class NoteSerializer {
 			'created' => self::date($n->getCreatedAt()),
 			'updated' => self::date($n->getUpdatedAt()),
 			'version' => $version,
-			// Erinnerungen ab M2c (nextnotes_reminders)
-			'reminder_at' => null,
+			// ungesendete Notiz-Erinnerung des Aufrufers
+			'reminder_at' => self::date($this->reminders->pendingNoteTimes($uid, [$id])[$id] ?? null),
 			'content_width' => $n->getContentWidth(),
 			'title_color' => $n->getTitleColor(),
 			'title_size' => $n->getTitleSize(),

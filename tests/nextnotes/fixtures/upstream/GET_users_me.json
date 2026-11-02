@@ -1,0 +1,15 @@
+{
+    "route": "GET /users/me",
+    "status": 200,
+    "body": {
+        "active": "bool",
+        "display_name": "string",
+        "email": "null",
+        "first_name": "null",
+        "id": "int",
+        "is_admin": "bool",
+        "language": "string",
+        "last_name": "null",
+        "username": "string"
+    }
+}

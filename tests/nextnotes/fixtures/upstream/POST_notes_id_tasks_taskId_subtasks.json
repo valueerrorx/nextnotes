@@ -1,0 +1,21 @@
+{
+    "route": "POST /notes/{id}/tasks/{taskId}/subtasks",
+    "status": 200,
+    "body": {
+        "note_id": "int",
+        "subtask": {
+            "completed": "bool",
+            "id": "float",
+            "text": "string"
+        },
+        "subtasks": [
+            {
+                "completed": "bool",
+                "id": "float",
+                "text": "string"
+            }
+        ],
+        "success": "bool",
+        "task_id": "string"
+    }
+}

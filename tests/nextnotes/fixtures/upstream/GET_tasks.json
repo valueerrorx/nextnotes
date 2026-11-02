@@ -1,0 +1,56 @@
+{
+    "route": "GET /tasks",
+    "status": 200,
+    "body": {
+        "checklists": [
+            {
+                "favorite": "bool",
+                "folder": "string",
+                "folder_id": "null",
+                "folder_path": "string",
+                "heading": "string",
+                "id": "int",
+                "tasks": [
+                    {
+                        "completed": "bool",
+                        "id": "int",
+                        "text": "string"
+                    }
+                ],
+                "type": "string",
+                "updated": "string",
+                "workspace": "string"
+            }
+        ],
+        "notes": [
+            {
+                "favorite": "bool",
+                "folder": "string",
+                "folder_id": "null",
+                "folder_path": "string",
+                "heading": "string",
+                "id": "int",
+                "tasks": [
+                    {
+                        "completed": "bool",
+                        "dueAt": "string",
+                        "dueReminder": "bool",
+                        "id": "float",
+                        "important": "bool",
+                        "subtasks": [
+                            {
+                                "completed": "bool",
+                                "id": "float",
+                                "text": "string"
+                            }
+                        ],
+                        "text": "string"
+                    }
+                ],
+                "updated": "string",
+                "workspace": "string"
+            }
+        ],
+        "success": "bool"
+    }
+}

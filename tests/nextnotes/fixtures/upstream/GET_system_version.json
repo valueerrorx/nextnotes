@@ -1,0 +1,11 @@
+{
+    "route": "GET /system/version",
+    "status": 200,
+    "body": {
+        "current_version": "string",
+        "has_update": "bool",
+        "is_up_to_date": "bool",
+        "latest_version": "string",
+        "success": "bool"
+    }
+}

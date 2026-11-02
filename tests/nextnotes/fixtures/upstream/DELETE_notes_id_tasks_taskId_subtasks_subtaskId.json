@@ -1,0 +1,17 @@
+{
+    "route": "DELETE /notes/{id}/tasks/{taskId}/subtasks/{subtaskId}",
+    "status": 200,
+    "body": {
+        "note_id": "int",
+        "subtask_id": "string",
+        "subtasks": [
+            {
+                "completed": "bool",
+                "id": "float",
+                "text": "string"
+            }
+        ],
+        "success": "bool",
+        "task_id": "string"
+    }
+}

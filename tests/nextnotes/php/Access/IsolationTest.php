@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Tests\Access;
 
+use OCA\NextNotes\Service\TaskService;
+use OCA\NextNotes\Service\WorkspaceService;
 use OCA\NextNotes\Tests\Support\ApiClient;
 use OCA\NextNotes\Tests\Support\ApiTestCase;
 use OCA\NextNotes\Tests\Support\Response;
@@ -27,7 +29,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
  * SCOPED-Einträge dürfen eine feste 'query' (z. B. Suchbegriff) mitbringen.
  */
 final class IsolationTest extends ApiTestCase {
-	private const KINDS = ['owned', 'scoped', 'scoped-write'];
+	private const KINDS = ['owned', 'scoped', 'scoped-write', 'excluded'];
+	// Dritter Benutzer: Empfänger der Freigabe, damit Mentions eine Grundlage haben
+	private static string $third = '';
 
 	/** @return array<string, array> Route (Verb + Pfad mit {}) → Eintrag */
 	public static function routeTable(): array {
@@ -186,6 +190,50 @@ final class IsolationTest extends ApiTestCase {
 			'POST /notes/{}/attachments/{}/move' => ['owned', 'cases' => [
 				['path' => '/notes/{n1}/attachments/{att}/move', 'body' => ['target_note_id' => '{n2}']],
 			]],
+			// M2c: Mentions ({ownerId} wird ignoriert; Zugriff nur über die Notiz)
+			'GET /mentions' => ['scoped', 'path' => '/mentions', 'sees' => 'mn'],
+			'GET /mentions/members' => ['scoped', 'path' => '/mentions/members', 'sees' => null],
+			'POST /mentions/{}/{}/handled' => ['owned', 'cases' => [['path' => '/mentions/x/{mn}/handled', 'body' => []]]],
+			'DELETE /mentions/{}/{}/handled' => ['owned', 'cases' => [['path' => '/mentions/x/{mn}/handled', 'body' => []]]],
+			// Tasks
+			'GET /tasks' => ['scoped', 'path' => '/tasks', 'sees' => 'tl'],
+			'GET /notes/{}/tasks' => ['owned', 'cases' => [['path' => '/notes/{tl}/tasks']]],
+			'POST /notes/{}/tasks' => ['owned', 'cases' => [['path' => '/notes/{tl}/tasks', 'body' => ['text' => 'neu']]]],
+			'PATCH /notes/{}/tasks/{}' => ['owned', 'cases' => [['path' => '/notes/{tl}/tasks/{task}', 'body' => ['text' => 'geändert']]]],
+			'DELETE /notes/{}/tasks/{}' => ['owned', 'cases' => [['path' => '/notes/{tl}/tasks/{task}', 'body' => []]]],
+			'POST /notes/{}/tasks/{}/subtasks' => ['owned', 'cases' => [['path' => '/notes/{tl}/tasks/{task}/subtasks', 'body' => ['text' => 'unter']]]],
+			'PATCH /notes/{}/tasks/{}/subtasks/{}' => ['owned', 'cases' => [['path' => '/notes/{tl}/tasks/{task}/subtasks/{sub}', 'body' => ['completed' => true]]]],
+			'DELETE /notes/{}/tasks/{}/subtasks/{}' => ['owned', 'cases' => [['path' => '/notes/{tl}/tasks/{task}/subtasks/{sub}', 'body' => []]]],
+			// Konvertierung: Rechteprüfung, dann 501 (SPEC §1.2.5)
+			'POST /notes/{}/convert' => ['owned', 'cases' => [['path' => '/notes/{n1}/convert', 'body' => ['target' => 'markdown'], 'control' => 501]]],
+			'POST /convert-html' => ['excluded', 'path' => '/convert-html', 'body' => ['html' => '<p>x</p>'], 'status' => 501, 'reason' => 'zustandslos, keine Objekt-ID; 501 bis M4'],
+			'POST /convert-markdown' => ['excluded', 'path' => '/convert-markdown', 'body' => ['markdown' => 'x'], 'status' => 501, 'reason' => 'zustandslos, keine Objekt-ID; 501 bis M4'],
+			// Erinnerungen
+			'GET /notes/{}/reminder' => ['owned', 'cases' => [['path' => '/notes/{n1}/reminder']]],
+			'POST /notes/{}/reminder' => ['owned', 'cases' => [['path' => '/notes/{n1}/reminder', 'body' => ['reminder_at' => '2030-01-01T10:00:00Z']]]],
+			'POST /notes/{}/task-reminder' => ['owned', 'cases' => [['path' => '/notes/{tl}/task-reminder', 'body' => ['task_id' => '{task}', 'reminder_at' => '2030-01-01T10:00:00Z']]]],
+			// task_id kein Objekt-Slot: Löschen ist idempotent und wirkt nur auf Erinnerungen des Aufrufers an der Notiz {tl}
+			'DELETE /notes/{}/task-reminder' => ['owned', 'cases' => [['path' => '/notes/{tl}/task-reminder', 'query' => ['task_id' => '1'], 'body' => []]]],
+			'DELETE /notes/{}/reminder' => ['owned', 'cases' => [['path' => '/notes/{n1}/reminder', 'body' => []]]],
+			'GET /reminders' => ['scoped', 'path' => '/reminders', 'sees' => null],
+			'GET /reminders/count' => ['scoped', 'path' => '/reminders/count', 'sees' => null],
+			'POST /reminders/dismiss-all' => ['scoped-write', 'path' => '/reminders/dismiss-all', 'body' => [], 'reason' => 'Kompatibilität ohne Wirkung (NC-Glocke)'],
+			'POST /reminders/{}/read' => ['scoped-write', 'path' => '/reminders/1/read', 'body' => [], 'reason' => 'Benachrichtigungs-ID ohne Objekt, ohne Wirkung'],
+			'POST /reminders/{}/dismiss' => ['scoped-write', 'path' => '/reminders/1/dismiss', 'body' => [], 'reason' => 'Benachrichtigungs-ID ohne Objekt, ohne Wirkung'],
+			// Einstellungen: {key} ist ein Name, Wirkung nur beim Aufrufer (A-Dump enthält A's Einstellungen)
+			'GET /settings' => ['scoped', 'path' => '/settings', 'sees' => null],
+			'GET /settings/{}' => ['scoped', 'path' => '/settings/note_list_sort', 'sees' => null],
+			'PUT /settings/{}' => ['scoped-write', 'path' => '/settings/note_list_sort', 'body' => ['value' => 'heading_asc'], 'reason' => '{key} ist ein Name; schreibt nur Einstellungen von B'],
+			// System
+			'GET /system/version' => ['scoped', 'path' => '/system/version', 'sees' => null],
+			'GET /system/whats-new' => ['scoped', 'path' => '/system/whats-new', 'sees' => null],
+			'POST /system/whats-new/seen' => ['scoped-write', 'path' => '/system/whats-new/seen', 'body' => [], 'reason' => 'ohne Wirkung (B12)'],
+			'GET /system/i18n' => ['scoped', 'path' => '/system/i18n', 'sees' => null],
+			'GET /shared/with-me' => ['scoped', 'path' => '/shared/with-me', 'sees' => null],
+			'GET /shared' => ['scoped', 'path' => '/shared', 'sees' => null],
+			// Benutzer: {username} ist ein Name; Sichtbarkeit nach NC-Freigaberegeln
+			'GET /users/me' => ['scoped', 'path' => '/users/me', 'sees' => null],
+			'GET /users/lookup/{}' => ['scoped', 'path' => '/users/lookup/admin', 'sees' => null],
 		];
 	}
 
@@ -203,8 +251,16 @@ final class IsolationTest extends ApiTestCase {
 		self::ok($c->call('DELETE', "/notes/$n3" . self::q(['workspace' => $ws])), 'seed n3 trash');
 		$att = (int)self::ok($c->upload("/notes/$n1/attachments", "att-$marker.txt", "datei $marker"), 'seed att')['attachment_id'];
 		$snap = (string)self::ok($c->call('POST', "/notes/$n1/snapshot?manual=1"), 'seed snapshot')['snapshot_key'];
+		// M2c: Tasklist mit Aufgabe und Unteraufgabe; Notiz mit @uid in einem an den Dritten freigegebenen Workspace
+		$tl = (int)self::ok($c->call('POST', '/notes', ['heading' => "TL $marker", 'type' => 'tasklist', 'content' => '[]', 'workspace' => $ws]), 'seed tl')['note']['id'];
+		$task = TaskService::idString(self::ok($c->call('POST', "/notes/$tl/tasks", ['text' => "T $marker"]), 'seed task')['task']['id']);
+		$sub = TaskService::idString(self::ok($c->call('POST', "/notes/$tl/tasks/$task/subtasks", ['text' => "S $marker"]), 'seed sub')['subtask']['id']);
+		$wsS = "IsoS $marker $gen";
+		self::ok($c->call('POST', '/workspaces', ['name' => $wsS]), 'seed ws shared');
+		Server::get(WorkspaceService::class)->share($c->uid, self::ownWsId($c->uid, $wsS), self::$third);
+		$mn = (int)self::ok($c->call('POST', '/notes', ['heading' => "MN $marker", 'content' => "<p>$marker @{$c->uid} bitte</p>", 'workspace' => $wsS]), 'seed mn')['note']['id'];
 		return ['ws' => $ws, 'f1' => $f1, 'f2' => $f2, 'n1' => $n1, 'n2' => $n2, 'n3' => $n3, 'tag' => $marker,
-			'title' => "N1 $marker", 'att' => $att, 'snap' => $snap];
+			'title' => "N1 $marker", 'att' => $att, 'snap' => $snap, 'tl' => $tl, 'task' => $task, 'sub' => $sub, 'mn' => $mn];
 	}
 
 	// ---- Slots und Varianten ----
@@ -293,7 +349,11 @@ final class IsolationTest extends ApiTestCase {
 		return in_array($r->status, [403, 404], true) ? '' : 'erwartet 403/404, erhalten ' . $r->describe();
 	}
 
-	public static function control(Response $r): string {
+	// $status: erwarteter Status statt 2xx (z. B. 501 für Konvertierung)
+	public static function control(Response $r, ?int $status = null): string {
+		if ($status !== null) {
+			return $r->status === $status ? '' : "Kontrolle nicht $status (inconclusive): " . $r->describe();
+		}
 		return $r->ok() ? '' : 'Kontrolle nicht 2xx (inconclusive): ' . $r->describe();
 	}
 
@@ -366,12 +426,14 @@ final class IsolationTest extends ApiTestCase {
 						}
 					}
 				}
+			} elseif ($e[0] === 'excluded' && (!isset($e['status']) || trim((string)($e['reason'] ?? '')) === '')) {
+				$errors[] = "$key: excluded braucht status + reason";
 			} elseif ($verb !== 'GET' && (!array_key_exists('body', $e) || trim((string)($e['reason'] ?? '')) === '')) {
 				$errors[] = "$key: Schreibroute ohne ID-Stellen braucht body + reason";
 			}
 		}
 		self::assertSame([], $errors);
-		self::assertCount(76, $table);
+		self::assertCount(112, $table);
 	}
 
 	public function testDetectorsObject(): void {
@@ -389,6 +451,7 @@ final class IsolationTest extends ApiTestCase {
 	public function testRoute(string $route, array $entry): void {
 		$a = $this->createUser('iso-a');
 		$b = $this->createUser('iso-b');
+		self::$third = $this->createUser('iso-c')->uid;
 		$aMark = 'amk' . bin2hex(random_bytes(5));
 		$bMark = 'bmk' . bin2hex(random_bytes(5));
 		$fx = ['A' => self::seed($a, $aMark, 1), 'B' => self::seed($b, $bMark, 1)];
@@ -397,6 +460,7 @@ final class IsolationTest extends ApiTestCase {
 			'owned' => $this->owned($route, $entry, $a, $b, $aMark, $bMark, $fx, $errors),
 			'scoped' => $this->scoped($route, $entry, $b, $aMark, $bMark, $fx, $errors),
 			'scoped-write' => $this->scopedWrite($route, $entry, $a, $b, $aMark, $errors),
+			'excluded' => $this->excluded($route, $entry, $a, $b, $aMark, $errors),
 		};
 		self::assertSame([], $errors, $route);
 	}
@@ -433,7 +497,7 @@ final class IsolationTest extends ApiTestCase {
 			// Kontrolle A mit A's Objekten
 			$allA = array_fill_keys(array_keys($slots), 'A');
 			[$url, $body] = self::build($case, $allA, $fx);
-			if (($e = self::control(self::send($a, $method, $url, $body, $case))) !== '') {
+			if (($e = self::control(self::send($a, $method, $url, $body, $case), $case['control'] ?? null)) !== '') {
 				$errors[] = "Fall $ci Kontrolle A $method $url: $e";
 			}
 			// Kontrolle B mit frischen B-Objekten (Angriffe könnten B's Satz berührt haben)
@@ -441,7 +505,7 @@ final class IsolationTest extends ApiTestCase {
 			$fxB['B'] = self::seed($b, $bMark, $gen++);
 			$allB = array_fill_keys(array_keys($slots), 'B');
 			[$url, $body] = self::build($case, $allB, $fxB);
-			if (($e = self::control(self::send($b, $method, $url, $body, $case))) !== '') {
+			if (($e = self::control(self::send($b, $method, $url, $body, $case), $case['control'] ?? null)) !== '') {
 				$errors[] = "Fall $ci Kontrolle B $method $url: $e";
 			}
 			// nächster Fall: frische Sätze für beide
@@ -488,6 +552,22 @@ final class IsolationTest extends ApiTestCase {
 			if (stripos($r->body, $needle) === false) {
 				$errors[] = "Kontrolle B: eigene Daten ($needle) fehlen: " . $r->describe();
 			}
+		}
+	}
+
+	// Ohne Objekt-ID und ohne Wirkung: fester Status, kein Leck, A unverändert
+	private function excluded(string $route, array $entry, ApiClient $a, ApiClient $b, string $aMark, array &$errors): void {
+		$method = explode(' ', $route)[0];
+		$before = self::dump($a->uid);
+		$r = $b->call($method, $entry['path'], $entry['body'] ?? null);
+		if ($r->status !== $entry['status']) {
+			$errors[] = "erwartet {$entry['status']}: " . $r->describe();
+		}
+		if (($e = self::leak($r, $aMark, [])) !== '') {
+			$errors[] = $e;
+		}
+		if (self::dump($a->uid) !== $before) {
+			$errors[] = 'A-Daten verändert';
 		}
 	}
 
