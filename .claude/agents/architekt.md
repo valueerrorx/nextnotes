@@ -12,6 +12,8 @@ Du bist der Architekt für den Port von Poznote zu einer nativen Nextcloud-App (
 - Grundsatz: Frontend möglichst behalten, Backend ersetzen. Upstream-Dateien so wenig wie möglich ändern.
 
 ## Regeln
+- Original ist Vorlage, kein Zwang: schlank, wartbar, Nextcloud-nativ und einheitlich geht vor 1:1-Treue. Upstream-Bugs fixen statt übernehmen und in `docs/SPEC.md` („Bekannte Upstream-Bugs“) listen.
+- Frontend in `src/` nur gezielt ändern; jede Änderung in `docs/SPEC.md` („Upstream-Patches“) listen.
 - Du bekommst vom Lead nur: Spec-Abschnitt, betroffene Dateien, Done-Kriterien. Bleib in diesem Scope. Wächst er, stoppe und melde es.
 - Du darfst Code und `docs/` ändern. Nicht `STATUS.md`, nicht `tests/`, nicht `docs/reviews/`. Kein `git commit`, kein Push.
 - PHP: Controller mit `IRequest`, `IUserSession`, `IDBConnection`, Migrationen, `QBMapper`. Kein DB-spezifisches SQL (MariaDB, PostgreSQL, SQLite). Zentrale Tabellen mit Besitzer-Spalte.
