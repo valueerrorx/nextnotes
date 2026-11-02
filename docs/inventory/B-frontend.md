@@ -5,8 +5,7 @@ Stand: 2026-11-02, Branch `nextcloud-port`, Upstream-Code unter `src/`. Nur Best
 **Status-Werte**
 - `übernehmen`: Ansicht/Code bleibt; der Einstieg wird eine Route im PageController (`TemplateResponse`), `auth.php`/`page_bootstrap.php` entfallen.
 - `ersetzen`: Funktion bleibt, Umsetzung wechselt (Ziel in der Spalte Hinweis).
-- `streichen`: Für v1 gestrichen (Login, Benutzerverwaltung, OIDC, OAuth, TOTP, App-Passwörter, SaaS, SMTP, Webhooks, S3, Git Sync, Backup/Restore, PWA, MCP, Chrome-Extension).
-- `offen (ADR)`: AI-Assistent, Transkription, öffentliche Links.
+- `streichen`: Für v1 gestrichen (AI-Assistent, Transkription, öffentliche Links laut ADR 0010/0011; Login, Benutzerverwaltung, OIDC, OAuth, TOTP, App-Passwörter, SaaS, SMTP, Webhooks, S3, Git Sync, Backup/Restore, PWA, MCP, Chrome-Extension).
 
 Webroot ist `src/public/` (siehe `docker/nginx/default.conf`). Dateien unter `src/` außerhalb von `public/` sind Includes, keine Einstiegspunkte. `src/public/api/v1/**` gehört zu Teil A (siehe Hinweis in 2.3).
 
@@ -50,10 +49,10 @@ Art: **S** = HTML-Seite, **F** = HTML-Fragment (per AJAX), **R** = Redirect/Rout
 
 | # | Datei | Art | Zweck | Ansicht | Status | Hinweis |
 |---|---|---|---|---|---|---|
-| 24 | `shared.php` | S | Übersicht freigegebener Notizen/Ordner | Public | offen (ADR) | |
-| 25 | `public_note.php` | S | Öffentliche Notiz per Token, Passwort-Gate | Public | offen (ADR) | Einzige Seite mit Nonce-CSP; braucht noch `unsafe-eval` |
-| 26 | `public_folder.php` | S | Öffentlicher Ordner per Token | Public | offen (ADR) | 2 `onclick=` |
-| 27 | `public_slug.php` | R | Router `/<slug>` → public_note.php | Public | offen (ADR) | nginx-Rewrite, in NC: `PublicShareController`-Route |
+| 24 | `shared.php` | S | Übersicht freigegebener Notizen/Ordner | Public | streichen (ADR 0011) | |
+| 25 | `public_note.php` | S | Öffentliche Notiz per Token, Passwort-Gate | Public | streichen (ADR 0011) | Einzige Seite mit Nonce-CSP; braucht noch `unsafe-eval` |
+| 26 | `public_folder.php` | S | Öffentlicher Ordner per Token | Public | streichen (ADR 0011) | 2 `onclick=` |
+| 27 | `public_slug.php` | R | Router `/<slug>` → public_note.php | Public | streichen (ADR 0011) | nginx-Rewrite, in NC: `PublicShareController`-Route |
 | 28 | `open_shared.php` | R | Signierter Mail-Link → Account wechseln → Notiz | Multi-Account | streichen | SMTP und Account-Wechsel |
 
 ### 1.3 Login, Accounts, Sitzung
@@ -87,10 +86,10 @@ Art: **S** = HTML-Seite, **F** = HTML-Fragment (per AJAX), **R** = Redirect/Rout
 | 48 | `local_backup_settings.php` | S | Lokales Backup | Settings/Admin | streichen | |
 | 49 | `s3_backup_settings.php` | S | S3-Backup | Settings/Admin | streichen | |
 | 50 | `s3_settings.php` | S | S3-Anhangsspeicher | Settings/Admin | streichen | |
-| 51 | `ai_settings.php` | S | AI-Assistent (Admin) | Settings/Admin | offen (ADR) | |
-| 52 | `ai_settings_user.php` | S | AI-Assistent (persönlich) | Settings | offen (ADR) | |
-| 53 | `stt_settings.php` | S | Transkription (Admin) | Settings/Admin | offen (ADR) | |
-| 54 | `stt_settings_user.php` | S | Transkription (persönlich) | Settings | offen (ADR) | |
+| 51 | `ai_settings.php` | S | AI-Assistent (Admin) | Settings/Admin | streichen (ADR 0010) | |
+| 52 | `ai_settings_user.php` | S | AI-Assistent (persönlich) | Settings | streichen (ADR 0010) | |
+| 53 | `stt_settings.php` | S | Transkription (Admin) | Settings/Admin | streichen (ADR 0010) | |
+| 54 | `stt_settings_user.php` | S | Transkription (persönlich) | Settings | streichen (ADR 0010) | |
 | 55 | `oauth/authorize.php` | S | OAuth-Consent für MCP | OAuth | streichen | |
 | 56 | `oauth/token.php` | E | OAuth-Token | OAuth | streichen | |
 | 57 | `oauth/register.php` | E | Dynamic Client Registration | OAuth | streichen | |
@@ -122,8 +121,8 @@ Art: **S** = HTML-Seite, **F** = HTML-Fragment (per AJAX), **R** = Redirect/Rout
 | 73 | `api_upload_css.php` | E | Eigene CSS-Themes (Admin-Upload) | streichen | entschieden (Thomas, ADR 0016) |
 | 74 | `api_upload_font.php` | E | Eigene Schriften | streichen | entschieden (Thomas, ADR 0016) |
 | 75 | `api_branding.php` | E | Instanzlogo | streichen | NC Theming liefert Logo (ADR 0016) |
-| 76 | `api_ai_chat.php` | E | Proxy zu OpenAI-kompatiblem Server | offen (ADR) | |
-| 77 | `api_transcribe.php` | E | Proxy zu STT-Server | offen (ADR) | |
+| 76 | `api_ai_chat.php` | E | Proxy zu OpenAI-kompatiblem Server | streichen (ADR 0010) | |
+| 77 | `api_transcribe.php` | E | Proxy zu STT-Server | streichen (ADR 0010) | |
 | 78 | `api_backup_job.php` | E | Hintergrund-Export | streichen | |
 | 79 | `api_export_entries.php` | E | Alle Notizen als ZIP | übernehmen | Benutzer-Export, Abgleich mit Teil A #196–198 (ADR 0008) |
 | 80 | `api_export_structured.php` | E | Strukturierter Export | übernehmen | Benutzer-Export, Abgleich mit Teil A #196–198 (ADR 0008) |
@@ -162,8 +161,8 @@ Quelle: `src/public/js/*.js` (226 Dateien, ohne `*-dist/`, `mermaid/`, `katex/`,
 | 13 | `index.php` (Fragment) | `note-loader.js` | XHR GET mit `X-Poznote-Fragment: right_col` | Notiz laden ohne Reload | übernehmen | Fragment-Route im PageController |
 | 14 | `index.php` (POST Suche) | `unified-search.js` (`fetch(form.action)`), Formular in `notes_list.php` | fetch POST | Suche | übernehmen | POST braucht `requesttoken` |
 | 15 | `audio_player.php` | `attachments.js`, `events-utils.js`, `slash-command.js`, `note-attachment-menu.js`, `markdown-parser.js` | iframe-`src`, root-absolut `/audio_player.php` | Audio im Editor | übernehmen | Absolute Pfade brechen unter `/apps/nextnotes/`; steht auch in gespeicherten Notizen |
-| 16 | `api_ai_chat.php` | `ai-chat.js`, `ai-settings-form.js`, `live-refresh.js` (Pfad-Ausnahme) | fetch POST | AI-Chat, Verbindungstest | offen (ADR) | |
-| 17 | `api_transcribe.php` | `speech-to-text.js`, `stt-settings-form.js` | fetch POST | Transkription, Test | offen (ADR) | |
+| 16 | `api_ai_chat.php` | `ai-chat.js`, `ai-settings-form.js`, `live-refresh.js` (Pfad-Ausnahme) | fetch POST | AI-Chat, Verbindungstest | streichen (ADR 0010) | |
+| 17 | `api_transcribe.php` | `speech-to-text.js`, `stt-settings-form.js` | fetch POST | Transkription, Test | streichen (ADR 0010) | |
 | 18 | `account_tree.php` | `workspaces-core.js`, `other-accounts.js` (`data-endpoint` aus `notes_list.php`) | fetch GET | Andere Accounts | streichen | |
 | 19 | `switch_account.php` | `profile.js` | Formular-POST mit `csrf_token` | Account wechseln | streichen | |
 | 20 | `api_backup_job.php` | `backup-export.js` | fetch GET/POST mit `csrf_token` | Hintergrund-Export | streichen | |
@@ -193,7 +192,7 @@ Quelle: `src/public/js/*.js` (226 Dateien, ohne `*-dist/`, `mermaid/`, `katex/`,
 | 39 | `excalidraw_editor.php` | `excalidraw.js` | Excalidraw | übernehmen | |
 | 40 | `workspaces.php?new=1` | `workspaces-create.js` | Workspace anlegen | übernehmen | |
 | 41 | `settings.php` (`#section=…`, `?open=…`) | `theme-manager.js`, `index-events.js`, `workspaces-core.js`, `dashboard-page.js`, `settings-page.js` | Einstellungen | übernehmen | Nur persönliche Teile; Admin-Ziele fallen weg (siehe 1.1 #22) |
-| 42 | `shared.php` | `share.js` | Freigaben | offen (ADR) | |
+| 42 | `shared.php` | `share.js` | Freigaben | streichen (ADR 0011) | |
 | 43 | `admin/webhooks.php` | `connected-apps.js` (Link) | Instanz-URL | streichen | |
 | 44 | `profile.php` | `index-events.js` | Profil | streichen | Datei existiert nicht, toter Code |
 
@@ -346,18 +345,18 @@ Vorgehen-Vorschlag: `tokens.css` behalten und nur die `:root`/`dark`-Werte auf N
 
 ## Zählung je Status
 
-| Abschnitt | übernehmen | ersetzen | streichen | offen (ADR) | Summe |
-|---|---|---|---|---|---|
-| 1 Seiten und PHP-Einstiegspunkte | 24 | 13 | 42 | 10 | 89 |
-| 2.1 Datenaufrufe aus JS | 4 | 12 | 11 | 2 | 29 |
-| 2.2 Navigation aus JS | 12 | 0 | 2 | 1 | 15 |
-| 2.3 Server-Formulare/Links (#45–#47, #49) | 2 | 0 | 2 | 0 | 4 |
-| 3 Eingebettete Daten/Inline-Code | 2 | 8 | 0 | 0 | 10 |
-| 4.2/4.3 Eigener Code und Vendor | 9 | 2 | 3 | 0 | 14 |
-| 5 Tokens/Themes | 5 | 14 | 2 | 0 | 21 |
-| 6 i18n | 5 | 2 | 2 | 0 | 9 |
-| **Gesamt** | **63** | **51** | **64** | **13** | **191** |
+| Abschnitt | übernehmen | ersetzen | streichen | Summe |
+|---|---|---|---|---|
+| 1 Seiten und PHP-Einstiegspunkte | 24 | 13 | 52 | 89 |
+| 2.1 Datenaufrufe aus JS | 4 | 12 | 13 | 29 |
+| 2.2 Navigation aus JS | 12 | 0 | 3 | 15 |
+| 2.3 Server-Formulare/Links (#45–#47, #49) | 2 | 0 | 2 | 4 |
+| 3 Eingebettete Daten/Inline-Code | 2 | 8 | 0 | 10 |
+| 4.2/4.3 Eigener Code und Vendor | 9 | 2 | 3 | 14 |
+| 5 Tokens/Themes | 5 | 14 | 2 | 21 |
+| 6 i18n | 5 | 2 | 2 | 9 |
+| **Gesamt** | **63** | **51** | **77** | **191** |
 
 (2.3 #48 und #50 verweisen auf den Status der Zielseiten in Abschnitt 1 und sind nicht gesondert gezählt. 4.2 zählt 3 Zeilen ohne die Zeile „keine Funde“.)
 
-**Korrekturen M0 (Architekt, 2026-11-02):** #73, #74, #75 und 2.1 #7–#9 ersetzen → streichen, Inter → streichen (Entscheidung Thomas, ADR 0016); #79–#81 streichen → übernehmen und 2.1 #21–#23 streichen → ersetzen (Abgleich mit Teil A #196–198, Datenexport ADR 0008); #41 ersetzen → streichen (ADR 0008); 4.4 Skript-Ladeart geklärt; App-Pfad `/apps/poznote/` → `/apps/nextnotes/` (ADR 0001).
+**Korrekturen M0 (Architekt, 2026-11-02):** #73, #74, #75 und 2.1 #7–#9 ersetzen → streichen, Inter → streichen (Entscheidung Thomas, ADR 0016); #79–#81 streichen → übernehmen und 2.1 #21–#23 streichen → ersetzen (Abgleich mit Teil A #196–198, Datenexport ADR 0008); #41 ersetzen → streichen (ADR 0008); 4.4 Skript-Ladeart geklärt; App-Pfad `/apps/poznote/` → `/apps/nextnotes/` (ADR 0001). M0-Nachtrag: alle ADR-offenen Zeilen → streichen (ADR 0010/0011).

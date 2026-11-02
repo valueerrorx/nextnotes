@@ -8,20 +8,20 @@ Zielbild und Entscheidungen: [SPEC](SPEC.md), [ADRs](adr/).
 
 ## Zählung je Status
 
-| Teil | übernehmen | ersetzen | streichen | offen (ADR) | Summe |
-|---|---|---|---|---|---|
-| A Backend | 132 | 48 | 128 | 30 | 338 |
-| B Frontend | 63 | 51 | 64 | 13 | 191 |
-| **Gesamt** | **195** | **99** | **192** | **43** | **529** |
+| Teil | übernehmen | ersetzen | streichen | Summe |
+|---|---|---|---|---|
+| A Backend | 132 | 49 | 157 | 338 |
+| B Frontend | 63 | 51 | 77 | 191 |
+| **Gesamt** | **195** | **100** | **234** | **529** |
 
-Zählweise wie in den Teilen (A: alle nummerierten Zeilen #/T/J/F/A; B: Abschnitte 1–6 laut Tabelle „Zählung je Status“). Einträge überschneiden sich zwischen A und B (z. B. `api_*.php` erscheint als Endpunkt in A und als Einstiegspunkt in B); die Summe ist daher eine Zeilenzahl, keine Zahl verschiedener Funktionen.
+Zählweise wie in den Teilen (A: alle nummerierten Zeilen #/T/J/F/A, per Skript nachgezählt; B: Abschnitte 1–6 laut Tabelle „Zählung je Status“). Einträge überschneiden sich zwischen A und B (z. B. `api_*.php` erscheint als Endpunkt in A und als Einstiegspunkt in B); die Summe ist daher eine Zeilenzahl, keine Zahl verschiedener Funktionen.
 
-## Offene Punkte „offen (ADR)“ und ihre ADR
+## Früher ADR-offene Punkte und ihre Entscheidung
 
-| Inventurzeilen | Gegenstand | ADR | Vorschlag |
+| Inventurzeilen | Gegenstand | ADR | Status (entschieden) |
 |---|---|---|---|
 | A #65–68, #96–99 | Öffentliche Notiz-/Ordner-Links (API) | [0011](adr/0011-oeffentliche-links.md) | streichen (v1) |
-| A #129, #130 | `/shared`, `/shared/with-me` | 0011 | Route bleibt, liefert `[]` |
+| A #129, #130 | `/shared`, `/shared/with-me` | 0011 | ersetzen: Kompatibilitätsroute liefert `[]` |
 | A #178–184 | `/public/*` (Bearbeitung über Link) | 0011 | streichen (v1) |
 | A #238, #240, #241, #242 | `shared.php`, `public_note.php`, `public_folder.php`, `public_slug.php` | 0011 | streichen (v1) |
 | A T5, T6, T12 | Tabellen `shared_notes`, `shared_folders`, `shared_links` | 0011 | streichen (v1) |
@@ -36,7 +36,7 @@ Zählweise wie in den Teilen (A: alle nummerierten Zeilen #/T/J/F/A; B: Abschnit
 | B #76, #77 | `api_ai_chat.php`, `api_transcribe.php` | 0010 | streichen (v1) |
 | B 2.1 #16, #17 | JS-Aufrufe AI/STT | 0010 | streichen (v1) |
 
-Summe: A 30 Zeilen, B 13 Zeilen – alle einer ADR zugeordnet. Die Zeilen behalten bis zur Freigabe der ADRs den Status „offen (ADR)“.
+Summe: A 30 Zeilen, B 13 Zeilen. Alle sind entschieden (ADR 0010, 0011) und in Teil A/B umgestellt: A #129, #130 → ersetzen, alle übrigen → streichen. Kein Eintrag ist mehr ADR-offen.
 
 ## Weitere ADR-Bezüge in der Inventur
 
@@ -48,7 +48,7 @@ Summe: A 30 Zeilen, B 13 Zeilen – alle einer ADR zugeordnet. Die Zeilen behalt
 | B §3, §4 | Inline-Code, CSP, Vendor | [0006](adr/0006-editoren-unter-csp.md), [0012](adr/0012-csp-ausnahmen.md) |
 | B §1, A #214–236 | Ablösung der Seiten | [0004](adr/0004-seiten-abloesung.md) |
 | A #196–198, #199; B #79–81; A T20, B #41 | Export, Aktivitätslog | [0008](adr/0008-export-und-loeschung.md) |
-| A #199, J9, J12 | Import | [0009](adr/0009-import-poznote.md) |
+| A #199, J9, J12 | Import | [0009](adr/0009-import-poznote.md) (gestrichen: kein Import aus Poznote in v1; J9, J12 streichen; A #199 Drag&Drop einzelner Notizdateien bleibt) |
 | A #25–27, #42, #92, #243, #244; B #61–64 | Offline/PWA (laut Auftrag gestrichen) | [0015](adr/0015-offline-pwa.md) |
 | A #209–211; B #73–75, 2.1 #7–9, §5 Themes, Inter | Themes, Schriften, Logo | [0016](adr/0016-themes-und-schriften.md) (entschieden) |
 | B §6, A #128 | i18n | SPEC §1.4 |
@@ -60,4 +60,5 @@ Summe: A 30 Zeilen, B 13 Zeilen – alle einer ADR zugeordnet. Die Zeilen behalt
 - B #79–81: streichen → übernehmen, B 2.1 #21–23: streichen → ersetzen (Widerspruch zu A #196–198; Benutzer-Export, ADR 0008).
 - B 4.4: Skript-Ladeart geklärt (`.js` klassisch mit `defer` + Nonce, `.mjs` Modul; `lib/private/Template/functions.php`).
 - Namen nach ADR 0001: `oc_poznote_*` → `oc_nextnotes_*`, `/apps/poznote/` → `/apps/nextnotes/`.
+- M0-Nachtrag (Thomas/Lead, 2026-11-02): alle ADRs entschieden; A J9 ersetzen → streichen (ADR 0009, kein Import); 43 ADR-offene Zeilen umgestellt (A #129, #130 → ersetzen, sonst streichen); Abgaben bleiben bei Austritt und Kontolöschung erhalten (ADR 0008).
 - Auftrag nennt „74 PHP-Seiten“; gefunden wurden 89 direkt aufrufbare Dateien, davon 50 HTML-Seiten/Fragmente (B §1).

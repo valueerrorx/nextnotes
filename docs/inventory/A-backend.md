@@ -9,7 +9,6 @@ Stand: Branch `nextcloud-port`, Upstream-Code unter `src/`. OCP-Abgleich gegen `
 | übernehmen | Funktion und API-Vertrag bleiben; Backend wird als NC-Controller/`QBMapper` auf eigenen App-Tabellen nachgebaut (Eigentum über `owner_type`/`owner_id` am Workspace, siehe SPEC §2; Korrektur M0). |
 | ersetzen → X | Funktion bleibt, eigener Mechanismus wird durch NC-Dienst X ersetzt. |
 | streichen | Entfällt in v1 (laut Auftrag oder weil Nextcloud es selbst liefert). |
-| offen (ADR) | AI-Assistent, Transkription, öffentliche Links: Entscheidung per ADR. |
 
 Alle unten genannten OCP-Klassen existieren in der Referenz und sind älter als NC 35, der Zielversion (geprüftes `@since`: `IUserSession` 6, `IDBConnection` 6, `QBMapper` 14, `SimpleMigrationStep` 13, `TimedJob`/`QueuedJob` 15, `IAppData` 11, `IRootFolder` 8, `Notification\IManager`/`INotifier` 17, `Config\IUserConfig` 32, `IAppConfig` 7, `IL10N` 6, `IUserManager` 8, `Collaboration\Collaborators\ISearch` 13, `Teams\ITeamManager` 29, `IGroupManager` 8, `Search\IProvider` 20, `PublicShareController` 14, `Attribute\NoAdminRequired`/`PublicPage`/`NoCSRFRequired` 27, `Attribute\ApiRoute`/`FrontpageRoute` 29, `IAppManager` 8, `User\Events\UserDeletedEvent` 18, `Security\Bruteforce\IThrottler` 25, `TaskProcessing\IManager` 30, `SpeechToText\ISpeechToTextManager` 27). Alle sind auf NC 35 verfügbar (Zielversion nur 35, Korrektur M0).
 
@@ -89,10 +88,10 @@ Spalte „Datei“: Controller::Methode (Kurzname, `Controller` weggelassen). Ze
 | 62 | POST | /reminders/dismiss-all | Reminders::dismissAll (589) | Alle verwerfen | ersetzen → `Notification\IManager` |
 | 63 | POST | /reminders/{id}/read | Reminders::markRead (594) | Gelesen | ersetzen → `Notification\IManager` |
 | 64 | POST | /reminders/{id}/dismiss | Reminders::dismiss (599) | Verwerfen | ersetzen → `Notification\IManager` |
-| 65 | GET | /notes/{id}/share | Share::show (604) | Öffentlicher Notiz-Link lesen | offen (ADR) |
-| 66 | POST | /notes/{id}/share | Share::store (609) | Öffentlichen Link anlegen | offen (ADR) |
-| 67 | PATCH | /notes/{id}/share | Share::update (614) | Link ändern (Passwort, Ablauf, Modus) | offen (ADR) |
-| 68 | DELETE | /notes/{id}/share | Share::destroy (619) | Link löschen | offen (ADR) |
+| 65 | GET | /notes/{id}/share | Share::show (604) | Öffentlicher Notiz-Link lesen | streichen (ADR 0011) |
+| 66 | POST | /notes/{id}/share | Share::store (609) | Öffentlichen Link anlegen | streichen (ADR 0011) |
+| 67 | PATCH | /notes/{id}/share | Share::update (614) | Link ändern (Passwort, Ablauf, Modus) | streichen (ADR 0011) |
+| 68 | DELETE | /notes/{id}/share | Share::destroy (619) | Link löschen | streichen (ADR 0011) |
 | 69 | POST | /notes/{id}/folder | Folders::moveNoteToFolder (624) | In Ordner verschieben | übernehmen |
 | 70 | POST | /notes/{id}/remove-folder | Folders::removeNoteFromFolder (629) | Aus Ordner lösen | übernehmen |
 | 71 | POST | /notes/{id}/archive | Folders::archiveNote (634) | Archivieren | übernehmen |
@@ -120,10 +119,10 @@ Spalte „Datei“: Controller::Methode (Kurzname, `Controller` weggelassen). Ze
 | 93 | PUT | /folders/{id}/favorite | Folders::updateFavorite (746) | Favorit | übernehmen |
 | 94 | GET | /folders/{id}/notes | Folders::noteCount (751) | Notizanzahl | übernehmen |
 | 95 | GET | /folders/{id}/path | Folders::path (756) | Pfad (rekursive CTE) | übernehmen |
-| 96 | GET | /folders/{id}/share | FolderShare::show (761) | Öffentlicher Ordner-Link | offen (ADR) |
-| 97 | POST | /folders/{id}/share | FolderShare::store (766) | Link anlegen | offen (ADR) |
-| 98 | PATCH | /folders/{id}/share | FolderShare::update (771) | Link ändern | offen (ADR) |
-| 99 | DELETE | /folders/{id}/share | FolderShare::destroy (776) | Link löschen | offen (ADR) |
+| 96 | GET | /folders/{id}/share | FolderShare::show (761) | Öffentlicher Ordner-Link | streichen (ADR 0011) |
+| 97 | POST | /folders/{id}/share | FolderShare::store (766) | Link anlegen | streichen (ADR 0011) |
+| 98 | PATCH | /folders/{id}/share | FolderShare::update (771) | Link ändern | streichen (ADR 0011) |
+| 99 | DELETE | /folders/{id}/share | FolderShare::destroy (776) | Link löschen | streichen (ADR 0011) |
 | 100 | GET | /trash | Trash::index (785) | Papierkorb | übernehmen |
 | 101 | DELETE | /trash | Trash::empty (790) | Papierkorb leeren | übernehmen |
 | 102 | DELETE | /trash/{id} | Trash::destroy (795) | Endgültig löschen | übernehmen |
@@ -153,8 +152,8 @@ Spalte „Datei“: Controller::Methode (Kurzname, `Controller` weggelassen). Ze
 | 126 | GET | /system/whats-new | System::whatsNew (939) | Neuigkeiten-Dialog | übernehmen |
 | 127 | POST | /system/whats-new/seen | System::whatsNewSeen (943) | Neuigkeiten gesehen | übernehmen |
 | 128 | GET | /system/i18n | System::i18n (948) | Übersetzungs-Strings | ersetzen → `IL10N` / `l10n/` der App |
-| 129 | GET | /shared/with-me | System::listSharedWithMe (953) | Links, die auf mich beschränkt sind | offen (ADR) |
-| 130 | GET | /shared | System::listShared (958) | Eigene öffentliche Links | offen (ADR) |
+| 129 | GET | /shared/with-me | System::listSharedWithMe (953) | Links, die auf mich beschränkt sind | ersetzen → Kompatibilitätsroute liefert `[]` (ADR 0011) |
+| 130 | GET | /shared | System::listShared (958) | Eigene öffentliche Links | ersetzen → Kompatibilitätsroute liefert `[]` (ADR 0011) |
 | 131 | GET | /git-sync/status | GitSync::status (967) | Git-Sync | streichen |
 | 132 | GET | /github-sync/status | GitSync::status (972) | Alias | streichen |
 | 133 | POST | /git-sync/test | GitSync::test (977) | Git-Sync | streichen |
@@ -202,13 +201,13 @@ Spalte „Datei“: Controller::Methode (Kurzname, `Controller` weggelassen). Ze
 | 175 | POST | /admin/users/{id}/reset-password | Users::adminResetPassword (1207) | Passwort-Reset | streichen |
 | 176 | POST | /admin/users/{id}/two-factor/reset | Users::adminResetTwoFactor (1212) | TOTP-Reset | streichen |
 | 177 | GET | /admin/users/{id}/password-status | Users::adminPasswordStatus (1217) | Passwortstatus | streichen |
-| 178 | PATCH | /public/tasks/{id} | Public::updateTask (1225) | Aufgabe über öffentlichen Link | offen (ADR) |
-| 179 | POST | /public/tasks | Public::addTask (1229) | dto. | offen (ADR) |
-| 180 | DELETE | /public/tasks/{id} | Public::deleteTask (1233) | dto. | offen (ADR) |
-| 181 | PATCH | /public/notes/content | Public::updateNoteContent (1237) | Notiz über öffentlichen Link bearbeiten | offen (ADR) |
-| 182 | POST | /public/notes/lock | Public::acquireEditLock (1242) | Sperre (öffentlich) | offen (ADR) |
-| 183 | POST | /public/notes/lock/heartbeat | Public::heartbeatEditLock (1246) | dto. | offen (ADR) |
-| 184 | POST | /public/notes/lock/release | Public::releaseEditLock (1250) | dto. | offen (ADR) |
+| 178 | PATCH | /public/tasks/{id} | Public::updateTask (1225) | Aufgabe über öffentlichen Link | streichen (ADR 0011) |
+| 179 | POST | /public/tasks | Public::addTask (1229) | dto. | streichen (ADR 0011) |
+| 180 | DELETE | /public/tasks/{id} | Public::deleteTask (1233) | dto. | streichen (ADR 0011) |
+| 181 | PATCH | /public/notes/content | Public::updateNoteContent (1237) | Notiz über öffentlichen Link bearbeiten | streichen (ADR 0011) |
+| 182 | POST | /public/notes/lock | Public::acquireEditLock (1242) | Sperre (öffentlich) | streichen (ADR 0011) |
+| 183 | POST | /public/notes/lock/heartbeat | Public::heartbeatEditLock (1246) | dto. | streichen (ADR 0011) |
+| 184 | POST | /public/notes/lock/release | Public::releaseEditLock (1250) | dto. | streichen (ADR 0011) |
 | 185 | GET | /public/statistics | InstanceStatistics::serveRequest (index.php:62, vor Router) | Instanzstatistik per Token | streichen |
 
 ### 1.2 Sonstige Endpunkte: Einzelskripte unter `src/public/` (nginx `location ~ \.php$`)
@@ -237,8 +236,8 @@ Diese Skripte werden direkt aufgerufen (JSON- oder HTML-Antwort). Seiten (HTML) 
 | 203 | POST | /api_local_backup.php | public/api_local_backup.php | Lokales Backup (Admin) | streichen |
 | 204 | POST | /api_s3_backup.php | public/api_s3_backup.php | S3-Backup (Admin) | streichen |
 | 205 | GET/POST | /api_s3_storage.php | public/api_s3_storage.php | S3-Anhangsspeicher (Admin) | streichen |
-| 206 | POST | /api_ai_chat.php | public/api_ai_chat.php | AI-Chat-Proxy (OpenAI-kompatibel) | offen (ADR) |
-| 207 | POST | /api_transcribe.php | public/api_transcribe.php | Transkriptions-Proxy | offen (ADR) |
+| 206 | POST | /api_ai_chat.php | public/api_ai_chat.php | AI-Chat-Proxy (OpenAI-kompatibel) | streichen (ADR 0010) |
+| 207 | POST | /api_transcribe.php | public/api_transcribe.php | Transkriptions-Proxy | streichen (ADR 0010) |
 | 208 | GET/POST/DELETE | /api_upload_background.php | public/api_upload_background.php | Hintergrundbild je Workspace | ersetzen → `IAppData` |
 | 209 | GET/POST/DELETE | /api_upload_css.php | public/api_upload_css.php | Eigenes CSS (instanzweit) | streichen |
 | 210 | GET/POST/DELETE | /api_upload_font.php | public/api_upload_font.php | Eigene Schriften (instanzweit) | streichen |
@@ -269,11 +268,11 @@ Diese Skripte werden direkt aufgerufen (JSON- oder HTML-Antwort). Seiten (HTML) 
 | 235 | GET | /audio_player.php | public/audio_player.php | Audio-Einbettung | übernehmen |
 | 236 | GET | /welcome.php | public/welcome.php | Erststart-Guide | übernehmen |
 | 237 | GET | /storage-stats-user.php | public/storage-stats-user.php | Eigene Speicherstatistik | ersetzen → api/v1-JSON, Summe aus `nextnotes_attachments` (Korrektur M0, ADR 0002) |
-| 238 | GET | /shared.php | public/shared.php | Übersicht öffentliche Links | offen (ADR) |
+| 238 | GET | /shared.php | public/shared.php | Übersicht öffentliche Links | streichen (ADR 0011) |
 | 239 | GET | /open_shared.php | public/open_shared.php | Landing aus Workspace-Share-Mail | streichen |
-| 240 | GET | /public_note.php (/workspace/{t}) | public/public_note.php | Öffentliche Notiz | offen (ADR) |
-| 241 | GET | /public_folder.php (/folder/{t}) | public/public_folder.php | Öffentlicher Ordner | offen (ADR) |
-| 242 | GET | /public_slug.php (/{slug}) | public/public_slug.php | Hübsche öffentliche URL | offen (ADR) |
+| 240 | GET | /public_note.php (/workspace/{t}) | public/public_note.php | Öffentliche Notiz | streichen (ADR 0011) |
+| 241 | GET | /public_folder.php (/folder/{t}) | public/public_folder.php | Öffentlicher Ordner | streichen (ADR 0011) |
+| 242 | GET | /public_slug.php (/{slug}) | public/public_slug.php | Hübsche öffentliche URL | streichen (ADR 0011) |
 | 243 | GET | /offline.php, /offline_notes.php | public/offline.php, offline_notes.php | Offline-Seiten (PWA) | streichen |
 | 244 | GET | /pwa/manifest.php, /sw.js, /share-target.php | public/pwa/*, sw.js, share-target.php | PWA, Service Worker, Web Share Target | streichen |
 | 245 | GET/POST | /login.php, /logout.php | public/login.php, logout.php | Eigener Login | streichen |
@@ -284,8 +283,8 @@ Diese Skripte werden direkt aufgerufen (JSON- oder HTML-Antwort). Seiten (HTML) 
 | 250 | GET/POST | /backup_export.php, /restore_import.php | public/backup_export.php, restore_import.php | Backup/Restore-Seiten | streichen |
 | 251 | GET/POST | /local_backup_settings.php, /s3_backup_settings.php, /s3_settings.php | public/… | Backup-/S3-Einstellungen | streichen |
 | 252 | GET/POST | /user-webhooks.php | public/user-webhooks.php | Benutzer-Webhooks | streichen |
-| 253 | GET/POST | /ai_settings.php, /ai_settings_user.php | public/ai_settings*.php | AI-Einstellungen | offen (ADR) |
-| 254 | GET/POST | /stt_settings.php, /stt_settings_user.php | public/stt_settings*.php | Transkriptions-Einstellungen | offen (ADR) |
+| 253 | GET/POST | /ai_settings.php, /ai_settings_user.php | public/ai_settings*.php | AI-Einstellungen | streichen (ADR 0010) |
+| 254 | GET/POST | /stt_settings.php, /stt_settings_user.php | public/stt_settings*.php | Transkriptions-Einstellungen | streichen (ADR 0010) |
 | 255 | GET/POST | /admin/users.php | public/admin/users.php | Benutzerverwaltung (create/delete/toggle_status/update_profile/update_account_access) | streichen |
 | 256 | GET/POST | /admin/oidc.php, /admin/smtp.php, /admin/webhooks.php | public/admin/… | OIDC/SMTP/Webhook-Admin | streichen |
 | 257 | GET/POST | /admin/activity-log.php, /admin/storage-stats.php, /admin/orphan-scanner.php, /admin/disaster-recovery.php | public/admin/… | Admin-Werkzeuge | streichen |
@@ -315,10 +314,10 @@ Hinweis: In der UI-Hauptseite gerenderte PHP-Includes in `src/` (`notes_list.php
 | T2 | folders | id, name, workspace, parent_id, display_order, pinned, favorite, icon, icon_color, color, kanban_enabled, sort_setting, is_diary, offline | Ordnerbaum je Workspace | parent_id→folders.id (CASCADE); eindeutig (workspace,parent_id,name) | db_connect.php:278, 401-434, 553-562 | übernehmen (+`workspace_id`) |
 | T3 | workspaces | id, name (UNIQUE), display_order, tags, color | Workspaces | per Name von entries/folders referenziert | db_connect.php:291, 676-705; public/workspaces.php:25 | übernehmen (+`owner_type`/`owner_id`; Name je Besitzer eindeutig, SPEC §2) |
 | T4 | settings | key, value | Benutzer-Einstellungen + Schema-Version | – | db_connect.php:305 | ersetzen → `Config\IUserConfig` (Schemaversion entfällt durch Migrationen) |
-| T5 | shared_notes | note_id, token, expires, access_mode, password(_encrypted), theme, indexable, allowed_users (JSON), disabled | Öffentliche Notiz-Links | note_id→entries.id (CASCADE) | db_connect.php:311, 445-463 | offen (ADR) |
-| T6 | shared_folders | folder_id, token, expires, theme, indexable, password(_encrypted), access_mode, allowed_users, disabled | Öffentliche Ordner-Links | folder_id→folders.id (CASCADE) | db_connect.php:324, 482-492 | offen (ADR) |
+| T5 | shared_notes | note_id, token, expires, access_mode, password(_encrypted), theme, indexable, allowed_users (JSON), disabled | Öffentliche Notiz-Links | note_id→entries.id (CASCADE) | db_connect.php:311, 445-463 | streichen (ADR 0011) |
+| T6 | shared_folders | folder_id, token, expires, theme, indexable, password(_encrypted), access_mode, allowed_users, disabled | Öffentliche Ordner-Links | folder_id→folders.id (CASCADE) | db_connect.php:324, 482-492 | streichen (ADR 0011) |
 | T7 | notifications | note_id, task_id, type, message, is_read, dismissed, trigger_at, recurrence, email_*, webhook_*, push_* | Erinnerungen + Zustellstatus | note_id→entries.id (CASCADE) | db_connect.php:340, 541-665; ReminderEmailService.php:203-246 | übernehmen (nur Fälligkeit; `email_*`/`webhook_*`/`push_*` streichen, Anzeige via `Notification\IManager`) |
-| T8 | ai_conversations | user_id, id, workspace, title, messages (JSON), updated | AI-Chat-Verläufe | – | lib/ai-conversations.php:78 | offen (ADR) |
+| T8 | ai_conversations | user_id, id, workspace, title, messages (JSON), updated | AI-Chat-Verläufe | – | lib/ai-conversations.php:78 | streichen (ADR 0010) |
 | T9 | shared_workspaces (legacy) | workspace_name, token, allowed_users | Alt, wird nach master.workspace_shares migriert | – | db_connect.php:207-240 | streichen |
 
 ### 2.3 Tabellen der `master.db` (`data/master.db`)
@@ -327,7 +326,7 @@ Hinweis: In der UI-Hauptseite gerenderte PHP-Includes in `src/` (`notes_list.php
 |---|---|---|---|---|---|---|
 | T10 | users | id, username, email, password_hash, oidc_subject, is_admin, active, language, ai_chat_enabled, stt_enabled, quota_*, password_login_disabled, last_login | Benutzerprofile | Ziel aller user_id-FKs | users/db_master.php:75-187 | ersetzen → NC-Benutzer (`IUserManager`, UID) |
 | T11 | global_settings | key, value | Instanz-Konfiguration (SMTP, OIDC, S3, AI, …) | – | users/db_master.php:209 | ersetzen → `IAppConfig` |
-| T12 | shared_links | token, user_id, target_type, target_id | Token→Besitzer-Routing öffentlicher Links | user_id→users | users/db_master.php:217 | offen (ADR) |
+| T12 | shared_links | token, user_id, target_type, target_id | Token→Besitzer-Routing öffentlicher Links | user_id→users | users/db_master.php:217 | streichen (ADR 0011) |
 | T13 | user_account_access | accessor_user_id, target_user_id | Login darf fremdes Profil öffnen | beide→users (CASCADE) | users/db_master.php:228 | streichen |
 | T14 | workspace_shares | owner_user_id, workspace_name, grantee_user_id | Workspace mit Benutzern teilen | →users (CASCADE) | users/db_master.php:256 | ersetzen → App-Tabelle mit NC-UID/Team-ID (`ITeamManager`/`IGroupManager`, ADR) |
 | T15 | note_edit_locks | target_user_id, note_id, holder_login_user_id, holder_session_id, holder_kind, expires_at | Bearbeitungssperren | →users | users/db_master.php:288 | übernehmen (Schlüssel auf globale Notiz-ID) |
@@ -381,7 +380,7 @@ Es gibt **keinen Cron**. Langläufer werden per supervisord gestartet (`docker/s
 | J6 | s3-backup-worker (Schleife 300 s) | supervisord | workers/s3-backup-worker.php → S3BackupService, LocalBackupService | Automatische S3-/lokale Backups | streichen |
 | J7 | job-runner `complete_export` | `nohup` aus api_backup_job.php | workers/job-runner.php, background_jobs.php | Komplett-Export-ZIP | streichen |
 | J8 | job-runner `chunked_restore` | `nohup` aus api_restore_upload.php | dto. | Restore | streichen |
-| J9 | job-runner `notes_import` | `nohup` aus api_restore_upload.php | dto. + import_helpers.php | ZIP-Import einzelner Notizen | ersetzen → `BackgroundJob\QueuedJob` (falls Import groß) |
+| J9 | job-runner `notes_import` | `nohup` aus api_restore_upload.php | dto. + import_helpers.php | ZIP-Import einzelner Notizen | streichen (ADR 0009, kein Import in v1; Korrektur M0-Nachtrag) |
 | J10 | job-runner `s3_backup` / `local_backup` | `nohup` aus Einstellungen | dto. | Manuelles Backup | streichen |
 | J11 | poznoteJobCleanup | im Request | background_jobs.php:227 | Jobverzeichnisse >24 h löschen | streichen |
 | J12 | maintenance/convert-base64-images.php | init.sh beim Start | maintenance/ | Base64-Bilder in Anhänge umwandeln | streichen (Altdaten-Migration, nur für Import relevant) |
@@ -439,23 +438,23 @@ Basis `src/data/` (Docker: `/var/www/html/data`). Pfadauflösung über `$_SESSIO
 | A15 | Shared-Workspace-Scope | auth.php:732-1036 | Grantee darf nur geteilten Workspace des Besitzers | ersetzen → Rechteprüfung je Request gegen Workspace-Freigabe (NC-UID/Team) |
 | A16 | `X-Editor-Session-ID` | public/js/notes.js:196 u. a.; Notes::acquireLock | Kennung des Editor-Tabs für Sperren | übernehmen |
 | A17 | Eigene CSRF-Tokens (`$_SESSION['csrf_token']` u. a.) | icon_sidebar.php, public/*settings*, admin/* | CSRF-Schutz Formulare | ersetzen → NC-CSRF (`requesttoken`-Header) |
-| A18 | Öffentliche Links: Token + Passwort in Session | db_connect.php:20-82, public_note.php, share_passwords.php | Zugriff ohne Login | offen (ADR; Option `PublicShareController`) |
+| A18 | Öffentliche Links: Token + Passwort in Session | db_connect.php:20-82, public_note.php, share_passwords.php | Zugriff ohne Login | streichen (ADR 0011) |
 | A19 | CORS `Access-Control-Allow-Origin: *` | public/api/v1/index.php:36-46 | Fremd-Origin-Clients | streichen |
 
 ---
 
 ## Zählung
 
-| Bereich | übernehmen | ersetzen | streichen | offen (ADR) | Summe |
-|---|---|---|---|---|---|
-| 1.1 REST v1 | 87 | 23 | 58 | 17 | 185 |
-| 1.2 Einzelskripte | 34 | 6 | 25 | 8 | 73 |
-| 2 Tabellen | 6 | 4 | 14 | 4 | 28 |
-| 3 Jobs | 2 | 4 | 14 | 0 | 20 |
-| 4 Dateispeicher | 2 | 6 | 5 | 0 | 13 |
-| 5 Auth | 1 | 5 | 12 | 1 | 19 |
-| **Gesamt** | **132** | **48** | **128** | **30** | **338** |
+| Bereich | übernehmen | ersetzen | streichen | Summe |
+|---|---|---|---|---|
+| 1.1 REST v1 | 87 | 25 | 73 | 185 |
+| 1.2 Einzelskripte | 34 | 6 | 33 | 73 |
+| 2 Tabellen | 6 | 4 | 18 | 28 |
+| 3 Jobs | 2 | 3 | 15 | 20 |
+| 4 Dateispeicher | 2 | 6 | 5 | 13 |
+| 5 Auth | 1 | 5 | 13 | 19 |
+| **Gesamt** | **132** | **49** | **157** | **338** |
 
 Gezählt per `awk` über die letzte Spalte aller nummerierten Zeilen (#, T, J, F, A); Tabelle 2.4 (SQL-Konstrukte) ist nicht mitgezählt.
 
-**Korrekturen M0 (Architekt, 2026-11-02):** #237 streichen → ersetzen (Abgleich mit Teil B #23, App-Speicher zählt nicht auf NC-Quota, ADR 0002); T20 ersetzen → streichen (ADR 0008); Legende, §2.1, T1–T3: Besitzer über `owner_type`/`owner_id` statt `user_id`; Z. 14 auf NC 35; Tabellenpräfix `oc_poznote_*` → `oc_nextnotes_*` (ADR 0001).
+**Korrekturen M0 (Architekt, 2026-11-02):** #237 streichen → ersetzen (Abgleich mit Teil B #23, App-Speicher zählt nicht auf NC-Quota, ADR 0002); T20 ersetzen → streichen (ADR 0008); Legende, §2.1, T1–T3: Besitzer über `owner_type`/`owner_id` statt `user_id`; Z. 14 auf NC 35; Tabellenpräfix `oc_poznote_*` → `oc_nextnotes_*` (ADR 0001). M0-Nachtrag: J9 ersetzen → streichen (ADR 0009, kein Import); alle ADR-offenen Zeilen umgestellt: #129, #130 → ersetzen (Kompatibilitätsroute `[]`, ADR 0011), übrige → streichen (ADR 0010/0011).

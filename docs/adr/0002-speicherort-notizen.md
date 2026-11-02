@@ -1,6 +1,6 @@
 # ADR 0002: Speicherort von Notizen, Anhängen und Snapshots (Auftragsfrage 1)
 
-Status: vorgeschlagen · [THOMAS] (Nutzerwirkung: Notizen nicht in Nextcloud Files, kein Desktop-Sync)
+Status: entschieden (Thomas, 2026-11-02): wie vorgeschlagen angenommen.
 
 ## Kontext
 Upstream speichert Notizinhalt doppelt (Datei `entries/{id}.html|md` + Spalte `entries.entry`), Anhänge als Dateien mit JSON-Metadaten in `entries.attachments`, Snapshots als Dateien (Inventur A: F1, F2, F4, T1). Notizen können einem Benutzer oder einem Team gehören (ADR 0003). Kriterien: Quota, Versionen, Sync, Suche, Team-Eigentum, Upstream-Kompatibilität (API liefert Inhalt als String, Anhänge über `/api/v1/notes/{id}/attachments/{aid}`).
@@ -19,7 +19,7 @@ Upstream speichert Notizinhalt doppelt (Datei `entries/{id}.html|md` + Spalte `e
 | Team-Eigentum | Spalte am Workspace, Rechte live (ADR 0003) | Team-Ordner (`ITeamFolderProvider`, 35) möglich, aber Rechte/Sperren/Abgaben liefen am Datei-Modell vorbei | wie 1 |
 | Transaktionen, Löschung, Export | einfach, eine Quelle | verteilt, Kollisionen mit Dateinamen | Datei+DB-Konsistenz |
 
-## Empfehlung
+## Entscheidung
 Option 1:
 - Notizinhalt nur in `nextnotes_notes.content` (`Types::TEXT`), dazu `search_text` (normalisiert) für Suche. Keine Dateikopie.
 - Anhänge als Dateien in `IAppData` (`attachments/<note_id>/<attachment_id>`), Metadaten in `nextnotes_attachments`. Kopie beim Austeilen ist eine physische Kopie.

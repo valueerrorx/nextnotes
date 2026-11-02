@@ -1,6 +1,6 @@
 # ADR 0014: Workspace-Teilen (Benutzer, Gruppen, Teams)
 
-Status: vorgeschlagen · [THOMAS] (Produkt: Gruppen-Freigabe in v1?)
+Status: entschieden (Thomas, 2026-11-02): wie vorgeschlagen angenommen.
 
 ## Kontext
 Upstream teilt einen Workspace mit einzelnen Benutzern (`master.workspace_shares`, T14; `workspaces.php` share/unshare, A #215; Erwähnungen A #8–11; Benutzersuche A #160). In NC gibt es Benutzer, Gruppen (`IGroupManager`, @since 8) und Teams (ADR 0003). Benutzersuche: `OCP\Collaboration\Collaborators\ISearch` (@since 13).
@@ -10,7 +10,7 @@ Upstream teilt einen Workspace mit einzelnen Benutzern (`master.workspace_shares
 2. **Team-Eigentum + Freigabe an einzelne Benutzer** (Upstream-Parität).
 3. Zusätzlich Freigabe an NC-Gruppen.
 
-## Empfehlung
+## Entscheidung
 Option 2 in v1, Option 3 vorbereitet (Spalte `share_type`), aber nicht freigeschaltet.
 - Tabelle `nextnotes_ws_shares` (`workspace_id`, `share_type` = `user` [später `group`], `share_with`, `permission` = `write`).
 - Nur der Besitzer eines privaten Workspace teilt. Team-Workspaces werden nicht zusätzlich an Einzelne geteilt (Mitgliedschaft regelt das).
