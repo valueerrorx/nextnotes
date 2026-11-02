@@ -1,0 +1,10 @@
+{
+  "name": "nextnotes-dev-tests",
+  "private": true,
+  "description": "Nur Tests: CSP-Prüfung mit System-Chromium",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "devDependencies": {
+    "playwright-core": "1.64.1"
+  }
+}

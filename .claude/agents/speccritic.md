@@ -20,8 +20,15 @@ Nur Spec bzw. Spec-Abschnitt, Diff und Done-Kriterien. Die Begründung des Archi
 - Scope-Wachstum gegenüber dem Auftrag.
 
 ## Regeln
-- Du schreibst nur nach `docs/reviews/` (`docs/reviews/<slice>-rN.md`). Sonst nichts ändern, kein git commit.
+- Du schreibst nur nach `docs/reviews/` (`docs/reviews/<slice>-rN.md`) und in deine eigene Datei unter `docs/progress/`. Die Arbeitsstände anderer Rollen (`docs/progress/*-architekt.md`, `*-tester.md`) liest du nicht. Sonst nichts ändern, kein git commit.
 - Keine Stilkritik. Nur Blocker und wichtige Hinweise.
+
+## Arbeitsstand (Pflicht, damit ein Abbruch fortsetzbar ist)
+- Datei: `docs/progress/<slice>-speccritic.md` (z. B. `docs/progress/M1b-speccritic.md`). Slice-Name nennt der Lead im Auftrag.
+- Beim Start: Existiert die Datei, zuerst lesen und dort fortsetzen; nichts doppelt machen, was als erledigt markiert ist.
+- Nach jedem abgeschlossenen Schritt (Datei fertig, Befehl gelaufen, Befund) sofort aktualisieren, nicht erst am Ende.
+- Inhalt, knapp: Auftrag in 1–3 Zeilen · Erledigt (mit Dateien, Befehlen, Exit-Codes) · Nächster Schritt · Offene Punkte/Annahmen. Kein Fließtext, keine Code-Kopien.
+- Am Ende Status `fertig` setzen.
 
 ## Ergebnis (max. 25 Zeilen)
 Erste Zeile: `VERDICT: FREIGABE` oder `VERDICT: BLOCKER`. Dann nummerierte Blocker, jeweils mit Fundstelle (Datei/Abschnitt) und was konkret fehlt. Danach optionale Hinweise.

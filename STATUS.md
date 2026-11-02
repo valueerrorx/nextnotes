@@ -1,6 +1,6 @@
 # Status Nextcloud-Port „Next Notes“
 
-**Aktueller Meilenstein:** M1 – Installierbares Skelett (M1a erledigt, M1b offen)
+**Aktueller Meilenstein:** M2 – Backend-Kern (noch nicht begonnen); M1 fertig
 
 ## Erledigte Slices
 - Setup: Branch `nextcloud-port`, Agenten unter `.claude/agents/`, `UPSTREAM.md`
@@ -33,12 +33,20 @@
 - GitHub-Repo umbenannt: `valueerrorx/poznote-nc` → `valueerrorx/nextnotes` (info.xml angepasst)
 - Autor/Copyright: Thomas Weissel
 
-## M1 (laufend)
+## M1 (fertig)
 - Plan `docs/slices/M1-plan.md`; Review `M1-plan-r1` (BLOCKER: frische Instanz) → `M1-plan-r2` (FREIGABE)
 - Lead: Teilung M1a (App, Migration, info.xml, SQLite/Apache) / M1b (MariaDB, PostgreSQL, nginx, URL-Spike, CSP-Check); M1 fertig erst nach M1b
 - Lead: `app:remove` erhält Daten (SPEC §8); Löschen beim Entfernen ist Datenschutzfrage für Thomas in M7
 - M1a erledigt: App-Skelett `nextnotes/`, Migration (11 Tabellen), Testsetup `dev/nextcloud/` (SQLite/Apache), Schematest `tests/nextnotes/schema/`. Review `M1a-diff-r1` (FREIGABE, 4 Hinweise → M1b).
   Testnachweis (tester, frische Instanz, `nextcloud:35` = 35.0.2): `validate-info.sh` 0; `CHECK_PAGE=1 lifecycle.sh sqlite` 0 (enable, 11 Tabellen, 200/303, Probe-Zeile nach disable+remove erhalten); `check-schema.php` 0 gegen §2.1 (Gegenprobe mit 6 Manipulationen → Exit 1); `down.sh all` 0.
 
+- M1b erledigt: Compose-Profile mariadb/pgsql/nginx, `run-m1.sh`, URL-Spike (ADR 0004: bestanden, kein Fallback), CSP-Prüfung per Playwright mit Selbsttest. Review `M1b-diff-r1` (FREIGABE, 5 Hinweise).
+  Testnachweis (tester, frische Instanzen, NC 35.0.2): `run-m1.sh` (sqlite, mariadb, pgsql je Apache; nginx/fpm) Exit 0; unabhängig je Umgebung: `app:list` aktiv, `check-schema.php --db=…` 0, Seite 200/303, Spike 4×200 per curl, CSP-Gegenprobe (`tests/nextnotes/csp/csp-gegenprobe.mjs`, 3 provozierte Verletzungen erkannt) 0, Lebenszyklus 0; Fehlerfälle (kaputte Erwartung, fehlendes Chromium) → Exit 1 mit Aufräumen; `down.sh all` 0.
+
+## Nacharbeit (vor/mit M2)
+- Favicon 404: `nextnotes/img/app.svg`/`app-dark.svg` beginnen mit SPDX-Kommentar → theming erkennt kein SVG; Kommentar ins `<svg>` oder `<?xml …?>` voranstellen (tester M1b)
+- `nginx:stable-alpine` auf Versionstag pinnen, getestete Versionen notieren (M1b-diff-r1 H1)
+- `down.sh:14` `mapfile < <(…)` Fehler wird nicht erkannt (H2); `KEEP=1`-Kommentar in `run-m1.sh`/README korrigieren (H3)
+
 ## Nächster Schritt
-M1b: MariaDB, PostgreSQL, nginx, URL-Spike (Krit. 5), CSP-Konsole per Playwright (Krit. 4), `run-m1.sh` inkl. Schematest; Hinweise 1–3 aus `M1a-diff-r1` einarbeiten.
+M2 – Backend-Kern (SPEC §13 M2): architekt plant Slice(s) inkl. Nacharbeit oben → speccritic → Umsetzung.

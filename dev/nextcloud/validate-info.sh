@@ -8,7 +8,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 xsd="$NN_CACHE/info.xsd"
 xml="$NN_REPO_ROOT/nextnotes/appinfo/info.xml"
 mkdir -p "$NN_CACHE"
-[[ -s "$xsd" ]] || curl -fsSL -o "$xsd" https://apps.nextcloud.com/schema/apps/info.xsd
+[[ -s "$xsd" ]] || "${NN_CURL[@]}" -fsSL -o "$xsd" https://apps.nextcloud.com/schema/apps/info.xsd
 xmllint --noout --schema "$xsd" "$xml"
 
 expect() {

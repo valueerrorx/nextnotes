@@ -22,3 +22,9 @@ Option 1:
 - Die App läuft im NC-Rahmen (`#content`), die Upstream-Icon-Leiste bleibt als App-interne Navigation; keine Vollbild-Navigation außerhalb.
 - Jede Upstream-Änderung an einer Seite muss in das abgeleitete Template übertragen werden; der Kopfkommentar plus `make -C nextnotes check-upstream` (ADR 0007) zeigen, welche.
 - Pro Ansicht ein Seitenaufruf (wie Upstream). Kein SPA-Umbau.
+
+## Spike-Ergebnis M1 (2026-11-02)
+Bestanden, kein Fallback nötig. `dev/nextcloud/spike-urls.sh` (in `run-m1.sh`) liefert angemeldet je HTTP 200 mit App-Markup für `/index.php/apps/nextnotes/dashboard.php`, `/apps/nextnotes/dashboard.php`, `/index.php/apps/nextnotes/index.php`, `/apps/nextnotes/index.php`:
+- Apache (`nextcloud:35.0.2-apache`, `htaccess.RewriteBase '/'`, generierte `.htaccess`),
+- nginx (`nginx:stable-alpine` + `nextcloud:35.0.2-fpm`, Referenzkonfiguration der NC-Admin-Doku, `dev/nextcloud/nginx/nextcloud.conf`).
+Voraussetzung für pretty URLs im Betrieb: Apache mit `RewriteBase` bzw. nginx nach Referenzkonfiguration; über `/index.php/…` funktionieren die Routen immer.

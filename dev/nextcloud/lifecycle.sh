@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: 2026 Thomas Weissel
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# lifecycle.sh <env>: frische Instanz → enable → Schema → disable → remove (Done M1.1/3/6); CHECK_PAGE=1 prüft zusätzlich die Seite.
+# lifecycle.sh <env>: frische Instanz → enable → Schema → disable → remove (Done M1.1/3/6); CHECK_PAGE/CHECK_SPIKE/CHECK_CSP=1 prüfen zusätzlich.
 set -euo pipefail
 dir="$(dirname "${BASH_SOURCE[0]}")"
 source "$dir/env.sh"
@@ -35,9 +35,18 @@ tables="$(nn_tables)"
 n="$(grep -c . <<<"$tables" || true)"
 [[ "$n" -eq 11 ]] || die "$n statt 11 oc_nextnotes_*-Tabellen"
 
+# Optionale Prüfungen bei aktivierter App
 if [[ "${CHECK_PAGE:-0}" == 1 ]]; then
 	step "Seite"
 	"$dir/check-page.sh" "$env"
+fi
+if [[ "${CHECK_SPIKE:-0}" == 1 ]]; then
+	step "URL-Spike"
+	"$dir/spike-urls.sh" "$env"
+fi
+if [[ "${CHECK_CSP:-0}" == 1 ]]; then
+	step "CSP"
+	"$dir/check-csp.sh" "$env"
 fi
 
 step "Probe + disable"
@@ -48,7 +57,8 @@ occ "$env" app:disable nextnotes
 step "remove"
 occ "$env" app:remove nextnotes
 apps="$(occ "$env" app:list --output=json)"
-jq -e '(.enabled | has("nextnotes")) or (.disabled | has("nextnotes")) | not' >/dev/null <<<"$apps" \
+# PHP gibt leere Listen als [] aus, daher über keys prüfen
+jq -e '[(.enabled // {}), (.disabled // {})] | map(keys[]) | index("nextnotes") == null' >/dev/null <<<"$apps" \
 	|| die "nextnotes noch in app:list"
 [[ "$(probe "$env" count)" == 1 ]] || die "Probe-Zeile nach app:remove fehlt (SPEC §8)"
 echo "== $env: Lebenszyklus OK"

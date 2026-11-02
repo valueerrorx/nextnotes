@@ -13,6 +13,7 @@ Branch `nextcloud-port`. Ziel: native Nextcloud-App „Next Notes“ (App-ID `ne
 - Liest keine großen Dateien selbst; arbeitet mit Agenten-Berichten.
 - Pro Slice: architekt beschreibt Scope/Dateien/Done → speccritic gibt frei → architekt setzt um → tester testet + speccritic prüft Diff → Lead committet (ein Commit pro Slice) und aktualisiert `STATUS.md`.
 - `architekt` pro Slice frisch starten, nur mit Spec-Abschnitt, betroffenen Dateien, Done-Kriterien. `speccritic` sieht nie die Begründung des Architekten.
+- Jeder Agent führt `docs/progress/<slice>-<rolle>.md` (siehe Agenten-Dateien). Bricht ein Agent ab (Token-Limit, Neustart), frisch starten mit Verweis auf diese Datei („fortsetzen“). Slice-Namen im Auftrag immer nennen. Progress-Dateien gehen mit dem Slice-Commit ins Repo.
 - Max. 2 Review-Runden, dann entscheidet der Lead. Nur der Lead markiert fertig, nur mit ausgeführtem Testnachweis.
 - Kein Push, kein Release, keine Upstream-Änderung ohne Freigabe von Thomas. Stoppen und fragen, wenn ein Gate zweimal fehlschlägt oder der Scope wächst.
 

@@ -11,7 +11,7 @@ x-nc-env: &nc-env
 services:
   nc-sqlite:
     profiles: [sqlite]
-    image: ${NC_APACHE_IMAGE:-nextcloud:35.0.2-apache}
+    image: nextcloud:35.0.2-apache
     pull_policy: missing
     ports: ["127.0.0.1:8081:80"]
     environment:
@@ -21,5 +21,97 @@ services:
     volumes:
       - nc-sqlite:/var/www/html
 
+  db-mariadb:
+    profiles: [mariadb]
+    image: mariadb:11.4
+    pull_policy: missing
+    command: --transaction-isolation=READ-COMMITTED
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: nextcloud
+      MARIADB_USER: nextcloud
+      MARIADB_PASSWORD: nextcloud
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 2s
+      retries: 60
+    volumes:
+      - db-mariadb:/var/lib/mysql
+
+  nc-mariadb:
+    profiles: [mariadb]
+    image: nextcloud:35.0.2-apache
+    pull_policy: missing
+    depends_on:
+      db-mariadb: {condition: service_healthy}
+    ports: ["127.0.0.1:8082:80"]
+    environment:
+      <<: *nc-env
+      MYSQL_HOST: db-mariadb
+      MYSQL_DATABASE: nextcloud
+      MYSQL_USER: nextcloud
+      MYSQL_PASSWORD: nextcloud
+      NEXTCLOUD_INIT_HTACCESS: "1"
+    volumes:
+      - nc-mariadb:/var/www/html
+
+  db-pgsql:
+    profiles: [pgsql]
+    image: postgres:17-alpine
+    pull_policy: missing
+    environment:
+      POSTGRES_DB: nextcloud
+      POSTGRES_USER: nextcloud
+      POSTGRES_PASSWORD: nextcloud
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "nextcloud", "-d", "nextcloud"]
+      interval: 2s
+      retries: 60
+    volumes:
+      - db-pgsql:/var/lib/postgresql/data
+
+  nc-pgsql:
+    profiles: [pgsql]
+    image: nextcloud:35.0.2-apache
+    pull_policy: missing
+    depends_on:
+      db-pgsql: {condition: service_healthy}
+    ports: ["127.0.0.1:8083:80"]
+    environment:
+      <<: *nc-env
+      POSTGRES_HOST: db-pgsql
+      POSTGRES_DB: nextcloud
+      POSTGRES_USER: nextcloud
+      POSTGRES_PASSWORD: nextcloud
+      NEXTCLOUD_INIT_HTACCESS: "1"
+    volumes:
+      - nc-pgsql:/var/www/html
+
+  # nginx + fpm (SQLite): nginx liest dasselbe Volume read-only (App-Kopie, statische Dateien)
+  nc-fpm:
+    profiles: [nginx]
+    image: nextcloud:35.0.2-fpm
+    pull_policy: missing
+    environment:
+      <<: *nc-env
+      SQLITE_DATABASE: nextcloud
+    volumes:
+      - nc-nginx:/var/www/html
+
+  web-nginx:
+    profiles: [nginx]
+    image: nginx:stable-alpine
+    pull_policy: missing
+    depends_on: [nc-fpm]
+    ports: ["127.0.0.1:8084:80"]
+    volumes:
+      - nc-nginx:/var/www/html:ro
+      - ./nginx/nextcloud.conf:/etc/nginx/conf.d/default.conf:ro
+
 volumes:
   nc-sqlite:
+  db-mariadb:
+  nc-mariadb:
+  db-pgsql:
+  nc-pgsql:
+  nc-nginx:

@@ -105,3 +105,9 @@ Teilung angenommen (Lead). **M1 ist erst nach M1b fertig** (Krit. 1/3/6 verlange
 - `db:schema:export --output=json` hat die Tabellennamen auf oberster Ebene (kein `.tables`).
 - `env.sh` wählt `nextcloud:35.0.2-apache`, sonst lokales `nextcloud:35`; `up.sh` bricht ab, wenn die Version nicht 35.0.2 ist. `probe-row.php` läuft per stdin (`php --`), wird nicht kopiert.
 - `info.xml`: `summary` englisch, Kategorie `office` und `organization`, Autor Thomas Weissel, Fork-URL `github.com/valueerrorx/nextnotes`.
+
+**Umsetzung M1b – Abweichungen**
+- Spike und CSP laufen als Hooks in `lifecycle.sh` (`CHECK_SPIKE=1`, `CHECK_CSP=1`) bei aktivierter App statt eigener Frisch-Runde; `nginx` durchläuft den vollen Lebenszyklus plus Schematest (`--db=sqlite`).
+- CSP-Prüfung (`check-csp.sh`, `scripts/check-csp.mjs`) im Testsetup statt unter `tests/` (Auftrag Lead): `playwright-core` (kein Browser-Download) nur in `dev/nextcloud/package.json`, System-Chromium; echter Formular-Login, Detektor-Selbsttest mit verbotener Bildquelle.
+- `down.sh all` nennt die Profile explizit statt `--profile '*'`; alle `curl` mit `--max-time 30` (`NN_CURL`); jq-Prüfung nach `app:remove` robust gegen leere Listen (`[]`).
+- `env.sh` ohne Fallback auf `nextcloud:35`: Images gepinnt.

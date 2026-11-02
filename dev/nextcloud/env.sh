@@ -7,22 +7,15 @@ shopt -s inherit_errexit
 NN_DEV_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NN_REPO_ROOT="$(cd "$NN_DEV_DIR/../.." && pwd)"
 NN_CACHE="$NN_DEV_DIR/.cache"
-NN_ENVS=(sqlite)
+NN_ENVS=(sqlite mariadb pgsql nginx)
 NN_ADMIN_USER=admin
 NN_ADMIN_PASS=admin
 NN_TEST_USER=alice
 NN_TEST_PASS='NextNotes-Alice-2026!'
 NN_NC_VERSION=35.0.2
 
-# Gepinntes Image bevorzugen, sonst lokales nextcloud:35 (Version wird in up.sh geprüft).
-if [[ -z "${NC_APACHE_IMAGE:-}" ]]; then
-	if docker image inspect nextcloud:35.0.2-apache >/dev/null 2>&1; then
-		NC_APACHE_IMAGE=nextcloud:35.0.2-apache
-	else
-		NC_APACHE_IMAGE=nextcloud:35
-	fi
-fi
-export NC_APACHE_IMAGE
+# Alle Aufrufe mit Zeitlimit, damit ein hängender Webserver nicht blockiert
+NN_CURL=(curl --max-time 30)
 
 die() { echo "FEHLER: $*" >&2; exit 1; }
 
@@ -32,16 +25,32 @@ check_env() {
 	die "unbekannte Umgebung '$1' (erlaubt: ${NN_ENVS[*]})"
 }
 
+# Dienst, in dem occ läuft
 svc_for() {
 	case "$1" in
-		sqlite) echo nc-sqlite ;;
+		sqlite|mariadb|pgsql) echo "nc-$1" ;;
+		nginx) echo nc-fpm ;;
 		*) die "keine Dienstzuordnung für '$1'" ;;
+	esac
+}
+
+# Benannte Volumes einer Umgebung (für down.sh)
+vols_for() {
+	case "$1" in
+		sqlite) echo nc-sqlite ;;
+		mariadb) echo nc-mariadb db-mariadb ;;
+		pgsql) echo nc-pgsql db-pgsql ;;
+		nginx) echo nc-nginx ;;
+		*) die "keine Volumes für '$1'" ;;
 	esac
 }
 
 port_for() {
 	case "$1" in
 		sqlite) echo 8081 ;;
+		mariadb) echo 8082 ;;
+		pgsql) echo 8083 ;;
+		nginx) echo 8084 ;;
 		*) die "kein Port für '$1'" ;;
 	esac
 }

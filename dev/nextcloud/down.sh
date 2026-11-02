@@ -7,10 +7,12 @@ source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 
 target="${1:?Aufruf: down.sh <env|all>}"
 if [[ "$target" == all ]]; then
-	dc '*' down -v --remove-orphans
+	profiles=(); for e in "${NN_ENVS[@]}"; do profiles+=(--profile "$e"); done
+	docker compose -f "$NN_DEV_DIR/compose.yaml" "${profiles[@]}" down -v --remove-orphans
 else
 	check_env "$target"
-	# Nur Dienste und Volumes dieses Profils
-	dc "$target" rm -sfv "$(svc_for "$target")"
-	docker volume rm -f "nextnotes-dev_$(svc_for "$target")" >/dev/null
+	# Nur Dienste und Volumes dieses Profils; Netz bleibt für andere Profile
+	mapfile -t svcs < <(dc "$target" config --services)
+	dc "$target" rm -sfv "${svcs[@]}"
+	for v in $(vols_for "$target"); do docker volume rm -f "nextnotes-dev_$v" >/dev/null; done
 fi
