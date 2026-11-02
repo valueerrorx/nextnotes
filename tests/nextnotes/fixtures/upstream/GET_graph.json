@@ -1,0 +1,36 @@
+{
+    "route": "GET /graph",
+    "status": 200,
+    "body": {
+        "edges": [
+            {
+                "source": "int",
+                "target": "int"
+            }
+        ],
+        "folders": [
+            {
+                "icon": "string",
+                "icon_color": "string",
+                "id": "int",
+                "name": "string",
+                "parent_id": "null"
+            }
+        ],
+        "nodes": [
+            {
+                "favorite": "bool",
+                "folder": "string",
+                "folder_id": "int",
+                "icon": "null",
+                "icon_color": "null",
+                "id": "int",
+                "tags": [],
+                "title": "string",
+                "type": "string"
+            }
+        ],
+        "success": "bool",
+        "total": "int"
+    }
+}

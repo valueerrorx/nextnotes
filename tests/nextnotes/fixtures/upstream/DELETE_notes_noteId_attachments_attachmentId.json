@@ -1,0 +1,9 @@
+{
+    "route": "DELETE /notes/{noteId}/attachments/{attachmentId}",
+    "status": 200,
+    "body": {
+        "message": "string",
+        "retained_for_snapshots": "bool",
+        "success": "bool"
+    }
+}

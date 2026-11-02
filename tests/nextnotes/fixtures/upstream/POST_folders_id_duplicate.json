@@ -1,0 +1,19 @@
+{
+    "route": "POST /folders/{id}/duplicate",
+    "status": 201,
+    "body": {
+        "folder": {
+            "id": "int",
+            "name": "string",
+            "parent_id": "null",
+            "workspace": "string"
+        },
+        "folder_id": "int",
+        "folder_name": "string",
+        "message": "string",
+        "notes_count": "int",
+        "source_folder_id": "int",
+        "subfolders_count": "int",
+        "success": "bool"
+    }
+}

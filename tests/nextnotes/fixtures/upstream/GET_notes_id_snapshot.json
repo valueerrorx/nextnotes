@@ -1,0 +1,20 @@
+{
+    "route": "GET /notes/{id}/snapshot",
+    "status": 200,
+    "body": {
+        "exists": "bool",
+        "snapshot": {
+            "content": "string",
+            "created_at": "string",
+            "date": "string",
+            "heading": "string",
+            "manual": "bool",
+            "note_id": "int",
+            "origin": "string",
+            "snapshot_key": "string",
+            "tags": "string",
+            "type": "string"
+        },
+        "success": "bool"
+    }
+}

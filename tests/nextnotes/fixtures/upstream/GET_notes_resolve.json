@@ -1,0 +1,10 @@
+{
+    "route": "GET /notes/resolve",
+    "status": 200,
+    "body": {
+        "heading": "string",
+        "id": "int",
+        "success": "bool",
+        "workspace": "string"
+    }
+}

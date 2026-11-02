@@ -1,0 +1,8 @@
+{
+    "route": "POST /notes/{id}/lock/release",
+    "status": 200,
+    "body": {
+        "released": "bool",
+        "success": "bool"
+    }
+}

@@ -28,6 +28,62 @@ final class ApiClient {
 		return self::raw($method, self::baseUrl() . self::PREFIX . $path, $json, array_merge($this->extraHeaders, $headers), $this->secret === null ? null : $this->uid . ':' . $this->secret);
 	}
 
+	/** Anfrage außerhalb des App-Präfixes (z. B. /ocs/v2.php/…) */
+	public function absolute(string $method, string $path, ?array $json = null): Response {
+		return self::raw($method, self::baseUrl() . $path, $json, $this->extraHeaders, $this->secret === null ? null : $this->uid . ':' . $this->secret);
+	}
+
+	/** Datei-Upload als multipart/form-data (Feld file, weitere Formularfelder) */
+	public function upload(string $path, string $filename, string $bytes, array $fields = [], string $mime = 'application/octet-stream'): Response {
+		$ch = curl_init(self::baseUrl() . self::PREFIX . $path);
+		curl_setopt_array($ch, [
+			CURLOPT_CUSTOMREQUEST => 'POST',
+			CURLOPT_RETURNTRANSFER => true,
+			CURLOPT_HEADER => true,
+			CURLOPT_TIMEOUT => 60,
+			CURLOPT_USERPWD => $this->uid . ':' . $this->secret,
+			CURLOPT_HTTPHEADER => array_merge($this->extraHeaders, ['Accept: application/json']),
+			CURLOPT_POSTFIELDS => ['file' => new \CURLStringFile($bytes, $filename, $mime)] + $fields,
+		]);
+		return self::toResponse($ch, (string)curl_exec($ch));
+	}
+
+	/**
+	 * Mehrere Uploads gleichzeitig (curl_multi); $uploads = [[Pfad, Dateiname, Bytes], …]
+	 * @return Response[]
+	 */
+	public function parallelUpload(array $uploads): array {
+		$mh = curl_multi_init();
+		$handles = [];
+		foreach ($uploads as $i => [$path, $filename, $bytes]) {
+			$ch = curl_init(self::baseUrl() . self::PREFIX . $path);
+			curl_setopt_array($ch, [
+				CURLOPT_CUSTOMREQUEST => 'POST',
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_HEADER => true,
+				CURLOPT_TIMEOUT => 60,
+				CURLOPT_USERPWD => $this->uid . ':' . $this->secret,
+				CURLOPT_HTTPHEADER => array_merge($this->extraHeaders, ['Accept: application/json']),
+				CURLOPT_POSTFIELDS => ['file' => new \CURLStringFile($bytes, $filename, 'application/octet-stream')],
+			]);
+			$handles[$i] = $ch;
+			curl_multi_add_handle($mh, $ch);
+		}
+		do {
+			$st = curl_multi_exec($mh, $running);
+			if ($running) {
+				curl_multi_select($mh, 1.0);
+			}
+		} while ($running && $st === CURLM_OK);
+		$out = [];
+		foreach ($handles as $i => $ch) {
+			$out[$i] = self::toResponse($ch, (string)curl_multi_getcontent($ch));
+			curl_multi_remove_handle($mh, $ch);
+		}
+		curl_multi_close($mh);
+		return $out;
+	}
+
 	/** Mehrere Anfragen gleichzeitig (curl_multi), Reihenfolge der Antworten = Eingabe */
 	public function parallel(array $requests): array {
 		$mh = curl_multi_init();

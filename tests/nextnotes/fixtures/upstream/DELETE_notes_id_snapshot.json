@@ -1,0 +1,9 @@
+{
+    "route": "DELETE /notes/{id}/snapshot",
+    "status": 200,
+    "body": {
+        "message": "string",
+        "snapshot_key": "string",
+        "success": "bool"
+    }
+}

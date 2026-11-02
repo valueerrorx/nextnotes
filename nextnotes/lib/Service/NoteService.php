@@ -14,6 +14,8 @@ use OCA\NextNotes\Db\FolderMapper;
 use OCA\NextNotes\Db\Note;
 use OCA\NextNotes\Db\NoteMapper;
 use OCA\NextNotes\Db\NoteTagMapper;
+use OCA\NextNotes\Db\LockMapper;
+use OCA\NextNotes\Db\SnapshotMapper;
 use OCA\NextNotes\Db\Workspace;
 use OCA\NextNotes\Service\Exception\BadRequestException;
 use OCA\NextNotes\Service\Exception\ConflictException;
@@ -49,6 +51,11 @@ class NoteService {
 		private ITimeFactory $time,
 		private IDateTimeZone $timeZone,
 		private IL10N $l,
+		private AttachmentService $attachments,
+		private SnapshotService $snapshots,
+		private SnapshotMapper $snapshotRows,
+		private LockService $locks,
+		private LockMapper $lockRows,
 	) {
 	}
 
@@ -383,8 +390,10 @@ class NoteService {
 	}
 
 	/** @return array<string, mixed> PATCH /notes/{id} */
-	public function update(string $uid, int $id, array $in, string $ifMatch): array {
+	public function update(string $uid, int $id, array $in, string $ifMatch, string $session): array {
 		$note = $this->access->requireNote($uid, $id, 'write');
+		// ADR 0005: gültige Sperre einer anderen Sitzung → 423, danach Versionsprüfung → 409
+		$this->locks->assertCanSave($uid, $id, $session);
 		$expected = trim((string)($in['if_version'] ?? ''));
 		if ($expected === '' && $ifMatch !== '') {
 			$expected = trim(str_starts_with($ifMatch, 'W/') ? substr($ifMatch, 2) : $ifMatch, '" ');
@@ -408,6 +417,9 @@ class NoteService {
 		$stateHash = (isset($in['state_hash']) && is_string($in['state_hash']) && preg_match('/^[0-9a-f-]{1,80}$/', $in['state_hash'])) ? $in['state_hash'] : null;
 
 		return $this->tx->run(function () use ($uid, $note, $in, $heading, $oldHeading, $content, $tagList, $stateHash) {
+			if ($content !== null || $heading !== $oldHeading || $tagList !== null) {
+				$this->snapshots->autoBefore($note, $uid);
+			}
 			$sourceWs = (int)$note->getWorkspaceId();
 			$wsId = $sourceWs;
 			$ws = null;
@@ -497,15 +509,46 @@ class NoteService {
 	}
 
 	// sendBeacon beim Verlassen der Seite (FormData)
-	public function beacon(string $uid, int $id, mixed $content): void {
+	public function beacon(string $uid, int $id, mixed $content, string $session): void {
 		if (!is_scalar($content) || (string)$content === '') {
 			throw new BadRequestException('Content is required');
 		}
 		$note = $this->access->requireNote($uid, $id, 'write');
-		$this->applyContent($note, (string)$content);
-		$note->setUpdatedAt($this->now());
-		$note->setUpdatedBy($uid);
-		$this->notes->update($note);
+		$this->locks->assertCanSave($uid, $id, $session);
+		$this->tx->run(function () use ($note, $content, $uid) {
+			$this->snapshots->autoBefore($note, $uid);
+			$this->applyContent($note, (string)$content);
+			$note->setUpdatedAt($this->now());
+			$note->setUpdatedBy($uid);
+			$this->notes->update($note);
+		});
+	}
+
+	/** @return array<string, mixed> POST /notes/{id}/snapshot/restore */
+	public function restoreSnapshot(string $uid, int $id, string $key, ?string $date, bool $meta): array {
+		$note = $this->access->requireNote($uid, $id, 'write');
+		$snapshot = $this->snapshots->require($note, $key, $date);
+		return $this->tx->run(function () use ($uid, $note, $snapshot, $meta) {
+			$now = $this->now();
+			$changedHeading = null;
+			$heading = trim((string)$snapshot->getHeading());
+			if ($meta && $heading !== '' && $heading !== (string)$note->getHeading()) {
+				$changedHeading = $this->uniqueHeading((int)$note->getWorkspaceId(), $note->getFolderId(), $heading, (int)$note->getId());
+				$note->setHeading($changedHeading);
+				foreach ($this->notes->findList($this->access->writableWorkspaceIds($uid), ['linked_note_id' => (int)$note->getId()], true) as $link) {
+					$link->setHeading($changedHeading);
+					$link->setUpdatedAt($now);
+					$link->setUpdatedBy($uid);
+					$this->refreshSearch($link);
+					$this->notes->update($link);
+				}
+			}
+			$this->applyContent($note, (string)$snapshot->getContent());
+			$note->setUpdatedAt($now);
+			$note->setUpdatedBy($uid);
+			$this->notes->update($note);
+			return ['message' => 'Note restored to snapshot state', 'heading' => $changedHeading, 'tags' => null];
+		});
 	}
 
 	/** @return array<string, mixed> DELETE /notes/{id} */
@@ -569,7 +612,7 @@ class NoteService {
 		return ['message' => 'Note restored successfully', 'note' => ['id' => $id, 'heading' => $note->getHeading()]];
 	}
 
-	// Endgültig löschen; M2b ergänzt Anhänge/Snapshots, M2c Erinnerungen
+	// Endgültig löschen: Tags, Anhänge (Dateien nach dem Commit), Snapshots, Sperren; M2c ergänzt Erinnerungen
 	/** @param int[] $ids */
 	public function purge(array $ids): void {
 		$ids = array_values(array_unique(array_map('intval', $ids)));
@@ -578,6 +621,9 @@ class NoteService {
 		}
 		$this->tx->run(function () use ($ids) {
 			$this->tagRows->deleteForNotes($ids);
+			$this->attachments->purge($ids);
+			$this->snapshotRows->deleteForNotes($ids);
+			$this->lockRows->deleteForNotes($ids);
 			$this->notes->deleteByIds($ids);
 		});
 	}
@@ -594,6 +640,7 @@ class NoteService {
 		}
 		$tags = $this->validator->noteTags($in['tags']);
 		$this->tx->run(function () use ($note, $tags, $uid) {
+			$this->snapshots->autoBefore($note, $uid);
 			$this->tags->replace((int)$note->getId(), $tags);
 			$note->setUpdatedAt($this->now());
 			$note->setUpdatedBy($uid);

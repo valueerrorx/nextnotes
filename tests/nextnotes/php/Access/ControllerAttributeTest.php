@@ -18,8 +18,8 @@ use PHPUnit\Framework\TestCase;
 
 // Done M2a 7 / SPEC §4.5: alle API-Methoden NoAdminRequired, CSRF aktiv außer Allowlist, nie PublicPage
 final class ControllerAttributeTest extends TestCase {
-	// "Klasse::methode" mit #[NoCSRFRequired]; M2a: keine (M2b: Anhang-GET)
-	private const CSRF_ALLOWLIST = [];
+	// "Klasse::methode" mit #[NoCSRFRequired]; M2b: Anhang-GET (wird als <img src> geladen)
+	private const CSRF_ALLOWLIST = ['AttachmentsApiController::show'];
 
 	/** @return array<string, \ReflectionMethod> */
 	private static function apiMethods(): array {
@@ -43,7 +43,7 @@ final class ControllerAttributeTest extends TestCase {
 
 	public function testEveryApiMethodHasExpectedAttributes(): void {
 		$methods = self::apiMethods();
-		self::assertGreaterThanOrEqual(53, count($methods), 'zu wenige API-Methoden gefunden');
+		self::assertGreaterThanOrEqual(76, count($methods), 'zu wenige API-Methoden gefunden');
 		$errors = [];
 		foreach ($methods as $name => $m) {
 			$attrs = array_map(static fn ($a) => $a->getName(), $m->getAttributes());

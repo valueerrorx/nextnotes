@@ -1,6 +1,6 @@
 # Status Nextcloud-Port „Next Notes“
 
-**Aktueller Meilenstein:** M2 – Backend-Kern (M2a fertig, weiter M2b); M1 fertig
+**Aktueller Meilenstein:** M2 – Backend-Kern (M2a, M2b fertig, weiter M2c); M1 fertig
 
 ## Erledigte Slices
 - Setup: Branch `nextcloud-port`, Agenten unter `.claude/agents/`, `UPSTREAM.md`
@@ -46,6 +46,8 @@
 ## Entscheidungen Thomas zu M2 (2026-11-02)
 - Plan-O5: Standard-Workspace heißt „Notizen“ (lokalisiert), keine Willkommensnotiz
 - M2a-diff-r1 Blocker 1: Workspace löschen verschiebt Inhalte nur in einen eigenen, nicht geteilten Workspace (sonst Standard-Workspace anlegen) – nie in geteilte
+- Leitlinie (Thomas, 2026-11-02): Reihenfolge M2b→M2c→M2d→M3 beibehalten; Lead entscheidet wo möglich selbst. Ziel: bugfrei, performant, einfache UI, MS Teams nur als lose Orientierung (bekannte Begriffe/Abläufe), nicht kopieren – Poznote-UI ist Basis, eigene bessere Lösungen erwünscht
+- M2b: Anhang-Quote zählt gegen den Workspace-Besitzer (auch bei Uploads durch Freigabe-Empfänger/Team)
 
 ## M2 (laufend)
 - Plan `docs/slices/M2-plan.md` r1: Slices M2a (Gerüst, Rechte, Notizen/Ordner/Workspaces/Tags/Papierkorb, M1-Nacharbeit), M2b (Anhänge, Snapshots, Suche, Sperre, Unified Search), M2c (Tasks, Mentions, Erinnerungen, Settings, Konvertierung), M2d (Kontolöschung, Abschlusslauf 3 DBs)
@@ -54,10 +56,14 @@
 - M2a erledigt: Nacharbeit M1, Grundgerüst (AccessService, Fehler-Middleware, HtmlSanitizer, InputValidator, Workspace-Schlüssel), 53 Routen (Notizen, Ordner, Workspaces, Tags, Papierkorb), PHPUnit-Setup, Upstream-Fixtures. Review `M2a-diff-r1` (BLOCKER: Workspace-Löschen verschob in geteilte Workspaces → Thomas-Entscheid) → `M2a-diff-r2` (FREIGABE, N1 umgesetzt). SPEC §11.2 B12–B20.
   Lead: fremde IDs in `POST /notes/reorder` (`scope=kanban`, `visible_order`) und `linked_note_id` bei `PATCH /notes/{id}` werden ignoriert (200, kein Leck, A unverändert, wie Upstream) – akzeptiert.
   Testnachweis (tester, frische Instanzen NC 35.0.2): `run-m2.sh sqlite mariadb pgsql` Exit 0, je 110 Tests/2173 Assertions; `mysql.utf8mb4`=true; `check-forbidden-sql.sh` 0 Treffer (Selbsttest ok); Gegenprobe (`requireNote` für `linked_note_id` entfernt → Isolationstest rot, Code zurückgesetzt); `down.sh all` 0.
-- Offen für M3: `requesttoken` im Beacon-FormData (B4); Sperr-Banner bei gleichem Konto in zweitem Tab (R11); Escaping von Tags mit `'` im Frontend.
+- M2b erledigt: Anhänge (IAppData, Quote je Workspace-Besitzer mit Sperre in Transaktion, Inline-Regel B22), Snapshots, Suche, Sperre (ADR 0005, B13), indirekte Lesepfade, Unified Search, LockCleanup-/SnapshotRetentionJob. Review `M2b-diff-r1` (BLOCKER: Doku Anhang-Auslieferung, B13) → `M2b-diff-r2` (FREIGABE).
+  Testnachweis (tester, frische Instanzen NC 35.0.2): `run-m2.sh sqlite mariadb pgsql` Exit 0, je 153 Tests; `check-forbidden-sql.sh` 0; Gegenprobe (Leserecht in `AttachmentService::download`, `holder_uid` in `LockMapper::takeOver` entfernt → Isolation/Lock/Attachment/IndirectRead rot, zurückgesetzt); `down.sh all` 0.
+  Lead: PDF-Anhänge behalten NC-Standard-CSP (`frame-ancestors 'none'`); falls M3 PDF im iFrame zeigt, dort `'self'` ergänzen (ADR 0012 prüfen).
+- Offen für M3: PDF-Vorschau im iFrame (CSP, s. o.); `requesttoken` im Beacon-FormData (B4); Sperr-Banner bei gleichem Konto in zweitem Tab (R11); Escaping von Tags mit `'` im Frontend.
 
 ## Nacharbeit (vor/mit M2)
 - erledigt in M2a
+- M2d: SQLite-Schreibsperre bei parallelen Uploads liefert 500 (LockWaitTimeoutException) → sauber als 503 mit Retry-After abbilden; Workspace/Summe vor Transaktion lesen, `lockOwner` als erste Anweisung (M2b-diff-r2)
 
 ## Nächster Schritt
-M2b – Anhänge, Snapshots, Suche, Sperre, Unified Search (Plan §2 M2b): architekt setzt um → tester + speccritic.
+M2c – Tasks, Mentions, Erinnerungen/ReminderJob, Settings, System, Users, Konvertierung (501) (Plan §2 M2c): architekt setzt um → tester + speccritic.

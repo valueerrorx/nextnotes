@@ -1,0 +1,18 @@
+{
+    "route": "GET /notes/{noteId}/attachments",
+    "status": 200,
+    "body": {
+        "attachments": [
+            {
+                "file_size": "int",
+                "file_type": "string",
+                "filename": "string",
+                "id": "string",
+                "original_filename": "string",
+                "uploaded_at": "string"
+            }
+        ],
+        "entry": "string",
+        "success": "bool"
+    }
+}

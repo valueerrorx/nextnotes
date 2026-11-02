@@ -9,9 +9,14 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Controller;
 
+use OCA\NextNotes\Service\AttachmentService;
+use OCA\NextNotes\Service\ChangesService;
+use OCA\NextNotes\Service\DuplicateService;
 use OCA\NextNotes\Service\Exception\BadRequestException;
 use OCA\NextNotes\Service\InputValidator;
+use OCA\NextNotes\Service\LockService;
 use OCA\NextNotes\Service\NoteService;
+use OCA\NextNotes\Service\SearchService;
 use OCA\NextNotes\Service\WorkspaceService;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\JSONResponse;
@@ -26,8 +31,76 @@ class NotesApiController extends ApiController {
 		WorkspaceService $workspaces,
 		private NoteService $notes,
 		private InputValidator $validator,
+		private SearchService $search,
+		private ChangesService $changes,
+		private LockService $locks,
+		private DuplicateService $duplicates,
+		private AttachmentService $attachments,
 	) {
 		parent::__construct($request, $userSession, $workspaces);
+	}
+
+	// Editor-Sitzung aus Header oder Body (Upstream getEditorSessionId)
+	private function editorSession(): string {
+		$fromBody = $this->param('editor_session_id');
+		if (is_scalar($fromBody) && trim((string)$fromBody) !== '') {
+			return trim((string)$fromBody);
+		}
+		return trim($this->request->getHeader('X-Editor-Session-ID'));
+	}
+
+	#[NoAdminRequired]
+	public function resolve(): JSONResponse {
+		return $this->ok($this->search->resolve($this->uid(), $this->param('reference'), $this->param('workspace')));
+	}
+
+	#[NoAdminRequired]
+	public function search(): JSONResponse {
+		return $this->ok($this->search->search($this->uid(), $this->input()));
+	}
+
+	#[NoAdminRequired]
+	public function searchIds(): JSONResponse {
+		return $this->ok($this->search->ids($this->uid(), $this->input()));
+	}
+
+	#[NoAdminRequired]
+	public function withAttachments(): JSONResponse {
+		return $this->ok($this->attachments->withAttachments($this->uid(), $this->param('workspace')));
+	}
+
+	#[NoAdminRequired]
+	public function changes(): JSONResponse {
+		return $this->ok($this->changes->changes($this->uid(), $this->param('workspace'), $this->param('note_ids')));
+	}
+
+	// takeover wird ignoriert (ADR 0005, SPEC §11.2 B13)
+	#[NoAdminRequired]
+	public function acquireLock(int $id): JSONResponse {
+		return $this->ok($this->locks->acquire($this->uid(), $id, $this->editorSession()));
+	}
+
+	#[NoAdminRequired]
+	public function lockStatus(int $id): JSONResponse {
+		return $this->ok($this->locks->status($this->uid(), $id, $this->editorSession()));
+	}
+
+	#[NoAdminRequired]
+	public function heartbeatLock(int $id): JSONResponse {
+		$data = $this->locks->acquire($this->uid(), $id, $this->editorSession());
+		return $this->ok(['lock' => $data['lock']]);
+	}
+
+	#[NoAdminRequired]
+	public function releaseLock(int $id): JSONResponse {
+		return $this->ok(['released' => $this->locks->release($this->uid(), $id, $this->editorSession())]);
+	}
+
+	#[NoAdminRequired]
+	public function duplicate(int $id): JSONResponse {
+		$in = $this->input();
+		unset($in['id']);
+		return $this->ok($this->duplicates->duplicateNote($this->uid(), $id, $in));
 	}
 
 	#[NoAdminRequired]
@@ -68,7 +141,7 @@ class NotesApiController extends ApiController {
 	public function update(int $id): JSONResponse {
 		$in = $this->input();
 		unset($in['id']);
-		$data = $this->notes->update($this->uid(), $id, $in, (string)$this->request->getHeader('If-Match'));
+		$data = $this->notes->update($this->uid(), $id, $in, (string)$this->request->getHeader('If-Match'), $this->editorSession());
 		$response = $this->ok($data);
 		$response->setETag($data['note']['version']);
 		return $response;
@@ -87,7 +160,7 @@ class NotesApiController extends ApiController {
 
 	#[NoAdminRequired]
 	public function beacon(int $id): JSONResponse {
-		$this->notes->beacon($this->uid(), $id, $this->param('content'));
+		$this->notes->beacon($this->uid(), $id, $this->param('content'), $this->editorSession());
 		return $this->ok(['id' => $id]);
 	}
 

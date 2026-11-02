@@ -1,0 +1,22 @@
+{
+    "route": "GET /notes/search",
+    "status": 200,
+    "body": {
+        "count": "int",
+        "query": "string",
+        "results": [
+            {
+                "created": "string",
+                "excerpt": "string",
+                "folder": "null",
+                "folder_id": "int",
+                "heading": "string",
+                "id": "int",
+                "tags": "string",
+                "updated": "string",
+                "workspace": "string"
+            }
+        ],
+        "success": "bool"
+    }
+}

@@ -1,0 +1,14 @@
+{
+    "route": "POST /notes/{noteId}/attachments/{attachmentId}/move",
+    "status": 200,
+    "body": {
+        "attachment_id": "string",
+        "kept_in_source": "bool",
+        "message": "string",
+        "source_note_id": "int",
+        "success": "bool",
+        "target_note_heading": "string",
+        "target_note_id": "int",
+        "target_workspace": "string"
+    }
+}

@@ -1,0 +1,15 @@
+{
+    "route": "GET /notes/{id}/backlinks",
+    "status": 200,
+    "body": {
+        "backlinks": [
+            {
+                "heading": "string",
+                "id": "int",
+                "workspace": "string"
+            }
+        ],
+        "count": "int",
+        "success": "bool"
+    }
+}

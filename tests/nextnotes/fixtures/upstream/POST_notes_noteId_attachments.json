@@ -1,0 +1,10 @@
+{
+    "route": "POST /notes/{noteId}/attachments",
+    "status": 201,
+    "body": {
+        "attachment_id": "string",
+        "filename": "string",
+        "message": "string",
+        "success": "bool"
+    }
+}

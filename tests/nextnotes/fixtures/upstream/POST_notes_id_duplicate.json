@@ -1,0 +1,11 @@
+{
+    "route": "POST /notes/{id}/duplicate",
+    "status": 200,
+    "body": {
+        "heading": "string",
+        "id": "int",
+        "message": "string",
+        "share_delta": "int",
+        "success": "bool"
+    }
+}

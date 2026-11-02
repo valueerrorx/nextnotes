@@ -1,0 +1,18 @@
+{
+    "route": "POST /notes/{id}/lock/heartbeat",
+    "status": 200,
+    "body": {
+        "lock": {
+            "expires_at": "string",
+            "holder_is_current_editor_session": "bool",
+            "holder_is_current_user": "bool",
+            "holder_is_public": "bool",
+            "holder_login_user_id": "int",
+            "holder_username": "string",
+            "last_seen_at": "string",
+            "note_id": "int",
+            "target_user_id": "int"
+        },
+        "success": "bool"
+    }
+}

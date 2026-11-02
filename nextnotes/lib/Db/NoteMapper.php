@@ -36,7 +36,7 @@ class NoteMapper extends QBMapper {
 
 	/**
 	 * Notizen (role=note) in den Workspaces, ohne Inhalt.
-	 * Filter: folder_id (int|null für Wurzel), favorite, trashed (bool), search (normalisiert), created_from/created_to (Unix), linked_note_id, folder_ids (int[])
+	 * Filter: folder_id (int|null für Wurzel), favorite, trashed (bool), search (normalisiert), created_from/created_to (Unix), linked_note_id, folder_ids (int[]), types (string[]), content_any (Teilzeichenketten, ODER)
 	 * @param int[] $workspaceIds
 	 * @param array<string, mixed> $filter
 	 * @return Note[]
@@ -91,6 +91,16 @@ class NoteMapper extends QBMapper {
 		}
 		if (isset($filter['created_to'])) {
 			$qb->andWhere($expr->lte('created_at', $qb->createNamedParameter((int)$filter['created_to'], IQueryBuilder::PARAM_INT)));
+		}
+		if (isset($filter['types'])) {
+			$qb->andWhere($expr->in('type', $qb->createNamedParameter(array_values($filter['types']), IQueryBuilder::PARAM_STR_ARRAY)));
+		}
+		if (isset($filter['content_any'])) {
+			$or = [];
+			foreach ($filter['content_any'] as $needle) {
+				$or[] = $expr->like('content', $qb->createNamedParameter('%' . $this->db->escapeLikeParameter((string)$needle) . '%'));
+			}
+			$qb->andWhere($or === [] ? $expr->eq($qb->createNamedParameter(1), $qb->createNamedParameter(0)) : $expr->orX(...$or));
 		}
 		if (isset($filter['exclude_id'])) {
 			$qb->andWhere($expr->neq('id', $qb->createNamedParameter((int)$filter['exclude_id'], IQueryBuilder::PARAM_INT)));

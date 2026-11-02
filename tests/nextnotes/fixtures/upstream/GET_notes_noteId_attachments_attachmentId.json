@@ -1,0 +1,5 @@
+{
+    "route": "GET /notes/{noteId}/attachments/{attachmentId}",
+    "status": 200,
+    "body": "null"
+}

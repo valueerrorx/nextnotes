@@ -1,0 +1,26 @@
+{
+    "route": "GET /notes/with-attachments",
+    "status": 200,
+    "body": {
+        "count": "int",
+        "notes": [
+            {
+                "attachments": [
+                    {
+                        "file_size": "int",
+                        "file_type": "string",
+                        "filename": "string",
+                        "id": "string",
+                        "original_filename": "string",
+                        "uploaded_at": "string"
+                    }
+                ],
+                "entry": "string",
+                "heading": "string",
+                "id": "int",
+                "updated": "string"
+            }
+        ],
+        "success": "bool"
+    }
+}

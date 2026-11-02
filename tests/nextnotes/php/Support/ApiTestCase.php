@@ -63,14 +63,14 @@ abstract class ApiTestCase extends TestCase {
 	}
 
 	/** @return list<array<string, mixed>> */
-	private static function rows(string $table, string $col, array $ids): array {
+	private static function rows(string $table, string $col, array $ids, string $order = 'id'): array {
 		if ($ids === []) {
 			return [];
 		}
 		$qb = self::db()->getQueryBuilder();
 		$qb->select('*')->from($table)
 			->where($qb->expr()->in($col, $qb->createNamedParameter($ids, IQueryBuilder::PARAM_INT_ARRAY)))
-			->orderBy('id');
+			->orderBy($order);
 		$rows = $qb->executeQuery()->fetchAllAssociative();
 		// DB-Treiber liefern Zahlen teils als String → einheitlich
 		return array_map(static fn (array $r) => array_map(static fn ($v) => $v === null ? null : (string)$v, $r), $rows);
@@ -93,6 +93,9 @@ abstract class ApiTestCase extends TestCase {
 			'folders' => $folders,
 			'notes' => $notes,
 			'tags' => self::rows('nextnotes_note_tags', 'note_id', $noteIds),
+			'attachments' => self::rows('nextnotes_attachments', 'note_id', $noteIds),
+			'snapshots' => self::rows('nextnotes_snapshots', 'note_id', $noteIds),
+			'locks' => self::rows('nextnotes_locks', 'note_id', $noteIds, 'note_id'),
 			'shares' => self::rows('nextnotes_ws_shares', 'workspace_id', $ws),
 			'prefs' => $qb->executeQuery()->fetchAllAssociative(),
 		];
@@ -107,8 +110,10 @@ abstract class ApiTestCase extends TestCase {
 				->where($qb->expr()->in('workspace_id', $qb->createNamedParameter($ws, IQueryBuilder::PARAM_INT_ARRAY)));
 			$noteIds = array_map('intval', $qb->executeQuery()->fetchFirstColumn());
 			if ($noteIds !== []) {
-				$qb = $db->getQueryBuilder();
-				$qb->delete('nextnotes_note_tags')->where($qb->expr()->in('note_id', $qb->createNamedParameter($noteIds, IQueryBuilder::PARAM_INT_ARRAY)))->executeStatement();
+				foreach (['nextnotes_note_tags', 'nextnotes_attachments', 'nextnotes_snapshots', 'nextnotes_locks'] as $t) {
+					$qb = $db->getQueryBuilder();
+					$qb->delete($t)->where($qb->expr()->in('note_id', $qb->createNamedParameter($noteIds, IQueryBuilder::PARAM_INT_ARRAY)))->executeStatement();
+				}
 			}
 			foreach (['nextnotes_notes', 'nextnotes_folders', 'nextnotes_ws_shares'] as $t) {
 				$qb = $db->getQueryBuilder();
@@ -134,6 +139,31 @@ abstract class ApiTestCase extends TestCase {
 		self::assertTrue($r->ok(), "$what: erwartet 2xx, erhalten " . $r->describe());
 		$j = $r->json();
 		return is_array($j) ? $j : [];
+	}
+
+	/** Eigener Workspace per Name → ID */
+	protected static function ownWsId(string $uid, string $name): int {
+		foreach (self::dump($uid)['workspaces'] as $w) {
+			if ($w['name'] === $name) {
+				return (int)$w['id'];
+			}
+		}
+		self::fail("Workspace $name von $uid fehlt");
+	}
+
+	/** Workspace per HTTP anlegen; liefert [Name, ID] */
+	protected static function newWorkspace(ApiClient $c, string $prefix = 'W'): array {
+		$name = $prefix . ' ' . bin2hex(random_bytes(3));
+		self::ok($c->call('POST', '/workspaces', ['name' => $name]), "Workspace $name");
+		return [$name, self::ownWsId($c->uid, $name)];
+	}
+
+	protected static function newNote(ApiClient $c, string $ws, string $heading, string $content, ?int $folder = null): int {
+		$body = ['heading' => $heading, 'content' => $content, 'workspace' => $ws];
+		if ($folder !== null) {
+			$body['folder_id'] = $folder;
+		}
+		return (int)self::ok($c->call('POST', '/notes', $body), "Notiz $heading")['note']['id'];
 	}
 
 	/** Workspace-Namen, die der Benutzer per GET /workspaces sieht */

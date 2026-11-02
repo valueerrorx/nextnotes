@@ -1,0 +1,10 @@
+{
+    "route": "GET /notes/search/ids",
+    "status": 200,
+    "body": {
+        "ids": [
+            "int"
+        ],
+        "success": "bool"
+    }
+}

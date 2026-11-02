@@ -23,6 +23,10 @@ Based on Poznote by Timothé Poznanski (MIT).]]></description>
 		<php min-version="8.3" max-version="8.5"/>
 		<nextcloud min-version="35" max-version="35"/>
 	</dependencies>
+	<background-jobs>
+		<job>OCA\NextNotes\BackgroundJob\LockCleanupJob</job>
+		<job>OCA\NextNotes\BackgroundJob\SnapshotRetentionJob</job>
+	</background-jobs>
 	<navigations>
 		<navigation>
 			<name>Next Notes</name>

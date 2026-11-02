@@ -1,0 +1,10 @@
+{
+    "route": "POST /notes/{id}/snapshot/restore",
+    "status": 200,
+    "body": {
+        "heading": "null",
+        "message": "string",
+        "success": "bool",
+        "tags": "null"
+    }
+}

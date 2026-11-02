@@ -19,11 +19,12 @@ use PHPUnit\Framework\Attributes\DataProvider;
 /**
  * Done M2a 3 / SPEC §13 M2.2, Plan §3.3: Port von tests/integration/isolation.test.php.
  * Jede API-Route aus routes.php braucht einen Eintrag in routeTable() (sonst rot).
- * Platzhalter {ws} {f1} {f2} {n1} {n2} {n3} {tag} in Pfad/Query/Body sind ID-Stellen (Slots);
+ * Platzhalter {ws} {f1} {f2} {n1} {n2} {n3} {tag} {title} {att} {snap} in Pfad/Query/Body sind ID-Stellen (Slots);
  * je Fall: Variante „alle A“ und je Slot „nur dieser A, Rest B“. B → 403/404 (strict) und kein
  * A-Marker; A-Daten vorher = nachher; Kontrolle A (alle A) und B (alle B) → 2xx.
  * Slots in 'hints' sind reine Filterangaben (z. B. ?workspace= neben einer Objekt-ID): dort gilt nur
- * „kein Marker, A unverändert“, kein Statuszwang.
+ * „kein Marker, A unverändert“, kein Statuszwang. Fälle mit 'upload' senden multipart (Feld file + Body als Formular).
+ * SCOPED-Einträge dürfen eine feste 'query' (z. B. Suchbegriff) mitbringen.
  */
 final class IsolationTest extends ApiTestCase {
 	private const KINDS = ['owned', 'scoped', 'scoped-write'];
@@ -42,9 +43,28 @@ final class IsolationTest extends ApiTestCase {
 			'POST /notes/favorites/clear' => ['owned', 'cases' => [
 				['path' => '/notes/favorites/clear', 'body' => ['workspace' => '{ws}']],
 			]],
+			'GET /notes/resolve' => ['owned', 'cases' => [
+				['path' => '/notes/resolve', 'query' => ['reference' => '{n1}', 'workspace' => '{ws}'], 'hints' => $hq],
+				['path' => '/notes/resolve', 'query' => ['reference' => '{title}']],
+			]],
+			// Suchbegriff "N1" trifft die N1-Notiz beider Benutzer; B darf nur die eigene sehen
+			'GET /notes/search' => ['scoped', 'path' => '/notes/search', 'query' => ['q' => 'N1'], 'sees' => 'n1'],
+			'GET /notes/search/ids' => ['scoped', 'path' => '/notes/search/ids', 'query' => ['q' => 'N1'], 'sees' => null],
+			'GET /notes/{}/backlinks' => ['owned', 'cases' => [
+				['path' => '/notes/{n1}/backlinks', 'query' => $wsQ, 'hints' => $hq],
+				['path' => '/notes/{n1}/backlinks', 'query' => ['workspace' => '{ws}', 'all_workspaces' => '1'], 'hints' => $hq],
+			]],
+			'GET /graph' => ['scoped', 'path' => '/graph', 'sees' => 'n1'],
+			'GET /notes/with-attachments' => ['scoped', 'path' => '/notes/with-attachments', 'sees' => 'n1'],
 			'GET /notes/templates' => ['scoped', 'path' => '/notes/templates', 'sees' => null],
 			'GET /notes' => ['scoped', 'path' => '/notes', 'sees' => 'n1'],
 			'GET /notes/{}' => ['owned', 'cases' => [['path' => '/notes/{n1}', 'query' => $wsQ, 'hints' => $hq]]],
+			// fremde Notiz-IDs gelten als „missing“ (200), der Workspace-Filter ist eine Objekt-ID
+			'GET /changes' => ['owned', 'cases' => [['path' => '/changes', 'query' => ['workspace' => '{ws}', 'note_ids' => '{n1}'], 'hints' => ['query.note_ids']]]],
+			'POST /notes/{}/lock' => ['owned', 'cases' => [['path' => '/notes/{n1}/lock', 'body' => ['editor_session_id' => 'iso-s1']]]],
+			'GET /notes/{}/lock' => ['owned', 'cases' => [['path' => '/notes/{n1}/lock']]],
+			'POST /notes/{}/lock/heartbeat' => ['owned', 'cases' => [['path' => '/notes/{n1}/lock/heartbeat', 'body' => ['editor_session_id' => 'iso-s1']]]],
+			'POST /notes/{}/lock/release' => ['owned', 'cases' => [['path' => '/notes/{n1}/lock/release', 'body' => ['editor_session_id' => 'iso-s1']]]],
 			'POST /notes' => ['owned', 'cases' => [
 				['path' => '/notes', 'body' => ['heading' => 'Neu', 'content' => '<p>neu</p>', 'workspace' => '{ws}', 'folder_id' => '{f1}']],
 				['path' => '/notes', 'body' => ['heading' => 'Kurz', 'type' => 'linked', 'workspace' => '{ws}', 'linked_note_id' => '{n2}']],
@@ -70,6 +90,16 @@ final class IsolationTest extends ApiTestCase {
 			'PUT /notes/{}/pinned' => ['owned', 'cases' => [['path' => '/notes/{n1}/pinned', 'body' => ['pinned' => true]]]],
 			'PUT /notes/{}/content-width' => ['owned', 'cases' => [['path' => '/notes/{n1}/content-width', 'body' => ['content_width' => 80]]]],
 			'PUT /notes/{}/title-style' => ['owned', 'cases' => [['path' => '/notes/{n1}/title-style', 'body' => ['title_color' => '#112233', 'title_size' => 24]]]],
+			'POST /notes/{}/duplicate' => ['owned', 'cases' => [
+				['path' => '/notes/{n1}/duplicate', 'body' => []],
+				['path' => '/notes/{n1}/duplicate', 'body' => ['folder_id' => '{f2}', 'workspace' => '{ws}']],
+			]],
+			// Snapshots: Schlüssel einer fremden Notiz → „exists:false“ beim Lesen (Upstream), 404 beim Löschen/Wiederherstellen
+			'POST /notes/{}/snapshot' => ['owned', 'cases' => [['path' => '/notes/{n1}/snapshot', 'query' => ['manual' => '1'], 'body' => []]]],
+			'GET /notes/{}/snapshots' => ['owned', 'cases' => [['path' => '/notes/{n1}/snapshots']]],
+			'GET /notes/{}/snapshot' => ['owned', 'cases' => [['path' => '/notes/{n1}/snapshot', 'query' => ['snapshot_key' => '{snap}'], 'hints' => ['query.snapshot_key']]]],
+			'DELETE /notes/{}/snapshot' => ['owned', 'cases' => [['path' => '/notes/{n1}/snapshot', 'query' => ['snapshot_key' => '{snap}'], 'body' => []]]],
+			'POST /notes/{}/snapshot/restore' => ['owned', 'cases' => [['path' => '/notes/{n1}/snapshot/restore', 'query' => ['snapshot_key' => '{snap}'], 'body' => []]]],
 			'POST /notes/{}/folder' => ['owned', 'cases' => [
 				['path' => '/notes/{n1}/folder', 'body' => ['folder_id' => '{f2}', 'workspace' => '{ws}']],
 				['path' => '/notes/{n1}/folder', 'body' => ['parent_id' => '{f2}']],
@@ -109,6 +139,10 @@ final class IsolationTest extends ApiTestCase {
 				['path' => '/folders/{f2}/move', 'body' => ['parent_id' => '{f1}']],
 				['path' => '/folders/{f2}/move', 'body' => ['target_workspace' => '{ws}']],
 			]],
+			'POST /folders/{}/duplicate' => ['owned', 'cases' => [
+				['path' => '/folders/{f1}/duplicate', 'query' => $wsQ, 'body' => [], 'hints' => $hq],
+				['path' => '/folders/{f1}/duplicate', 'body' => []],
+			]],
 			'POST /folders/{}/archive' => ['owned', 'cases' => [['path' => '/folders/{f2}/archive', 'body' => []]]],
 			'POST /folders/{}/empty' => ['owned', 'cases' => [['path' => '/folders/{f1}/empty', 'query' => $wsQ, 'body' => [], 'hints' => $hq]]],
 			'POST /folders/{}/tags' => ['owned', 'cases' => [['path' => '/folders/{f1}/tags', 'body' => ['tags' => ['neu'], 'workspace' => '{ws}'], 'hints' => ['body.workspace']]]],
@@ -138,6 +172,20 @@ final class IsolationTest extends ApiTestCase {
 				['path' => '/tags/{tag}', 'query' => $wsQ, 'body' => [], 'hints' => ['path.tag']],
 				['path' => '/tags/{tag}', 'body' => [], 'hints' => ['path.tag']],
 			]],
+			// Anhänge
+			'GET /notes/{}/attachments' => ['owned', 'cases' => [['path' => '/notes/{n1}/attachments', 'query' => $wsQ, 'hints' => $hq]]],
+			'POST /notes/{}/attachments' => ['owned', 'cases' => [
+				['path' => '/notes/{n1}/attachments', 'upload' => true, 'body' => []],
+				['path' => '/notes/{n1}/attachments', 'upload' => true, 'body' => ['workspace' => '{ws}'], 'hints' => ['body.workspace']],
+			]],
+			'GET /notes/{}/attachments/{}' => ['owned', 'cases' => [
+				['path' => '/notes/{n1}/attachments/{att}'],
+				['path' => '/notes/{n1}/attachments/{att}', 'query' => $wsQ, 'hints' => $hq],
+			]],
+			'DELETE /notes/{}/attachments/{}' => ['owned', 'cases' => [['path' => '/notes/{n1}/attachments/{att}', 'body' => []]]],
+			'POST /notes/{}/attachments/{}/move' => ['owned', 'cases' => [
+				['path' => '/notes/{n1}/attachments/{att}/move', 'body' => ['target_note_id' => '{n2}']],
+			]],
 		];
 	}
 
@@ -153,7 +201,10 @@ final class IsolationTest extends ApiTestCase {
 		$n2 = (int)self::ok($c->call('POST', '/notes', ['heading' => "N2 $marker", 'content' => "<p>$marker</p>", 'workspace' => $ws, 'folder_id' => $f1]), 'seed n2')['note']['id'];
 		$n3 = (int)self::ok($c->call('POST', '/notes', ['heading' => "N3 $marker", 'content' => "<p>$marker</p>", 'workspace' => $ws]), 'seed n3')['note']['id'];
 		self::ok($c->call('DELETE', "/notes/$n3" . self::q(['workspace' => $ws])), 'seed n3 trash');
-		return ['ws' => $ws, 'f1' => $f1, 'f2' => $f2, 'n1' => $n1, 'n2' => $n2, 'n3' => $n3, 'tag' => $marker];
+		$att = (int)self::ok($c->upload("/notes/$n1/attachments", "att-$marker.txt", "datei $marker"), 'seed att')['attachment_id'];
+		$snap = (string)self::ok($c->call('POST', "/notes/$n1/snapshot?manual=1"), 'seed snapshot')['snapshot_key'];
+		return ['ws' => $ws, 'f1' => $f1, 'f2' => $f2, 'n1' => $n1, 'n2' => $n2, 'n3' => $n3, 'tag' => $marker,
+			'title' => "N1 $marker", 'att' => $att, 'snap' => $snap];
 	}
 
 	// ---- Slots und Varianten ----
@@ -320,7 +371,7 @@ final class IsolationTest extends ApiTestCase {
 			}
 		}
 		self::assertSame([], $errors);
-		self::assertCount(53, $table);
+		self::assertCount(76, $table);
 	}
 
 	public function testDetectorsObject(): void {
@@ -359,7 +410,7 @@ final class IsolationTest extends ApiTestCase {
 			$before = self::dump($a->uid);
 			foreach (self::variants($slots) as $owner) {
 				[$url, $body, $echo] = self::build($case, $owner, $fx);
-				$r = $b->call($method, $url, $body);
+				$r = self::send($b, $method, $url, $body, $case);
 				$label = "Fall $ci " . json_encode($owner) . " $method $url " . json_encode($body);
 				$strict = array_filter(array_keys($owner), static fn ($s) => $owner[$s] === 'A' && !in_array($s, $hints, true)) !== [];
 				if ($strict && ($e = self::refused($r)) !== '') {
@@ -382,7 +433,7 @@ final class IsolationTest extends ApiTestCase {
 			// Kontrolle A mit A's Objekten
 			$allA = array_fill_keys(array_keys($slots), 'A');
 			[$url, $body] = self::build($case, $allA, $fx);
-			if (($e = self::control($a->call($method, $url, $body))) !== '') {
+			if (($e = self::control(self::send($a, $method, $url, $body, $case))) !== '') {
 				$errors[] = "Fall $ci Kontrolle A $method $url: $e";
 			}
 			// Kontrolle B mit frischen B-Objekten (Angriffe könnten B's Satz berührt haben)
@@ -390,7 +441,7 @@ final class IsolationTest extends ApiTestCase {
 			$fxB['B'] = self::seed($b, $bMark, $gen++);
 			$allB = array_fill_keys(array_keys($slots), 'B');
 			[$url, $body] = self::build($case, $allB, $fxB);
-			if (($e = self::control($b->call($method, $url, $body))) !== '') {
+			if (($e = self::control(self::send($b, $method, $url, $body, $case))) !== '') {
 				$errors[] = "Fall $ci Kontrolle B $method $url: $e";
 			}
 			// nächster Fall: frische Sätze für beide
@@ -398,6 +449,13 @@ final class IsolationTest extends ApiTestCase {
 				$fx = ['A' => self::seed($a, $aMark, $gen++), 'B' => self::seed($b, $bMark, $gen++)];
 			}
 		}
+	}
+
+	private static function send(ApiClient $c, string $method, string $url, ?array $body, array $case): Response {
+		if (!empty($case['upload'])) {
+			return $c->upload($url, 'iso-upload.txt', 'iso', $body ?? []);
+		}
+		return $c->call($method, $url, $body);
 	}
 
 	private function scoped(string $route, array $entry, ApiClient $b, string $aMark, string $bMark, array $fx, array &$errors): void {
@@ -408,8 +466,9 @@ final class IsolationTest extends ApiTestCase {
 			'workspace=B, folder_id=A' => ['workspace' => $fx['B']['ws'], 'folder_id' => $fx['A']['f1']],
 			'note_id=A' => ['note_id' => $fx['A']['n1']],
 		];
+		$base = $entry['query'] ?? [];
 		foreach ($variants as $label => $query) {
-			$r = $b->call('GET', $entry['path'] . self::q($query));
+			$r = $b->call('GET', $entry['path'] . self::q($base + $query));
 			if ($r->status >= 500 || !in_array($r->status, [200, 400, 403, 404], true)) {
 				$errors[] = "$label: unerwarteter Status " . $r->describe();
 			}
@@ -418,7 +477,7 @@ final class IsolationTest extends ApiTestCase {
 			}
 		}
 		// Kontrolle: B sieht im eigenen Workspace die eigenen Daten (Detektor greift tatsächlich)
-		$r = $b->call('GET', $entry['path'] . self::q(['workspace' => $fx['B']['ws']]));
+		$r = $b->call('GET', $entry['path'] . self::q($base + ['workspace' => $fx['B']['ws']]));
 		if (($e = self::control($r)) !== '') {
 			$errors[] = "Kontrolle B: $e";
 		} elseif ($entry['sees'] !== null) {

@@ -16,7 +16,7 @@ use OCP\App\IAppManager;
 use OCP\Config\IUserConfig;
 use OCP\Server;
 
-// Done M2a 4 / SPEC §13 M2.3 (Teil M2a): Kern-Szenario, A und B parallel; JSON-Schlüssel = Upstream-Fixtures (Plan §3.4)
+// Done M2a 4, M2b 2 / SPEC §13 M2.3 (Teil M2a+M2b): Kern-Szenario, A und B parallel; JSON-Schlüssel = Upstream-Fixtures (Plan §3.4)
 final class CoreScenarioTest extends ApiTestCase {
 	/** @var array<string, Response> Route → erste 2xx-Antwort (sonst letzte) */
 	private array $recorded = [];
@@ -167,6 +167,8 @@ final class CoreScenarioTest extends ApiTestCase {
 		self::assertArrayHasKey('restore_snapshot', $snap);
 		$this->rec('POST /folders/restore', $a->call('POST', '/folders/restore', $snap['restore_snapshot']));
 
+		$this->m2bSteps($a, $ws2, (int)$f1);
+
 		$n4 = self::ok($a->call('POST', '/notes', ['heading' => 'Archiv', 'content' => '<p>a</p>', 'workspace' => $ws2, 'folder_id' => $f1]), 'n4')['note']['id'];
 		$this->rec('POST /notes/{id}/archive', $a->call('POST', "/notes/$n4/archive"));
 		$this->rec('POST /folders/{id}/archive', $a->call('POST', "/folders/$f2/archive"));
@@ -182,6 +184,63 @@ final class CoreScenarioTest extends ApiTestCase {
 		self::assertSame($bBefore, self::dump($b->uid), 'B durch A verändert');
 
 		$this->compareFixtures();
+	}
+
+	// M2b: Suche, Links, Anhänge, Sperre, Snapshots, Duplizieren (gleiche Schritte wie dev/upstream/capture.php)
+	private function m2bSteps(ApiClient $a, string $ws2, int $f1): void {
+		$q = self::q(['workspace' => $ws2]);
+		$m1 = self::ok($a->call('POST', '/notes', ['heading' => 'Mehr eins', 'content' => '<p>Suchwort Kaffee Écoute</p>', 'workspace' => $ws2, 'folder_id' => $f1]), 'm1')['note']['id'];
+		$m2 = self::ok($a->call('POST', '/notes', ['heading' => 'Mehr zwei', 'content' => '<p><a href="index.php?note=' . $m1 . '">eins</a></p>', 'workspace' => $ws2]), 'm2')['note']['id'];
+		self::assertSame((int)$m1, (int)$this->rec('GET /notes/resolve', $a->call('GET', '/notes/resolve' . self::q(['reference' => 'Mehr eins', 'workspace' => $ws2])))['id']);
+		$this->rec('GET /notes/search', $a->call('GET', '/notes/search' . self::q(['q' => 'Suchwort', 'workspace' => $ws2])));
+		// Akzente und Groß/Klein egal
+		$hits = self::ok($a->call('GET', '/notes/search' . self::q(['q' => 'ECOUTE', 'workspace' => $ws2])), 'search akzent')['results'];
+		self::assertSame([(int)$m1], array_map(static fn ($r) => (int)$r['id'], $hits));
+		self::assertSame([(int)$m1], $this->rec('GET /notes/search/ids', $a->call('GET', '/notes/search/ids' . self::q(['q' => 'suchwort', 'workspace' => $ws2])))['ids']);
+		$back = $this->rec('GET /notes/{id}/backlinks', $a->call('GET', "/notes/$m1/backlinks$q"))['backlinks'];
+		self::assertSame([(int)$m2], array_map(static fn ($r) => (int)$r['id'], $back));
+		$this->rec('GET /graph', $a->call('GET', '/graph' . $q));
+
+		// Anhang hoch/runter: Bytes gleich, Kopfzeilen
+		$gif = "GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;";
+		$att = $this->rec('POST /notes/{noteId}/attachments', $a->upload("/notes/$m1/attachments$q", 'bild.gif', $gif, [], 'image/gif'))['attachment_id'];
+		$this->rec('GET /notes/{noteId}/attachments', $a->call('GET', "/notes/$m1/attachments$q"));
+		$dl = $a->call('GET', "/notes/$m1/attachments/$att$q");
+		$this->rec('GET /notes/{noteId}/attachments/{attachmentId}', $dl);
+		self::assertSame($gif, $dl->body, 'Anhang-Bytes');
+		self::assertSame('image/gif', $dl->header('content-type'));
+		self::assertStringStartsWith('inline;', (string)$dl->header('content-disposition'));
+		self::assertSame('nosniff', $dl->header('x-content-type-options'));
+		$svg = self::ok($a->upload("/notes/$m1/attachments$q", 'x.svg', '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>', [], 'image/svg+xml'), 'svg')['attachment_id'];
+		$sv = $a->call('GET', "/notes/$m1/attachments/$svg$q");
+		self::assertStringStartsWith('attachment;', (string)$sv->header('content-disposition'), 'SVG nie inline');
+		self::assertStringContainsString('sandbox', (string)$sv->header('content-security-policy'));
+		self::ok($a->call('DELETE', "/notes/$m1/attachments/$svg$q"), 'svg löschen');
+		$this->rec('GET /notes/with-attachments', $a->call('GET', '/notes/with-attachments' . $q));
+		$moved = $this->rec('POST /notes/{noteId}/attachments/{attachmentId}/move', $a->call('POST', "/notes/$m1/attachments/$att/move", ['target_note_id' => $m2]))['attachment_id'];
+		$this->rec('DELETE /notes/{noteId}/attachments/{attachmentId}', $a->call('DELETE', "/notes/$m2/attachments/$moved$q"));
+		$this->rec('GET /changes', $a->call('GET', '/changes' . self::q(['workspace' => $ws2, 'note_ids' => "$m1,$m2"])));
+
+		// Sperre: Sitzung s1 hält, s2 → 409 beim Erwerb, 423 beim Speichern
+		$s1 = ['X-Editor-Session-ID: fx-s1'];
+		$this->rec('POST /notes/{id}/lock', $a->call('POST', "/notes/$m1/lock", ['editor_session_id' => 'fx-s1'], $s1));
+		$this->rec('GET /notes/{id}/lock', $a->call('GET', "/notes/$m1/lock", null, $s1));
+		self::assertSame(409, $a->call('POST', "/notes/$m1/lock", ['editor_session_id' => 'fx-s2'])->status, 'fremde Sitzung erwirbt');
+		self::assertSame(423, $a->call('PATCH', "/notes/$m1", ['content' => '<p>x</p>'], ['X-Editor-Session-ID: fx-s2'])->status, 'fremde Sitzung speichert');
+		$this->rec('POST /notes/{id}/lock/heartbeat', $a->call('POST', "/notes/$m1/lock/heartbeat", ['editor_session_id' => 'fx-s1'], $s1));
+		$this->rec('POST /notes/{id}/lock/release', $a->call('POST', "/notes/$m1/lock/release", ['editor_session_id' => 'fx-s1'], $s1));
+
+		// Snapshot anlegen, ändern, wiederherstellen
+		$key = $this->rec('POST /notes/{id}/snapshot', $a->call('POST', "/notes/$m1/snapshot?manual=1"))['snapshot_key'];
+		self::ok($a->call('PATCH', "/notes/$m1", ['content' => '<p>geändert</p>']), 'm1 ändern');
+		$keys = array_column($this->rec('GET /notes/{id}/snapshots', $a->call('GET', "/notes/$m1/snapshots"))['snapshots'], 'snapshot_key');
+		self::assertContains($key, $keys);
+		$this->rec('GET /notes/{id}/snapshot', $a->call('GET', "/notes/$m1/snapshot" . self::q(['snapshot_key' => $key])));
+		$this->rec('POST /notes/{id}/snapshot/restore', $a->call('POST', "/notes/$m1/snapshot/restore" . self::q(['snapshot_key' => $key])));
+		self::assertStringContainsString('Suchwort', self::ok($a->call('GET', "/notes/$m1$q"), 'm1')['note']['content'], 'wiederhergestellt');
+		$this->rec('DELETE /notes/{id}/snapshot', $a->call('DELETE', "/notes/$m1/snapshot" . self::q(['snapshot_key' => $key])));
+		$this->rec('POST /notes/{id}/duplicate', $a->call('POST', "/notes/$m1/duplicate", ['workspace' => $ws2]));
+		$this->rec('POST /folders/{id}/duplicate', $a->call('POST', "/folders/$f1/duplicate$q", []));
 	}
 
 	private function compareFixtures(): void {
@@ -228,7 +287,7 @@ final class CoreScenarioTest extends ApiTestCase {
 		}
 		self::assertSame([], $errors);
 
-		// Fixtures decken alle M2a-Routen ab
+		// Fixtures decken alle API-Routen ab
 		$file = Server::get(IAppManager::class)->getAppPath('nextnotes') . '/appinfo/routes.php';
 		$routes = (static fn () => require $file)();
 		$fxRoutes = array_map(static fn ($f) => json_decode((string)file_get_contents($f))->route, $fixtures);
@@ -243,7 +302,7 @@ final class CoreScenarioTest extends ApiTestCase {
 				}
 			}
 		}
-		self::assertSame([], $missing, 'M2a-Routen ohne Upstream-Fixture');
+		self::assertSame([], $missing, 'Routen ohne Upstream-Fixture');
 	}
 
 	// Detektor-Selbsttest: fehlende/zusätzliche Schlüssel werden erkannt, Zahlen-Schlüssel ignoriert

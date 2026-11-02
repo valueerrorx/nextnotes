@@ -7,7 +7,7 @@ declare(strict_types=1);
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-// Nur Tests: spielt das Kern-Szenario M2a ab und speichert je Route den JSON-Schlüsselbaum (Werte → Typname).
+// Nur Tests: spielt das Kern-Szenario M2a+M2b ab und speichert je Route den JSON-Schlüsselbaum (Werte → Typname).
 // php capture.php upstream <out-dir>            Upstream auf 127.0.0.1:8090 (legt zwei Konten an)
 // php capture.php nextnotes <out-dir> <base> <userA:pass> <userB:pass>   Next Notes (Basic-Auth)
 
@@ -22,8 +22,8 @@ final class Client {
 	}
 
 	/** @return array{0: int, 1: mixed} */
-	public function call(string $method, string $path, ?array $json = null, ?array $form = null): array {
-		$headers = ['Accept: application/json', 'OCS-APIRequest: true'];
+	public function call(string $method, string $path, ?array $json = null, ?array $form = null, array $extra = []): array {
+		$headers = array_merge(['Accept: application/json', 'OCS-APIRequest: true'], $extra);
 		if ($this->profile !== null) {
 			$headers[] = 'X-User-ID: ' . $this->profile;
 		}
@@ -168,6 +168,34 @@ $snap = rec('DELETE /folders/{id}', $A->call('DELETE', "/folders/$f3$q"));
 if (isset($snap->restore_snapshot)) {
 	rec('POST /folders/restore', $A->call('POST', '/folders/restore', json_decode(json_encode($snap->restore_snapshot), true)));
 }
+// M2b: Suche, Links, Anhänge, Sperre, Snapshots, Duplizieren
+$m1 = $A->call('POST', '/notes', ['heading' => 'Mehr eins', 'content' => '<p>Suchwort Kaffee</p>', 'workspace' => $ws2, 'folder_id' => $f1])[1]->note->id;
+$m2 = $A->call('POST', '/notes', ['heading' => 'Mehr zwei', 'content' => '<p><a href="index.php?note=' . $m1 . '">eins</a></p>', 'workspace' => $ws2])[1]->note->id;
+rec('GET /notes/resolve', $A->call('GET', '/notes/resolve?reference=' . rawurlencode('Mehr eins') . '&workspace=' . rawurlencode($ws2)));
+rec('GET /notes/search', $A->call('GET', '/notes/search?q=Suchwort&workspace=' . rawurlencode($ws2)));
+rec('GET /notes/search/ids', $A->call('GET', '/notes/search/ids?q=Suchwort&workspace=' . rawurlencode($ws2)));
+rec('GET /notes/{id}/backlinks', $A->call('GET', "/notes/$m1/backlinks$q"));
+rec('GET /graph', $A->call('GET', '/graph' . $q));
+$att = rec('POST /notes/{noteId}/attachments', $A->call('POST', "/notes/$m1/attachments$q", null, ['file' => new CURLStringFile("GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;", 'bild.gif', 'image/gif')]))->attachment_id ?? 0;
+rec('GET /notes/{noteId}/attachments', $A->call('GET', "/notes/$m1/attachments$q"));
+rec('GET /notes/{noteId}/attachments/{attachmentId}', $A->call('GET', "/notes/$m1/attachments/$att$q"));
+rec('GET /notes/with-attachments', $A->call('GET', '/notes/with-attachments' . $q));
+$moved = rec('POST /notes/{noteId}/attachments/{attachmentId}/move', $A->call('POST', "/notes/$m1/attachments/$att/move", ['target_note_id' => $m2]))->attachment_id ?? $att;
+rec('DELETE /notes/{noteId}/attachments/{attachmentId}', $A->call('DELETE', "/notes/$m2/attachments/$moved$q"));
+rec('GET /changes', $A->call('GET', '/changes?workspace=' . rawurlencode($ws2) . "&note_ids=$m1,$m2"));
+$sess = ['X-Editor-Session-ID: fx-s1'];
+rec('POST /notes/{id}/lock', $A->call('POST', "/notes/$m1/lock", ['editor_session_id' => 'fx-s1'], null, $sess));
+rec('GET /notes/{id}/lock', $A->call('GET', "/notes/$m1/lock", null, null, $sess));
+rec('POST /notes/{id}/lock/heartbeat', $A->call('POST', "/notes/$m1/lock/heartbeat", ['editor_session_id' => 'fx-s1'], null, $sess));
+rec('POST /notes/{id}/lock/release', $A->call('POST', "/notes/$m1/lock/release", ['editor_session_id' => 'fx-s1'], null, $sess));
+$key = rec('POST /notes/{id}/snapshot', $A->call('POST', "/notes/$m1/snapshot?manual=1"))->snapshot_key ?? '';
+rec('GET /notes/{id}/snapshots', $A->call('GET', "/notes/$m1/snapshots"));
+rec('GET /notes/{id}/snapshot', $A->call('GET', "/notes/$m1/snapshot?snapshot_key=" . rawurlencode($key)));
+rec('POST /notes/{id}/snapshot/restore', $A->call('POST', "/notes/$m1/snapshot/restore?snapshot_key=" . rawurlencode($key)));
+rec('DELETE /notes/{id}/snapshot', $A->call('DELETE', "/notes/$m1/snapshot?snapshot_key=" . rawurlencode($key)));
+rec('POST /notes/{id}/duplicate', $A->call('POST', "/notes/$m1/duplicate", ['workspace' => $ws2]));
+rec('POST /folders/{id}/duplicate', $A->call('POST', "/folders/$f1/duplicate$q", []));
+
 $n4 = $A->call('POST', '/notes', ['heading' => 'Archiv', 'content' => '<p>a</p>', 'workspace' => $ws2, 'folder_id' => $f1])[1]->note->id;
 rec('POST /notes/{id}/archive', $A->call('POST', "/notes/$n4/archive"));
 rec('POST /folders/{id}/archive', $A->call('POST', "/folders/$f2/archive"));

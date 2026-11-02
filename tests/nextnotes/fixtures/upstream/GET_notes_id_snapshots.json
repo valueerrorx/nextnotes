@@ -1,0 +1,25 @@
+{
+    "route": "GET /notes/{id}/snapshots",
+    "status": 200,
+    "body": {
+        "current_hash": "string",
+        "current_heading": "string",
+        "current_tags": "string",
+        "empty_new_note": "bool",
+        "snapshots": [
+            {
+                "content_hash": "string",
+                "created_at": "string",
+                "date": "string",
+                "heading": "string",
+                "manual": "bool",
+                "origin": "string",
+                "size": "int",
+                "snapshot_key": "string",
+                "tags": "string",
+                "type": "string"
+            }
+        ],
+        "success": "bool"
+    }
+}

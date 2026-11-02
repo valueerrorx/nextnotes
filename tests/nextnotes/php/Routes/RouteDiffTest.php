@@ -13,12 +13,12 @@ use OCP\App\IAppManager;
 use OCP\Server;
 use PHPUnit\Framework\TestCase;
 
-// Done M2a 2 / SPEC §13 M2.1: routes.php = Router-Zeilen index.php − „streichen“ − „ausstehend“
+// Done M2a 2, M2b 1 / SPEC §13 M2.1: routes.php = Router-Zeilen index.php − „streichen“ − „ausstehend“
 final class RouteDiffTest extends TestCase {
-	// Inventurnummern, die erst M2b/M2c liefern (Plan §0); M2c leert die Liste
-	private const PENDING = '1,4-7,20,24,28-31,46,50-54,84,110-114,8-19,47-49,55-64,115-117,124,126-130,142,160';
-	// Umfang M2a laut Plan §0 (Gegenkontrolle der Rechnung)
-	private const M2A = '2,3,21-23,32-41,43-45,69-83,85-91,93-95,100-109';
+	// Inventurnummern, die erst M2c liefert (Plan §0); M2c leert die Liste
+	private const PENDING = '8-19,47-49,55-64,115-117,124,126-130,142,160';
+	// Umfang M2a + M2b laut Plan §0 (Gegenkontrolle der Rechnung)
+	private const DONE = '2,3,21-23,32-41,43-45,69-83,85-91,93-95,100-109,1,4-7,20,24,28-31,46,50-54,84,110-114';
 
 	private static function numbers(string $spec): array {
 		$out = [];
@@ -105,12 +105,12 @@ final class RouteDiffTest extends TestCase {
 			}
 			$expected[$n] = $route;
 		}
-		self::assertSame(self::numbers(self::M2A), array_keys($expected), 'Rechnung ergibt nicht den M2a-Umfang des Plans');
+		self::assertSame(self::numbers(self::DONE), array_keys($expected), 'Rechnung ergibt nicht den M2a+M2b-Umfang des Plans');
 
 		$actual = self::appRoutes();
 		self::assertSame([], array_values(array_diff($actual, $expected)), 'Routen in routes.php ohne Upstream-Gegenstück');
 		self::assertSame([], array_values(array_diff($expected, $actual)), 'Upstream-Routen fehlen in routes.php');
 		self::assertSame(count($actual), count(array_unique($actual)), 'doppelte Routen in routes.php');
-		self::assertCount(53, $actual);
+		self::assertCount(76, $actual);
 	}
 }

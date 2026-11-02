@@ -1,0 +1,23 @@
+{
+    "route": "GET /changes",
+    "status": 200,
+    "body": {
+        "notes": {
+            "5": {
+                "content_version": "string",
+                "exists": "bool",
+                "trash": "bool",
+                "version": "string"
+            },
+            "6": {
+                "content_version": "string",
+                "exists": "bool",
+                "trash": "bool",
+                "version": "string"
+            }
+        },
+        "success": "bool",
+        "tree_version": "string",
+        "workspace": "string"
+    }
+}

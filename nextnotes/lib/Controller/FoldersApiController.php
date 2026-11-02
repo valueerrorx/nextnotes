@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Controller;
 
+use OCA\NextNotes\Service\DuplicateService;
 use OCA\NextNotes\Service\Exception\BadRequestException;
 use OCA\NextNotes\Service\FolderService;
 use OCA\NextNotes\Service\InputValidator;
@@ -26,8 +27,14 @@ class FoldersApiController extends ApiController {
 		WorkspaceService $workspaces,
 		private FolderService $folders,
 		private InputValidator $validator,
+		private DuplicateService $duplicates,
 	) {
 		parent::__construct($request, $userSession, $workspaces);
+	}
+
+	#[NoAdminRequired]
+	public function duplicate(int $id): JSONResponse {
+		return $this->ok($this->duplicates->duplicateFolder($this->uid(), $id, $this->param('workspace')), 201);
 	}
 
 	#[NoAdminRequired]

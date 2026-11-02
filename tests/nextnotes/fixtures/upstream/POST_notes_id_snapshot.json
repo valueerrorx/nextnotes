@@ -1,0 +1,12 @@
+{
+    "route": "POST /notes/{id}/snapshot",
+    "status": 200,
+    "body": {
+        "created": "bool",
+        "date": "string",
+        "manual": "bool",
+        "snapshot_key": "string",
+        "success": "bool",
+        "updated": "bool"
+    }
+}
