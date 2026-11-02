@@ -1,6 +1,6 @@
 # Status Nextcloud-Port „Next Notes“
 
-**Aktueller Meilenstein:** M1 – Installierbares Skelett (noch nicht begonnen)
+**Aktueller Meilenstein:** M1 – Installierbares Skelett (M1a erledigt, M1b offen)
 
 ## Erledigte Slices
 - Setup: Branch `nextcloud-port`, Agenten unter `.claude/agents/`, `UPSTREAM.md`
@@ -28,5 +28,17 @@
 - ADR 0009: kein Import aus Poznote
 - M0 freigegeben → weiter mit M1
 
+## Entscheidungen Thomas zu M1 (2026-11-02)
+- Lizenz der App: `AGPL-3.0-or-later` (`nextnotes/COPYING`); Upstream-MIT-Hinweis bleibt als `nextnotes/LICENCE`
+- GitHub-Repo umbenannt: `valueerrorx/poznote-nc` → `valueerrorx/nextnotes` (info.xml angepasst)
+- Autor/Copyright: Thomas Weissel
+
+## M1 (laufend)
+- Plan `docs/slices/M1-plan.md`; Review `M1-plan-r1` (BLOCKER: frische Instanz) → `M1-plan-r2` (FREIGABE)
+- Lead: Teilung M1a (App, Migration, info.xml, SQLite/Apache) / M1b (MariaDB, PostgreSQL, nginx, URL-Spike, CSP-Check); M1 fertig erst nach M1b
+- Lead: `app:remove` erhält Daten (SPEC §8); Löschen beim Entfernen ist Datenschutzfrage für Thomas in M7
+- M1a erledigt: App-Skelett `nextnotes/`, Migration (11 Tabellen), Testsetup `dev/nextcloud/` (SQLite/Apache), Schematest `tests/nextnotes/schema/`. Review `M1a-diff-r1` (FREIGABE, 4 Hinweise → M1b).
+  Testnachweis (tester, frische Instanz, `nextcloud:35` = 35.0.2): `validate-info.sh` 0; `CHECK_PAGE=1 lifecycle.sh sqlite` 0 (enable, 11 Tabellen, 200/303, Probe-Zeile nach disable+remove erhalten); `check-schema.php` 0 gegen §2.1 (Gegenprobe mit 6 Manipulationen → Exit 1); `down.sh all` 0.
+
 ## Nächster Schritt
-M1 laut SPEC §13: architekt beschreibt Scope (appinfo/info.xml, Application.php, Routen, Navigation, Migration, leere Seite, Docker-Testsetup in `dev/nextcloud/` mit `nextcloud:35`), speccritic gibt frei, dann umsetzen und testen.
+M1b: MariaDB, PostgreSQL, nginx, URL-Spike (Krit. 5), CSP-Konsole per Playwright (Krit. 4), `run-m1.sh` inkl. Schematest; Hinweise 1–3 aus `M1a-diff-r1` einarbeiten.

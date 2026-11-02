@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<!--
+  - SPDX-FileCopyrightText: 2026 Thomas Weissel
+  - SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+	<id>nextnotes</id>
+	<name>Next Notes</name>
+	<summary>Notes, folders and workspaces for Nextcloud</summary>
+	<description><![CDATA[Next Notes is a native Nextcloud app for notes, folders, tags and shared workspaces.
+
+Based on Poznote by Timothé Poznanski (MIT).]]></description>
+	<version>0.1.0</version>
+	<licence>AGPL-3.0-or-later</licence>
+	<author>Thomas Weissel</author>
+	<namespace>NextNotes</namespace>
+	<category>office</category>
+	<category>organization</category>
+	<bugs>https://github.com/valueerrorx/nextnotes/issues</bugs>
+	<repository type="git">https://github.com/valueerrorx/nextnotes</repository>
+	<dependencies>
+		<php min-version="8.3" max-version="8.5"/>
+		<nextcloud min-version="35" max-version="35"/>
+	</dependencies>
+	<navigations>
+		<navigation>
+			<name>Next Notes</name>
+			<route>nextnotes.page.index</route>
+			<icon>app.svg</icon>
+		</navigation>
+	</navigations>
+</info>

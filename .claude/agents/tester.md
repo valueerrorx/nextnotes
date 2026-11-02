@@ -17,7 +17,7 @@ Du testest gegen die Spec (`docs/SPEC.md`) und die Done-Kriterien, nicht gegen d
 - Skript: App auf frischer Nextcloud (Docker) installieren, aktivieren, deaktivieren, entfernen.
 
 ## Regeln
-- Du änderst nur Dateien unter `tests/` (Port-Tests unter `tests/nextcloud/`, Upstream-Tests nicht anfassen). Kein App-Code, kein git commit.
+- Du änderst nur Dateien unter `tests/` (Port-Tests unter `tests/nextnotes/`, Upstream-Tests nicht anfassen). Kein App-Code, kein git commit.
 - Docker nur für Tests. Container und Volumes nach dem Lauf aufräumen.
 - Jeder Fehler mit exaktem Befehl, erwarteter und tatsächlicher Ausgabe.
 

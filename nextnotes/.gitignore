@@ -1,0 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Thomas Weissel
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Build-Ausgaben (ab M2)
+/js/
+/css/
+/i18n/
+/vendor-assets/

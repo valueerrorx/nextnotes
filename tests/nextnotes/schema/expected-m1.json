@@ -1,0 +1,220 @@
+{
+  "_comment": "SPDX-License-Identifier: AGPL-3.0-or-later. Erwartung abgeleitet aus docs/SPEC.md §2.1 (nicht aus der Migration). Spalte: [typ, notnull, default, length, autoincrement]. Typen: int=integer. Index: [unique, [spalten]]. Ohne Tabellenpräfix.",
+  "absent": ["nextnotes_assignments", "nextnotes_submissions"],
+  "tables": {
+    "nextnotes_workspaces": {
+      "primary": ["id"],
+      "columns": {
+        "id": ["bigint", true, null, null, true],
+        "owner_type": ["string", true, "user", 8, false],
+        "owner_id": ["string", true, null, 64, false],
+        "kind": ["string", true, "normal", 16, false],
+        "linked_team_id": ["string", false, null, 64, false],
+        "name": ["string", true, null, 255, false],
+        "color": ["string", false, null, 32, false],
+        "tags": ["string", false, null, 4000, false],
+        "display_order": ["integer", true, "0", null, false],
+        "created_by": ["string", false, null, 64, false],
+        "created_at": ["bigint", true, null, null, false],
+        "updated_at": ["bigint", true, null, null, false]
+      },
+      "indexes": {
+        "nn_ws_owner": [false, ["owner_type", "owner_id"]],
+        "nn_ws_asg": [true, ["owner_id", "linked_team_id"]]
+      }
+    },
+    "nextnotes_teams": {
+      "primary": ["team_id"],
+      "columns": {
+        "team_id": ["string", true, null, 64, false],
+        "state": ["string", true, "active", 16, false],
+        "orphaned_at": ["bigint", false, null, null, false],
+        "missing_count": ["smallint", true, "0", null, false],
+        "team_name_snapshot": ["string", false, null, 255, false],
+        "deletion_notified_at": ["bigint", false, null, null, false],
+        "created_at": ["bigint", true, null, null, false],
+        "updated_at": ["bigint", true, null, null, false]
+      },
+      "indexes": {
+        "nn_team_state": [false, ["state", "orphaned_at"]]
+      }
+    },
+    "nextnotes_ws_shares": {
+      "primary": ["id"],
+      "columns": {
+        "id": ["bigint", true, null, null, true],
+        "workspace_id": ["bigint", true, null, null, false],
+        "share_type": ["string", true, "user", 8, false],
+        "share_with": ["string", true, null, 64, false],
+        "permission": ["string", true, "write", 8, false],
+        "created_by": ["string", true, null, 64, false],
+        "created_at": ["bigint", true, null, null, false]
+      },
+      "indexes": {
+        "nn_wss_uniq": [true, ["workspace_id", "share_type", "share_with"]],
+        "nn_wss_with": [false, ["share_type", "share_with"]]
+      }
+    },
+    "nextnotes_folders": {
+      "primary": ["id"],
+      "columns": {
+        "id": ["bigint", true, null, null, true],
+        "workspace_id": ["bigint", true, null, null, false],
+        "parent_id": ["bigint", false, null, null, false],
+        "name": ["string", true, null, 255, false],
+        "display_order": ["integer", true, "0", null, false],
+        "pinned": ["smallint", true, "0", null, false],
+        "favorite": ["smallint", true, "0", null, false],
+        "kanban_enabled": ["smallint", true, "0", null, false],
+        "is_diary": ["smallint", true, "0", null, false],
+        "icon": ["string", false, null, 64, false],
+        "icon_color": ["string", false, null, 32, false],
+        "color": ["string", false, null, 32, false],
+        "sort_setting": ["string", false, null, 32, false],
+        "assignment_id": ["bigint", false, null, null, false],
+        "trashed_at": ["bigint", false, null, null, false],
+        "created_at": ["bigint", true, null, null, false],
+        "updated_at": ["bigint", true, null, null, false]
+      },
+      "indexes": {
+        "nn_fold_ws_parent": [false, ["workspace_id", "parent_id"]],
+        "nn_fold_asg": [false, ["assignment_id"]]
+      }
+    },
+    "nextnotes_notes": {
+      "primary": ["id"],
+      "columns": {
+        "id": ["bigint", true, null, null, true],
+        "workspace_id": ["bigint", false, null, null, false],
+        "folder_id": ["bigint", false, null, null, false],
+        "heading": ["string", false, null, 1000, false],
+        "content": ["text", false, null, null, false],
+        "search_text": ["text", false, null, null, false],
+        "type": ["string", true, "note", 16, false],
+        "role": ["string", true, "note", 16, false],
+        "assignment_id": ["bigint", false, null, null, false],
+        "submission_id": ["bigint", false, null, null, false],
+        "linked_note_id": ["bigint", false, null, null, false],
+        "favorite": ["smallint", true, "0", null, false],
+        "pinned": ["smallint", true, "0", null, false],
+        "icon": ["string", false, null, 64, false],
+        "icon_color": ["string", false, null, 32, false],
+        "color": ["string", false, null, 32, false],
+        "title_color": ["string", false, null, 32, false],
+        "title_size": ["integer", false, null, null, false],
+        "content_width": ["integer", false, null, null, false],
+        "display_order": ["integer", true, "0", null, false],
+        "dashboard_order": ["integer", true, "0", null, false],
+        "speed_dial_order": ["integer", true, "0", null, false],
+        "kanban_order": ["integer", true, "0", null, false],
+        "kanban_completed": ["bigint", false, null, null, false],
+        "trashed_at": ["bigint", false, null, null, false],
+        "client_state_hash": ["string", false, null, 64, false],
+        "client_state_version": ["string", false, null, 64, false],
+        "created_by": ["string", false, null, 64, false],
+        "updated_by": ["string", false, null, 64, false],
+        "created_at": ["bigint", true, null, null, false],
+        "updated_at": ["bigint", true, null, null, false]
+      },
+      "indexes": {
+        "nn_note_ws": [false, ["workspace_id", "trashed_at"]],
+        "nn_note_folder": [false, ["folder_id"]],
+        "nn_note_upd": [false, ["updated_at"]],
+        "nn_note_asg": [false, ["assignment_id"]],
+        "nn_note_sub": [true, ["submission_id"]],
+        "nn_note_link": [false, ["linked_note_id"]]
+      }
+    },
+    "nextnotes_note_tags": {
+      "primary": ["id"],
+      "columns": {
+        "id": ["bigint", true, null, null, true],
+        "note_id": ["bigint", true, null, null, false],
+        "tag": ["string", true, null, 255, false]
+      },
+      "indexes": {
+        "nn_tag_uniq": [true, ["note_id", "tag"]],
+        "nn_tag_tag": [false, ["tag"]]
+      }
+    },
+    "nextnotes_attachments": {
+      "primary": ["id"],
+      "columns": {
+        "id": ["bigint", true, null, null, true],
+        "note_id": ["bigint", true, null, null, false],
+        "original_name": ["string", true, null, 255, false],
+        "mime": ["string", true, null, 255, false],
+        "size": ["bigint", true, null, null, false],
+        "created_by": ["string", false, null, 64, false],
+        "created_at": ["bigint", true, null, null, false]
+      },
+      "indexes": {
+        "nn_att_note": [false, ["note_id"]]
+      }
+    },
+    "nextnotes_snapshots": {
+      "primary": ["id"],
+      "columns": {
+        "id": ["bigint", true, null, null, true],
+        "note_id": ["bigint", true, null, null, false],
+        "heading": ["string", false, null, 1000, false],
+        "content": ["text", false, null, null, false],
+        "type": ["string", true, "note", 16, false],
+        "kind": ["string", true, "auto", 16, false],
+        "created_by": ["string", false, null, 64, false],
+        "created_at": ["bigint", true, null, null, false]
+      },
+      "indexes": {
+        "nn_snap_note": [false, ["note_id", "created_at"]]
+      }
+    },
+    "nextnotes_reminders": {
+      "primary": ["id"],
+      "columns": {
+        "id": ["bigint", true, null, null, true],
+        "note_id": ["bigint", true, null, null, false],
+        "user_id": ["string", true, null, 64, false],
+        "task_id": ["string", false, null, 64, false],
+        "type": ["string", true, "reminder", 16, false],
+        "message": ["string", false, null, 1000, false],
+        "trigger_at": ["bigint", true, null, null, false],
+        "recurrence": ["string", false, null, 32, false],
+        "sent_at": ["bigint", false, null, null, false],
+        "created_at": ["bigint", true, null, null, false]
+      },
+      "indexes": {
+        "nn_rem_due": [false, ["sent_at", "trigger_at"]],
+        "nn_rem_note": [false, ["note_id"]],
+        "nn_rem_user": [false, ["user_id"]]
+      }
+    },
+    "nextnotes_locks": {
+      "primary": ["note_id"],
+      "columns": {
+        "note_id": ["bigint", true, null, null, false],
+        "holder_uid": ["string", true, null, 64, false],
+        "holder_session": ["string", true, null, 64, false],
+        "holder_kind": ["string", true, "user", 16, false],
+        "created_at": ["bigint", true, null, null, false],
+        "last_seen_at": ["bigint", true, null, null, false],
+        "expires_at": ["bigint", true, null, null, false]
+      },
+      "indexes": {
+        "nn_lock_exp": [false, ["expires_at"]]
+      }
+    },
+    "nextnotes_mentions_handled": {
+      "primary": ["id"],
+      "columns": {
+        "id": ["bigint", true, null, null, true],
+        "note_id": ["bigint", true, null, null, false],
+        "user_id": ["string", true, null, 64, false],
+        "handled_count": ["integer", true, "0", null, false],
+        "updated_at": ["bigint", true, null, null, false]
+      },
+      "indexes": {
+        "nn_men_uniq": [true, ["note_id", "user_id"]]
+      }
+    }
+  }
+}
