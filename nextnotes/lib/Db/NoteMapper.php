@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Db;
 
+use OCP\AppFramework\Db\Entity;
 use OCP\AppFramework\Db\QBMapper;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
@@ -24,6 +25,28 @@ class NoteMapper extends QBMapper {
 
 	public function __construct(IDBConnection $db) {
 		parent::__construct($db, self::TABLE, Note::class);
+	}
+
+	// Inhalt und search_text in getrennten Statements: sonst beide in einem Paket (MySQL max_allowed_packet, B37)
+	public function insert(Entity $entity): Entity {
+		$split = $entity instanceof Note && $entity->takeSearchTextUpdate();
+		$entity = parent::insert($entity);
+		return $split ? $this->writeSearchText($entity) : $entity;
+	}
+
+	public function update(Entity $entity): Entity {
+		$split = $entity instanceof Note && $entity->takeSearchTextUpdate();
+		$entity = parent::update($entity);
+		return $split ? $this->writeSearchText($entity) : $entity;
+	}
+
+	private function writeSearchText(Note $note): Note {
+		$qb = $this->db->getQueryBuilder();
+		$qb->update(self::TABLE)
+			->set('search_text', $qb->createNamedParameter($note->getSearchText()))
+			->where($qb->expr()->eq('id', $qb->createNamedParameter((int)$note->getId(), IQueryBuilder::PARAM_INT)))
+			->executeStatement();
+		return $note;
 	}
 
 	/** @throws \OCP\AppFramework\Db\DoesNotExistException */

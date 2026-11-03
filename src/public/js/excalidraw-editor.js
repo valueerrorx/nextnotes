@@ -566,6 +566,8 @@
                     },
                     files: {}
                 };
+                // Next Notes: read-only share opens the diagram in view mode
+                if (config.readOnly === true) safeInitialData.appState.viewModeEnabled = true;
                 
                 excalidrawAPI = window.PoznoteExcalidraw.init('app', {
                     initialData: safeInitialData,

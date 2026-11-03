@@ -10,6 +10,8 @@ declare(strict_types=1);
 namespace OCA\NextNotes\Service;
 
 use OCA\NextNotes\Service\Exception\BadRequestException;
+use OCA\NextNotes\Service\Exception\TooLargeException;
+use OCP\IDBConnection;
 
 // Serverseitige Prüfung von Eingaben (Regeln wie Upstream, Verstoß → 400)
 class InputValidator {
@@ -18,7 +20,20 @@ class InputValidator {
 		'blue' => '#3b82f6', 'green' => '#22c55e', 'yellow' => '#eab308', 'orange' => '#f97316',
 		'red' => '#ef4444', 'purple' => '#a855f7', 'pink' => '#ec4899', 'gray' => '#6b7280',
 	];
+	// Obergrenze Notizinhalt in Byte (B37); Excalidraw-Diagramm zusätzlich eigens (ExcalidrawService::MAX_DATA_BYTES)
+	public const MAX_CONTENT_BYTES = 16 * 1024 * 1024;
 	public const RESERVED_FOLDER_NAMES = ['Favorites', 'Tags', 'Trash', 'Public'];
+	// MySQL/MariaDB: Reserve im Paket für SQL-Text und übrige Spalten
+	private const PACKET_RESERVE = 1024 * 1024;
+	// MariaDB-Standard, falls @@max_allowed_packet nicht lesbar
+	private const DEFAULT_PACKET = 16 * 1024 * 1024;
+
+	private ?int $packetLimit = null;
+
+	public function __construct(
+		private IDBConnection $db,
+	) {
+	}
 
 	// Notiz-/Ordner-/Workspace-Farbe: Paletten-ID oder #rgb/#rrggbb; '' = keine
 	public function color(mixed $raw): ?string {
@@ -83,7 +98,7 @@ class InputValidator {
 		if (!preg_match('/^[A-Za-z0-9 _-]{1,64}$/', $value)) {
 			throw new BadRequestException('Invalid icon');
 		}
-		return preg_replace('/\s+/', ' ', $value);
+		return Pcre::replace('/\s+/', ' ', $value);
 	}
 
 	public function noteType(mixed $raw): string {
@@ -97,8 +112,69 @@ class InputValidator {
 		return $type;
 	}
 
+	// Notizinhalt vor Sanitizer: Größe begrenzt (CPU/Speicher), nur gültiges UTF-8 (B37); gilt für jeden Schreibpfad über NoteService
+	public function content(string $content): string {
+		$this->storable($content);
+		if (!mb_check_encoding($content, 'UTF-8')) {
+			throw new BadRequestException('Invalid UTF-8 in content');
+		}
+		return $content;
+	}
+
+	// Größe vor und nach dem Sanitizer: 16 MiB, auf MySQL/MariaDB zusätzlich maskiert in max_allowed_packet (B37)
+	public function storable(string $content): void {
+		if (strlen($content) > self::MAX_CONTENT_BYTES) {
+			throw new TooLargeException('Content too large (max ' . intdiv(self::MAX_CONTENT_BYTES, 1024 * 1024) . ' MB)');
+		}
+		$packet = $this->packetLimit();
+		if ($this->packetBytes($content) > $packet) {
+			throw new TooLargeException('Content too large (max ' . intdiv($packet, 1024 * 1024) . ' MB)');
+		}
+	}
+
+	// Abgeleiteten Text (search_text) nach derselben Regel wie storable() an einer UTF-8-Grenze kürzen (B37)
+	public function fitStorable(string $text): string {
+		if (strlen($text) > self::MAX_CONTENT_BYTES) {
+			$text = mb_strcut($text, 0, self::MAX_CONTENT_BYTES, 'UTF-8');
+		}
+		// je abgeschnittenem Byte sinkt die maskierte Länge um mindestens 1, ein Schnitt reicht
+		$excess = $this->packetBytes($text) - $this->packetLimit();
+		return $excess > 0 ? mb_strcut($text, 0, max(0, strlen($text) - $excess), 'UTF-8') : $text;
+	}
+
+	// Länge im Paket: emulierte Prepares maskieren \0 \n \r \\ ' " \x1a mit je einem Byte mehr; ohne MySQL nur strlen
+	private function packetBytes(string $content): int {
+		$bytes = strlen($content);
+		if ($this->packetLimit() !== PHP_INT_MAX) {
+			foreach (["\0", "\n", "\r", '\\', "'", '"', "\x1a"] as $c) {
+				$bytes += substr_count($content, $c);
+			}
+		}
+		return $bytes;
+	}
+
+	// Nutzbare Paketgröße auf MySQL/MariaDB, einmal je Request gelesen; sonst PHP_INT_MAX
+	private function packetLimit(): int {
+		if ($this->packetLimit === null) {
+			$this->packetLimit = PHP_INT_MAX;
+			$provider = $this->db->getDatabaseProvider();
+			if ($provider === IDBConnection::PLATFORM_MYSQL || $provider === IDBConnection::PLATFORM_MARIADB) {
+				$packet = self::DEFAULT_PACKET;
+				try {
+					$qb = $this->db->getQueryBuilder();
+					$result = $qb->select($qb->createFunction('@@max_allowed_packet'))->executeQuery();
+					$packet = (int)$result->fetchOne() ?: $packet;
+					$result->closeCursor();
+				} catch (\Throwable) {
+				}
+				$this->packetLimit = max(0, $packet - self::PACKET_RESERVE);
+			}
+		}
+		return $this->packetLimit;
+	}
+
 	public function heading(string $heading): string {
-		$heading = trim(preg_replace('/[\x00-\x1F\x7F]/u', ' ', $heading) ?? '');
+		$heading = trim(Pcre::replace('/[\x00-\x1F\x7F]/u', ' ', $heading));
 		if (mb_strlen($heading) > 1000) {
 			throw new BadRequestException('Title too long (max 1000 characters)');
 		}
@@ -155,7 +231,7 @@ class InputValidator {
 			if (!is_scalar($part)) {
 				throw new BadRequestException('Invalid workspace tag');
 			}
-			$tag = trim(preg_replace('/\s+/u', ' ', (string)$part) ?? '');
+			$tag = trim(Pcre::replace('/\s+/u', ' ', (string)$part));
 			if ($tag === '') {
 				continue;
 			}
@@ -204,7 +280,7 @@ class InputValidator {
 
 	// Einzelner Tag: Leerzeichen/Kommas → _, keine Markup-Zeichen
 	public function tagName(string $tag): string {
-		$tag = preg_replace('/[\s,]+/u', '_', trim($tag)) ?? '';
+		$tag = Pcre::replace('/[\s,]+/u', '_', trim($tag));
 		if ($tag === '' || mb_strlen($tag) > 255 || preg_match('/[<>"`\x00-\x1F\x7F]/', $tag)) {
 			throw new BadRequestException('Invalid tag: ' . mb_substr($tag, 0, 50));
 		}

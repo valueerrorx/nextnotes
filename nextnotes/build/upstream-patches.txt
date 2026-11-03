@@ -16,3 +16,4 @@ src/public/js/events-drag-drop.js
 src/public/js/attachments-page.js
 src/public/js/events-utils.js
 src/public/js/slash-command.js
+src/public/js/excalidraw-editor.js

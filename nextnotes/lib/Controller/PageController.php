@@ -12,6 +12,7 @@ namespace OCA\NextNotes\Controller;
 use OCA\NextNotes\AppInfo\Application;
 use OCA\NextNotes\Http\CspFactory;
 use OCA\NextNotes\Service\AttachmentService;
+use OCA\NextNotes\Service\ExcalidrawService;
 use OCA\NextNotes\Service\Exception\NotFoundException;
 use OCA\NextNotes\Service\SettingsService;
 use OCA\NextNotes\Service\SnapshotService;
@@ -48,6 +49,7 @@ class PageController extends Controller {
 		private AttachmentService $attachments,
 		private KanbanViewService $kanbanView,
 		private NotePageViewService $pageView,
+		private ExcalidrawService $excalidraw,
 	) {
 		parent::__construct(Application::APP_ID, $request);
 	}
@@ -180,6 +182,52 @@ class PageController extends Controller {
 			$format = $this->settings->read($uid, 'date_time_format');
 			return ['poznoteConfig' => ['dateTimeFormat' => preg_match('/^[A-Za-z0-9_:.-]{1,40}$/', $format) ? $format : 'default', 'speechToText' => false]];
 		});
+	}
+
+	// Upstream excalidraw_editor.php: Diagramm einer Notiz (diagram_id = eingebettet); Lesefreigabe nur ansehen; ohne note_id → 404
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function excalidrawEditor(): TemplateResponse {
+		$uid = $this->userSession->getUser()?->getUID() ?? '';
+		$lang = $this->language($uid);
+		$baseUrl = $this->urls->linkToRoute('nextnotes.page.index');
+		try {
+			$data = $this->excalidraw->page($uid, $this->request->getParam('note_id'), $this->request->getParam('diagram_id'), $this->request->getParam('workspace'));
+		} catch (NotFoundException) {
+			return $this->notFound(TemplateResponse::RENDER_AS_GUEST);
+		}
+		$note = $data['note'];
+		$t = fn (string $key, string $default, array $vars = []) => $this->translator->t($key, $vars, $default);
+		$heading = (string)($note->getHeading() ?? '');
+		$this->assets->page('excalidraw_editor', $lang, ['vendor/excalidraw-dist/excalidraw-bundle.iife']);
+		$this->provideConfig($uid, $baseUrl, $lang);
+		return $this->page('excalidraw_editor', 'excalidraw_editor', [
+			'tr' => $this->translator,
+			'title' => $heading !== '' ? $heading : $t('excalidraw.editor.titles.embedded_diagram', 'Embedded Diagram'),
+			'canWrite' => $data['canWrite'],
+			'config' => [
+				'language' => $lang,
+				'noteId' => (int)$note->getId(),
+				'noteTitle' => $heading,
+				'workspace' => $data['workspace'],
+				'diagramId' => $data['diagramId'],
+				'isEmbeddedDiagram' => $data['diagramId'] !== null,
+				'existingData' => $data['existingData'],
+				'readOnly' => !$data['canWrite'],
+				'txt' => [
+					'editorNotReady' => $t('excalidraw.editor.alerts.editor_not_ready', 'Editor not ready'),
+					'saving' => $t('excalidraw.editor.toolbar.saving', 'Saving...'),
+					'saved' => $t('excalidraw.editor.toolbar.saved', 'Saved!'),
+					'save' => $t('common.save', 'Save'),
+					'saveAndExit' => $t('excalidraw.editor.toolbar.save_and_exit', 'Save and exit'),
+					'failedToLoad' => $t('excalidraw.editor.errors.failed_to_load', 'Error: Failed to load Excalidraw. Please refresh the page.'),
+					'initErrorTemplate' => $t('excalidraw.editor.errors.initializing_prefix', 'Error initializing Excalidraw: {{error}}', ['error' => '{{error}}']),
+					'errorTemplate' => $t('excalidraw.editor.alerts.error_prefix', 'Error: {{error}}', ['error' => '{{error}}']),
+					'saveFailed' => $t('excalidraw.editor.errors.save_failed', 'Save failed'),
+					'saveTimeout' => $t('excalidraw.editor.errors.save_timeout', 'The server did not answer in time. Your diagram is still open here, try saving again.'),
+				],
+			],
+		]);
 	}
 
 	/** Gemeinsamer Rahmen der Notiz-Unterseiten: Leserecht, Workspace-Abgleich, Assets, Konfiguration */

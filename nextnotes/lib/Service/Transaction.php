@@ -35,7 +35,13 @@ class Transaction {
 			$this->db->commit();
 		} catch (\Throwable $e) {
 			$this->depth--;
-			$this->db->rollBack();
+			// nach Verbindungsabbruch keine Transaktion mehr: ursprüngliche Ausnahme nicht verdecken
+			try {
+				if ($this->db->inTransaction()) {
+					$this->db->rollBack();
+				}
+			} catch (\Throwable) {
+			}
 			if ($this->depth === 0) {
 				$this->files->discard();
 			}

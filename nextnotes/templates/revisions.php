@@ -12,7 +12,7 @@
 $tr = $_['tr'];
 $page = $_['page'];
 $config = $_['config'];
-$jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR;
+$jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR;
 $islands = [
 	'revisions-config' => $config,
 	'nextnotes-body' => ['classes' => ['revisions-page'], 'data' => ['note-type' => $page['note']['type']]],

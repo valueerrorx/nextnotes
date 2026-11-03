@@ -139,4 +139,19 @@ class Note extends Entity {
 		$this->addType('createdAt', ColumnType::Integer);
 		$this->addType('updatedAt', ColumnType::Integer);
 	}
+
+	// search_text aus den geänderten Feldern nehmen (NoteMapper schreibt ihn getrennt, B37)
+	public function takeSearchTextUpdate(): bool {
+		$fields = $this->getUpdatedFields();
+		if (!isset($fields['searchText'], $fields['content'])) {
+			return false;
+		}
+		$this->resetUpdatedFields();
+		foreach (array_keys($fields) as $field) {
+			if ($field !== 'searchText') {
+				$this->markFieldUpdated($field);
+			}
+		}
+		return true;
+	}
 }

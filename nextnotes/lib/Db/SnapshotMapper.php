@@ -31,6 +31,19 @@ class SnapshotMapper extends QBMapper {
 		return $this->findEntities($qb);
 	}
 
+	// Verweist ein Snapshot der Notiz auf $needle (z. B. Anhang-URL)? LIKE mit Escape, ohne DB-Spezifika
+	public function contains(int $noteId, string $needle): bool {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('id')->from(self::TABLE)
+			->where($qb->expr()->eq('note_id', $qb->createNamedParameter($noteId, IQueryBuilder::PARAM_INT)))
+			->andWhere($qb->expr()->like('content', $qb->createNamedParameter('%' . $this->db->escapeLikeParameter($needle) . '%')))
+			->setMaxResults(1);
+		$result = $qb->executeQuery();
+		$found = $result->fetchOne() !== false;
+		$result->closeCursor();
+		return $found;
+	}
+
 	public function newest(int $noteId): ?Snapshot {
 		$qb = $this->db->getQueryBuilder();
 		$qb->select('*')->from(self::TABLE)

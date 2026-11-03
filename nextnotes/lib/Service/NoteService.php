@@ -72,14 +72,19 @@ class NoteService {
 		return $this->time->getTime();
 	}
 
-	// Inhalt säubern, URLs kanonisch, search_text neu
+	// Inhalt prüfen (Größe, UTF-8), säubern, URLs kanonisch, search_text neu
 	private function applyContent(Note $note, string $content): void {
+		$content = $this->validator->content($content);
 		$type = (string)$note->getType();
-		if ($type === 'markdown' && str_contains($content, '<div class="markdown-editor"')
-			&& preg_match('/<div class="markdown-editor"[^>]*>(.*?)<\/div>/s', $content, $m)) {
-			$content = html_entity_decode(strip_tags($m[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+		// Editor-Hülle: Inhalt bis zum ersten </div> (wie Upstream-Regex, per strpos linear, B37)
+		$open = $type === 'markdown' ? strpos($content, '<div class="markdown-editor"') : false;
+		$inner = $open !== false ? strpos($content, '>', $open) : false;
+		$close = $inner !== false ? strpos($content, '</div>', $inner) : false;
+		if ($close !== false) {
+			$content = html_entity_decode(strip_tags(substr($content, $inner + 1, $close - $inner - 1)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
 		}
 		$content = $this->sanitizer->sanitizeForType($type, $this->urls->toServer($content));
+		$this->validator->storable($content);
 		$note->setContent($content);
 		$this->refreshSearch($note);
 	}

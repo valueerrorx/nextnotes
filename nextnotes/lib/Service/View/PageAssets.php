@@ -37,10 +37,13 @@ class PageAssets {
 		}
 	}
 
-	/** Eigene Seite aus bundles.json pages (revisions, attachments): Adapter, Seitenbündel, Late-Adapter */
-	public function page(string $page, string $lang): void {
+	/**
+	 * Eigene Seite aus bundles.json pages (revisions, attachments, excalidraw_editor): Adapter, Vendor, Seitenbündel, Late-Adapter
+	 * @param string[] $vendor unveränderte Vendor-Skripte (js/vendor/…), vor dem Seitenbündel
+	 */
+	public function page(string $page, string $lang, array $vendor = []): void {
 		Util::addScript(Application::APP_ID, 'i18n/nextnotes-i18n-' . $lang);
-		foreach (['nextnotes-bootstrap', 'nextnotes-page-' . $page, 'nextnotes-late'] as $script) {
+		foreach (['nextnotes-bootstrap', ...$vendor, 'nextnotes-page-' . $page, 'nextnotes-late'] as $script) {
 			Util::addScript(Application::APP_ID, $script);
 		}
 		foreach (['nextnotes-page-' . $page, 'nextnotes-tokens', 'nextnotes-layout'] as $style) {

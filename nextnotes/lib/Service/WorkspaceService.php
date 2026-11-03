@@ -297,26 +297,72 @@ class WorkspaceService {
 				}
 				$target = $this->insert($uid, $name, 'normal', [], null);
 			}
-			$now = $this->time->getTime();
-			$folders = $this->folders->findInWorkspace((int)$ws->getId());
-			// Namensgleiche Wurzelordner im Ziel bekommen einen Zusatz
-			foreach ($folders as $folder) {
-				if ($folder->getParentId() !== null) {
-					continue;
-				}
-				$name = $folder->getName();
-				for ($i = 2; $this->folders->findSibling((int)$target->getId(), null, $name) !== null; $i++) {
-					$name = $folder->getName() . ' (' . $i . ')';
-				}
-				if ($name !== $folder->getName()) {
-					$folder->setName($name);
-					$this->folders->update($folder);
-				}
+			// Quelle und Ziel in einer Anweisung sperren: kein paralleles Löschen/Verschieben dazwischen (fehlt eine → 404)
+			if ($this->workspaces->lockRows([(int)$ws->getId(), (int)$target->getId()]) < 2) {
+				throw new NotFoundException('Workspace not found');
 			}
-			$this->folders->moveToWorkspace(array_map(static fn (Folder $f) => (int)$f->getId(), $folders), (int)$target->getId(), $now);
-			$this->notes->moveWorkspaceNotes((int)$ws->getId(), (int)$target->getId());
+			$this->moveContents($ws, $target);
 			$this->shares->deleteForWorkspace((int)$ws->getId());
 			$this->workspaces->deleteById((int)$ws->getId());
+		});
+		$this->reset();
+	}
+
+	// Ordner und Notizen in einen anderen Workspace; namensgleiche Wurzelordner im Ziel bekommen einen Zusatz
+	private function moveContents(Workspace $ws, Workspace $target): int {
+		$folders = $this->folders->findInWorkspace((int)$ws->getId());
+		foreach ($folders as $folder) {
+			if ($folder->getParentId() !== null) {
+				continue;
+			}
+			$name = $folder->getName();
+			for ($i = 2; $this->folders->findSibling((int)$target->getId(), null, $name) !== null; $i++) {
+				$name = $folder->getName() . ' (' . $i . ')';
+			}
+			if ($name !== $folder->getName()) {
+				$folder->setName($name);
+				$this->folders->update($folder);
+			}
+		}
+		$this->folders->moveToWorkspace(array_map(static fn (Folder $f) => (int)$f->getId(), $folders), (int)$target->getId(), $this->time->getTime());
+		return $this->notes->moveWorkspaceNotes((int)$ws->getId(), (int)$target->getId());
+	}
+
+	// workspaces.php move_notes: nur zwischen eigenen Workspaces (Quota beim Besitzer, B17); Quelle bleibt bestehen
+	public function moveNotes(string $uid, string $key, string $targetKey): int {
+		$ws = $this->requireByKey($uid, $key, 'manage');
+		$target = $this->requireByKey($uid, $targetKey, 'manage');
+		if ($ws->getId() === $target->getId()) {
+			throw new BadRequestException('Source and target workspaces must differ');
+		}
+		$moved = $this->tx->run(function () use ($uid, $ws, $target) {
+			// beide sperren und neu lesen: ein paralleles delete darf das Ziel nicht zwischen Prüfung und Verschieben entfernen
+			if ($this->workspaces->lockRows([(int)$ws->getId(), (int)$target->getId()]) !== 2) {
+				throw new NotFoundException('Workspace not found');
+			}
+			return $this->moveContents(
+				$this->access->requireWorkspace($uid, (int)$ws->getId(), 'manage'),
+				$this->access->requireWorkspace($uid, (int)$target->getId(), 'manage'),
+			);
+		});
+		$this->reset();
+		return $moved;
+	}
+
+	/**
+	 * workspaces.php reorder: Positionen 1..n; jeder Name braucht Verwaltungsrecht (fremde/geteilte → 404/403)
+	 * @param string[] $keys
+	 */
+	public function reorder(string $uid, array $keys): void {
+		$list = [];
+		foreach ($keys as $key) {
+			$list[] = $this->requireByKey($uid, $key, 'manage');
+		}
+		$this->tx->run(function () use ($list) {
+			foreach ($list as $i => $ws) {
+				$ws->setDisplayOrder($i + 1);
+				$this->workspaces->update($ws);
+			}
 		});
 		$this->reset();
 	}

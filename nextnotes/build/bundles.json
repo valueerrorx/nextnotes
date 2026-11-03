@@ -720,6 +720,16 @@
 			"omit": {
 				"js/icon-sidebar-toggle.js": "keine Icon-Leiste auf Unterseiten, Navigation über NC und „Zurück zur Notiz“"
 			}
+		},
+		"excalidraw_editor": {
+			"js": [
+				"js/excalidraw-theme-init.js",
+				"js/modal-alerts.js",
+				"js/excalidraw-editor.js"
+			],
+			"omit": {
+				"js/excalidraw-dist/excalidraw-bundle.iife.js": "Vendor unverändert (js/vendor/excalidraw-dist), eigenes Skript vor dem Seitenbündel (PageAssets::page)"
+			}
 		}
 	}
 }

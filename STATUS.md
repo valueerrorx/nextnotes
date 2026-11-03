@@ -1,6 +1,6 @@
 # Status Nextcloud-Port „Next Notes“
 
-**Aktueller Meilenstein:** M3 – Frontend-Grundlage und Editor (M3a1–M3c1 fertig, weiter M3c2); M1, M2 fertig
+**Aktueller Meilenstein:** M4 (Planung); M1, M2, M3 fertig
 
 ## Erledigte Slices
 - Setup: Branch `nextcloud-port`, Agenten unter `.claude/agents/`, `UPSTREAM.md`
@@ -36,6 +36,11 @@ Vorläufig (M3b1):
 - Datumszeile unter dem Titel standardmäßig sichtbar (`show_note_created='1'` wie Upstream-DB) (M3c1)
 - Upstream-PR-Kandidaten an Poznote (nur mit Freigabe): P9/B31 (Reload nach Notizöffnen verlässt App), P10/B32 (Tippen während Speichern ging verloren)
 
+Vorläufig (M3c2):
+- `workspaces.php` Löschen verschiebt die Notizen wie B18 in den Ziel-Workspace (kein stilles Mitlöschen)
+- Workspace teilen/Freigabe aufheben über die Upstream-Oberfläche → 501 bis M5 (Teams)
+- Sehr große Notizen: Suche indexiert nur die ersten ~15 MiB (gekürzter Suchtext); auf MariaDB-Standard liegt die Speichergrenze bei ~14–15 MiB statt 16 MiB
+
 Vorläufig (M2d):
 - Kontolöschung: Notizen, die andere Benutzer in den (geteilten) Workspaces des gelöschten Kontos geschrieben haben, werden mit diesen Workspaces gelöscht (SPEC §8). Alternative wäre Übergabe an einen Freigabe-Empfänger.
 
@@ -66,7 +71,7 @@ Vorläufig (M2d):
 - Leitlinie (Thomas, 2026-11-02): Reihenfolge M2b→M2c→M2d→M3 beibehalten; Lead entscheidet wo möglich selbst. Ziel: bugfrei, performant, einfache UI, MS Teams nur als lose Orientierung (bekannte Begriffe/Abläufe), nicht kopieren – Poznote-UI ist Basis, eigene bessere Lösungen erwünscht
 - M2b: Anhang-Quote zählt gegen den Workspace-Besitzer (auch bei Uploads durch Freigabe-Empfänger/Team)
 
-## M3 (laufend)
+## M3 (fertig)
 - M3-Plan `docs/slices/M3-plan.md`: Slices M3a1 (Build, check-upstream, Adapter, i18n, Theme), M3a2 (Seitenrahmen, Gestrichenes, Navigation), M3b (Editor, Anhänge, Mermaid/KaTeX, Beacon, Sperre, Suche), M3c (Fremdzugriff Seiten-/Kompatibilitätsrouten, Abschluss). Review `M3-plan-r1` (BLOCKER: XSS-Ausgaberegel, Gestrichenes in Menüs, Such-POST ohne Token, Lesefreigabe-Fall) → `M3-plan-r2` (FREIGABE mit Auflage M3b).
   Lead: i18n als gecachte Datei je Sprache (SPEC §1.4); Export-Menüpunkte bis M4 ausgeblendet; unbekannter `?workspace=` → Standard-Workspace (§4.4); duplizierter Tab → Nur-Lesen als Done-Test; PDF `frame-ancestors 'self'` (ADR 0012 Nachtrag).
   Lead B26: `data-action` in Notizinhalten wird vom Sanitizer ganz entfernt (Allowlist nur bei belegter Upstream-Fundstelle); Klick-Delegation ignoriert Ziele im Notizinhalt; Kollision eingeschleuster `id`/Klassen mit App-Elementen wird in M3b behandelt und getestet.
@@ -107,6 +112,12 @@ Vorläufig (M2d):
   DNS-Warnung im Test: Ursache NC-App `password_policy` (HIBP-Abfrage beim Anlegen von Testbenutzern), nicht Next Notes; Testumgebung setzt `has_internet_connection=false`.
 - M2d erledigt: Kontolöschung (synchroner Listener neutralisiert alle UID-/Rechte-Spalten, Löschkennung `#<16hex>`, `UserDataDeletionJob`, täglicher `DeletedWorkspaceSweepJob` als Nachlauf mit Fehlerisolation je Kennung), Migration 0.1.1 (5 Indizes), SQLite-Sperr-Timeout/Deadlock → 503 mit Retry-After, `run-m2.sh` über alle DBs mit Gesamt-Exit. Review `M2d-diff-r1` (BLOCKER: Löschung nach Abbruch nicht fortgesetzt) → `M2d-diff-r2` (FREIGABE, Hinweis Fehlerisolation umgesetzt).
   Testnachweis (tester, frische Instanzen NC 35.0.2): `run-m1.sh` (sqlite, mariadb, pgsql, nginx) Exit 0; `run-m2.sh sqlite mariadb pgsql` Exit 0, je 225 Tests/7267 Assertions; grep §13 M2.5 0 Treffer; Gegenprobe (`ws_shares`-Neutralisierung entfernt → UserDeletionTest rot, zurückgesetzt); `down.sh all` 0.
+- M3c2 erledigt: `excalidraw_editor.php` (eigene Seite im NC-Rahmen, CSP ohne Ausnahme), `api_save_excalidraw.php` (`ExcalidrawService`, Sperre → 423 übersetzt, P14 Nur-Lesen), `workspaces.php` POST (Lesefreigabe → 403, Löschen/Verschieben/Sortieren mit `WorkspaceMapper::lockRows`), B35–B40. Sanitizer gehärtet: `Pcre` (Regex-Fehler → 413, nie leerer/unbereinigter Inhalt), lineare Markdown-/HTML-Bereinigung, Inhalt ≤ 16 MiB, Tag-/Attribut-Budget, `on*`-Scanner in Markup-/Text-/Fremd-Sicht, `InputEncodingMiddleware` (ungültiges UTF-8 → 400). MariaDB: `search_text` in eigenem UPDATE, Grenze maskiert ≤ `max_allowed_packet` − 1 MiB, Suchtext an UTF-8-Grenze gekürzt (`fitStorable`), Duplikat prüft Größe, `Transaction` verdeckt Ursache nicht mehr.
+  Reviews `M3c2-diff-r1` (BLOCKER) → `r2` (BLOCKER) → Lead-Entscheid nach 2 Runden: Befunde (Sanitizer-DoS/Datenverlust) in r3–r6 behoben, per Fuzz/Lasttest belegt; `M3c2-diff-r3` (BLOCKER Suchtext-Paketlimit) → r8 behoben und getestet.
+  Testnachweis: sqlite Teil 1 (B37–B39, ExcalidrawSave u. a. 97 Tests; 16-MiB-Angriffsformen ≤ 0,5 s → 413; Fuzz 3×300k ohne verbliebene Handler), E2E `excalidraw` Hell/Dunkel je 46, 0 CSP. **M3-Abschluss volle Matrix:** `run-m3.sh` sqlite (PHPUnit 274, E2E 9 Specs × Hell/Dunkel), pgsql 274, nginx E2E 9×2, mariadb 274 (nach r7) – alle rc0; Build 2× 129 Dateien reproduzierbar, check-upstream grün; `run-m2.sh` (3 DBs je 274) rc0; `run-m1.sh` (sqlite, mariadb, pgsql, nginx) rc0. Nachlauf r8 sqlite+mariadb: 276 Tests (inkl. İ-Notiz 10,5 MiB → 200 + Suche, Duplikat über Grenze → 413 ohne Teilkopie) grün.
+
+  **M3 fertig** – Frontend im NC-Rahmen, Editor, Anhänge, Suche, Kanban, Revisionen, Excalidraw; volle Matrix grün (2026-11-03).
+
   **M2 fertig** – Kriterien 1–8 je mit Test belegt (RouteDiff, Isolation/IndirectRead/DenyByDefault, CoreScenario/Attachment, WorkspaceName, check-forbidden-sql + 3 DBs, LockService, ReminderJob/UnifiedSearch, UserDeletion).
 - Offen für M3: PDF-Vorschau im iFrame (CSP, s. o.); `requesttoken` im Beacon-FormData (B4); Sperr-Banner bei gleichem Konto in zweitem Tab (R11); Escaping von Tags mit `'` im Frontend.
 
@@ -117,8 +128,10 @@ Vorläufig (M2d):
 - M4: `allowed_iframe_domains` im Admin-Formular auch mit Schema (`https://…`) annehmen bzw. normalisieren, Fehler melden statt still verwerfen
 - M3b: Suche schreibt `requesttoken` per History-Update in die URL (mit Such-POST beheben); an `body` angehängte Poznote-Elemente ohne Formular-Reset prüfen; eigene Overrides brauchen Spezifität ≥ 1,1,0
 - M7: nginx-Beispielkonfiguration sendet `X-Content-Type-Options` doppelt (App setzt ihn bereits) – in Betriebsdoku/Beispiel-Conf bereinigen
+- M5: `moveNotes`/`reorder` prüfen bei Teams den Eigentümer (B17); CleanupJob für verwaiste Excalidraw-Vorschauen
+- Tests: Nachlauf-Filter eng halten (`Note`/`Search` treffen Methodennamen → fast volle Suite)
 - M5: `AccessService::filterReadable` und `noteLevel`/`visibleWorkspaceIds` gemeinsam um Teams erweitern (FilterReadableTest sichert ab)
 - Hinweis: CSS-Nesting (`&`) zählt `check-css` nicht mit – bei Upstream-Updates beachten
 
 ## Nächster Schritt
-M3c2 – `excalidraw_editor.php`, `api_save_excalidraw.php`, `workspaces.php` POST (Lesefreigabe → 403), Slash-Befehl Excalidraw einblenden, dann Abschlusslauf M3 volle Matrix (`run-m3.sh`, `run-m2.sh`, `run-m1.sh`): architekt → tester + speccritic.
+M4 – Plan `docs/slices/M4-plan.md` (Export, `calendar.js`/`background-settings.js`, `allowed_iframe_domains` normalisieren, `api_download_note` für verknüpfte Notizen, „Neuer Workspace“, Excalidraw-Bild einfügen unter CSP): architekt plant → speccritic → Slices.

@@ -114,3 +114,32 @@ body.nextnotes-readonly #attachmentsList [data-action="move"],
 body.nextnotes-readonly #attachmentsList [data-action="delete"] {
 	display: none;
 }
+
+/* Excalidraw-Editor im NC-Rahmen: Leiste und Zeichenfläche in #app-content statt fest am Fensterrand (excalidraw.css, auch mobil per JS) */
+#nextnotes-root.nextnotes-excalidraw {
+	display: block;
+	--excalidraw-toolbar-height: 48px;
+}
+
+#nextnotes-root .excalidraw-page-wrapper {
+	position: relative;
+	height: 100%;
+}
+
+#nextnotes-root .poznote-toolbar {
+	position: absolute !important;
+	top: 0 !important;
+}
+
+#nextnotes-root #app {
+	margin-top: var(--excalidraw-toolbar-height) !important;
+	height: calc(100% - var(--excalidraw-toolbar-height)) !important;
+}
+
+/* excalidraw.css färbt body mit var(--pz-bg) und verdeckt den NC-Kopf (Logo/App-Name weiß auf weiß): NC-Hintergrund zurück */
+body#body-user.excalidraw-editor-page {
+	background-color: var(--color-background-plain, var(--color-main-background));
+	background-image: var(--image-background);
+	background-size: cover;
+	background-position: center;
+}

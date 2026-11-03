@@ -11,6 +11,7 @@ namespace OCA\NextNotes\AppInfo;
 
 use OCA\NextNotes\Listener\UserDeletedListener;
 use OCA\NextNotes\Middleware\ApiExceptionMiddleware;
+use OCA\NextNotes\Middleware\InputEncodingMiddleware;
 use OCA\NextNotes\Notification\Notifier;
 use OCA\NextNotes\Search\NotesProvider;
 use OCP\AppFramework\App;
@@ -27,7 +28,9 @@ class Application extends App implements IBootstrap {
 	}
 
 	public function register(IRegistrationContext $context): void {
+		// Reihenfolge: ApiException zuerst, damit sie den 400 aus InputEncoding in JSON übersetzt
 		$context->registerMiddleware(ApiExceptionMiddleware::class);
+		$context->registerMiddleware(InputEncodingMiddleware::class);
 		$context->registerSearchProvider(NotesProvider::class);
 		$context->registerNotifierService(Notifier::class);
 		$context->registerEventListener(UserDeletedEvent::class, UserDeletedListener::class);

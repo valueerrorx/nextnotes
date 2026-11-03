@@ -27,12 +27,18 @@ class SearchTextNormalizer {
 		'æ' => 'ae', 'œ' => 'oe',
 	];
 
+	public function __construct(
+		private InputValidator $validator,
+	) {
+	}
+
 	public function fold(string $text): string {
 		return strtr(mb_strtolower($text, 'UTF-8'), self::ACCENTS);
 	}
 
+	// Kleinschreibung kann Byte vermehren (U+0130 2 → 3): auf speicherbare Länge kürzen statt 500 (B37)
 	public function build(?string $heading, ?string $content, string $type): string {
-		return $this->fold(trim(($heading ?? '') . ' ' . $this->plainText($content ?? '', $type)));
+		return $this->validator->fitStorable($this->fold(trim(($heading ?? '') . ' ' . $this->plainText($content ?? '', $type))));
 	}
 
 	public function plainText(string $content, string $type): string {

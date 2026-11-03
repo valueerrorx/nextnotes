@@ -53,6 +53,17 @@ class WorkspaceMapper extends QBMapper {
 			->executeStatement();
 	}
 
+	/**
+	 * Zeilensperre bis Transaktionsende (leeres UPDATE, DB-neutral); Rückgabe: Zahl noch vorhandener Zeilen
+	 * @param int[] $ids
+	 */
+	public function lockRows(array $ids): int {
+		$qb = $this->db->getQueryBuilder();
+		$qb->update(self::TABLE)->set('id', 'id')
+			->where($qb->expr()->in('id', $qb->createNamedParameter($ids, IQueryBuilder::PARAM_INT_ARRAY)));
+		return $qb->executeStatement();
+	}
+
 	// Eigene Workspaces (nur owner_type=user), optional gefiltert nach kind und Name
 	/** @return Workspace[] */
 	public function findOwned(string $uid, ?string $kind = null, ?string $name = null): array {

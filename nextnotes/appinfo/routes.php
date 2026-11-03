@@ -24,12 +24,15 @@ return [
 		['name' => 'page#revisions', 'url' => '/revisions.php', 'verb' => 'GET'],
 		['name' => 'page#attachments', 'url' => '/attachments.php', 'verb' => 'GET'],
 		['name' => 'page#kanbanContent', 'url' => '/kanban_content.php', 'verb' => 'GET'],
+		['name' => 'page#excalidrawEditor', 'url' => '/excalidraw_editor.php', 'verb' => 'GET'],
 		// Kompatibilitätsrouten (SPEC §4.2): Upstream-Einzeldateien unter gleichem Namen
 		['name' => 'compat#noteInfo', 'url' => '/api_note_info.php', 'verb' => 'GET'],
 		['name' => 'compat#downloadNote', 'url' => '/api_download_note.php', 'verb' => 'GET'],
 		['name' => 'compat#exportNote', 'url' => '/api_export_note.php', 'verb' => 'GET'],
 		['name' => 'compat#exportFolder', 'url' => '/api_export_folder.php', 'verb' => 'GET'],
 		['name' => 'compat#attachments', 'url' => '/api_attachments.php', 'verb' => 'GET'],
+		['name' => 'compat#saveExcalidraw', 'url' => '/api_save_excalidraw.php', 'verb' => 'POST'],
+		['name' => 'compat#workspaces', 'url' => '/workspaces.php', 'verb' => 'POST'],
 		// API v1, Reihenfolge wie src/public/api/v1/index.php
 		['name' => 'notes_api#resolve', 'url' => '/api/v1/notes/resolve', 'verb' => 'GET'],
 		['name' => 'notes_api#reorder', 'url' => '/api/v1/notes/reorder', 'verb' => 'POST'],

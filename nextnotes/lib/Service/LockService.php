@@ -35,7 +35,7 @@ class LockService {
 		if ($session === '') {
 			throw new BadRequestException('Missing editor session');
 		}
-		if (strlen($session) > 64) {
+		if (strlen($session) > 64 || !mb_check_encoding($session, 'UTF-8')) {
 			throw new BadRequestException('Invalid editor session');
 		}
 		return $session;
@@ -86,6 +86,10 @@ class LockService {
 	 */
 	public function assertCanSave(string $uid, int $noteId, string $session): void {
 		$session = trim($session);
+		// Sitzung aus Header landet sonst ungeprüft in der Sperrtabelle (B40)
+		if (!mb_check_encoding($session, 'UTF-8')) {
+			throw new BadRequestException('Invalid editor session');
+		}
 		$lock = $this->locks->findValid($noteId, $this->time->getTime());
 		if ($session === '') {
 			if ($lock === null || $lock->getHolderUid() === $uid) {

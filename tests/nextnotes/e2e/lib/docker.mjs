@@ -26,12 +26,17 @@ export function ncContainer(base) {
 
 // Lesefreigabe hat keine HTTP-Route (Teams ab M5): Workspace <wsName> von <owner> lesend an <target>; gibt die ID zurück
 export function shareRead(base, owner, wsName, target) {
+	return share(base, owner, wsName, target, 'read');
+}
+
+// Freigabe mit Recht <perm> (read|write) über WorkspaceService::share
+export function share(base, owner, wsName, target, perm) {
 	const php = `require '/var/www/html/lib/base.php';
 		$qb = \\OCP\\Server::get(\\OCP\\IDBConnection::class)->getQueryBuilder();
 		$id = (int)$qb->select('id')->from('nextnotes_workspaces')->where($qb->expr()->eq('owner_type', $qb->createNamedParameter('user')))
 			->andWhere($qb->expr()->eq('owner_id', $qb->createNamedParameter($argv[1])))->andWhere($qb->expr()->eq('name', $qb->createNamedParameter($argv[2])))
 			->executeQuery()->fetchOne();
-		\\OCP\\Server::get(\\OCA\\NextNotes\\Service\\WorkspaceService::class)->share($argv[1], $id, $argv[3], 'read');
+		\\OCP\\Server::get(\\OCA\\NextNotes\\Service\\WorkspaceService::class)->share($argv[1], $id, $argv[3], $argv[4]);
 		echo $id;`;
-	return dk('exec', '-u', 'www-data', ncContainer(base), 'php', '-r', php, '--', owner, wsName, target);
+	return dk('exec', '-u', 'www-data', ncContainer(base), 'php', '-r', php, '--', owner, wsName, target, perm);
 }

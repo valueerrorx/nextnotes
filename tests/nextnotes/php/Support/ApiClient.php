@@ -38,6 +38,32 @@ final class ApiClient {
 		return self::raw($method, self::baseUrl() . $path, $json, $this->extraHeaders, $this->secret === null ? null : $this->uid . ':' . $this->secret);
 	}
 
+	/**
+	 * Formular-POST außerhalb des API-Präfixes (Kompatibilitätsrouten wie workspaces.php, api_save_excalidraw.php);
+	 * $multipart = true wie FormData im Browser, sonst application/x-www-form-urlencoded (Arrays als name[]).
+	 */
+	public function form(string $path, array $fields, bool $multipart = false): Response {
+		if (!$multipart) {
+			return self::raw('POST', self::baseUrl() . $path, null, $this->extraHeaders, $this->uid . ':' . $this->secret, null, http_build_query($fields));
+		}
+		$ch = curl_init(self::baseUrl() . $path);
+		curl_setopt_array($ch, [
+			CURLOPT_CUSTOMREQUEST => 'POST',
+			CURLOPT_RETURNTRANSFER => true,
+			CURLOPT_HEADER => true,
+			CURLOPT_TIMEOUT => 60,
+			CURLOPT_USERPWD => $this->uid . ':' . $this->secret,
+			CURLOPT_HTTPHEADER => array_merge($this->extraHeaders, ['Accept: application/json']),
+			CURLOPT_POSTFIELDS => array_map('strval', $fields),
+		]);
+		return self::toResponse($ch, (string)curl_exec($ch));
+	}
+
+	/** Formular-Anfrage mit beliebigem Verb (urlencoded), z. B. PATCH mit Bytes, die JSON nicht tragen kann */
+	public function formMethod(string $method, string $path, array $fields): Response {
+		return self::raw($method, self::baseUrl() . $path, null, $this->extraHeaders, $this->uid . ':' . $this->secret, null, http_build_query($fields));
+	}
+
 	/** Datei-Upload als multipart/form-data (Feld file, weitere Formularfelder) */
 	public function upload(string $path, string $filename, string $bytes, array $fields = [], string $mime = 'application/octet-stream'): Response {
 		$ch = curl_init(self::baseUrl() . self::PREFIX . $path);

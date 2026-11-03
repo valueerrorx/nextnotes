@@ -90,11 +90,13 @@ class DuplicateService {
 		$map = $this->attachments->copyAll((int)$src->getId(), $newId, $uid);
 		if ($map !== []) {
 			$srcId = (int)$src->getId();
-			$content = preg_replace_callback(
-				'#/api/v1/notes/' . $srcId . '/attachments/(\d+)(?![0-9])#',
+			$content = Pcre::replaceCallback(
+				'#/api/v1/notes/' . $srcId . '/attachments/(\d++)(?![0-9])#',
 				static fn ($m) => isset($map[(int)$m[1]]) ? '/api/v1/notes/' . $newId . '/attachments/' . $map[(int)$m[1]] : $m[0],
 				(string)$n->getContent(),
-			) ?? (string)$n->getContent();
+			);
+			// längere IDs können die Grenze sprengen: 413, Transaktion rollt zurück (B37)
+			$this->validator->storable($content);
 			$n->setContent($content);
 			$this->notes->update($n);
 		}
@@ -236,14 +238,15 @@ class DuplicateService {
 		$map = array_map(static fn (Note $n) => (int)$n->getId(), $pairs);
 		foreach ($pairs as $copy) {
 			$content = (string)$copy->getContent();
-			$new = preg_replace_callback('/([?&](?:amp;)?note=)(\d+)(?![0-9])|(data-note-id=")(\d+)(")/',
+			$new = Pcre::replaceCallback('/([?&](?:amp;)?note=)(\d++)(?![0-9])|(data-note-id=")(\d++)(")/',
 				static function ($m) use ($map) {
 					if (($m[1] ?? '') !== '') {
 						return $m[1] . ($map[(int)$m[2]] ?? $m[2]);
 					}
 					return $m[3] . ($map[(int)$m[4]] ?? $m[4]) . $m[5];
-				}, $content) ?? $content;
+				}, $content);
 			if ($new !== $content) {
+				$this->validator->storable($new);
 				$copy->setContent($new);
 				$this->notes->update($copy);
 			}

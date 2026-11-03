@@ -21,6 +21,8 @@ final class TemplateOutputTest extends TestCase {
 		// M3c1: JSON-Inseln der Unterseiten (Flags in testJsonIslandFlags geprüft)
 		'revisions.php' => ['json_encode($islandData, $jsonFlags)'],
 		'attachments.php' => ['json_encode($islandData, $jsonFlags)'],
+		// M3c2: Excalidraw-Editor (Konfiguration inkl. Diagramm-JSON als Insel)
+		'excalidraw_editor.php' => ['json_encode($islandData, $jsonFlags)'],
 		// Notizinhalt, beim Speichern durch HtmlSanitizer::sanitizeForType geprüft (Lead M3b1); Tasklist-JSON wird nicht ausgegeben
 		// (Gegenprobe: EditorPageTest::testTasklistContentNeverRenderedUnsanitized)
 		'partials/note_display.php' => ['$note[\'display\']'],
@@ -62,7 +64,7 @@ final class TemplateOutputTest extends TestCase {
 
 	/** @return array<string, array{string}> Templates mit JSON-Inseln */
 	public static function islandTemplates(): array {
-		return ['index.php' => ['index.php'], 'revisions.php' => ['revisions.php'], 'attachments.php' => ['attachments.php']];
+		return ['index.php' => ['index.php'], 'revisions.php' => ['revisions.php'], 'attachments.php' => ['attachments.php'], 'excalidraw_editor.php' => ['excalidraw_editor.php']];
 	}
 
 	#[\PHPUnit\Framework\Attributes\DataProvider('islandTemplates')]

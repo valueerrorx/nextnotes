@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Tests\Page;
 
+use OCA\NextNotes\Service\LockService;
 use OCA\NextNotes\Service\WorkspaceService;
 use OCA\NextNotes\Tests\Support\ApiClient;
 use OCA\NextNotes\Tests\Support\ApiTestCase;
@@ -17,7 +18,7 @@ use OCP\Server;
 
 // Done M3 6 / SPEC §3 (AccessService: alle Seiten- und Kompatibilitätsrouten), §4.2, §4.5, §11.2 B33:
 // Seiten (revisions, attachments, kanban_content, audio_player) und Compat-Routen (api_note_info, api_download_note,
-// api_export_*, api_attachments) – jede ID-Stelle einzeln fremd → 404 ohne Daten; Lesefreigabe → lesend 200, schreibend 403.
+// api_export_*, api_attachments; M3c2: excalidraw_editor, api_save_excalidraw, workspaces.php) – jede ID-Stelle einzeln fremd → 404 ohne Daten; Lesefreigabe → lesend 200, schreibend 403.
 final class PageIsolationTest extends ApiTestCase {
 	private const APP = '/index.php/apps/nextnotes/';
 
@@ -45,7 +46,7 @@ final class PageIsolationTest extends ApiTestCase {
 	private static function assertNotFoundClean(Response $r, string $mark, string $what): void {
 		self::assertSame(404, $r->status, "$what: " . $r->describe());
 		self::assertStringNotContainsString($mark, $r->body, "$what: Marker von A im Body");
-		foreach (['nextnotes-root', 'revisions-config', 'uploadBtn', 'kanban-card'] as $leak) {
+		foreach (['nextnotes-root', 'revisions-config', 'uploadBtn', 'kanban-card', 'excalidraw-config', 'data-excalidraw'] as $leak) {
 			self::assertStringNotContainsString($leak, $r->body, "$what: App-Inhalt ($leak) in 404");
 		}
 	}
@@ -322,4 +323,164 @@ final class PageIsolationTest extends ApiTestCase {
 			self::assertStringNotContainsString('settings.php', $r->body, "$lang: Link auf settings.php");
 		}
 	}
+
+	// ---- M3c2: excalidraw_editor.php, api_save_excalidraw.php, workspaces.php (POST) ----
+
+	private const SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect x="0" y="0" width="10" height="10" fill="#ffffff"/></svg>';
+
+	private static function diagram(string $text): string {
+		return json_encode(['type' => 'excalidraw', 'elements' => [['id' => 'e1', 'type' => 'text', 'text' => $text]], 'appState' => new \stdClass(), 'files' => new \stdClass()], JSON_THROW_ON_ERROR);
+	}
+
+	/** Eingebettetes Diagramm speichern (Felder wie excalidraw-editor.js) */
+	private static function saveEmbedded(ApiClient $c, int $note, string $text, array $extra = [], bool $multipart = false): Response {
+		return $c->form(self::APP . 'api_save_excalidraw.php', ['action' => 'save_embedded_diagram', 'note_id' => $note, 'diagram_id' => 'excalidraw-1',
+			'diagram_data' => self::diagram($text), 'preview_svg' => self::SVG] + $extra, $multipart);
+	}
+
+	private static function saveFull(ApiClient $c, int $note, string $text, array $extra = []): Response {
+		return $c->form(self::APP . 'api_save_excalidraw.php', ['note_id' => $note, 'diagram_data' => self::diagram($text), 'preview_svg' => self::SVG] + $extra);
+	}
+
+	private static function wsPost(ApiClient $c, array $fields): Response {
+		return $c->form(self::APP . 'workspaces.php', $fields);
+	}
+
+	/** alle 8 workspaces.php-Aktionen auf Workspace $ws (Ziel/Reihenfolge-Partner $other) */
+	private static function wsActions(string $ws, string $other): array {
+		return [
+			'rename' => ['action' => 'rename', 'name' => $ws, 'new_name' => 'Gekapert ' . bin2hex(random_bytes(2))],
+			'delete' => ['action' => 'delete', 'name' => $ws],
+			'set_color' => ['action' => 'set_color', 'name' => $ws, 'color' => '#ff0000'],
+			'set_tags' => ['action' => 'set_tags', 'name' => $ws, 'tags' => 'gekapert'],
+			'reorder' => ['action' => 'reorder', 'names' => [$ws]],
+			'move_notes' => ['action' => 'move_notes', 'name' => $ws, 'target' => $other],
+			'share_workspace' => ['action' => 'share_workspace', 'name' => $ws],
+			'unshare_workspace' => ['action' => 'unshare_workspace', 'name' => $ws],
+		];
+	}
+
+	public function testExcalidrawAndWorkspacesOwner(): void {
+		$x = $this->fixture();
+		['a' => $a, 'mark' => $mark, 'n' => $n] = $x;
+		$wq = 'workspace=' . self::enc($x['ws']);
+		$r = self::saveEmbedded($a, $n, "Bild $mark", ['workspace' => $x['ws'], 'cursor_position' => 3], true);
+		self::assertSame(200, $r->status, 'A speichert eingebettet (multipart): ' . $r->describe());
+		$r = self::get($a, "excalidraw_editor.php?note_id=$n&diagram_id=excalidraw-1&$wq");
+		self::assertSame(200, $r->status, 'A Editor: ' . $r->describe());
+		self::assertStringContainsString('id="excalidraw-config"', $r->body);
+		self::assertStringContainsString('id="saveBtn"', $r->body, 'A: Speichern-Knopf');
+		self::assertStringContainsString("Bild $mark", $r->body, 'A: Diagramm geladen');
+		self::assertStringNotContainsString('nextnotes-readonly', $r->body);
+		self::assertSame(200, self::saveFull($a, $n, "Voll $mark")->status, 'A Vollmodus');
+		// fehlende/ungültige IDs und fremder eigener Workspace → 404 bzw. 400
+		foreach (['excalidraw_editor.php', 'excalidraw_editor.php?note_id=abc', 'excalidraw_editor.php?note_id=0', 'excalidraw_editor.php?note_id=99999999',
+			"excalidraw_editor.php?note_id=$n&diagram_id=a%22b", "excalidraw_editor.php?note_id=$n&workspace=" . self::enc($x['ws2'])] as $p) {
+			self::assertSame(404, self::get($a, $p)->status, "A $p");
+		}
+		self::assertSame(404, self::saveEmbedded($a, $n, 'x', ['workspace' => $x['ws2']])->status, 'A speichert mit anderem eigenen Workspace');
+		self::assertSame(400, self::saveFull($a, 0, 'x')->status, 'note_id=0 legt nichts an');
+		// workspaces.php: Besitzer
+		$r = self::wsPost($a, ['action' => 'set_color', 'name' => $x['ws2'], 'color' => '#00ff00']);
+		self::assertSame(200, $r->status, 'A set_color: ' . $r->describe());
+		self::assertSame(501, self::wsPost($a, ['action' => 'share_workspace', 'name' => $x['ws2']])->status, 'A share → 501 (M5)');
+		self::assertSame(400, self::wsPost($a, ['action' => 'frobnicate', 'name' => $x['ws2']])->status);
+		self::assertSame(404, self::wsPost($a, ['action' => 'delete', 'name' => 'Gibtsnicht ' . $mark])->status);
+		// CSRF: ohne OCS-APIRequest/Token → 412 (Anmeldung per Passwort statt App-Token, damit der CSRF-Check greift)
+		$r = ApiClient::raw('POST', ApiClient::baseUrl() . self::APP . 'workspaces.php', null, [], $a->uid . ':' . self::PASSWORD, null,
+			http_build_query(['action' => 'delete', 'name' => $x['ws2']]));
+		self::assertContains($r->status, [401, 412], 'ohne CSRF-Token: ' . $r->describe());
+		self::assertContains($x['ws2'], self::workspaceNames($a), 'ohne CSRF-Token gelöscht');
+	}
+
+	public function testExcalidrawAndWorkspacesForeignIs404(): void {
+		$x = $this->fixture();
+		['a' => $a, 'b' => $b, 'mark' => $mark, 'n' => $n, 't' => $t, 'ws' => $ws, 'ws2' => $ws2] = $x;
+		self::ok(self::saveEmbedded($a, $n, "Geheim $mark", ['workspace' => $ws]), 'A Diagramm');
+		[$bws] = self::newWorkspace($b, 'Eigen');
+		$bn = self::newNote($b, $bws, 'Eigene', '<p>b</p>');
+		$wq = 'workspace=' . self::enc($ws);
+		$bwq = 'workspace=' . self::enc($bws);
+		$before = self::dump($a->uid);
+
+		foreach (["excalidraw_editor.php?note_id=$n", "excalidraw_editor.php?note_id=$n&diagram_id=excalidraw-1",
+			"excalidraw_editor.php?note_id=$n&diagram_id=excalidraw-1&$wq", "excalidraw_editor.php?note_id=$t",
+			"excalidraw_editor.php?note_id=$bn&$wq", "excalidraw_editor.php?note_id=$n&$bwq"] as $p) {
+			self::assertNotFoundClean(self::get($b, $p), $mark, "B GET $p");
+		}
+		$saves = [
+			'eingebettet' => self::saveEmbedded($b, $n, 'B'),
+			'eingebettet multipart' => self::saveEmbedded($b, $n, 'B', [], true),
+			'eingebettet ws A' => self::saveEmbedded($b, $n, 'B', ['workspace' => $ws]),
+			'eingebettet ws B' => self::saveEmbedded($b, $n, 'B', ['workspace' => $bws]),
+			'eigene Notiz, ws A' => self::saveEmbedded($b, $bn, 'B', ['workspace' => $ws]),
+			'voll' => self::saveFull($b, $n, 'B'),
+			'voll ws A' => self::saveFull($b, $n, 'B', ['workspace' => $ws]),
+		];
+		foreach ($saves as $label => $r) {
+			self::assertNotFoundClean($r, $mark, "B api_save_excalidraw $label");
+		}
+		foreach (self::wsActions($ws, $ws2) as $act => $f) {
+			self::assertNotFoundClean(self::wsPost($b, $f), $mark, "B workspaces.php $act (Workspace A)");
+		}
+		// gemischt: eigene Quelle/fremdes Ziel, fremde Quelle/eigenes Ziel, Reihenfolge mit fremdem Namen
+		foreach (['move eigen→A' => ['action' => 'move_notes', 'name' => $bws, 'target' => $ws],
+			'move A→eigen' => ['action' => 'move_notes', 'name' => $ws, 'target' => $bws],
+			'reorder eigen+A' => ['action' => 'reorder', 'names' => [$bws, $ws]]] as $label => $f) {
+			self::assertNotFoundClean(self::wsPost($b, $f), $mark, "B workspaces.php $label");
+		}
+		self::assertSame($before, self::dump($a->uid), 'Fremdzugriff hat Daten von A verändert');
+		// Gegenprobe: B erreicht Eigenes
+		self::assertSame(200, self::get($b, "excalidraw_editor.php?note_id=$bn&$bwq")->status, 'B eigener Editor');
+		self::assertSame(200, self::saveEmbedded($b, $bn, 'B eigen')->status, 'B speichert eigene Notiz');
+		self::assertSame(200, self::wsPost($b, ['action' => 'set_tags', 'name' => $bws, 'tags' => 'x'])->status, 'B eigener Workspace');
+		self::assertContains($bws, self::workspaceNames($b), 'B-Workspace bleibt');
+	}
+
+	public function testExcalidrawAndWorkspacesReadShare(): void {
+		$x = $this->fixture();
+		['a' => $a, 'b' => $b, 'mark' => $mark, 'n' => $n, 'ws' => $ws, 'ws2' => $ws2] = $x;
+		self::ok(self::saveEmbedded($a, $n, "Lesbar $mark", ['workspace' => $ws]), 'A Diagramm');
+		Server::get(WorkspaceService::class)->share($a->uid, $x['wsId'], $b->uid, 'read');
+		[$bws] = self::newWorkspace($b, 'Eigen');
+		$before = self::dump($a->uid);
+
+		$r = self::get($b, "excalidraw_editor.php?note_id=$n&diagram_id=excalidraw-1");
+		self::assertSame(200, $r->status, 'B lesend Editor: ' . $r->describe());
+		self::assertStringContainsString("Lesbar $mark", $r->body, 'lesend: Diagramm sichtbar');
+		self::assertStringNotContainsString('id="saveBtn"', $r->body, 'lesend: Speichern-Knopf');
+		self::assertStringNotContainsString('id="saveAndExitBtn"', $r->body, 'lesend: Speichern-und-Schließen');
+		self::assertStringContainsString('"readOnly":true', $r->body, 'lesend: readOnly (P14)');
+		self::assertStringContainsString('nextnotes-readonly', $r->body);
+
+		foreach (['eingebettet' => self::saveEmbedded($b, $n, 'B'), 'eingebettet multipart' => self::saveEmbedded($b, $n, 'B', ['workspace' => $ws], true),
+			'voll' => self::saveFull($b, $n, 'B')] as $label => $r) {
+			self::assertSame(403, $r->status, "B lesend api_save_excalidraw $label: " . $r->describe());
+		}
+		foreach (self::wsActions($ws, $ws) + ['move eigen→A' => ['action' => 'move_notes', 'name' => $bws, 'target' => $ws],
+			'move A→eigen' => ['action' => 'move_notes', 'name' => $ws, 'target' => $bws]] as $act => $f) {
+			$r = self::wsPost($b, $f);
+			self::assertSame(403, $r->status, "B lesend workspaces.php $act: " . $r->describe());
+		}
+		self::assertSame($before, self::dump($a->uid), 'Lesefreigabe: Schreibversuche haben Daten von A verändert');
+		self::assertContains($ws, self::workspaceNames($b), 'Freigabe besteht weiter');
+	}
+
+	// ADR 0005: fremde gültige Sperre → 423, Inhalt unverändert; nach Freigabe 200
+	public function testExcalidrawSaveRespectsLock(): void {
+		$x = $this->fixture();
+		['a' => $a, 'b' => $b, 'n' => $n] = $x;
+		Server::get(WorkspaceService::class)->share($a->uid, $x['wsId'], $b->uid, 'write');
+		$locks = Server::get(LockService::class);
+		$locks->acquire($b->uid, $n, 'tester-b');
+		$before = self::dump($a->uid);
+		$r = self::saveEmbedded($a, $n, 'gesperrt');
+		self::assertSame(423, $r->status, 'A speichert trotz B-Sperre: ' . $r->describe());
+		self::assertSame(423, self::saveFull($a, $n, 'gesperrt')->status, 'Vollmodus trotz B-Sperre');
+		self::assertSame($before, self::dump($a->uid), 'Sperre: Inhalt/Anhänge geändert');
+		$locks->release($b->uid, $n, 'tester-b');
+		self::assertSame(200, self::saveEmbedded($a, $n, 'frei')->status, 'nach Freigabe');
+		self::assertSame(200, self::saveEmbedded($b, $n, 'B schreibt')->status, 'B mit Schreibfreigabe');
+	}
+
 }

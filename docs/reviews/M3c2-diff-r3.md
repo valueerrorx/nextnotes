@@ -1,0 +1,9 @@
+VERDICT: BLOCKER
+
+1. (blockierend) nextnotes/lib/Db/NoteMapper.php:44-50 und nextnotes/lib/Service/NoteService.php:92-94: search_text wird nie gegen das Paketlimit geprueft. SearchTextNormalizer::fold (mb_strtolower) vergroessert z. B. U+023A, U+023E, U+0130 von 2 auf 3 Byte (php -r nachgeprueft). Eine Notiz mit ca. 10,5 MiB solcher Zeichen besteht storable(content) (<= 15 MiB auf MariaDB-Standard), search_text hat dann ca. 15,7 MiB, das zweite UPDATE scheitert mit max_allowed_packet und gibt 500 statt 413. Die Transaktion rollt zurueck, die Daten bleiben also konsistent, aber die Vorgabe „nie 500" ist verletzt. Behebung: storable() auch auf den gebauten search_text anwenden (in refreshSearch bzw. vor writeSearchText).
+
+Hinweise (nicht blockierend):
+2. nextnotes/lib/Service/DuplicateService.php:90-99 und 236-249: Beim Umschreiben von Anhang- und Link-IDs kann der Inhalt wachsen, es gibt aber kein storable(). Bei Inhalt knapp an der Grenze droht 500, die Transaktion rollt zurueck.
+3. Die Code-Kommentare in Note.php:143 und NoteMapper.php:30 und InputValidator.php:125 verweisen auf B38. In SPEC §11 steht der Paket-Fix aber unter B37 (Nacharbeit), B38 ist die 423-Meldung.
+
+Geprueft und in Ordnung: Alle Schreiber von Inhalt (create, PATCH, beacon, restoreSnapshot, saveContent, Duplikat, Anhang-Loeschen) laufen in tx->run, Inhalt und search_text bleiben bei Fehler im zweiten Statement konsistent. takeSearchTextUpdate ist mit QBMapper vertraeglich (.ref: kein resetUpdatedFields, setter markiert gleiche Werte nicht). Transaction::run verdeckt die Ursache nicht (IDBConnection::inTransaction existiert in OCP). Die Paketgroesse wird einmal je Request gelesen (geteilter Dienst), nur auf MySQL/MariaDB. Pro Speichern kommt genau ein zusaetzliches UPDATE dazu, kein N+1. Keine Aenderung an Rechten.

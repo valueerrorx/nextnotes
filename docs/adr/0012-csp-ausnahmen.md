@@ -30,3 +30,6 @@ PDF-Anhänge (`GET …/attachments/{id}`, inline) erhalten `frame-ancestors 'sel
 
 ## Nachtrag M3c1 (2026-11-03)
 Ansicht `attachments` (Anhang-Seite) erhält nur `frame-src 'self'` (`addAllowedFrameDomain("'self'")`), keine Admin-Embed-Domains. Zweck: PDF-Vorschau im iFrame (Upstream-Patch P13 statt `<embed>`, das `object-src` bräuchte). Eingebettet wird dort nur der eigene Anhang-GET; Embed-Domains sind für Notizinhalt gedacht und entfallen hier. Umsetzung: eigene Liste `SELF_FRAME_VIEWS` in `CspFactory`.
+
+## Nachtrag M3c2 (2026-11-03)
+`excalidraw_editor.php` läuft mit der NC-Standard-CSP ohne Ausnahme: Laden, Zeichnen, Speichern und Ansichtsmodus ohne Verletzung (Probe hell/dunkel). Worker/WASM bleiben offen bis zum M4-Test „Bild einfügen“.

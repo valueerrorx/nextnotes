@@ -103,7 +103,6 @@ class IndexViewService {
 	public const FORCED_HIDDEN = [
 		'wsmenu:edit-workspaces', // settings.php: M4
 		'wsmenu:new-workspace', // Workspace anlegen: mit Einstellungen M4
-		'slash:excalidraw', // excalidraw_editor.php: M3c2
 	];
 	private const SPEED_DIAL_TAG = 'speed-dial';
 

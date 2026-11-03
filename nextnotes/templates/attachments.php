@@ -11,7 +11,7 @@
 /** @var \OCA\NextNotes\Service\View\PageTranslator $tr */
 $tr = $_['tr'];
 $page = $_['page'];
-$jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR;
+$jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR;
 $txt = [
 	'uploading' => ['attachments.upload.button_uploading', [], 'Uploading...'],
 	'select-file' => ['attachments.errors.select_file', [], 'Please select a file to upload.'],
@@ -53,7 +53,7 @@ $txt = [
 ];
 $data = ['note-id' => (string)$page['note']['id'], 'note-type' => $page['note']['type'], 'workspace' => $page['workspace'],
 	'filesize-units' => json_encode([$tr->t('attachments.size.units.bytes', [], 'bytes'), $tr->t('attachments.size.units.kb', [], 'KB'),
-		$tr->t('attachments.size.units.mb', [], 'MB'), $tr->t('attachments.size.units.gb', [], 'GB')], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)];
+		$tr->t('attachments.size.units.mb', [], 'MB'), $tr->t('attachments.size.units.gb', [], 'GB')], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR)];
 foreach ($txt as $name => [$key, $vars, $default]) {
 	$data['txt-' . $name] = $tr->t($key, $vars, $default);
 }

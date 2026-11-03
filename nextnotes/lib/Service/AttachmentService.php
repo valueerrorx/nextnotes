@@ -181,7 +181,7 @@ class AttachmentService {
 		if ($base[0] === '.') {
 			throw new BadRequestException('Hidden attachment filenames are not allowed');
 		}
-		if (preg_match('/[\x00-\x1F\x7F]/', $base)) {
+		if (!mb_check_encoding($base, 'UTF-8') || preg_match('/[\x00-\x1F\x7F]/', $base)) {
 			throw new BadRequestException('Attachment filename contains invalid characters');
 		}
 		if (strlen($base) > 255) {
@@ -225,6 +225,30 @@ class AttachmentService {
 		$a->setCreatedBy($uid);
 		$a->setCreatedAt($this->time->getTime());
 		return $this->attachments->insert($a);
+	}
+
+	/** Erzeugte Datei (Excalidraw-Vorschau) als Anhang; Aufrufer hält die Transaktion (enforceQuota zuerst), bei Fehler discardNew */
+	public function createFromString(int $noteId, string $name, string $mime, string $data, string $uid): Attachment {
+		$a = $this->newRow($noteId, $name, $mime, strlen($data), $uid);
+		$this->noteFolder($noteId)->newFile((string)$a->getId(), $data);
+		return $a;
+	}
+
+	// Datei eines zurückgerollten Anhangs sofort entfernen
+	public function discardNew(int $noteId, int $attachmentId): void {
+		$this->queueFileDeletion($noteId, $attachmentId);
+		$this->cleanup->flush();
+	}
+
+	// Anhang ohne Verweis entfernen: Zeile sofort, Datei nach dem Commit; unbekannt → nichts
+	public function retire(int $noteId, int $attachmentId): void {
+		try {
+			$a = $this->attachments->findOnNote($attachmentId, $noteId);
+		} catch (DoesNotExistException) {
+			return;
+		}
+		$this->attachments->delete($a);
+		$this->queueFileDeletion($noteId, $attachmentId);
 	}
 
 	// ---------- API ----------
@@ -332,15 +356,16 @@ class AttachmentService {
 		return ['message' => 'Attachment deleted successfully', 'retained_for_snapshots' => false];
 	}
 
-	// Upstream: <img>, <a> und Markdown-Verweise auf den Anhang aus dem Inhalt entfernen
+	// Upstream: <img>, <a> und Markdown-Verweise auf den Anhang aus dem Inhalt entfernen; Regex-Fehler wirft (B37)
 	private static function stripReferences(string $content, int $attachmentId): string {
 		if ($content === '') {
 			return $content;
 		}
 		$ref = 'attachments\/' . $attachmentId . '(?![0-9])';
-		$content = preg_replace('/<img[^>]*src=[\'"][^\'"]*' . $ref . '[^\'"]*[\'"][^>]*>/i', '', $content) ?? $content;
-		$content = preg_replace('/<a[^>]*href=[\'"][^\'"]*' . $ref . '[^\'"]*[\'"][^>]*>.*?<\/a>/is', '', $content) ?? $content;
-		return preg_replace('/!?\[[^\]]*\]\([^)]*' . $ref . '[^)]*\)/i', '', $content) ?? $content;
+		$content = Pcre::replace('/<img[^>]*src=[\'"][^\'"]*' . $ref . '[^\'"]*+[\'"][^>]*+>/i', '', $content);
+		// Linkinhalt bis zum ersten </a> wie .*? upstream, possessiv ohne Backtracking
+		$content = Pcre::replace('/<a[^>]*href=[\'"][^\'"]*' . $ref . '[^\'"]*+[\'"][^>]*+>(?:[^<]++|<(?!\/a>))*+<\/a>/i', '', $content);
+		return Pcre::replace('/!?\[[^\]]*+\]\([^)]*' . $ref . '[^)]*+\)/i', '', $content);
 	}
 
 	private static function referenced(string $content, int $noteId, int $attachmentId): bool {

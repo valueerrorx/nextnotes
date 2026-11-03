@@ -4,12 +4,19 @@
 export function apiClient(ctx, request, user = process.env.NN_USER, pass = process.env.NN_PASS) {
 	const auth = `Basic ${Buffer.from(`${user}:${pass}`).toString('base64')}`;
 	const call = async (method, path, data) => {
-		const resp = await request.fetch(`${ctx.base}/index.php/apps/nextnotes/api/v1${path}`, {
-			method,
-			headers: { Authorization: auth, 'OCS-APIRequest': 'true', Accept: 'application/json', ...(data ? { 'Content-Type': 'application/json' } : {}) },
-			data: data ? JSON.stringify(data) : undefined,
-			failOnStatusCode: false,
-		});
+		let resp;
+		// SQLite „Database busy“: App antwortet 503 + Retry-After (SPEC M2d) → bis zu 5× wiederholen; 503 ohne Retry-After bleibt ein Fehler
+		for (let i = 0; ; i++) {
+			resp = await request.fetch(`${ctx.base}/index.php/apps/nextnotes/api/v1${path}`, {
+				method,
+				headers: { Authorization: auth, 'OCS-APIRequest': 'true', Accept: 'application/json', ...(data ? { 'Content-Type': 'application/json' } : {}) },
+				data: data ? JSON.stringify(data) : undefined,
+				failOnStatusCode: false,
+			});
+			const after = Number(resp.headers()['retry-after']);
+			if (resp.status() !== 503 || !(after >= 0) || i >= 5) break;
+			await new Promise((r) => setTimeout(r, Math.min(after, 3) * 1000 + 250));
+		}
 		let body = null;
 		try { body = await resp.json(); } catch { body = await resp.text().catch(() => null); }
 		return { status: resp.status(), body };
