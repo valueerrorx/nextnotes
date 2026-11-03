@@ -77,3 +77,40 @@ html.nextnotes-ready #app-content {
 	appearance: revert;
 	opacity: revert;
 }
+
+/* Unterseiten (revisions.php, attachments.php) im NC-Rahmen: Spalte, eigener Scrollbereich */
+#nextnotes-root.nextnotes-subpage {
+	display: block;
+	overflow: auto;
+}
+
+#nextnotes-root .revisions-shell {
+	height: 100%;
+}
+
+/* Upstream attachments.php <style> (Platzhalter, Hinweis, Abstand der Zurück-Leiste) */
+#nextnotes-root .file-icon-placeholder {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 60px;
+	height: 60px;
+	border-radius: 4px;
+	background-color: var(--color-background-dark);
+	color: var(--color-text-maxcontrast);
+	font-size: 24px;
+}
+
+#nextnotes-root .attachments-back-to-note-bar {
+	margin: 20px 0 0 0;
+}
+
+#nextnotes-root .attachments-back-to-note-bar + .settings-container {
+	margin-top: 8px;
+}
+
+/* Lesefreigabe: keine Verschieben-/Löschen-Knöpfe in der Anhangliste (Server antwortet sonst 403) */
+body.nextnotes-readonly #attachmentsList [data-action="move"],
+body.nextnotes-readonly #attachmentsList [data-action="delete"] {
+	display: none;
+}

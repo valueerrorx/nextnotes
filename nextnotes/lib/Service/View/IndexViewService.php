@@ -40,7 +40,7 @@ class IndexViewService {
 		'note_font_size' => '15',
 		'sidebar_font_size' => '13',
 		'center_note_content' => '0',
-		'show_note_created' => '0',
+		'show_note_created' => '1', // Upstream-DB setzt '1' bei Anlage (db_connect.php:584); Unterzeile mit Info-Knopf
 		'show_note_icons' => '1',
 		'hide_folder_actions' => '1',
 		'notes_without_folders_after_folders' => '1',
@@ -103,6 +103,7 @@ class IndexViewService {
 	public const FORCED_HIDDEN = [
 		'wsmenu:edit-workspaces', // settings.php: M4
 		'wsmenu:new-workspace', // Workspace anlegen: mit Einstellungen M4
+		'slash:excalidraw', // excalidraw_editor.php: M3c2
 	];
 	private const SPEED_DIAL_TAG = 'speed-dial';
 
@@ -171,7 +172,7 @@ class IndexViewService {
 		$noteFolderId = $note?->getFolderId();
 
 		$tree = $this->tree($uid, $baseUrl, $key, $byId, $notes, $tagMap, $sort, $favSort, $note, $folderFilter, $openFolder, $search);
-		$titleColor = $this->colorHex($ws->getColor());
+		$titleColor = self::colorHex($ws->getColor());
 
 		return [
 			'workspaceKey' => $key,
@@ -184,7 +185,7 @@ class IndexViewService {
 			'sortModes' => self::SORT_MODES,
 			'favoritesSort' => $favSort,
 			'favoritesSortModes' => self::FAVORITES_SORT_MODES,
-			'favoritesIconColor' => $this->iconColor($this->value($uid, 'favorites_icon_color')),
+			'favoritesIconColor' => self::iconColor($this->value($uid, 'favorites_icon_color')),
 			'folderIconOpensKanban' => $this->bool($uid, 'folder_icon_opens_kanban'),
 			'showNoteIcons' => $this->bool($uid, 'show_note_icons'),
 			'tree' => $tree,
@@ -292,16 +293,16 @@ class IndexViewService {
 			'heading' => $heading,
 			'titleValue' => $isDefault ? '' : $heading,
 			'titlePlaceholder' => $isDefault ? $this->noteTitle($heading) : $this->tr->t('index.note.title_placeholder', [], 'Title ?'),
-			'titleColor' => $this->iconColor((string)($note->getTitleColor() ?? '')),
+			'titleColor' => self::iconColor((string)($note->getTitleColor() ?? '')),
 			'titleColorRaw' => (string)($note->getTitleColor() ?? ''),
 			'titleSize' => $titleSize !== null ? min(64, max(12, (int)$titleSize)) : null,
 			'contentWidth' => $width !== null ? min(100, max(10, (int)$width)) : null,
 			'showIcon' => $this->bool($uid, 'show_note_icons'),
-			'iconClass' => $this->iconClass($icon, $default),
+			'iconClass' => self::iconClass($icon, $default),
 			'iconCustom' => $icon !== '',
 			'iconDefault' => $default,
-			'iconColor' => $this->iconColor((string)($note->getIconColor() ?? '')),
-			'iconColorRaw' => $this->iconColor((string)($note->getIconColor() ?? '')) !== '' ? (string)$note->getIconColor() : '',
+			'iconColor' => self::iconColor((string)($note->getIconColor() ?? '')),
+			'iconColorRaw' => self::iconColor((string)($note->getIconColor() ?? '')) !== '' ? (string)$note->getIconColor() : '',
 			'favorite' => (int)$note->getFavorite() === 1,
 			'tags' => implode(' ', $tags),
 			'folderId' => $folder !== null ? (int)$folderId : null,
@@ -443,12 +444,12 @@ class IndexViewService {
 				'updated' => (string)NoteSerializer::date($n->getUpdatedAt()),
 				'favorite' => (int)$n->getFavorite() === 1,
 				'speedDial' => in_array(self::SPEED_DIAL_TAG, array_map(static fn ($t) => mb_strtolower(trim((string)$t)), $tags[$id] ?? []), true),
-				'iconClass' => $this->iconClass($icon, $default),
+				'iconClass' => self::iconClass($icon, $default),
 				'iconCustom' => $icon !== '',
 				'iconDefault' => $default,
-				'iconColorRaw' => $this->iconColor($iconColor) !== '' ? $iconColor : '',
-				'iconColor' => $this->iconColor($iconColor),
-				'titleColor' => $this->iconColor($titleColor),
+				'iconColorRaw' => self::iconColor($iconColor) !== '' ? $iconColor : '',
+				'iconColor' => self::iconColor($iconColor),
+				'titleColor' => self::iconColor($titleColor),
 				'selected' => $id === $selectedId,
 				'url' => $baseUrl . 'index.php?' . http_build_query($linkBase + ['note' => $id]),
 			];
@@ -516,10 +517,10 @@ class IndexViewService {
 					'count' => $count,
 					'open' => $isOpen,
 					'favorite' => (int)$f->getFavorite() === 1,
-					'iconClass' => $icon !== '' ? $this->iconClass($icon, 'lucide-folder') : ($isOpen ? 'lucide lucide-folder-open' : 'lucide lucide-folder'),
+					'iconClass' => $icon !== '' ? self::iconClass($icon, 'lucide-folder') : ($isOpen ? 'lucide lucide-folder-open' : 'lucide lucide-folder'),
 					'iconCustom' => $icon !== '',
-					'iconColorRaw' => $this->iconColor((string)($f->getIconColor() ?? '')) !== '' ? (string)$f->getIconColor() : '',
-					'iconColor' => $this->iconColor((string)($f->getIconColor() ?? '')),
+					'iconColorRaw' => self::iconColor((string)($f->getIconColor() ?? '')) !== '' ? (string)$f->getIconColor() : '',
+					'iconColor' => self::iconColor((string)($f->getIconColor() ?? '')),
 					'treeClass' => !$highlight ? '' : ($id === $activeId ? ' folder-tree-active' : (isset($branch[$id]) ? ' folder-tree-branch' : '')),
 					'notes' => $own,
 					'children' => $sub,
@@ -552,8 +553,8 @@ class IndexViewService {
 		$favFolders = array_map(fn (Folder $f) => [
 			'id' => (int)$f->getId(),
 			'name' => $f->getName(),
-			'iconClass' => $this->iconClass((string)($f->getIcon() ?? ''), 'lucide-folder'),
-			'iconColor' => $this->iconColor((string)($f->getIconColor() ?? '')),
+			'iconClass' => self::iconClass((string)($f->getIcon() ?? ''), 'lucide-folder'),
+			'iconColor' => self::iconColor((string)($f->getIconColor() ?? '')),
 			'url' => $baseUrl . 'index.php?' . http_build_query(['folder' => $f->getName(), 'workspace' => $this->workspaces->keyFor($uid, (int)$f->getWorkspaceId())]),
 		], $favoriteFolders);
 
@@ -610,7 +611,7 @@ class IndexViewService {
 	}
 
 	// Nur lucide-Klassen (InputValidator::icon erlaubt [A-Za-z0-9 _-]); sonst Standard
-	private function iconClass(string $icon, string $default): string {
+	public static function iconClass(string $icon, string $default): string {
 		$classes = array_values(array_filter(preg_split('/\s+/', trim($icon)) ?: [], static fn ($c) => preg_match('/^lucide(-[a-z0-9-]+)?$/', $c) === 1));
 		$hasIcon = array_filter($classes, static fn ($c) => $c !== 'lucide') !== [];
 		if (!$hasIcon) {
@@ -620,7 +621,7 @@ class IndexViewService {
 	}
 
 	// Upstream poznoteIconColorCss: Paletten-/Altfarbe → Token, sonst geprüfte Farbe, sonst ''
-	private function iconColor(string $color): string {
+	public static function iconColor(string $color): string {
 		$color = trim($color);
 		if (!preg_match('/^(#[0-9a-fA-F]{3,8}|[a-zA-Z]{3,30})$/', $color)) {
 			return '';
@@ -635,7 +636,7 @@ class IndexViewService {
 		return $color;
 	}
 
-	private function colorHex(?string $stored): string {
+	public static function colorHex(?string $stored): string {
 		$hex = $stored === null || $stored === '' ? '' : ($stored[0] === '#' ? $stored : (InputValidator::PALETTE[$stored] ?? ''));
 		return preg_match('/^#[0-9a-f]{3,8}$/i', $hex) ? $hex : '';
 	}

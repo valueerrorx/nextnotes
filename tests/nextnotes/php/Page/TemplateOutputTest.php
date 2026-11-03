@@ -18,6 +18,9 @@ final class TemplateOutputTest extends TestCase {
 	// Erlaubte print_unescaped-Stellen: Datei => Liste der exakten Argumente (Reihenfolge egal)
 	private const ALLOW = [
 		'index.php' => ['json_encode($islandData, $jsonFlags)'],
+		// M3c1: JSON-Inseln der Unterseiten (Flags in testJsonIslandFlags geprüft)
+		'revisions.php' => ['json_encode($islandData, $jsonFlags)'],
+		'attachments.php' => ['json_encode($islandData, $jsonFlags)'],
 		// Notizinhalt, beim Speichern durch HtmlSanitizer::sanitizeForType geprüft (Lead M3b1); Tasklist-JSON wird nicht ausgegeben
 		// (Gegenprobe: EditorPageTest::testTasklistContentNeverRenderedUnsanitized)
 		'partials/note_display.php' => ['$note[\'display\']'],
@@ -57,8 +60,18 @@ final class TemplateOutputTest extends TestCase {
 		self::assertSame(1, count($found['index.php'] ?? []), 'templates/index.php: genau ein print_unescaped (JSON-Inseln)');
 	}
 
-	public function testJsonIslandFlags(): void {
-		$src = self::templates()['index.php'];
+	/** @return array<string, array{string}> Templates mit JSON-Inseln */
+	public static function islandTemplates(): array {
+		return ['index.php' => ['index.php'], 'revisions.php' => ['revisions.php'], 'attachments.php' => ['attachments.php']];
+	}
+
+	#[\PHPUnit\Framework\Attributes\DataProvider('islandTemplates')]
+	public function testJsonIslandFlags(string $file): void {
+		$all = self::templates();
+		self::assertArrayHasKey($file, $all, "templates/$file fehlt");
+		$src = $all[$file];
+		// jede ungeschützte JSON-Ausgabe nutzt $jsonFlags (json_encode innerhalb der Inseldaten bzw. in p() ist ohnehin geschützt)
+		self::assertSame(substr_count($src, 'print_unescaped(json_encode('), substr_count($src, 'print_unescaped(json_encode($islandData, $jsonFlags))'), "$file: print_unescaped(json_encode) ohne \$jsonFlags");
 		self::assertMatchesRegularExpression('/\$jsonFlags\s*=\s*([^;]+);/', $src);
 		preg_match('/\$jsonFlags\s*=\s*([^;]+);/', $src, $m);
 		foreach (['JSON_HEX_TAG', 'JSON_HEX_AMP', 'JSON_HEX_APOS', 'JSON_HEX_QUOT'] as $flag) {

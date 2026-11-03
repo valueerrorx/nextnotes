@@ -26,6 +26,9 @@ const read = (rel) => fs.readFileSync(path.join(pub, rel), 'utf8');
 const sources = {};
 for (const [g, files] of Object.entries(bundles.css)) sources[`nextnotes-${g}.css`] = files.map(read).join('\n');
 for (const [n, def] of Object.entries(bundles.cssSingle)) sources[`${n}.css`] = def.media ? `@media ${def.media} {\n${read(def.src)}\n}` : read(def.src);
+for (const p of Object.keys(bundles.pages)) {
+	if (p !== '_doc') sources[`nextnotes-page-${p}.css`] = bundles.cssPages[p].flatMap((f) => (f.startsWith('@') ? bundles.cssPageGroups[f] : [f])).map(read).join('\n');
+}
 
 const sheets = {};
 const lists = {};

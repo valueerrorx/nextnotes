@@ -837,7 +837,8 @@ function buildAttachmentPreviewUrl(noteId, attachmentId, forceDownload) {
     if (forceDownload) {
         params.push('download=1');
     }
-    return params.length ? url + '?' + params.join('&') : url;
+    url = params.length ? url + '?' + params.join('&') : url;
+    return window.NEXTNOTES ? window.NEXTNOTES.url(url) : url;
 }
 
 function buildAttachmentAudioPreviewUrl(noteId, attachmentId) {
@@ -849,7 +850,8 @@ function buildAttachmentAudioPreviewUrl(noteId, attachmentId) {
     if (workspace) {
         params.push('workspace=' + encodeURIComponent(workspace));
     }
-    return '/audio_player.php?' + params.join('&');
+    var url = '/audio_player.php?' + params.join('&');
+    return window.NEXTNOTES ? window.NEXTNOTES.url(url) : url;
 }
 
 function buildAttachmentPreviewCard(noteId, attachment) {

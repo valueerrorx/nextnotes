@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OCA\NextNotes\Middleware;
 
 use OCA\NextNotes\Controller\AttachmentsApiController;
+use OCA\NextNotes\Controller\CompatController;
 use OCA\NextNotes\Controller\TagsApiController;
 use OCA\NextNotes\Controller\WorkspacesApiController;
 use OCA\NextNotes\Service\Exception\ApiException;
@@ -43,7 +44,7 @@ class ApiExceptionMiddleware extends Middleware {
 		$message = $exception instanceof DoesNotExistException ? 'Not found' : $exception->getMessage();
 		$body = ['success' => false, 'error' => $message];
 		// Upstream Workspaces/Tags/Attachments liefern den Text zusätzlich unter „message“
-		if ($controller instanceof WorkspacesApiController || $controller instanceof TagsApiController || $controller instanceof AttachmentsApiController) {
+		if ($controller instanceof WorkspacesApiController || $controller instanceof TagsApiController || $controller instanceof AttachmentsApiController || $controller instanceof CompatController) {
 			$body['message'] = $message;
 		}
 		return new JSONResponse($body + $extra, $status);

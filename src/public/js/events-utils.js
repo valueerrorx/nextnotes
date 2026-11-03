@@ -40,7 +40,7 @@ function buildAudioPlayerUrl(src) {
     if (queryString) {
         url += queryString.replace('?', '&');
     }
-    return url;
+    return window.NEXTNOTES ? window.NEXTNOTES.url(url) : url;
 }
 
 // Convert audio tags to iframes in Chrome for contenteditable compatibility

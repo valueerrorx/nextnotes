@@ -6,7 +6,7 @@
 // abgeleitet von src/note_display.php @ 7e2e0b6aa501ba95ac1e9789fd2bb477c281a001
 // Geöffnete Notiz in #right_col. Daten: $note (IndexViewService::noteView), Inhalt beim Speichern durch HtmlSanitizer geprüft.
 // Weggelassen: Teilen/öffentlicher Link (gestrichen), Download/Drucken (Export M4), Umwandeln (501 bis M4),
-// Revisionen und Notiz-Info (revisions.php/api_note_info.php M3c), Aufgabenseite (M4), Audio-Aufnahme,
+// Aufgabenseite (M4), Audio-Aufnahme,
 // Excalidraw-Platzhalter-Bereinigung (kein Altbestand). Anhang-Vorschauen rendert attachments.js beim Laden.
 /** @var \OCA\NextNotes\Service\View\PageTranslator $tr */
 /** @var array $note */
@@ -73,11 +73,14 @@ $item = static function (string $action, string $icon, string $label, array $dat
 	<?php $btn('btn-move note-action-btn', 'show-move-folder-dialog', 'lucide-folder-output', $tr->t('common.move', [], 'Move')); ?>
 	<?php if ($type !== 'linked' && !$note['hasLinked']): ?><?php $btn('btn-create-linked-note note-action-btn', 'create-linked-note', 'lucide-link', $tr->t('editor.toolbar.create_linked_note'), false); ?><?php endif; ?>
 	<?php if ($prose): ?><?php $btn('btn-search-replace note-action-btn', 'open-search-replace-modal', 'lucide-search', $tr->t('editor.toolbar.search_replace', [], 'Search and replace')); ?><?php endif; ?>
+	<?php $btn('btn-snapshot note-action-btn', 'show-snapshot', 'lucide-history', $tr->t('snapshot.menu_item', [], 'Revisions')); ?>
 	<button type="button" id="note-history-forward" class="toolbar-btn btn-history-nav btn-history-forward history-disabled" title="<?php p($tr->t('editor.toolbar.go_forward', [], 'Go forward')); ?>" disabled><i class="lucide lucide-circle-chevron-right"></i></button>
 	<?php $btn('btn-trash note-action-btn', 'delete-note', 'lucide-trash-2', $tr->t('common.delete', [], 'Delete')); ?>
 	<div class="toolbar-menu-anchor">
 		<button type="button" class="toolbar-btn mobile-more-btn note-action-btn" title="<?php p($tr->t('common.menu', [], 'Menu')); ?>" data-action="toggle-mobile-toolbar-menu" aria-haspopup="true" aria-expanded="false"><i class="lucide lucide-more-vertical"></i></button>
 		<div class="dropdown-menu mobile-toolbar-menu" hidden role="menu" aria-label="<?php p($tr->t('index.toolbar.menu_actions', [], 'Menu actions')); ?>">
+			<?php $item('show-snapshot', 'lucide-history', $tr->t('snapshot.menu_item', [], 'Revisions'), ['note-id' => $id]); ?>
+			<?php if (!$note['showDates']): ?><?php $item('show-note-info', 'lucide-info', $tr->t('common.information', [], 'Information'), ['note-id' => $id]); ?><?php endif; ?>
 			<?php if ($prose): ?><?php $item('trigger-mobile-action', 'lucide-search', $tr->t('editor.toolbar.search_replace', [], 'Search and replace'), ['selector' => '.btn-search-replace']); ?><?php endif; ?>
 			<?php if ($type === 'tasklist'): ?>
 			<?php $item('clear-completed-tasks', 'lucide-check-square', $tr->t('tasklist.clear_completed', [], 'Clear completed tasks'), ['note-id' => $id]); ?>
@@ -88,7 +91,7 @@ $item = static function (string $action, string $icon, string $label, array $dat
 			<?php $item('trigger-mobile-action', 'lucide-folder-output', $tr->t('common.move', [], 'Move'), ['selector' => '.btn-move']); ?>
 			<?php if ($type !== 'linked'): ?>
 			<button type="button" class="dropdown-item mobile-toolbar-item speed-dial-state-on" role="menuitem" data-action="toggle-speed-dial" data-note-id="<?php p($id); ?>" style="display: none;"><i class="lucide lucide-zap"></i> <?php p($tr->t('speed_dial.remove', [], 'Remove from speed dial')); ?></button>
-			<?php $item('toggle-speed-dial', 'lucide-zap', $tr->t('speed_dial.add', [], 'Add to speed dial'), ['note-id' => $id]); ?>
+			<button type="button" class="dropdown-item mobile-toolbar-item speed-dial-state-off" role="menuitem" data-action="toggle-speed-dial" data-note-id="<?php p($id); ?>"><i class="lucide lucide-zap"></i> <?php p($tr->t('speed_dial.add', [], 'Add to speed dial')); ?></button>
 			<?php endif; ?>
 			<?php if (!$note['archive']): ?><?php $item('archive-note', 'lucide-archive', $tr->t('archive.menu_item', [], 'Archive note'), ['note-id' => $id, 'note-title' => $note['heading']]); ?><?php endif; ?>
 		</div>
@@ -144,7 +147,7 @@ $item = static function (string $action, string $icon, string $label, array $dat
 	<span class="note-subline"><span class="note-subline-list"><span class="note-sub-dates">
 		<?php if ($note['created'] !== ''): ?><span class="note-sub-created"><?php p($tr->t('index.note.created_on', ['date' => $note['created']], 'Created {{date}}')); ?></span><?php endif; ?>
 		<?php if ($note['updated'] !== ''): ?><span class="note-sub-updated" id="noteUpdated<?php p($id); ?>" data-label="<?php p($tr->t('index.note.modified_on', [], 'Modified {{date}}')); ?>"><?php p($tr->t('index.note.modified_on', ['date' => $note['updated']], 'Modified {{date}}')); ?></span><?php endif; ?>
-	</span><span class="note-sub-stats" id="noteStats<?php p($id); ?>" data-note-id="<?php p($id); ?>" data-labels="<?php p(json_encode($note['statsLabels'], JSON_UNESCAPED_UNICODE)); ?>"><span class="note-sub-stat note-sub-stat-characters" data-stat="characters"></span> <span class="note-sub-stat note-sub-stat-words" data-stat="words"></span> <span class="note-sub-stat note-sub-stat-lines" data-stat="lines"></span></span></span></span>
+	</span><span class="note-sub-stats" id="noteStats<?php p($id); ?>" data-note-id="<?php p($id); ?>" data-labels="<?php p(json_encode($note['statsLabels'], JSON_UNESCAPED_UNICODE)); ?>"><span class="note-sub-stat note-sub-stat-characters" data-stat="characters"></span> <span class="note-sub-stat note-sub-stat-words" data-stat="words"></span> <span class="note-sub-stat note-sub-stat-lines" data-stat="lines"></span></span></span> <span class="note-sub-info"><button type="button" class="note-sub-info-btn" data-action="show-note-info" data-note-id="<?php p($id); ?>" title="<?php p($tr->t('common.information', [], 'Information')); ?>" aria-label="<?php p($tr->t('common.information', [], 'Information')); ?>"><i class="lucide lucide-info"></i></button></span></span>
 	<?php endif; ?>
 </h4>
 <?php if ($type === 'markdown'): ?>

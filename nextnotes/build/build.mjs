@@ -151,6 +151,16 @@ for (const [out, def] of Object.entries(bundles.cssSingle)) {
 	if (def.media) code = `@media ${def.media} {\n${code}\n}\n`;
 	writeCss(name, code);
 }
+// Eigene Seiten (bundles.json pages): CSS aus cssPages (Gruppen aufgelöst), JS wie die Upstream-Seite
+for (const [page, def] of Object.entries(bundles.pages)) {
+	if (page === '_doc') continue;
+	const css = (bundles.cssPages[page] ?? []).flatMap((f) => (f.startsWith('@') ? bundles.cssPageGroups[f] : [f]));
+	if (!css.length) die(`pages.${page}: keine cssPages-Liste`);
+	const cssName = `css/nextnotes-page-${page}.css`;
+	writeCss(cssName, css.map((f) => `/* --- ${f} --- */\n${cssFile(f, cssName)}\n`).join(''));
+	const jsName = `js/nextnotes-page-${page}.js`;
+	write(jsName, minifyJs(def.js.map((f) => `/* --- ${f} --- */\n${read(f)}\n;\n`).join(''), jsName));
+}
 for (const f of walk(path.join(app, 'css-src'))) {
 	write(`css/${f}`, fs.readFileSync(path.join(app, 'css-src', f)));
 }

@@ -154,7 +154,6 @@
             var fileSize = formatFileSize(file.size);
 
             var isImage = file.type.startsWith('image/');
-            var isPDF = file.type === 'application/pdf';
             var isVideo = file.type.startsWith('video/') || /\.mp4$/i.test(fileName);
 
             var htmlContent = '<div class="selected-file-info"><span>' + escapeHtml(fileName) + ' (' + escapeHtml(fileSize) + ')</span></div>';
@@ -163,13 +162,6 @@
                 var reader = new FileReader();
                 reader.onload = function (e) {
                     htmlContent += '<div class="image-preview"><img src="' + e.target.result + '" alt="' + TXT.previewAlt + '" style="max-width: 200px; max-height: 150px; border-radius: 4px; margin-top: 10px;"></div>';
-                    fileNameDiv.innerHTML = htmlContent;
-                };
-                reader.readAsDataURL(file);
-            } else if (isPDF) {
-                var reader = new FileReader();
-                reader.onload = function (e) {
-                    htmlContent += '<div class="pdf-preview"><embed src="' + e.target.result + '" type="application/pdf" width="200" height="150" style="border-radius: 4px; margin-top: 10px;"></div>';
                     fileNameDiv.innerHTML = htmlContent;
                 };
                 reader.readAsDataURL(file);
@@ -506,7 +498,7 @@
             '<h3>' + escapeHtml(fileName) + '</h3>' +
             '<button type="button" class="pdf-preview-close">&times;</button>' +
             '</div>' +
-            '<embed src="' + escapeHtml(pdfUrl) + '" type="application/pdf" width="90%" height="80%" style="margin: 20px auto; display: block; border-radius: 4px;">' +
+            '<iframe src="' + escapeHtml(pdfUrl) + '" title="' + escapeHtml(fileName) + '" width="90%" height="80%" style="margin: 20px auto; display: block; border: 0; border-radius: 4px;"></iframe>' +
             '<div class="pdf-preview-actions">' +
             '<button type="button" class="btn btn-primary pdf-preview-open">' + escapeHtml(TXT.openNewTab) + '</button>' +
             '<button type="button" class="btn btn-secondary pdf-preview-download">' + escapeHtml(TXT.download) + '</button>' +
@@ -552,7 +544,7 @@
         if (queryParams.length > 0) {
             url += '?' + queryParams.join('&');
         }
-        return url;
+        return window.NEXTNOTES ? window.NEXTNOTES.url(url) : url;
     }
 
     // Open attachment in a new tab when the file type supports inline viewing.

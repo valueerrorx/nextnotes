@@ -27,3 +27,6 @@ Nicht erlaubt: `unsafe-eval`, `unsafe-inline` für Skripte, externe Skript-/Font
 
 ## Nachtrag M3 (2026-11-03)
 PDF-Anhänge (`GET …/attachments/{id}`, inline) erhalten `frame-ancestors 'self'` (`EmptyContentSecurityPolicy::addAllowedFrameAncestorDomain`, @since 13). Die leere Standard-CSP von Nicht-Template-Antworten setzt `'none'` und blockiert die PDF-Vorschau im iFrame der Notiz (`attachments.js`). `'self'` entspricht dem NC-Standard für Seiten und dem `X-Frame-Options: SAMEORIGIN` des Webservers; `frame-src` der Seiten bleibt unverändert. Übrige Anhänge behalten `sandbox` (SPEC B22).
+
+## Nachtrag M3c1 (2026-11-03)
+Ansicht `attachments` (Anhang-Seite) erhält nur `frame-src 'self'` (`addAllowedFrameDomain("'self'")`), keine Admin-Embed-Domains. Zweck: PDF-Vorschau im iFrame (Upstream-Patch P13 statt `<embed>`, das `object-src` bräuchte). Eingebettet wird dort nur der eigene Anhang-GET; Embed-Domains sind für Notizinhalt gedacht und entfallen hier. Umsetzung: eigene Liste `SELF_FRAME_VIEWS` in `CspFactory`.

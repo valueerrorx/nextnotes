@@ -49,6 +49,17 @@ for (const [p, files] of Object.entries(up.manifest)) {
 }
 for (const p of Object.keys(b.cssPages)) if (!up.manifest[p]) errors.push(`cssPages.${p}: keine Upstream-Seite`);
 
+// Eigene Seiten: Skript-Reihenfolge der Upstream-Seite (ohne exclude/omit), CSS aus cssPages
+for (const [p, def] of Object.entries(b.pages)) {
+	if (p === '_doc') continue;
+	if (!b.cssPages[p]) errors.push(`pages.${p}: keine cssPages-Liste`);
+	const file = path.join(pub, p + '.php');
+	const html = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+	if (html === '') { errors.push(`pages.${p}: src/public/${p}.php fehlt`); continue; }
+	const scripts = [...html.matchAll(/(?:src="|poznoteAsset\(')(js\/[^"'?]+\.js)/g)].map((m) => m[1]).filter((f) => !matches(def.omit ?? {}, f));
+	same(`pages.${p}.js (src/public/${p}.php)`, [...new Set(scripts)], def.js);
+}
+
 // Einzeldateien und Vendor existieren
 for (const f of b.jsSingle) if (!fs.existsSync(path.join(pub, f))) errors.push(`jsSingle ${f}: fehlt in src/public`);
 for (const def of Object.values(b.cssSingle)) if (!fs.existsSync(path.join(pub, def.src))) errors.push(`cssSingle ${def.src}: fehlt in src/public`);

@@ -86,4 +86,70 @@ final class ControllerAttributeTest extends TestCase {
 		}
 		self::assertSame([], $missing, 'Routenziele ohne geprüfte Methode');
 	}
+
+	// M3c1 / SPEC §4.5: Seiten- und Kompatibilitätsrouten. NoCSRFRequired nur für Seiten-GETs und GET-Downloads ohne Seiteneffekt;
+	// api_note_info (JSON-Daten per Adapter) und das Such-POST prüfen CSRF.
+	private const PAGE_COMPAT_NOCSRF = [
+		'PageController::index', 'PageController::dashboard', 'PageController::login', 'PageController::logout',
+		'PageController::audioPlayer', 'PageController::revisions', 'PageController::attachments', 'PageController::kanbanContent',
+		'CompatController::downloadNote', 'CompatController::exportNote', 'CompatController::exportFolder', 'CompatController::attachments',
+	];
+	private const PAGE_COMPAT_CSRF = ['PageController::search', 'CompatController::noteInfo'];
+
+	public function testPageAndCompatControllerAttributes(): void {
+		$errors = [];
+		$seen = [];
+		foreach (['PageController', 'CompatController'] as $short) {
+			$rc = new \ReflectionClass('OCA\\NextNotes\\Controller\\' . $short);
+			foreach ($rc->getAttributes() as $a) {
+				if (in_array($a->getName(), [PublicPage::class, NoCSRFRequired::class], true)) {
+					$errors[] = "$short: Klassenattribut " . $a->getName();
+				}
+			}
+			foreach ($rc->getMethods(\ReflectionMethod::IS_PUBLIC) as $m) {
+				if ($m->isStatic() || $m->isConstructor() || $m->getDeclaringClass()->getName() !== $rc->getName()) {
+					continue;
+				}
+				$name = "$short::" . $m->getName();
+				$seen[] = $name;
+				$attrs = array_map(static fn ($a) => $a->getName(), $m->getAttributes());
+				$doc = (string)$m->getDocComment();
+				if (!in_array(NoAdminRequired::class, $attrs, true)) {
+					$errors[] = "$name: NoAdminRequired fehlt";
+				}
+				if (in_array(PublicPage::class, $attrs, true) || str_contains($doc, '@PublicPage')) {
+					$errors[] = "$name: PublicPage";
+				}
+				$csrfOff = in_array(NoCSRFRequired::class, $attrs, true) || str_contains($doc, '@NoCSRFRequired');
+				if ($csrfOff && !in_array($name, self::PAGE_COMPAT_NOCSRF, true)) {
+					$errors[] = "$name: NoCSRFRequired gesetzt, nicht auf Allowlist";
+				}
+				if (!$csrfOff && !in_array($name, self::PAGE_COMPAT_CSRF, true)) {
+					$errors[] = "$name: CSRF aktiv, aber unbekannte Methode (Allowlist prüfen)";
+				}
+			}
+		}
+		foreach (array_merge(self::PAGE_COMPAT_NOCSRF, self::PAGE_COMPAT_CSRF) as $expected) {
+			if (!in_array($expected, $seen, true)) {
+				$errors[] = "$expected: Methode fehlt";
+			}
+		}
+		// NoCSRFRequired-Methoden nur über GET erreichbar
+		$file = Server::get(IAppManager::class)->getAppPath('nextnotes') . '/appinfo/routes.php';
+		$routes = (static fn () => require $file)();
+		foreach ($routes['routes'] as $r) {
+			[$ctl, $action] = explode('#', $r['name']);
+			if (!in_array($ctl, ['page', 'compat'], true)) {
+				continue;
+			}
+			$name = ucfirst($ctl) . 'Controller::' . $action;
+			if (!in_array($name, $seen, true)) {
+				$errors[] = "Route {$r['name']}: Zielmethode fehlt";
+			}
+			if (in_array($name, self::PAGE_COMPAT_NOCSRF, true) && strtoupper($r['verb'] ?? 'GET') !== 'GET') {
+				$errors[] = "Route {$r['name']} {$r['verb']}: NoCSRFRequired nur für GET";
+			}
+		}
+		self::assertSame([], $errors);
+	}
 }

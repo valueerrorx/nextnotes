@@ -128,6 +128,17 @@ class AccessService {
 	}
 
 	/**
+	 * Lesbare Notizen ohne Einzelabfrage je Workspace (gleiche Regel wie noteLevel ≥ READ)
+	 * @param Note[] $notes
+	 * @return Note[]
+	 */
+	public function filterReadable(string $uid, array $notes): array {
+		$visible = array_flip($this->visibleWorkspaceIds($uid));
+		return array_values(array_filter($notes, static fn (Note $n) => $n->getRole() === 'note'
+			&& $n->getWorkspaceId() !== null && isset($visible[(int)$n->getWorkspaceId()])));
+	}
+
+	/**
 	 * @param bool|null $trashed false = nicht im Papierkorb, true = nur Papierkorb, null = egal
 	 */
 	public function requireNote(string $uid, int $id, string $perm, ?bool $trashed = false): Note {

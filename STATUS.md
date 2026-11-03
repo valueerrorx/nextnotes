@@ -1,6 +1,6 @@
 # Status Nextcloud-Port „Next Notes“
 
-**Aktueller Meilenstein:** M3 – Frontend-Grundlage und Editor (M3a1, M3a2, M3b1, M3b2 fertig, weiter M3c); M1, M2 fertig
+**Aktueller Meilenstein:** M3 – Frontend-Grundlage und Editor (M3a1–M3c1 fertig, weiter M3c2); M1, M2 fertig
 
 ## Erledigte Slices
 - Setup: Branch `nextcloud-port`, Agenten unter `.claude/agents/`, `UPSTREAM.md`
@@ -32,6 +32,8 @@ Vorläufig (M3-Plan O6):
 Vorläufig (M3b1):
 - Ohne `?note=` bleibt die rechte Spalte leer (Upstream öffnet die zuletzt bearbeitete Notiz)
 - Nach einer Suche öffnet rechts der neueste Treffer (wie Upstream) (M3b2)
+- Notiz-Info zeigt Anzeigenamen „Erstellt/Geändert von“ für Leser des Workspace (gelöschte Konten: „Nicht verfügbar“), wie Sperr-Banner O12 (M3c1)
+- Datumszeile unter dem Titel standardmäßig sichtbar (`show_note_created='1'` wie Upstream-DB) (M3c1)
 - Upstream-PR-Kandidaten an Poznote (nur mit Freigabe): P9/B31 (Reload nach Notizöffnen verlässt App), P10/B32 (Tippen während Speichern ging verloren)
 
 Vorläufig (M2d):
@@ -86,6 +88,10 @@ Vorläufig (M2d):
   Review `M3b2-diff-r1` FREIGABE mit Hinweisen (Performance Suche, P1/P3) → vom Lead nachgezogen.
   Testnachweis: PHPUnit voll sqlite 235/235; nach Fix `PageSearchTest|UnifiedSearchTest` auf sqlite, mariadb, pgsql OK; E2E nginx alle 7 Specs Hell+Dunkel grün (attachments-search 137, editor 118, frame 143, stripped 113, xss 82, assets 82, budget 21), Apache `attachments-search`+`editor` Hell grün inkl. Auslieferungs-Header; 0 CSP/pageerror/Konsolenfehler; check-upstream grün.
 
+- M3c1 erledigt (M3c geteilt): Kanban, `revisions.php`, `attachments.php`, `api_note_info.php`, `api_download_note.php`, Export-Routen (Rechte, dann 501), Alt-URL `api_attachments.php?action=download`, Revisionen-/Info-Knopf (Info auch im ⋮-Menü). `CompatController`, `AttachmentResponse`, `AccessService::filterReadable` (Kanban ohne N+1, äquivalent zu `noteLevel`, per Test). CSP `attachments` nur `frame-src 'self'` (ADR 0012 Nachtrag). Patches P5 (App-Präfix beim ersten Request), P13 (PDF iframe statt embed, keine PDF-Vorschau in Dateiauswahl). Fixes: `indexPath` im Adapter, `.speed-dial-state-off` (Speed Dial entfernte statt hinzuzufügen). B33/B34.
+  Review `M3c1-diff-r1` (BLOCKER: CSP-Ausweitung, Testnachweis) → `M3c1-diff-r2` (FREIGABE).
+  Testnachweis (sqlite/nginx): PHPUnit voll 248/248 (PageIsolationTest inkl. Detektor-Selbsttest, A vorher=nachher, `workspace` allein; FilterReadableTest 36 Fälle; PageCspTest; ControllerAttributeTest), E2E alle Specs Hell+Dunkel grün, `KNOWN_MISSING` leer; Nachlauf nach Fix `pages` 186, `editor` 118, `attachments-search` 137 je Theme, 0 CSP/Konsolenfehler/unpräfixierte Requests; Apache `attachments-search` Hell 137.
+
 ## M2 (fertig)
 - Plan `docs/slices/M2-plan.md` r1: Slices M2a (Gerüst, Rechte, Notizen/Ordner/Workspaces/Tags/Papierkorb, M1-Nacharbeit), M2b (Anhänge, Snapshots, Suche, Sperre, Unified Search), M2c (Tasks, Mentions, Erinnerungen, Settings, Konvertierung), M2d (Kontolöschung, Abschlusslauf 3 DBs)
 
@@ -111,7 +117,8 @@ Vorläufig (M2d):
 - M4: `allowed_iframe_domains` im Admin-Formular auch mit Schema (`https://…`) annehmen bzw. normalisieren, Fehler melden statt still verwerfen
 - M3b: Suche schreibt `requesttoken` per History-Update in die URL (mit Such-POST beheben); an `body` angehängte Poznote-Elemente ohne Formular-Reset prüfen; eigene Overrides brauchen Spezifität ≥ 1,1,0
 - M7: nginx-Beispielkonfiguration sendet `X-Content-Type-Options` doppelt (App setzt ihn bereits) – in Betriebsdoku/Beispiel-Conf bereinigen
+- M5: `AccessService::filterReadable` und `noteLevel`/`visibleWorkspaceIds` gemeinsam um Teams erweitern (FilterReadableTest sichert ab)
 - Hinweis: CSS-Nesting (`&`) zählt `check-css` nicht mit – bei Upstream-Updates beachten
 
 ## Nächster Schritt
-M3c – Fremdzugriff Seiten-/Kompatibilitätsrouten (inkl. Lesefreigabe → 403 für schreibende Routen), Kanban-Route, `attachments.php`, Revisionen/Notiz-Info, `KNOWN_MISSING` leer, Abschlusslauf volle Matrix (Meilenstein-Ende): architekt → tester + speccritic.
+M3c2 – `excalidraw_editor.php`, `api_save_excalidraw.php`, `workspaces.php` POST (Lesefreigabe → 403), Slash-Befehl Excalidraw einblenden, dann Abschlusslauf M3 volle Matrix (`run-m3.sh`, `run-m2.sh`, `run-m1.sh`): architekt → tester + speccritic.

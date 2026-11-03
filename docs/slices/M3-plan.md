@@ -156,8 +156,13 @@ Ziel ≤ 10 Einträge nach M3. M3b ist geteilt in M3b1 (Editor, Fragment, Beacon
 3. `ControllerAttributeTest` grün mit erweiterter Allowlist; `check-forbidden-sql.sh` 0 Treffer.
 4. Abschluss M3: `run-m3.sh` (§3) Exit 0 auf allen Umgebungen; `run-m2.sh` und `run-m1.sh` Exit 0 (Regression).
 
+**Teilung M3c (Architekt, Umfang ≈ 6 000 Zeilen Upstream)**
+- **M3c1**: `kanban_content.php` (`KanbanViewService`, ohne `ajax=1` → Weiterleitung auf `index.php?kanban=`), `revisions.php`, `attachments.php` (eigene Seiten im NC-Rahmen ohne Icon-Leiste, Bündel `pages` in `bundles.json`, Skriptliste per `check-upstream` gegen die Upstream-Seite), `api_note_info.php`, `api_download_note.php` (gespeicherte Form), `api_export_note.php`/`api_export_folder.php` (Prüfung + 501), `api_attachments.php?action=download`; Revisionen-Knopf/-Menüpunkt und Info-Knopf in der Notizansicht, `#noteInfoModal`; `KNOWN_MISSING` leer. Done: Krit. 1/1a/1b/2/3 für diese Routen.
+- **M3c2**: `excalidraw_editor.php`, `api_save_excalidraw.php` (CSP ohne Ausnahme prüfen, ADR 0012), `workspaces.php` POST (inkl. Lesefreigabe → 403), Abschlusslauf M3 (Krit. 4). Bis dahin ist der Slash-Befehl „Excalidraw“ erzwungen ausgeblendet (`FORCED_HIDDEN` `slash:excalidraw`).
+
 ### M4-Vormerkungen (aus M3a1)
 - Aus M3b1 verschoben: „Neuer Workspace“ im Workspace-Menü (`wsmenu:new-workspace`, Sidebar-Aktion `new-workspace`) bleibt bis M4 ausgeblendet (FORCED_HIDDEN); Dialog und `workspaces.php`-Anbindung mit der Workspace-Verwaltung.
+- Aus M3c1 offen (Export): `api_download_note.php` bei `type=linked` liefert die Verknüpfung selbst statt des Ziels; mit ExportService entscheiden (Ziel nur bei Leserecht über `AccessService`).
 - Done M4: `js/calendar.js` und `js/background-settings.js` wieder in den Build (aus `bundles.json` `exclude` nehmen), sobald `api/v1/calendar/*.php` (DiaryApiController) bzw. `api_upload_background.php` (CompatController) registriert sind; Probe: 0 Antworten ≥ 400 beim Laden.
 
 ## 3. Testsetup

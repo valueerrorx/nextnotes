@@ -7,7 +7,7 @@
 // (dazu src/task_list_picker_modal.php, src/task_due_modal.php, src/modals/{folder_icon_modal,icon_color_options,tag_folder_notes_modal}.php)
 // Nur Dialoge der Hauptansicht und des Editors. Weggelassen: Update/What's new, eigenes CSS/Schriften, Admin-Limits,
 // Konten/Passwort, Workspace-Einstellungen und Workspace anlegen (M4), Export (M4), Umwandeln (501 bis M4),
-// Notiz-Info (api_note_info.php M3c), Anhang-Auswahl (M3b2), Offline, Spracheingabe, Tagebuch (M4), Hintergrundbild,
+// Anhang-Auswahl (M3b2), Offline, Spracheingabe, Tagebuch (M4), Hintergrundbild,
 // Farbpalette/Markdown-Farben/Revisionen/Datumsformat (Einstellungen M4), NC-Glocke statt Benachrichtigungsdialog,
 // E-Mail-Erinnerung (nur NC-Benachrichtigung).
 /** @var \OCA\NextNotes\Service\View\PageTranslator $tr */
@@ -797,6 +797,38 @@ $createTitle = static function (string $title): void {
             <button type="button" class="btn-primary" data-action="move-linked-note-shortcut"><?php p($tr->t('modals.move_linked_note.move_link_only', [], 'Move this shortcut only')); ?></button>
             <button type="button" class="btn-secondary" data-action="move-linked-note-target"><?php p($tr->t('modals.move_linked_note.move_target_note', [], 'Move the original note')); ?></button>
             <button type="button" class="btn-cancel" data-action="close-modal" data-modal="moveLinkedNoteModal"><?php p($tr->t('common.cancel')); ?></button>
+        </div>
+    </div>
+</div>
+
+<!-- Note Information Modal (note-info-modal.js, api_note_info.php); ohne Zeile „Vollständiger Pfad“ (keine Datei auf dem Server) -->
+<?php
+$noteInfoRows = [
+	'title' => ['info.labels.note_title', 'Note title:'], 'workspace' => ['info.labels.workspace', 'Workspace:'],
+	'folder' => ['info.labels.folder', 'Folder:'], 'created' => ['info.labels.created', 'Created:'],
+	'created_by' => ['info.labels.created_by', 'Created by:'], 'updated' => ['info.labels.last_modified', 'Last Modified:'],
+	'updated_by' => ['info.labels.last_modified_by', 'Last modified by:'], 'tags' => ['info.labels.tags', 'Tags:'],
+	'favorite' => ['info.labels.favorite', 'Favorite:'], 'attachments' => ['info.labels.attachments', 'Attachments:'],
+	'characters' => ['info.labels.characters', 'Characters:'], 'words' => ['info.labels.words', 'Words:'],
+	'lines' => ['info.labels.lines', 'Lines:'], 'note_id' => ['info.labels.note_id', 'Note ID:'],
+];
+?>
+<div id="noteInfoModal" class="modal">
+    <div class="modal-content note-info-modal-content">
+        <h3><i class="lucide lucide-info"></i> <?php p($tr->t('info.page_title', [], 'Note Information')); ?></h3>
+        <div class="modal-body">
+            <div class="note-info-rows">
+                <?php foreach ($noteInfoRows as $infoKey => [$infoLabel, $infoDefault]): ?>
+                <div class="note-info-row">
+                    <div class="note-info-label"><?php p($tr->t($infoLabel, [], $infoDefault)); ?></div>
+                    <div class="note-info-value" data-note-info="<?php p($infoKey); ?>"></div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+            <p id="noteInfoError" class="note-info-error" role="alert" hidden></p>
+        </div>
+        <div class="modal-buttons">
+            <button type="button" class="btn-cancel" data-action="close-modal" data-modal="noteInfoModal"><?php p($tr->t('common.close')); ?></button>
         </div>
     </div>
 </div>

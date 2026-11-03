@@ -11,10 +11,8 @@ import { apiClient } from './lib/api.mjs';
 const RUN = `${process.argv[3]}${Date.now().toString(36)}`;
 
 // Bekannt fehlende Funktionen (Smoke): Fehler beim Auslösen werden als WARN gemeldet, nicht rot; nur mit Slice der Behebung
-const KNOWN_MISSING = {
-	// muss bis M3c verschwinden (Kanban-Seite kanban_content.php)
-	'open-kanban-view': 'M3c: kanban_content.php fehlt (404); kein CSP-Fehler mehr (P2 erledigt in M3b2)',
-};
+// M3c1: leer (Kanban-Seite kanban_content.php portiert); jeder Eintrag braucht Slice der Behebung
+const KNOWN_MISSING = {};
 
 // Seiten, die in M3a2 nicht verlinkt sein dürfen (gestrichen oder erst M4/M3c portiert)
 const FORBIDDEN_PAGES = /(^|\/)(dashboard|graph|speed_dial|notes_manager|tasks|list_folders|diary|list_tags|shared|offline_notes|attachments_list|trash|mentions|settings|login|logout|profile|backup[a-z_]*|users|about|whats_new|public_note|git[a-z_]*|ai[a-z_]*|export[a-z_]*|api_export[a-z_]*|api_download[a-z_]*)\.php/i;

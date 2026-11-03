@@ -7005,6 +7005,7 @@
                             mediaHtml = '<video class="note-video-embed" contenteditable="false" width="560" height="315" controls preload="metadata" playsinline src="' + fileUrl + '"></video>';
                         } else {
                             var audioPlayerUrl = '/audio_player.php?note=' + noteId + '&attachment=' + attachmentId + workspaceQuery;
+                            if (window.NEXTNOTES) audioPlayerUrl = window.NEXTNOTES.url(audioPlayerUrl);
                             mediaHtml = '<iframe class="note-audio-embed" contenteditable="false" scrolling="no" frameborder="0" allow="autoplay" data-is-audio="true" data-audio-src="' + fileUrl + '" src="' + audioPlayerUrl + '"></iframe>';
                         }
 

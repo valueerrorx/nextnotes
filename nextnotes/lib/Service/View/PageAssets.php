@@ -36,4 +36,15 @@ class PageAssets {
 			Util::addStyle(Application::APP_ID, $style);
 		}
 	}
+
+	/** Eigene Seite aus bundles.json pages (revisions, attachments): Adapter, Seitenbündel, Late-Adapter */
+	public function page(string $page, string $lang): void {
+		Util::addScript(Application::APP_ID, 'i18n/nextnotes-i18n-' . $lang);
+		foreach (['nextnotes-bootstrap', 'nextnotes-page-' . $page, 'nextnotes-late'] as $script) {
+			Util::addScript(Application::APP_ID, $script);
+		}
+		foreach (['nextnotes-page-' . $page, 'nextnotes-tokens', 'nextnotes-layout'] as $style) {
+			Util::addStyle(Application::APP_ID, $style);
+		}
+	}
 }

@@ -17,8 +17,10 @@ use Psr\Log\LoggerInterface;
 
 /** Einzige Quelle für CSP-Abweichungen (ADR 0012); ohne ADR keine Ausnahme. */
 class CspFactory {
-	// Ansichten mit Notizanzeige: Audio-Player-iframe (self) und Admin-Embed-Domains
+	// Ansichten mit Notizanzeige: iframes (self) und Admin-Embed-Domains
 	private const NOTE_VIEWS = ['index', 'revisions', 'kanban_content'];
+	// Nur iframes (self): PDF-Vorschau der Anhang-Seite (P13, ADR 0012 Nachtrag M3c1)
+	private const SELF_FRAME_VIEWS = ['attachments'];
 
 	public function __construct(
 		private IAppConfig $appConfig,
@@ -33,6 +35,8 @@ class CspFactory {
 			foreach ($this->embedDomains() as $domain) {
 				$csp->addAllowedFrameDomain('https://' . $domain);
 			}
+		} elseif (in_array($view, self::SELF_FRAME_VIEWS, true)) {
+			$csp->addAllowedFrameDomain("'self'");
 		}
 		return $csp;
 	}

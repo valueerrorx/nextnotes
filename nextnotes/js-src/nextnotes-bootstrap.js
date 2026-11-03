@@ -25,6 +25,8 @@
 	var baseUrl = String(config.baseUrl || '/index.php/apps/nextnotes/').replace(/\/?$/, '/');
 	var apiBase = String(config.apiBase || baseUrl + 'api/v1').replace(/\/$/, '');
 	var appPath = baseUrl.replace(/\/index\.php\//, '/');
+	// Seiten unter /index.php/apps/… lösen relative URLs (api_note_info.php …) dorthin auf, auch bei hübschen URLs
+	var indexPath = appPath.replace(/\/apps\/([^/]+)\/$/, '/index.php/apps/$1/');
 	var origin = window.location.origin;
 
 	var i18n = window.__NEXTNOTES_I18N__ || { lang: 'en', strings: {} };
@@ -99,7 +101,7 @@
 		try {
 			var target = new URL(url, window.location.href);
 			if (target.origin !== origin) return false;
-			return target.pathname.indexOf(baseUrl) === 0 || target.pathname.indexOf(appPath) === 0;
+			return target.pathname.indexOf(baseUrl) === 0 || target.pathname.indexOf(appPath) === 0 || target.pathname.indexOf(indexPath) === 0;
 		} catch (e) {
 			return false;
 		}

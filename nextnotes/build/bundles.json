@@ -693,5 +693,33 @@
 			"css/welcome.css",
 			"@theme"
 		]
+	},
+	"pages": {
+		"_doc": "Eigene Seiten (M3c): CSS = cssPages[<seite>], JS = Skripte von src/public/<seite>.php in Reihenfolge ohne exclude/omit (check-upstream) → css/js nextnotes-page-<seite>",
+		"revisions": {
+			"js": [
+				"js/theme-manager.js",
+				"js/globals.js",
+				"js/request-errors.js",
+				"js/modal-alerts.js",
+				"js/revisions-diff.js",
+				"js/revisions-page.js"
+			],
+			"omit": {
+				"js/icon-sidebar-toggle.js": "keine Icon-Leiste auf Unterseiten, Navigation über NC und „Zurück zur Notiz“"
+			}
+		},
+		"attachments": {
+			"js": [
+				"js/theme-manager.js",
+				"js/error-handler.js",
+				"js/date-time-format.js",
+				"js/attachment-move.js",
+				"js/attachments-page.js"
+			],
+			"omit": {
+				"js/icon-sidebar-toggle.js": "keine Icon-Leiste auf Unterseiten, Navigation über NC und „Zurück zur Notiz“"
+			}
+		}
 	}
 }

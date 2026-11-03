@@ -1044,7 +1044,7 @@ class NoteService {
 	}
 
 	// Upstream poznoteComparePlacedOrder
-	private static function comparePlaced(int $oa, int $ob, Note $a, Note $b): int {
+	public static function comparePlaced(int $oa, int $ob, Note $a, Note $b): int {
 		if ($oa > 0 && $ob > 0) {
 			return ($oa <=> $ob) ?: ((int)$a->getId() <=> (int)$b->getId());
 		}
