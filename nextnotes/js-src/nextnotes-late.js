@@ -52,6 +52,12 @@
 		return pending[path];
 	}
 
+	// Schnellknöpfe der Ordnerzeile (M3-ui1): Enter/Leertaste löst den Knopf aus, nicht die Baum-Tastatur (tree-keyboard-nav.js)
+	document.addEventListener('keydown', function (e) {
+		var t = e.target;
+		if ((e.key === 'Enter' || e.key === ' ') && t && t.closest && t.closest('.nn-folder-quick')) e.stopPropagation();
+	}, true);
+
 	window.poznoteEnsureScript = ensureScript;
 	window.poznoteEnsureMermaid = function () {
 		return typeof window.mermaid !== 'undefined' ? Promise.resolve() : ensureScript('js/mermaid/mermaid.min.js');

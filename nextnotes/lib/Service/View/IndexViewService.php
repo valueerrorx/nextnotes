@@ -520,6 +520,7 @@ class IndexViewService {
 					'iconCustom' => $icon !== '',
 					'iconColorRaw' => self::iconColor((string)($f->getIconColor() ?? '')) !== '' ? (string)$f->getIconColor() : '',
 					'iconColor' => self::iconColor((string)($f->getIconColor() ?? '')),
+					'active' => $id === $activeId,
 					'treeClass' => !$highlight ? '' : ($id === $activeId ? ' folder-tree-active' : (isset($branch[$id]) ? ' folder-tree-branch' : '')),
 					'notes' => $own,
 					'children' => $sub,

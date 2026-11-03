@@ -14,6 +14,16 @@ $renderFolderActions = static function (array $folder) use ($tr): void {
 	?><div class="folder-actions-toggle" data-action="toggle-folder-actions-menu" data-folder-id="<?php p((string)$folder['id']); ?>" data-folder-name="<?php p($folder['name']); ?>" data-note-count="<?php p((string)$folder['count']); ?>" data-shared="0" data-favorite="<?php p($folder['favorite'] ? '1' : '0'); ?>" data-offline="0" title="<?php p($tr->t('notes_list.folder_actions.menu', [], 'Folder actions')); ?>"><i class="lucide lucide-more-vertical"></i></div><?php
 };
 
+// Schnellknöpfe je Ordnerzeile (M3-ui1): Kanban und „Hier erstellen“, gleiche data-action wie die Menüpunkte
+$renderFolderQuick = static function (array $folder, bool $canWrite) use ($tr): void {
+	$kanban = $tr->t('notes_list.folder_actions.kanban_view', [], 'Kanban view');
+	$create = $tr->t('notes_list.folder_actions.create', [], 'Create here');
+	?><button type="button" class="nn-folder-quick" data-action="open-kanban-view" data-folder-id="<?php p((string)$folder['id']); ?>" data-folder-name="<?php p($folder['name']); ?>" title="<?php p($kanban); ?>" aria-label="<?php p($kanban); ?>"><i class="lucide lucide-columns-2" aria-hidden="true"></i></button><?php
+	if ($canWrite) {
+		?><button type="button" class="nn-folder-quick" data-action="create-note-in-folder" data-folder-id="<?php p((string)$folder['id']); ?>" data-folder-name="<?php p($folder['name']); ?>" title="<?php p($create); ?>" aria-label="<?php p($create); ?>"><i class="lucide lucide-plus" aria-hidden="true"></i></button><?php
+	}
+};
+
 // Drei-Punkte-Schalter je Notiz (generateNoteActions)
 $renderNoteActions = static function (array $note) use ($tr): void {
 	$label = $tr->t('notes_list.note_actions.menu', [], 'Note actions');

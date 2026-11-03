@@ -157,3 +157,68 @@ body#body-user.excalidraw-editor-page {
 	max-height: calc(100vh - var(--header-height) - 40px - 5vw);
 	overflow-y: auto;
 }
+
+/* Ordnerzeile: Schnellknöpfe Kanban / „Hier erstellen“ (M3-ui1). Unsichtbar, aber per Tab erreichbar;
+   sichtbar bei Hover, Fokus in der Zeile, offenem Menü, aktivem Ordner und auf Touch-Geräten. */
+#nextnotes-root .folder-toggle .nn-folder-quick {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: 0;
+	border: 0;
+	overflow: hidden;
+	clip-path: inset(50%);
+	align-items: center;
+	justify-content: center;
+	background: transparent;
+	color: var(--color-text-maxcontrast);
+	border-radius: var(--border-radius);
+	cursor: pointer;
+}
+
+/* Platz für die Knöpfe fest freihalten: lange Namen und Zähler laufen nicht darunter, kein Umbruch-Springen bei Hover */
+#nextnotes-root .folder-toggle:has(> .folder-actions > .nn-folder-quick) {
+	padding-right: 74px;
+}
+
+#nextnotes-root .folder-toggle:is(:hover, :focus-within, .nn-folder-active) .nn-folder-quick,
+#nextnotes-root .folder-toggle:has(.folder-actions-toggle.open) .nn-folder-quick {
+	position: static;
+	display: inline-flex;
+	width: 22px;
+	height: 22px;
+	overflow: visible;
+	clip-path: none;
+}
+
+@media (hover: none) {
+	#nextnotes-root .folder-toggle .nn-folder-quick {
+		position: static;
+		display: inline-flex;
+		width: 22px;
+		height: 22px;
+		overflow: visible;
+		clip-path: none;
+	}
+}
+
+#nextnotes-root .folder-toggle .nn-folder-quick:hover {
+	background: var(--color-background-hover);
+	color: var(--color-main-text);
+}
+
+#nextnotes-root .folder-toggle .nn-folder-quick:focus-visible {
+	outline: 2px solid var(--color-primary-element);
+	outline-offset: -2px;
+}
+
+#nextnotes-root .folder-toggle .nn-folder-quick i {
+	font-size: 0.85em;
+	pointer-events: none;
+}
+
+/* Inline-Umbenennen: Knöpfe ausblenden wie .folder-actions (tree-inline-edit.css) */
+#nextnotes-root .folder-toggle.tree-row-editing .nn-folder-quick {
+	display: none;
+}
