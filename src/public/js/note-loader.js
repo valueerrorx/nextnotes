@@ -815,7 +815,8 @@ function updateBrowserUrl(url, noteId) {
         const currentParams = new URLSearchParams(window.location.search || '');
         const preserveKeys = ['search', 'tags_search', 'created_from', 'created_to', 'workspace', 'preserve_notes', 'preserve_tags', 'search_combined'];
 
-        const target = new URL(url, window.location.origin);
+        // Next Notes P9: relative to the page, the app does not sit at the web root
+        const target = new URL(url, window.location.href);
         const targetParams = new URLSearchParams(target.search || '');
 
         preserveKeys.forEach(k => {

@@ -53,6 +53,9 @@ class PageController extends Controller {
 		$lang = $this->translator->languageFor($this->settings->read($uid, 'language'));
 		$this->translator->setLanguage($lang);
 		$baseUrl = $this->urls->linkToRoute('nextnotes.page.index');
+		if ($this->request->getHeader('X-Poznote-Fragment') === 'right_col') {
+			return $this->fragment($uid);
+		}
 		try {
 			$view = $this->indexView->build($uid, $baseUrl, [
 				'note' => $this->request->getParam('note'),
@@ -86,6 +89,20 @@ class PageController extends Controller {
 			'view' => $view,
 			'baseUrl' => $baseUrl,
 		]);
+	}
+
+	// Fragment-Modus (note-loader.js): nur #right_col ohne Seitenrahmen; Zugriff wie die volle Seite
+	private function fragment(string $uid): TemplateResponse {
+		try {
+			$view = $this->indexView->fragment($uid, $this->request->getParam('note'));
+		} catch (NotFoundException) {
+			$response = new TemplateResponse('core', '404', [], TemplateResponse::RENDER_AS_BLANK);
+			$response->setStatus(Http::STATUS_NOT_FOUND);
+			return $response;
+		}
+		$response = new TemplateResponse(Application::APP_ID, 'fragment', ['tr' => $this->translator, 'note' => $view['note']], TemplateResponse::RENDER_AS_BLANK);
+		$response->setContentSecurityPolicy($this->cspFactory->forView('index'));
+		return $response;
 	}
 
 	// Spike ADR 0004, leere Seite bis M4

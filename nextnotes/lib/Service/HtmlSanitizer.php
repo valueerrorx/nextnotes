@@ -56,7 +56,8 @@ class HtmlSanitizer {
 		'iframe' => ['src', 'width', 'height', 'frameborder', 'allow', 'allowfullscreen', 'allowtransparency', 'title', 'sandbox', 'loading', 'referrerpolicy', 'style', 'class', 'scrolling', 'contenteditable', 'data-is-audio', 'data-audio-src', 'data-converted-from-audio'],
 		'video' => ['src', 'width', 'height', 'preload', 'poster', 'class', 'style', 'controls', 'muted', 'playsinline', 'loop', 'autoplay'],
 		'audio' => ['src', 'preload', 'class', 'style', 'controls', 'muted', 'loop', 'autoplay'],
-		'button' => ['class', 'data-action'],
+		// ohne data-action: kein Upstream-Code schreibt Aktionsknöpfe in Inhalte; sonst UI-Aktionen im Recht des Lesers (B26)
+		'button' => ['class'],
 		'svg' => ['viewBox', 'width', 'height', 'aria-hidden', 'fill', 'xmlns', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin'],
 		'path' => ['d', 'fill', 'fill-rule', 'clip-rule', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin'],
 		'rect' => ['x', 'y', 'width', 'height', 'rx', 'ry', 'fill', 'stroke', 'stroke-width'],
@@ -96,11 +97,12 @@ class HtmlSanitizer {
 	}
 
 	public static function isStructuredJson(string $content): bool {
-		$trimmed = trim($content);
+		// nur JSON-Leerraum (RFC 8259) erlaubt; trim() entfernte auch \x0B/\0 → Rohspeicherung von Nicht-JSON (M3b1-Test)
+		$trimmed = trim($content, " \t\n\r");
 		if ($trimmed === '' || ($trimmed[0] !== '[' && $trimmed[0] !== '{')) {
 			return false;
 		}
-		$decoded = json_decode($trimmed, true);
+		$decoded = json_decode($content, true);
 		return json_last_error() === JSON_ERROR_NONE && is_array($decoded);
 	}
 

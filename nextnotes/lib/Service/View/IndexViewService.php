@@ -9,20 +9,25 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Service\View;
 
+use OCA\NextNotes\Db\AttachmentMapper;
 use OCA\NextNotes\Db\Folder;
 use OCA\NextNotes\Db\Note;
 use OCA\NextNotes\Db\NoteMapper;
 use OCA\NextNotes\Db\NoteTagMapper;
+use OCA\NextNotes\Db\ReminderMapper;
 use OCA\NextNotes\Db\Workspace;
 use OCA\NextNotes\Service\AccessService;
+use OCA\NextNotes\Service\ContentUrlRewriter;
 use OCA\NextNotes\Service\Exception\NotFoundException;
 use OCA\NextNotes\Service\FolderService;
+use OCA\NextNotes\Service\HtmlSanitizer;
 use OCA\NextNotes\Service\InputValidator;
 use OCA\NextNotes\Service\MentionService;
 use OCA\NextNotes\Service\NoteSerializer;
 use OCA\NextNotes\Service\NoteService;
 use OCA\NextNotes\Service\SettingsService;
 use OCA\NextNotes\Service\WorkspaceService;
+use OCP\IDateTimeFormatter;
 
 /**
  * Daten der Hauptansicht (Upstream index.php, notes_list.php, folders_display.php) ohne Markup.
@@ -96,7 +101,7 @@ class IndexViewService {
 	// Bis zur Portierung erzwungen ausgeblendet (ui-customization.js, __POZNOTE_GLOBAL_HIDDEN_UI_ELEMENTS__)
 	public const FORCED_HIDDEN = [
 		'wsmenu:edit-workspaces', // settings.php: M4
-		'wsmenu:new-workspace', // Workspace-Modal: M3b
+		'wsmenu:new-workspace', // Workspace anlegen: mit Einstellungen M4
 	];
 	private const SPEED_DIAL_TAG = 'speed-dial';
 
@@ -112,6 +117,10 @@ class IndexViewService {
 		private SettingsService $settings,
 		private MentionService $mentions,
 		private PageTranslator $tr,
+		private ContentUrlRewriter $urls,
+		private ReminderMapper $reminders,
+		private AttachmentMapper $attachments,
+		private IDateTimeFormatter $dates,
 	) {
 	}
 
@@ -170,6 +179,122 @@ class IndexViewService {
 			'globals' => $this->globals($uid, $key),
 			'hiddenUiElements' => $this->hiddenUi($uid),
 			'prefetchedSettings' => ['tasklist_insert_order' => $this->value($uid, 'tasklist_insert_order') === 'top' ? 'top' : 'bottom'],
+			'note' => $note !== null ? $this->noteView($uid, $note, $key, $canWrite, $byId) : null,
+			'iconPalette' => self::iconPalette(),
+		];
+	}
+
+	/**
+	 * Nur die Notizansicht (#right_col, X-Poznote-Fragment), ohne Baum
+	 * @return array<string, mixed>
+	 * @throws NotFoundException fremde oder unbekannte Notiz
+	 */
+	public function fragment(string $uid, mixed $rawNote): array {
+		$this->values = [];
+		$rawNote = is_string($rawNote) ? trim($rawNote) : '';
+		if ($rawNote === '') {
+			return ['note' => null];
+		}
+		if (!ctype_digit($rawNote)) {
+			throw new NotFoundException('Note not found');
+		}
+		$note = $this->access->requireNote($uid, (int)$rawNote, 'read');
+		// kein Schlüssel = Workspace für uid nicht erreichbar, kein Rückfall auf den Standard-Workspace
+		$key = $this->workspaces->keyFor($uid, (int)$note->getWorkspaceId());
+		if ($key === null) {
+			throw new NotFoundException('Note not found');
+		}
+		$ws = $this->workspaces->resolveKey($uid, $key);
+		$canWrite = $this->access->workspaceLevel($uid, $ws) >= AccessService::WRITE;
+		return ['note' => $this->noteView($uid, $note, $key, $canWrite, $this->folders->byId((int)$ws->getId()))];
+	}
+
+	/**
+	 * Notizansicht (Upstream note_display.php) ohne Markup; Inhalt wurde beim Speichern durch HtmlSanitizer geprüft
+	 * @param array<int, Folder> $byId
+	 * @return array<string, mixed>
+	 */
+	private function noteView(string $uid, Note $note, string $key, bool $canWrite, array $byId): array {
+		$id = (int)$note->getId();
+		$type = in_array($note->getType(), ['note', 'markdown', 'tasklist', 'linked', 'excalidraw'], true) ? (string)$note->getType() : 'note';
+		$content = (string)($note->getContent() ?? '');
+		$heading = (string)($note->getHeading() ?? '');
+		$tags = $this->tags->tagsFor([$id])[$id] ?? [];
+		$folderId = $note->getFolderId();
+		$folder = $folderId !== null ? ($byId[$folderId] ?? null) : null;
+		$path = array_map(static fn (Folder $f) => ['id' => (int)$f->getId(), 'name' => (string)$f->getName()], $this->folders->ancestry($folder !== null ? $folderId : null, $byId));
+		// Anhänge ohne die im Inhalt eingebetteten (Upstream poznoteCountDisplayableAttachments)
+		$visible = 0;
+		foreach ($this->attachments->findForNotes([$id])[$id] ?? [] as $a) {
+			if (!str_contains($content, 'attachments/' . (int)$a->getId())) {
+				$visible++;
+			}
+		}
+		$hasLinked = $type !== 'linked' && $this->notes->findList([(int)$note->getWorkspaceId()], ['linked_note_id' => $id]) !== [];
+		$display = '';
+		if ($type === 'markdown') {
+			$display = $content;
+		} elseif ($type === 'tasklist') {
+			// gültiges JSON rendert der Client; sonst (Altbestand) nie roh ausgeben
+			$display = HtmlSanitizer::isStructuredJson($content) ? '' : htmlspecialchars($content, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+		} else {
+			$display = $this->urls->toClient($content);
+		}
+		$isDefault = trim($heading) === '' || $this->isDefaultTitle($heading);
+		$default = match ($type) {
+			'tasklist' => 'lucide-list-todo',
+			'markdown' => 'lucide-file-code',
+			default => 'lucide-file-text',
+		};
+		$icon = (string)($note->getIcon() ?? '');
+		$titleSize = $note->getTitleSize();
+		$width = $note->getContentWidth();
+		$reminder = $this->reminders->pendingNoteTimes($uid, [$id])[$id] ?? null;
+		$date = fn (?int $ts) => $ts === null ? '' : $this->dates->formatDateTime($ts, 'short', 'short');
+		$stats = [];
+		foreach (['characters', 'words', 'lines'] as $unit) {
+			foreach (['one', 'few', 'many', 'other'] as $form) {
+				$label = $this->tr->t('index.note.stats.' . $unit . '.' . $form, [], '');
+				if ($label !== '') {
+					$stats[$unit][$form] = $label;
+				}
+			}
+		}
+		return [
+			'id' => $id,
+			'type' => $type,
+			'canWrite' => $canWrite,
+			'heading' => $heading,
+			'titleValue' => $isDefault ? '' : $heading,
+			'titlePlaceholder' => $isDefault ? $this->noteTitle($heading) : $this->tr->t('index.note.title_placeholder', [], 'Title ?'),
+			'titleColor' => $this->iconColor((string)($note->getTitleColor() ?? '')),
+			'titleColorRaw' => (string)($note->getTitleColor() ?? ''),
+			'titleSize' => $titleSize !== null ? min(64, max(12, (int)$titleSize)) : null,
+			'contentWidth' => $width !== null ? min(100, max(10, (int)$width)) : null,
+			'showIcon' => $this->bool($uid, 'show_note_icons'),
+			'iconClass' => $this->iconClass($icon, $default),
+			'iconCustom' => $icon !== '',
+			'iconDefault' => $default,
+			'iconColor' => $this->iconColor((string)($note->getIconColor() ?? '')),
+			'iconColorRaw' => $this->iconColor((string)($note->getIconColor() ?? '')) !== '' ? (string)$note->getIconColor() : '',
+			'favorite' => (int)$note->getFavorite() === 1,
+			'tags' => implode(' ', $tags),
+			'folderId' => $folder !== null ? (int)$folderId : null,
+			'folderName' => $folder !== null ? (string)$folder->getName() : '',
+			'folderPath' => $path,
+			'attachments' => $visible,
+			'reminderAt' => (string)NoteSerializer::date($reminder),
+			'hasLinked' => $hasLinked,
+			'linkedNoteId' => $type === 'linked' && $note->getLinkedNoteId() !== null ? (int)$note->getLinkedNoteId() : null,
+			'archive' => $key === WorkspaceService::ARCHIVE_NAME,
+			'showDates' => $this->bool($uid, 'show_note_created'),
+			'created' => $date($note->getCreatedAt()),
+			'updated' => $date($note->getUpdatedAt()),
+			'statsLabels' => (object)$stats,
+			'spellcheck' => $type === 'note' && $this->bool($uid, 'spellcheck_html_notes'),
+			'lang' => $this->tr->language(),
+			'content' => $content,
+			'display' => $display,
 		];
 	}
 
@@ -423,6 +548,25 @@ class IndexViewService {
 			}
 		}
 		return $heading;
+	}
+
+	/** @return list<array{id: string, hex: string, css: string}> Upstream icon_color_options.php */
+	public static function iconPalette(): array {
+		$out = [];
+		foreach (self::ICON_PALETTE as $hex => $id) {
+			$out[] = ['id' => $id, 'hex' => $hex, 'css' => 'var(--pz-color-' . $id . ', ' . $hex . ')'];
+		}
+		return $out;
+	}
+
+	// Upstream matchDefaultNoteTitle
+	private function isDefaultTitle(string $heading): bool {
+		foreach ($this->tr->defaultNoteTitles() as $default) {
+			if (preg_match('/^' . preg_quote($default, '/') . '(?: \((\d+)\))?$/u', trim($heading))) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	// Nur lucide-Klassen (InputValidator::icon erlaubt [A-Za-z0-9 _-]); sonst Standard

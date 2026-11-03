@@ -1,3 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Thomas Weissel
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Geänderte Upstream-Dateien (SPEC §11.1), Pfade relativ zum Repo; check-upstream vergleicht mit git diff gegen die Basis aus UPSTREAM.md.
+src/public/js/note-edit-lock.js
+src/public/js/note-loader.js
+src/public/js/notes.js

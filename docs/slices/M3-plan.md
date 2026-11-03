@@ -80,7 +80,10 @@ Jede Slice ist für sich lauffähig (`run-m3.sh` grün) und wird einzeln committ
 | P5 | M3b (bedingt) | §11.1 | nur bei gemessenen 404 trotz MutationObserver |
 | P7 (neu) | M3b | `note-edit-lock.js:309` | `isLockHeldByDifferentUser` → „von anderer Editor-Sitzung gehalten“ (`!holder_is_current_editor_session`); Banner, Nur-Lesen und Übernahme-Hinweis auch beim gleichen Konto im zweiten Tab (SPEC B13; Plan-M2 R11). Upstream-PR-Kandidat: nein (folgt aus ADR 0005) |
 | P8 (neu, bedingt) | M3a2 | `notes_list.php` (Template) + `unified-search.js`, `note-loader.js`, `notes-list-events.js`, `search-highlight.js`, `keyboard-shortcuts.js`, `tabs.js`, `syntax-highlight.js` | ID `unified-search` kollidiert mit `#unified-search` im NC-Header (`layout.user.php:76`); erst nach Bestätigung im Browser (M3a2-Smoke) ändern: ID → `pz-unified-search`; vorher kein Eintrag in §11.1. Alternative ohne Patch gibt es nicht sauber |
-Ziel ≤ 10 Einträge nach M3.
+| P9 (neu, M3b1) | M3b | `note-loader.js:818` | `updateBrowserUrl` löst gegen `location.href` statt `location.origin` auf (B31) |
+| P10 (neu, M3b1) | M3b | `notes.js` `saveNoteToServer` | weicht der Bildschirm bei Eingang der Antwort vom gesendeten Stand ab, wird der gesendete Stand Vergleichsbasis und erneut gespeichert (B32) |
+| P11 (neu, M3b1) | M3b | `note-edit-lock.js` `handleCurrentNoteLoaded` | Notiz ohne Schreibrecht (`data-nextnotes-readonly`): kein Lock-Request, Nur-Lesen ohne Banner/403 |
+Ziel ≤ 10 Einträge nach M3. M3b ist geteilt in M3b1 (Editor, Fragment, Beacon/B30, Sperre/P7, B26, „+“-Menü, Verschieben-Dialoge, Tags) und M3b2 (Anhänge, PDF, Mermaid/KaTeX, Suche, P1–P3). B30 (M3b1): statt eigenem frühem Speichern stuft der Adapter `keepalive` ≥ 64 KiB ab (SPEC §4.3.8).
 
 ## 2. Slices
 
@@ -154,6 +157,7 @@ Ziel ≤ 10 Einträge nach M3.
 4. Abschluss M3: `run-m3.sh` (§3) Exit 0 auf allen Umgebungen; `run-m2.sh` und `run-m1.sh` Exit 0 (Regression).
 
 ### M4-Vormerkungen (aus M3a1)
+- Aus M3b1 verschoben: „Neuer Workspace“ im Workspace-Menü (`wsmenu:new-workspace`, Sidebar-Aktion `new-workspace`) bleibt bis M4 ausgeblendet (FORCED_HIDDEN); Dialog und `workspaces.php`-Anbindung mit der Workspace-Verwaltung.
 - Done M4: `js/calendar.js` und `js/background-settings.js` wieder in den Build (aus `bundles.json` `exclude` nehmen), sobald `api/v1/calendar/*.php` (DiaryApiController) bzw. `api_upload_background.php` (CompatController) registriert sind; Probe: 0 Antworten ≥ 400 beim Laden.
 
 ## 3. Testsetup

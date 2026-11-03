@@ -393,6 +393,16 @@
 			"file": "js/note-edit-lock.js",
 			"text": "SESSION_STORAGE_KEY = 'poznote_editor_session_id'",
 			"by": "nextnotes-bootstrap.js"
+		},
+		{
+			"file": "js/events-auto-save.js",
+			"text": "keepalive: true",
+			"by": "nextnotes-bootstrap.js"
+		},
+		{
+			"file": "js/note-loader.js",
+			"text": "xhr.setRequestHeader('X-Poznote-Fragment', 'right_col')",
+			"by": "PageController::fragment"
 		}
 	],
 	"cssPageGroups": {

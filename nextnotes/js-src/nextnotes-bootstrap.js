@@ -144,6 +144,7 @@
 	}
 
 	// 4. fetch
+	var KEEPALIVE_LIMIT = 65536;
 	var nativeFetch = window.fetch;
 	window.fetch = function (input, init) {
 		var isRequest = typeof Request !== 'undefined' && input instanceof Request;
@@ -163,6 +164,8 @@
 			return nativeFetch.call(this, target === url ? input : target, init);
 		}
 		var opts = Object.assign({}, init || {});
+		// keepalive verwirft Bodies ab 64 KiB (Notfallspeichern großer Notizen, B30): dann normaler Request
+		if (opts.keepalive && typeof opts.body === 'string' && new Blob([opts.body]).size >= KEEPALIVE_LIMIT) opts.keepalive = false;
 		var headers = new Headers(opts.headers || (isRequest ? input.headers : undefined));
 		if (!headers.has('requesttoken')) headers.set('requesttoken', token());
 		if (!headers.has('X-Requested-With')) headers.set('X-Requested-With', 'XMLHttpRequest');
@@ -294,7 +297,30 @@
 		if (!nav || nav.type !== 'reload') sessionStorage.removeItem('poznote_editor_session_id');
 	} catch (e) { /* ohne sessionStorage nutzt Upstream eine Fallback-ID */ }
 
-	// 11. Inhalt erst nach dem Start zeigen (gegen Flackern; CSS-Rückfall nach 2 s)
+	// 11. Klicks auf eingeschleuste App-Bedienelemente im Notizinhalt erreichen die Upstream-Delegation nicht (B26)
+	var CONTENT_ACTIONS = Object.create(null);
+	var GENERIC_CLASS = /^(lucide(-.*)?|cursor-pointer|hidden|initially-hidden|active|selected|show|open|disabled|is-.*|has-.*)$/;
+	function injectedControl(target) {
+		var entry = target && target.closest ? target.closest('.noteentry') : null;
+		if (!entry) return false;
+		for (var el = target; el && el !== entry; el = el.parentElement) {
+			var action = el.getAttribute('data-action');
+			if (action !== null && !Object.hasOwn(CONTENT_ACTIONS, action)) return true;
+			if (el.id && document.querySelectorAll('[id="' + CSS.escape(el.id) + '"]').length > 1) return true;
+			for (var i = 0; i < el.classList.length; i++) {
+				var c = el.classList[i];
+				if (!GENERIC_CLASS.test(c) && document.querySelector('.' + CSS.escape(c) + ':not(.noteentry, .noteentry *)')) return true;
+			}
+		}
+		return false;
+	}
+	['click', 'dblclick', 'auxclick'].forEach(function (type) {
+		window.addEventListener(type, function (e) {
+			if (injectedControl(e.target)) e.stopImmediatePropagation();
+		}, true);
+	});
+
+	// 12. Inhalt erst nach dem Start zeigen (gegen Flackern; CSS-Rückfall nach 2 s)
 	document.addEventListener('DOMContentLoaded', function () {
 		document.documentElement.classList.add('nextnotes-ready');
 	});
@@ -303,5 +329,6 @@
 		config: config,
 		url: rewrite,
 		requestToken: token,
+		contentActions: CONTENT_ACTIONS,
 	};
 })();

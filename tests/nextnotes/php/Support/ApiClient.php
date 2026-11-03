@@ -20,6 +20,11 @@ final class ApiClient {
 	) {
 	}
 
+	/** Kopie mit zusätzlichen Kopfzeilen (z. B. X-Poznote-Fragment) */
+	public function withHeaders(array $headers): self {
+		return new self($this->uid, $this->secret, array_merge($this->extraHeaders, $headers));
+	}
+
 	public static function baseUrl(): string {
 		return rtrim((string)(getenv('NN_BASE_URL') ?: 'http://localhost'), '/');
 	}

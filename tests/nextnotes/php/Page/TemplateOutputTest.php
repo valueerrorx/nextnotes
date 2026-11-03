@@ -18,6 +18,9 @@ final class TemplateOutputTest extends TestCase {
 	// Erlaubte print_unescaped-Stellen: Datei => Liste der exakten Argumente (Reihenfolge egal)
 	private const ALLOW = [
 		'index.php' => ['json_encode($islandData, $jsonFlags)'],
+		// Notizinhalt, beim Speichern durch HtmlSanitizer::sanitizeForType geprüft (Lead M3b1); Tasklist-JSON wird nicht ausgegeben
+		// (Gegenprobe: EditorPageTest::testTasklistContentNeverRenderedUnsanitized)
+		'partials/note_display.php' => ['$note[\'display\']'],
 	];
 
 	/** @return array<string, string> relativer Pfad => Inhalt */

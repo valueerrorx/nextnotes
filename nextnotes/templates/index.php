@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 // abgeleitet von src/public/index.php @ 7e2e0b6aa501ba95ac1e9789fd2bb477c281a001
-// Rahmen der Hauptansicht (M3a2): Daten aus IndexViewService, Inline-Skripte → JSON-Inseln (Adapter), rechte Spalte leer bis M3b.
-// Weggelassen: PWA/Manifest, Git-Sync, KI, Spracheingabe, What's new, Konten, Modals/Notizansicht (M3b), UI-Anpassung/Mobil-Leiste (M3b).
+// Hauptansicht: Daten aus IndexViewService, Inline-Skripte → JSON-Inseln (Adapter), Notiz in #right_col (M3b).
+// Weggelassen: PWA/Manifest, Git-Sync, KI, Spracheingabe, What's new, Konten, UI-Anpassung/Mobil-Leiste (M4).
 /** @var array $_ */
 /** @var \OCA\NextNotes\Service\View\PageTranslator $tr */
 $tr = $_['tr'];
@@ -20,6 +20,11 @@ $islands = [
 ];
 if ($view['noteId'] !== null) {
 	$islands['current-note-data'] = ['noteId' => (string)$view['noteId']];
+	if ($view['note']['type'] === 'tasklist') {
+		$islands['tasklist-init-data'] = [$view['noteId']];
+	} elseif ($view['note']['type'] === 'markdown') {
+		$islands['markdown-init-data'] = [$view['noteId']];
+	}
 }
 ?>
 <div id="app-content">
@@ -28,6 +33,8 @@ if ($view['noteId'] !== null) {
 	<script type="application/json" id="<?php p($islandId); ?>"><?php print_unescaped(json_encode($islandData, $jsonFlags)); ?></script>
 	<?php endforeach; ?>
 	<div id="save-indicator" class="save-indicator" style="display: none;"></div>
+
+	<?php include __DIR__ . '/partials/modals.php'; ?>
 
 	<?php include __DIR__ . '/partials/icon_sidebar.php'; ?>
 
@@ -66,7 +73,10 @@ if ($view['noteId'] !== null) {
 	</div>
 
 	<div id="right_pane">
-		<div id="right_col"></div>
+		<div id="right_col"><?php if ($view['note'] !== null) {
+			$note = $view['note'];
+			include __DIR__ . '/partials/note_display.php';
+		} ?></div>
 	</div>
 
 	<div class="outline-mobile-backdrop" id="outlineMobileBackdrop"></div>

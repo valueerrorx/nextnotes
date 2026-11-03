@@ -309,6 +309,7 @@ function saveNoteToServer(options) {
     // The exact state being sent becomes the draft, and its fingerprint
     // travels with the request (js/events-auto-save.js, DRAFT STORAGE)
     var stateHash = (typeof window.snapshotNoteStateForSave === 'function') ? window.snapshotNoteStateForSave(noteid) : null;
+    var sentState = (stateHash && typeof readNoteStateFromScreen === 'function') ? readNoteStateFromScreen(noteid) : null; // Next Notes P10
 
     var updates = {
         state_hash: stateHash,
@@ -372,6 +373,7 @@ function saveNoteToServer(options) {
                 return;
             }
             if (result.ok && data.success) {
+                var typedInFlight = !!sentState && readNoteStateFromScreen(noteid)?.hash !== stateHash; // Next Notes P10
                 if (data.note && data.note.version && typeof window.setLiveNoteContentVersion === 'function') {
                     window.setLiveNoteContentVersion(noteid, data.note.version);
                 }
@@ -387,6 +389,13 @@ function saveNoteToServer(options) {
                 }
                 var responseTitle = (data.note && data.note.heading) ? data.note.heading : headi;
                 handleSaveResponse(JSON.stringify({ date: new Date().toLocaleDateString(), title: responseTitle, original_title: headi }));
+                // Next Notes P10 (B32): typed while in flight → baseline is the sent state, save again
+                if (typedInFlight) {
+                    lastSavedContent = sentState.content;
+                    lastSavedTitle = responseTitle;
+                    lastSavedTags = sentState.tags;
+                    if (typeof window.markNoteAsModified === 'function') window.markNoteAsModified();
+                }
                 if (typeof options.onSaved === 'function') {
                     options.onSaved();
                 }

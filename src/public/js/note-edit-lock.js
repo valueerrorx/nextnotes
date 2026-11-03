@@ -306,8 +306,9 @@
         return fallbackMessage;
     }
 
+    // Next Notes P7 (ADR 0005): another editor session, the same account's other tabs included
     function isLockHeldByDifferentUser(lock) {
-        return !!(lock && !lock.holder_is_current_user && !lock.holder_is_current_editor_session);
+        return !!(lock && !lock.holder_is_current_editor_session);
     }
 
     function showLockConflictNotification(message) {
@@ -347,7 +348,8 @@
         }
 
         var noteId = normalizeNoteId(String(noteCard.id || '').replace(/^note/, ''));
-        var canTakeOver = !!(noteId && lock && isLockHeldByDifferentUser(lock));
+        // Next Notes P7: no takeover, the server only hands a lock back to its own session (ADR 0005)
+        var canTakeOver = false;
         var signature = message + '|' + (canTakeOver ? 'takeover' : '');
         if (banner.dataset.lockBannerSignature === signature) {
             return;   // same banner already on screen (status check): no blink
@@ -454,7 +456,7 @@
         }
     }
 
-    function setNoteLockedState(noteId, lock) {
+    function setNoteLockedState(noteId, lock, noBanner) {
         noteId = normalizeNoteId(noteId);
         if (!noteId) {
             return;
@@ -471,7 +473,7 @@
 
         if (noteCard) {
             noteCard.classList.add('note-edit-locked');
-            ensureLockBanner(noteCard, getLockBannerMessage(lock || null), lock || null);
+            if (!noBanner) ensureLockBanner(noteCard, getLockBannerMessage(lock || null), lock || null); // Next Notes P11
             updateToolbarState(noteCard, true);
         }
 
@@ -861,6 +863,13 @@
         }
 
         ensureStyles();
+        // Next Notes P11: no write right (read-only share): read-only without lock request, 403 or banner
+        var readOnlyEntry = document.getElementById('entry' + noteId);
+        if (readOnlyEntry && readOnlyEntry.hasAttribute('data-nextnotes-readonly')) {
+            releaseCurrentLock();
+            setNoteLockedState(noteId, null, true);
+            return;
+        }
         acquireLock(noteId);
     }
 

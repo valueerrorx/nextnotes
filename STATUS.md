@@ -1,6 +1,6 @@
 # Status Nextcloud-Port „Next Notes“
 
-**Aktueller Meilenstein:** M3 – Frontend-Grundlage und Editor (M3a1, M3a2 fertig, weiter M3b); M1, M2 fertig
+**Aktueller Meilenstein:** M3 – Frontend-Grundlage und Editor (M3a1, M3a2, M3b1 fertig, weiter M3b2); M1, M2 fertig
 
 ## Erledigte Slices
 - Setup: Branch `nextcloud-port`, Agenten unter `.claude/agents/`, `UPSTREAM.md`
@@ -28,6 +28,10 @@ Vorläufig vom Lead entschieden, zur Durchsicht (M2c):
 
 Vorläufig (M3-Plan O6):
 - Marke in der Oberfläche: „Next Notes“ mit App-Icon; Poznote-GitHub-, Doku- und Spenden-Links entfernt; Herkunft „Basiert auf Poznote von Timothé Poznanski (MIT)“ im Über-Dialog
+
+Vorläufig (M3b1):
+- Ohne `?note=` bleibt die rechte Spalte leer (Upstream öffnet die zuletzt bearbeitete Notiz)
+- Upstream-PR-Kandidaten an Poznote (nur mit Freigabe): P9/B31 (Reload nach Notizöffnen verlässt App), P10/B32 (Tippen während Speichern ging verloren)
 
 Vorläufig (M2d):
 - Kontolöschung: Notizen, die andere Benutzer in den (geteilten) Workspaces des gelöschten Kontos geschrieben haben, werden mit diesen Workspaces gelöscht (SPEC §8). Alternative wäre Übergabe an einen Freigabe-Empfänger.
@@ -72,6 +76,11 @@ Vorläufig (M2d):
   Testnachweis (tester, frische Instanzen NC 35.0.2, nach allen Fixes): Build 2× (2. offline) identisch, 123 Dateien; check-upstream 0 inkl. (e2), Gegenproben `Inter`/Zusatz hinter Pseudo-Element rot; `run-m3.sh sqlite mariadb pgsql nginx` Exit 0: PHPUnit 231/7404 auf 3 DBs, E2E 20/20 (assets, budget, frame, stripped, xss; Hell/Dunkel; Apache/nginx), Regel-Scan NC-Kopf 24× PASS inkl. geöffneter NC-Menüs, Scrollbalken-Regeln vorhanden; Budget 1 API-Request, keine Duplikate, JS 998 KB/CSS 139 KB gz, TTFB ~25 ms; `run-m1.sh` (4 Umgebungen) und `run-m2.sh` (3 DBs) Exit 0 (nach Build-Fix, vor einzeiligem CSS-Fix); `down.sh all` 0.
   Lead: Teststufen eingeführt (`.claude/agents/tester.md`): Nachlauf ≤ 10 min nur betroffene Tests, Slice ≤ 30 min sqlite + ein Webserver, volle Matrix nur am Meilenstein-Ende (Feedback Thomas: Tests zu lang).
 
+- M3b1 erledigt: Editor öffnen/bearbeiten/speichern (Fragment-Modus `X-Poznote-Fragment`, gleiche Rechte wie Seite, fehlender Workspace-Schlüssel → 404), „+“-Menü, Verschieben-Dialoge, Tags mit `'`, Beacon mit Token (B4), >64 KiB beim Schließen als normaler Request (B30, ersetzt eigenes visibilitychange-Speichern), Sperre/duplizierter Tab nur lesbar (P7), Lesefreigabe ohne Sperr-Anfrage/Banner und nicht editierbar (P11), B26 (`data-action` entfernt, Klick-Schutz, `Object.hasOwn`), B31 (P9), B32 (P10). `src/`-Patches P7, P9, P10, P11 (SPEC §11.1). M3b geteilt in M3b1/M3b2.
+  Review `M3b1-diff-r1` (BLOCKER: print_unescaped-Allowlist) → `M3b1-diff-r2` (BLOCKER: Parse-Fehler im Allowlist-Eintrag, Lead-Fix). Tester-Befund: Tasklist mit `\x0B`-Präfix roh ausgegeben (`trim()` in `isStructuredJson`) → Lead-Fix: nur JSON-Leerraum, ungültige Tasklist nur escaped.
+  Testnachweis (sqlite/nginx): PHPUnit voll 235/235 (7486 Assertions); E2E `editor` 118 je Theme (Hell/Dunkel), `stripped` 113, `assets` 82, `budget` 21, `xss` 82, `frame` 143 – 0 CSP/pageerror/Konsolenfehler; check-upstream grün; `down.sh all` 0. Andere DBs/Apache nicht (kein SQL geändert; Teststufe Slice).
+  Hinweis: PHPUnit voll dauert ~10 min – bei Nachläufen gefiltert laufen lassen.
+
 ## M2 (fertig)
 - Plan `docs/slices/M2-plan.md` r1: Slices M2a (Gerüst, Rechte, Notizen/Ordner/Workspaces/Tags/Papierkorb, M1-Nacharbeit), M2b (Anhänge, Snapshots, Suche, Sperre, Unified Search), M2c (Tasks, Mentions, Erinnerungen, Settings, Konvertierung), M2d (Kontolöschung, Abschlusslauf 3 DBs)
 
@@ -99,4 +108,4 @@ Vorläufig (M2d):
 - Hinweis: CSS-Nesting (`&`) zählt `check-css` nicht mit – bei Upstream-Updates beachten
 
 ## Nächster Schritt
-M3b – Editor, Anhänge, Mermaid/KaTeX, Beacon, Sperre, Suche (Plan §2 M3b) inkl. Nacharbeit oben und `KNOWN_MISSING`-Einträge für M3b: architekt → tester + speccritic.
+M3b2 – Anhänge, PDF im iFrame, Mermaid/KaTeX, Such-POST (requesttoken nicht in URL), P2 (CSP-Inline-Handler), Tag-Klick-Filter: architekt → tester + speccritic.

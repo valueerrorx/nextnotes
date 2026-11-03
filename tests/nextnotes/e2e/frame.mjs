@@ -330,7 +330,7 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	ctx.ok(b27.t.length === 2 && b27.t.find((x) => x.id === `folder-${fTwin}`)?.open === false && b27.t.find((x) => x.id !== `folder-${fTwin}`)?.open === true,
 		'B27: Notizordner offen, gleichnamiger Ordner zu');
 	ctx.ok(b27.selected.length === 1 && b27.selected[0] === b27.nDeep, 'Notiz in Liste markiert', b27.selected.join(','));
-	ctx.ok(await pageN.locator('#right_col').evaluate((e) => e.children.length) === 0, 'rechte Spalte leer (Notizansicht erst M3b)');
+	ctx.ok(await pageN.locator(`#right_col #entry${nDeep}`).count() === 1, 'rechte Spalte zeigt die Notiz (M3b1)');
 	ctx.assertClean('?note=', m);
 	await ctxN.close();
 
