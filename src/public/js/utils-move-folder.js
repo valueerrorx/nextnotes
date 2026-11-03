@@ -414,12 +414,14 @@ function executeMoveAllFiles() {
                 closeModal('moveFolderFilesModal');
                 // Show where the notes went, and keep them selected (#1441),
                 // unless they left for another workspace
+                // Next Notes (P18): redraw the tree in place
                 if (targetWorkspace === getMoveFallbackWorkspace()) {
-                    markFolderPathOpen(targetId === '0' ? null : targetId);
-                    keepTreeSelection(movedNotes, true);
+                    showAddedTreeRow(null, targetId === '0' ? null : targetId).then(function () {
+                        keepTreeSelection(movedNotes, false);
+                    });
+                } else {
+                    showAddedTreeRow(null, null, sourceFolderId);
                 }
-                // Refresh the page to reflect changes
-                location.reload();
             } else {
                 showNotificationPopup(
                     (window.t ? window.t('folders.errors.move_files_prefix', { error: data.error }, 'Error moving files: {{error}}') : ('Error moving files: ' + data.error)),
@@ -591,17 +593,15 @@ function executeMoveFolderToSubfolder() {
                     });
                 }
 
-                // Successfully moved folder
-                showNotificationPopup(
-                    (window.t ? window.t('folders.move.success', { folder: sourceFolderName }, 'Folder "{{folder}}" moved successfully') : ('Folder "' + sourceFolderName + '" moved successfully')),
-                    'success'
-                );
+                // Next Notes (P18): no success modal, the redrawn tree is the confirmation
                 closeModal('moveFolderModal');
                 // Show where the folder went, and keep it selected there (#1441)
-                markFolderPathOpen(targetParentId);
-                keepTreeSelection([{ type: 'folder', id: sourceFolderId }], true);
-                // Refresh the page to reflect changes
-                location.reload();
+                // Next Notes (P18): redraw the tree in place
+                if (targetWorkspace === getMoveFallbackWorkspace()) {
+                    showAddedTreeRow({ type: 'folder', id: sourceFolderId }, targetParentId);
+                } else {
+                    showAddedTreeRow(null, null, sourceFolderId);
+                }
             } else {
                 throw new Error(data.error || 'Unknown error');
             }

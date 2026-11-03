@@ -66,6 +66,12 @@
 			"kind": "extra",
 			"path": "error",
 			"reason": "Konvertierung folgt mit dem Export in M4 (SPEC §1.2.5, Plan O2): bis dahin 501 {success:false,error}"
+		},
+		{
+			"route": "PUT /notes/{id}/tags",
+			"kind": "extra",
+			"path": "note.version",
+			"reason": "B52 (SPEC Bekannte Upstream-Bugs, P19, M3-fix3): Antwort liefert note.version, damit der Editor nach Speed-Dial-Umschalten nicht mit 409 speichert"
 		}
 	]
 }

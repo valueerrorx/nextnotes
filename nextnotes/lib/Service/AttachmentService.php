@@ -31,6 +31,9 @@ use OCP\IAppConfig;
 // Anhänge (Upstream AttachmentsController): Zeile in nextnotes_attachments, Datei in IAppData attachments/<note_id>/<id>
 class AttachmentService {
 	private const MB = 1048576;
+	// Grenzen ab Werk; Admin ändert sie in der NC-Verwaltung (AdminSettingsController)
+	public const DEFAULT_MAX_FILE_MB = 20;
+	public const DEFAULT_QUOTA_MB = 500;
 	// Upstream lib/attachments.php: ausführbare Typen (Server und Client) werden abgelehnt
 	private const BLOCKED_EXT = ['asp', 'aspx', 'cgi', 'fcgi', 'jsp', 'jspx', 'phar', 'pht', 'phtml', 'shtml',
 		'bash', 'bat', 'cmd', 'com', 'dll', 'dylib', 'exe', 'fish', 'jar', 'ksh', 'pl', 'ps1', 'psm1', 'py', 'rb', 'sh', 'so', 'zsh'];
@@ -162,7 +165,7 @@ class AttachmentService {
 
 	/** @param array{type: string, id: string, ws: int, bytes: int} $quota */
 	private function checkQuotaSum(array $quota): void {
-		$limit = $this->appConfig->getValueInt(Application::APP_ID, 'attachment_quota_mb', 500) * self::MB;
+		$limit = $this->appConfig->getValueInt(Application::APP_ID, 'attachment_quota_mb', self::DEFAULT_QUOTA_MB) * self::MB;
 		$wsIds = [$quota['ws']];
 		if ($quota['type'] === 'user') {
 			$wsIds = array_map(static fn ($w) => (int)$w->getId(), $this->workspaceMapper->findOwned($quota['id']));
@@ -292,7 +295,7 @@ class AttachmentService {
 			throw new BadRequestException('Invalid uploaded file');
 		}
 		$size = (int)filesize($tmp);
-		$maxMb = $this->appConfig->getValueInt(Application::APP_ID, 'attachment_max_file_mb', 20);
+		$maxMb = $this->appConfig->getValueInt(Application::APP_ID, 'attachment_max_file_mb', self::DEFAULT_MAX_FILE_MB);
 		if ($size > $maxMb * self::MB) {
 			throw new TooLargeException('File too large (max ' . $maxMb . 'MB)');
 		}

@@ -17,6 +17,13 @@ use OCP\AppFramework\Utility\ITimeFactory;
 
 // Tags (nextnotes_note_tags); API liefert weiter kommagetrennten Text
 class TagService {
+	// Interner Tag der Speed-Dial-Ansicht (Upstream POZNOTE_SPEED_DIAL_TAG); in Tag-Listen und -Anzeigen ausgeblendet (B51)
+	public const SPEED_DIAL = 'speed-dial';
+
+	public static function isInternal(string $tag): bool {
+		return mb_strtolower(trim($tag)) === self::SPEED_DIAL;
+	}
+
 	public function __construct(
 		private NoteTagMapper $tags,
 		private NoteMapper $notes,
@@ -52,7 +59,7 @@ class TagService {
 	public function index(string $uid, mixed $workspaceKey): array {
 		$ws = $this->workspaces->resolveOptional($uid, $workspaceKey);
 		$ids = $ws !== null ? [(int)$ws->getId()] : $this->access->visibleWorkspaceIds($uid);
-		$list = $ids === [] ? [] : $this->tags->findInWorkspaces($ids);
+		$list = $ids === [] ? [] : array_filter($this->tags->findInWorkspaces($ids), static fn ($t) => !self::isInternal((string)$t));
 		sort($list, SORT_NATURAL | SORT_FLAG_CASE);
 		return array_values($list);
 	}

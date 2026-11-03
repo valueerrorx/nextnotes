@@ -9,15 +9,23 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Tests\Security;
 
+use OCA\NextNotes\Service\EmbedDomainService;
 use OCA\NextNotes\Service\HtmlSanitizer;
-use OCP\Server;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 // Done M2a 8: Fälle aus Upstream tests/html-sanitize.test.php als Datensatz (Port, Upstream-Datei unverändert)
 final class HtmlSanitizerTest extends TestCase {
+	// Embed-Liste fest www.youtube.com (ab Werk leer, M4a); Admin-Liste selbst prüft EmbedDomainTest
 	private static function s(): HtmlSanitizer {
-		return Server::get(HtmlSanitizer::class);
+		return new HtmlSanitizer(new class extends EmbedDomainService {
+			public function __construct() {
+			}
+
+			public function domains(): array {
+				return ['www.youtube.com'];
+			}
+		});
 	}
 
 	/** [Eingabe, erwartet gleich | null, enthält[], enthält nicht[]] */
@@ -75,6 +83,10 @@ final class HtmlSanitizerTest extends TestCase {
 	public function testTrustedDomainMatchedOnHost(): void {
 		self::assertFalse(self::s()->iframeSrcIsTrusted('https://youtube.com.evil.test/x'));
 		self::assertTrue(self::s()->iframeSrcIsTrusted('https://www.youtube.com/embed/a'));
+		// B41: exakter Host, keine Subdomain/Elterndomain
+		self::assertTrue(self::s()->iframeSrcIsTrusted('https://WWW.YouTube.com/embed/a'));
+		self::assertFalse(self::s()->iframeSrcIsTrusted('https://youtube.com/embed/a'));
+		self::assertFalse(self::s()->iframeSrcIsTrusted('https://m.www.youtube.com/embed/a'));
 	}
 
 	public function testCodeSegmentsRoundTrip(): void {

@@ -25,6 +25,8 @@ return [
 		['name' => 'page#attachments', 'url' => '/attachments.php', 'verb' => 'GET'],
 		['name' => 'page#kanbanContent', 'url' => '/kanban_content.php', 'verb' => 'GET'],
 		['name' => 'page#excalidrawEditor', 'url' => '/excalidraw_editor.php', 'verb' => 'GET'],
+		// Admin-Formular (Settings\AdminSettings), nur Admins
+		['name' => 'admin_settings#save', 'url' => '/admin/settings', 'verb' => 'POST'],
 		// Kompatibilitätsrouten (SPEC §4.2): Upstream-Einzeldateien unter gleichem Namen
 		['name' => 'compat#noteInfo', 'url' => '/api_note_info.php', 'verb' => 'GET'],
 		['name' => 'compat#downloadNote', 'url' => '/api_download_note.php', 'verb' => 'GET'],

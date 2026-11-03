@@ -18,6 +18,7 @@ use OCA\NextNotes\Service\Exception\BadRequestException;
 use OCA\NextNotes\Service\Exception\LockedException;
 use OCA\NextNotes\Service\Exception\NotImplementedException;
 use OCA\NextNotes\Service\Exception\NotFoundException;
+use OCA\NextNotes\Service\Exception\TooLargeException;
 use OCA\NextNotes\Service\ExcalidrawService;
 use OCA\NextNotes\Service\FolderService;
 use OCA\NextNotes\Service\SettingsService;
@@ -178,6 +179,15 @@ class CompatController extends ApiController {
 			$this->tr->setLanguage($this->tr->languageFor($this->settings->read($uid, 'language')));
 			throw new LockedException($this->tr->t('note_lock.lost_to_user', ['user' => $holder],
 				'You no longer hold the edit lock for this note. {{user}} is now editing it.'), $e->getExtra());
+		} catch (TooLargeException $e) {
+			// Editor zeigt message direkt: Grenze in Sprache des Kontos (M4a)
+			$max = $e->getExtra()['max_mb'] ?? null;
+			if (!is_int($max)) {
+				throw $e;
+			}
+			$this->tr->setLanguage($this->tr->languageFor($this->settings->read($uid, 'language')));
+			throw new TooLargeException($this->tr->t('attachments.errors.file_too_large', ['maxSize' => $max . ' MB'],
+				'The file is too large (max: {{maxSize}}).'), $e->getExtra());
 		}
 	}
 

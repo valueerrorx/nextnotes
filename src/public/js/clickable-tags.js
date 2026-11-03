@@ -112,6 +112,10 @@ function setNoteSpeedDial(noteId, add) {
                 body: JSON.stringify({ tags: tags })
             }).then(response => response.json().then(saved => {
                 if (!response.ok || !saved.success) throw new Error(saved.error || saved.message || 'HTTP ' + response.status);
+                // Next Notes P19: the open editor saves against the new version (no 409)
+                if (saved.note && saved.note.version && typeof window.setLiveNoteContentVersion === 'function') {
+                    window.setLiveNoteContentVersion(noteId, saved.note.version);
+                }
                 const tagsInput = document.getElementById('tags' + noteId);
                 if (tagsInput) {
                     tagsInput.value = tags.join(' ');
@@ -424,7 +428,8 @@ function highlightMatchingTags(searchTerm, _attempt = 0) {
     }
 
     if (!normalized) {
-        tagEls.forEach(el => el.classList.remove('tag-highlight'));
+        // Next Notes P19: the class sits on the wrapper
+        tagEls.forEach(el => (el.closest('.clickable-tag-wrapper') || el).classList.remove('tag-highlight'));
         return;
     }
 
@@ -702,6 +707,12 @@ function addTagElement(container, tagText, noteId) {
     tagElement.setAttribute('data-tag', tagText);
 
     applyNoteTagDot(tagElement);
+
+    // Next Notes P19: the speed dial tag is internal, the menus add and remove it
+    if (isSpeedDialTag(tagText)) {
+        tagWrapper.style.display = 'none';
+        tagWrapper.setAttribute('data-internal-tag', '1');
+    }
 
     tagElement.addEventListener('click', function (e) {
         e.preventDefault();
@@ -1052,7 +1063,7 @@ function handleTagInput(e, noteId, container) {
         return false;
     } else if (e.key === 'Backspace' && e.target.value === '') {
         // If backspace on empty input, remove last tag
-        const tagWrappers = container.querySelectorAll('.clickable-tag-wrapper');
+        const tagWrappers = container.querySelectorAll('.clickable-tag-wrapper:not([data-internal-tag])');
         if (tagWrappers.length > 0) {
             const lastTag = tagWrappers[tagWrappers.length - 1];
             removeTagElement(lastTag, noteId);
@@ -1276,56 +1287,57 @@ function getCurrentWorkspace() {
  * @param {string} tag - The tag to search for
  */
 function redirectToTag(tag) {
-    const currentWorkspace = getCurrentWorkspace();
+    // Next Notes P19: keeps every other parameter (workspace, note, folder, search)
+    const url = new URL(window.location.href);
+    const currentTags = (url.searchParams.get('tags_search') || '').split(/[\s,]+/).filter(t => t.trim() !== '');
 
-    // Get current search parameters
-    let urlParams = new URLSearchParams(window.location.search);
-    let currentTagsSearch = urlParams.get('tags_search') || '';
-
-    // Parse the current tags (space or comma separated)
-    let currentTags = [];
-    if (currentTagsSearch.trim()) {
-        currentTags = currentTagsSearch.split(/[\s,]+/).filter(t => t.trim() !== '');
-    }
-
-    // Check if the clicked tag is already in the search
+    // Toggle the clicked tag in the search
     const tagIndex = currentTags.findIndex(t => t.toLowerCase() === tag.toLowerCase());
-    let newTagsSearch = '';
-
     if (tagIndex > -1) {
-        // Tag is already selected - remove it
         currentTags.splice(tagIndex, 1);
-        newTagsSearch = currentTags.join(' ');
     } else {
-        // Tag is not selected - add it
         currentTags.push(tag);
-        newTagsSearch = currentTags.join(' ');
+    }
+    const newTagsSearch = currentTags.join(' ');
+    if (newTagsSearch) {
+        url.searchParams.set('tags_search', newTagsSearch);
+    } else {
+        url.searchParams.delete('tags_search');
+    }
+    if (!url.searchParams.get('workspace') && getCurrentWorkspace()) {
+        url.searchParams.set('workspace', getCurrentWorkspace());
     }
 
-    // Build URL with updated tags parameter while preserving date filters
-    const finalParams = new URLSearchParams();
-    if (currentWorkspace) {
-        finalParams.set('workspace', currentWorkspace);
+    // Only the sidebar follows the filter; the open note stays (P18 fragment)
+    if (typeof refreshNotesListAfterFolderAction !== 'function' || !document.getElementById('left_col')) {
+        // e.g. the tags page (list_tags.js): the main view shows the filter
+        window.location.href = new URL('index.php' + url.search, window.location.href).toString();
+        return;
     }
-
-    const createdFrom = urlParams.get('created_from');
-    const createdTo = urlParams.get('created_to');
-    if (createdFrom) {
-        finalParams.set('created_from', createdFrom);
-    }
-    if (createdTo) {
-        finalParams.set('created_to', createdTo);
-    }
-
-    if (newTagsSearch.trim()) {
-        finalParams.set('tags_search', newTagsSearch);
-    }
-
-    const finalUrl = 'index.php' + (finalParams.toString() ? '?' + finalParams.toString() : '');
-
-    // Navigate to the URL
-    window.location.href = finalUrl;
+    history.pushState(history.state, '', url.toString());
+    applyTagFilterFromUrl();
 }
+
+/**
+ * Next Notes P19: rebuild the sidebar for the tag filter of the current URL
+ */
+function applyTagFilterFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const tagsSearch = params.get('tags_search') || '';
+    window.isSearchMode = ['search', 'tags_search', 'created_from', 'created_to'].some(k => params.get(k));
+    refreshNotesListAfterFolderAction(null, { skipKanbanViewRefresh: true }).then(() => {
+        highlightMatchingTags(tagsSearch);
+    });
+}
+
+// Next Notes P19: back and forward follow the tag filter without a reload
+window.addEventListener('popstate', function () {
+    const hidden = document.getElementById('search-tags-hidden');
+    const tagsSearch = new URLSearchParams(window.location.search).get('tags_search') || '';
+    if (hidden && hidden.value !== tagsSearch && typeof refreshNotesListAfterFolderAction === 'function') {
+        applyTagFilterFromUrl();
+    }
+});
 
 // ============================================
 // Global Exports

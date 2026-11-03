@@ -20,6 +20,7 @@ use OCA\NextNotes\Service\FolderService;
 use OCA\NextNotes\Service\NoteService;
 use OCA\NextNotes\Service\SearchTextNormalizer;
 use OCA\NextNotes\Service\SettingsService;
+use OCA\NextNotes\Service\TagService;
 use OCA\NextNotes\Service\TaskService;
 use OCA\NextNotes\Service\WorkspaceService;
 use OCP\IDateTimeZone;
@@ -170,6 +171,7 @@ class KanbanViewService {
 		if ($tags === [] && $target !== null) {
 			$tags = $tagMap[(int)$target->getId()] ?? [];
 		}
+		$tags = array_values(array_filter($tags, static fn ($t) => !TagService::isInternal((string)$t)));
 		$ownColor = (string)($n->getColor() ?? '');
 		$color = $ownColor !== '' || $target === null ? $ownColor : (string)($target->getColor() ?? '');
 		$reminder = $reminderMap[$id] ?? ($target !== null ? ($reminderMap[(int)$target->getId()] ?? null) : null);

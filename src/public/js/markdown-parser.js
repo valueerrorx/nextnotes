@@ -654,8 +654,8 @@ function _mdIsAllowedIframeSrc(src) {
         var parsed = new URL(src, window.location.origin);
         var host = parsed.hostname.toLowerCase();
         return allowedDomains.some(function (domain) {
-            domain = String(domain).toLowerCase();
-            return host === domain || host.endsWith('.' + domain);
+            // exact host only, same rule as the server sanitizer and the CSP frame-src
+            return host === String(domain).toLowerCase();
         });
     } catch (e) {
         // Unparsable URL: never fall back to a substring match

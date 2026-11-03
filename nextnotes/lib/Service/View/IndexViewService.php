@@ -102,7 +102,6 @@ class IndexViewService {
 	// Bis zur Portierung erzwungen ausgeblendet (ui-customization.js, __POZNOTE_GLOBAL_HIDDEN_UI_ELEMENTS__)
 	public const FORCED_HIDDEN = [
 		'wsmenu:edit-workspaces', // settings.php: M4
-		'wsmenu:new-workspace', // Workspace anlegen: mit Einstellungen M4
 	];
 	private const SPEED_DIAL_TAG = 'speed-dial';
 

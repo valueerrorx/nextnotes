@@ -33,3 +33,6 @@ Ansicht `attachments` (Anhang-Seite) erhält nur `frame-src 'self'` (`addAllowed
 
 ## Nachtrag M3c2 (2026-11-03)
 `excalidraw_editor.php` läuft mit der NC-Standard-CSP ohne Ausnahme: Laden, Zeichnen, Speichern und Ansichtsmodus ohne Verletzung (Probe hell/dunkel). Worker/WASM bleiben offen bis zum M4-Test „Bild einfügen“.
+
+## Nachtrag M4a (2026-11-03)
+Probe „Bild einfügen“ auf `excalidraw_editor.php` (PNG 200 KB und 3 MB/2000 px, speichern, neu laden, Vorschau in der Notiz; Chromium, hell): Funktion arbeitet. Einzige Meldung `script-src` mit `blockedURI` `wasm-eval` aus dem Vendor-Bündel (pica testet WebAssembly); keine `worker-src`-Meldung. Bilder über 1440 px werden über den JS-Rückfall verkleinert. Entscheidung Fall (b): keine Lockerung, `allowEvalWasm()`/`worker-src` bleiben aus; die Meldung ist im E2E-Test `excalidraw.mjs` nur in diesem Abschnitt als erwartet zugelassen (Direktive + `blockedURI` + Quelldatei). Embed-Domains: CSP je Eintrag genau `https://<host>` aus `EmbedDomainService` (B41).

@@ -276,8 +276,8 @@ function executeDeleteFolderOperation(folderId, folderName) {
                     console.debug('utils-folders: executeDeleteFolderOperation() failed:', e);
                 }
 
-                // Reload to update UI
-                window.location.reload();
+                // Next Notes (P18): redraw the tree in place
+                showAddedTreeRow(null, null, folderId);
             } else {
                 showNotificationPopup(
                     (window.t ? window.t('folders.errors.generic_prefix', { error: data.error }, 'Error: {{error}}') : ('Error: ' + data.error)),
@@ -387,7 +387,7 @@ function executeArchiveFolder(folderId, folderName, workspace) {
             if ((noteOnScreenLeft || folderOnScreen) && typeof window.redirectToWorkspace === 'function') {
                 window.redirectToWorkspace();
             } else {
-                window.location.reload();
+                showAddedTreeRow(null, null);
             }
         })
         .catch(function (error) {

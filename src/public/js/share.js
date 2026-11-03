@@ -108,7 +108,8 @@ function refreshNotesListAfterFolderAction(folderIdToOpen, options) {
 
     const url = new URL(window.location.href);
 
-    return fetch(url.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    // Next Notes (P18): the server answers with #left_col only
+    return fetch(url.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-Poznote-Fragment': 'left_col' } })
         .then(response => response.text())
         .then(html => {
             const parser = new DOMParser();

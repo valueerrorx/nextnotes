@@ -468,8 +468,9 @@
                 return;
             }
             done(true);
-            if (data.folder_id) rememberFolderReveal(data.folder_id);
-            window.location.reload();
+            // Next Notes (P18): tree redrawn in place, no page reload
+            var parentId = parentFolderKey ? String(parentFolderKey).replace('folder_', '') : null;
+            showAddedTreeRow(data.folder_id ? { type: 'folder', id: data.folder_id } : null, parentId);
         });
     }
 
@@ -489,8 +490,7 @@
                     type: 'folder-rename', folderId: String(folderId), from: previousName, to: name, workspace: ws
                 });
             }
-            rememberFolderReveal(folderId);
-            window.location.reload();
+            showAddedTreeRow({ type: 'folder', id: folderId }, null);
         });
     }
 
@@ -520,8 +520,7 @@
                     type: 'note-rename', noteId: String(noteId), from: previousName, to: name
                 });
             }
-            rememberNoteReveal(noteId);
-            window.location.reload();
+            showAddedTreeRow({ type: 'note', id: noteId }, null);
         });
     }
 

@@ -666,7 +666,8 @@ class NoteService {
 	}
 
 	/** @return string Tags als Text */
-	public function setTags(string $uid, int $id, array $in): string {
+	/** @return array{tags: string, version: string} neue Version, damit der offene Editor ohne 409 weiterspeichert (B52) */
+	public function setTags(string $uid, int $id, array $in): array {
 		if (!array_key_exists('tags', $in) || $in['tags'] === null) {
 			throw new BadRequestException('tags field is required');
 		}
@@ -683,7 +684,7 @@ class NoteService {
 			$note->setUpdatedBy($uid);
 			$this->notes->update($note);
 		});
-		return $this->serializer->tagString($tags);
+		return ['tags' => $this->serializer->tagString($tags), 'version' => NoteSerializer::version($note)];
 	}
 
 	/** @return array{0: string, 1: ?string} */

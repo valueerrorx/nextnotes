@@ -48,8 +48,10 @@ function isTrustedEmbedSrc(src) {
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return false;
 
     var host = url.hostname.toLowerCase();
-    return PASTE_ALLOWED_EMBED_DOMAINS.some(function (domain) {
-        return host === domain || host.slice(-(domain.length + 1)) === '.' + domain;
+    // the page's list (window.ALLOWED_IFRAME_DOMAINS) wins; exact host, as in the CSP frame-src
+    var domains = Array.isArray(window.ALLOWED_IFRAME_DOMAINS) ? window.ALLOWED_IFRAME_DOMAINS : PASTE_ALLOWED_EMBED_DOMAINS;
+    return domains.some(function (domain) {
+        return host === String(domain).toLowerCase();
     });
 }
 

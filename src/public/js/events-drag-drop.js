@@ -1879,9 +1879,8 @@ function moveFolderToParent(folderId, newParentFolderId) {
                 parentId: newParentFolderId ? String(newParentFolderId) : null,
                 workspace: workspace
             });
-            markFolderPathOpen(newParentFolderId);
-            keepTreeSelection([{ type: 'folder', id: folderId }], true);
-            location.reload();
+            // Next Notes (P18): redraw the tree in place
+            showAddedTreeRow({ type: 'folder', id: folderId }, newParentFolderId);
         },
         'Error moving folder: '
     );
@@ -1906,8 +1905,7 @@ function moveFolderBesideTarget(folderId, targetFolderId, position) {
                 position: position,
                 workspace: workspace
             });
-            keepTreeSelection([{ type: 'folder', id: folderId }], true);
-            location.reload();
+            showAddedTreeRow({ type: 'folder', id: folderId }, null);
         },
         'Error reordering folder: '
     );

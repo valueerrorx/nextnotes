@@ -170,8 +170,8 @@ class NotesApiController extends ApiController {
 
 	#[NoAdminRequired]
 	public function updateTags(int $id): JSONResponse {
-		$tags = $this->notes->setTags($this->uid(), $id, $this->input());
-		return $this->ok(['message' => 'Tags updated successfully', 'note' => ['id' => $id, 'tags' => $tags]]);
+		$r = $this->notes->setTags($this->uid(), $id, $this->input());
+		return $this->ok(['message' => 'Tags updated successfully', 'note' => ['id' => $id, 'tags' => $r['tags'], 'version' => $r['version']]]);
 	}
 
 	#[NoAdminRequired]

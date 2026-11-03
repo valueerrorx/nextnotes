@@ -16,12 +16,6 @@ use OCA\NextNotes\Service\Exception\TooLargeException;
 
 // Port von src/lib/html-sanitize.php (Poznote, MIT): sanitizeHtml, sanitizeMarkdownContent, Iframe-Regeln
 class HtmlSanitizer {
-	// Upstream ALLOWED_IFRAME_DOMAINS; Admin-Liste folgt mit ISettings (M4)
-	public const IFRAME_DOMAINS = [
-		'youtube.com', 'www.youtube.com', 'youtube-nocookie.com', 'www.youtube-nocookie.com',
-		'player.bilibili.com', 'www.bilibili.com', 'bilibili.com',
-	];
-
 	private const ALLOWED_TAGS = [
 		'p', 'br', 'div', 'span', 'a', 'strong', 'b', 'em', 'i', 'u', 's', 'strike',
 		'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
@@ -100,6 +94,11 @@ class HtmlSanitizer {
 	private const VIEW_TEXT = 1;
 	private const VIEW_FOREIGN = 2;
 
+	public function __construct(
+		private EmbedDomainService $embedDomains,
+	) {
+	}
+
 	// Inhalt nach Notiztyp wie NotesController::sanitizeContentForType
 	public function sanitizeForType(string $type, string $content): string {
 		if ($content === '') {
@@ -141,13 +140,8 @@ class HtmlSanitizer {
 				|| str_starts_with($src, './')
 				|| Pcre::match('~^audio_player\.php(?:[?#]|$)~i', $src);
 		}
-		$host = strtolower($host);
-		foreach (self::IFRAME_DOMAINS as $domain) {
-			if ($host === $domain || str_ends_with($host, '.' . $domain)) {
-				return true;
-			}
-		}
-		return false;
+		// exakter Host aus der Admin-Liste, keine Subdomains (B41)
+		return $this->embedDomains->isAllowedHost($host);
 	}
 
 	public function sanitizeHtml(string $html): string {

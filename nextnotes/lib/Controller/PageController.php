@@ -12,6 +12,7 @@ namespace OCA\NextNotes\Controller;
 use OCA\NextNotes\AppInfo\Application;
 use OCA\NextNotes\Http\CspFactory;
 use OCA\NextNotes\Service\AttachmentService;
+use OCA\NextNotes\Service\EmbedDomainService;
 use OCA\NextNotes\Service\ExcalidrawService;
 use OCA\NextNotes\Service\Exception\NotFoundException;
 use OCA\NextNotes\Service\SettingsService;
@@ -50,6 +51,7 @@ class PageController extends Controller {
 		private KanbanViewService $kanbanView,
 		private NotePageViewService $pageView,
 		private ExcalidrawService $excalidraw,
+		private EmbedDomainService $embedDomains,
 	) {
 		parent::__construct(Application::APP_ID, $request);
 	}
@@ -75,7 +77,8 @@ class PageController extends Controller {
 		$uid = $this->userSession->getUser()?->getUID() ?? '';
 		$lang = $this->language($uid);
 		$baseUrl = $this->urls->linkToRoute('nextnotes.page.index');
-		if ($this->request->getHeader('X-Poznote-Fragment') === 'right_col') {
+		$fragment = $this->request->getHeader('X-Poznote-Fragment');
+		if ($fragment === 'right_col') {
 			return $this->fragment($uid);
 		}
 		try {
@@ -86,7 +89,13 @@ class PageController extends Controller {
 				'open_folder' => $this->request->getParam('open_folder'),
 			] + array_combine(self::SEARCH_PARAMS, array_map(fn (string $k) => $this->request->getParam($k), self::SEARCH_PARAMS)));
 		} catch (NotFoundException) {
-			return $this->notFound(TemplateResponse::RENDER_AS_GUEST);
+			return $fragment === 'left_col' ? $this->blankNotFound() : $this->notFound(TemplateResponse::RENDER_AS_GUEST);
+		}
+		if ($fragment === 'left_col') {
+			// Baum-Neuaufbau nach Ordner-Aktionen (P18): nur #left_col, gleiche Daten und Rechte wie die Seite
+			$response = new TemplateResponse(Application::APP_ID, 'fragment_left', ['tr' => $this->translator, 'view' => $view, 'baseUrl' => $baseUrl], TemplateResponse::RENDER_AS_BLANK);
+			$response->setContentSecurityPolicy($this->cspFactory->forView('index'));
+			return $response;
 		}
 		$this->assets->index($lang);
 		$this->provideConfig($uid, $baseUrl, $lang, [
@@ -113,7 +122,7 @@ class PageController extends Controller {
 			'lang' => $lang,
 			'teamsAvailable' => false, // M5
 			'excalidrawAssetPath' => $assetBase . '/js/vendor/excalidraw-dist/',
-			'allowedIframeDomains' => $this->cspFactory->embedDomains(),
+			'allowedIframeDomains' => $this->embedDomains->domains(),
 		] + $extra);
 	}
 
@@ -245,17 +254,21 @@ class PageController extends Controller {
 		return $this->page($page, $page, ['tr' => $this->translator, 'page' => $info] + $data($info, $uid));
 	}
 
-	// Fragment-Modus (note-loader.js): nur #right_col ohne Seitenrahmen; Zugriff wie die volle Seite
+	// Fragment-Modus right_col (note-loader.js): nur #right_col ohne Seitenrahmen; Zugriff wie die volle Seite
 	private function fragment(string $uid): TemplateResponse {
 		try {
 			$view = $this->indexView->fragment($uid, $this->request->getParam('note'));
 		} catch (NotFoundException) {
-			$response = new TemplateResponse('core', '404', [], TemplateResponse::RENDER_AS_BLANK);
-			$response->setStatus(Http::STATUS_NOT_FOUND);
-			return $response;
+			return $this->blankNotFound();
 		}
 		$response = new TemplateResponse(Application::APP_ID, 'fragment', ['tr' => $this->translator, 'note' => $view['note']], TemplateResponse::RENDER_AS_BLANK);
 		$response->setContentSecurityPolicy($this->cspFactory->forView('index'));
+		return $response;
+	}
+
+	private function blankNotFound(): TemplateResponse {
+		$response = new TemplateResponse('core', '404', [], TemplateResponse::RENDER_AS_BLANK);
+		$response->setStatus(Http::STATUS_NOT_FOUND);
 		return $response;
 	}
 

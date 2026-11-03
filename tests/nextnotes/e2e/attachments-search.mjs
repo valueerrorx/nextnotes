@@ -244,8 +244,9 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 		const m = ctx.mark();
 		const tag = page.locator(`#note${t1} .name_tags .clickable-tag, #note${t1} .name_tags [data-tag]`).first();
 		ctx.ok(await tag.count() === 1, 'J: Tag klickbar');
-		await Promise.all([page.waitForNavigation(), tag.click()]);
-		await page.waitForLoadState('networkidle');
+		// P19: Tag-Klick baut nur #left_col neu (kein Seiten-Reload)
+		await Promise.all([page.waitForResponse((r) => r.request().headers()['x-poznote-fragment'] === 'left_col'), tag.click()]);
+		await page.waitForFunction((id) => [...document.querySelectorAll('#left_col a[data-note-id]')].every((a) => a.dataset.noteId === id), String(t1), { timeout: 5000 }).catch(() => {});
 		const got = await ids(page);
 		ctx.ok(new URL(page.url()).searchParams.get('tags_search') === `l'été${RUN}` && JSON.stringify(got) === JSON.stringify([String(t1)]), 'J: Tag-Klick filtert auf die Notiz', `${page.url()} ${JSON.stringify(got)}`);
 		ctx.ok(await page.locator(`#left_col a.selected-note[data-note-id="${t1}"]`).count() >= 1, 'J: Notiz im Baum markiert (selected-note)');

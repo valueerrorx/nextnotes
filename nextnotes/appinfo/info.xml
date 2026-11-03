@@ -29,6 +29,10 @@ Based on Poznote by Timothé Poznanski (MIT).]]></description>
 		<job>OCA\NextNotes\BackgroundJob\ReminderJob</job>
 		<job>OCA\NextNotes\BackgroundJob\DeletedWorkspaceSweepJob</job>
 	</background-jobs>
+	<settings>
+		<admin>OCA\NextNotes\Settings\AdminSettings</admin>
+		<admin-section>OCA\NextNotes\Settings\AdminSection</admin-section>
+	</settings>
 	<navigations>
 		<navigation>
 			<name>Next Notes</name>

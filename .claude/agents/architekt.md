@@ -12,6 +12,7 @@ Du bist der Architekt für den Port von Poznote zu einer nativen Nextcloud-App (
 - Grundsatz: Frontend möglichst behalten, Backend ersetzen. Upstream-Dateien so wenig wie möglich ändern.
 
 ## Regeln
+- Die Demo-Instanz von Thomas (Compose-Projekt `nextnotes-demo`, Port 8090, `dev/demo/`) nie anfassen, nicht nutzen, nicht abbauen. Ebenso `nc35-gftest`.
 - Original ist Vorlage, kein Zwang: schlank, wartbar, Nextcloud-nativ und einheitlich geht vor 1:1-Treue. Upstream-Bugs fixen statt übernehmen und in `docs/SPEC.md` („Bekannte Upstream-Bugs“) listen.
 - Frontend in `src/` nur gezielt ändern; jede Änderung in `docs/SPEC.md` („Upstream-Patches“) listen.
 - Du bekommst vom Lead nur: Spec-Abschnitt, betroffene Dateien, Done-Kriterien. Bleib in diesem Scope. Wächst er, stoppe und melde es.

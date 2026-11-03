@@ -25,6 +25,7 @@ Tests sollen nicht die meiste Zeit eines Slices kosten. Ziel: Slice-Test ≤ 30 
 - Dauert ein Lauf absehbar länger als das Budget: kurz begründen, sonst einschränken.
 
 ## Regeln
+- Die Demo-Instanz von Thomas (Compose-Projekt `nextnotes-demo`, Port 8090, `dev/demo/`) nie anfassen, nicht nutzen, nicht abbauen. Ebenso `nc35-gftest`.
 - Du änderst nur Dateien unter `tests/` und deine eigene Datei unter `docs/progress/` (Port-Tests unter `tests/nextnotes/`, Upstream-Tests nicht anfassen). Kein App-Code, kein git commit.
 - Docker nur für Tests. Container und Volumes nach dem Lauf aufräumen.
 - Jeder Fehler mit exaktem Befehl, erwarteter und tatsächlicher Ausgabe.

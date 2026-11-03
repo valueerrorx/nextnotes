@@ -17,3 +17,11 @@ src/public/js/attachments-page.js
 src/public/js/events-utils.js
 src/public/js/slash-command.js
 src/public/js/excalidraw-editor.js
+src/public/js/markdown-parser.js
+src/public/js/events-rte-paste.js
+src/public/js/share.js
+src/public/js/utils-folder-tree.js
+src/public/js/inline-tree-edit.js
+src/public/js/utils-folders.js
+src/public/js/utils-move-folder.js
+src/public/js/clickable-tags.js

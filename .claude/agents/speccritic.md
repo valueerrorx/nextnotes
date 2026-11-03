@@ -20,6 +20,7 @@ Nur Spec bzw. Spec-Abschnitt, Diff und Done-Kriterien. Die Begründung des Archi
 - Scope-Wachstum gegenüber dem Auftrag.
 
 ## Regeln
+- Die Demo-Instanz von Thomas (Compose-Projekt `nextnotes-demo`, Port 8090, `dev/demo/`) nie anfassen, nicht nutzen, nicht abbauen. Ebenso `nc35-gftest`.
 - Du schreibst nur nach `docs/reviews/` (`docs/reviews/<slice>-rN.md`) und in deine eigene Datei unter `docs/progress/`. Die Arbeitsstände anderer Rollen (`docs/progress/*-architekt.md`, `*-tester.md`) liest du nicht. Sonst nichts ändern, kein git commit.
 - Keine Stilkritik. Nur Blocker und wichtige Hinweise.
 

@@ -125,7 +125,7 @@ class ExcalidrawService {
 			throw new BadRequestException('diagram_data is required');
 		}
 		if (strlen($data) > self::MAX_DATA_BYTES) {
-			throw new TooLargeException('Diagram too large');
+			throw new TooLargeException('Diagram too large', ['max_mb' => self::MAX_DATA_BYTES >> 20]);
 		}
 		$decoded = json_decode($data, true);
 		if (!is_array($decoded) || array_is_list($decoded) && $decoded !== []) {
@@ -140,7 +140,7 @@ class ExcalidrawService {
 			return null;
 		}
 		if (strlen($svg) > self::MAX_PREVIEW_BYTES) {
-			throw new TooLargeException('Preview too large');
+			throw new TooLargeException('Preview too large', ['max_mb' => self::MAX_PREVIEW_BYTES >> 20]);
 		}
 		$svg = Pcre::replace('/\s++filter="invert\([^"]*+"/i', '', $svg);
 		$svg = Pcre::replace('/<rect x="0" y="0" width="[^"]*+" height="[^"]*+" fill="[^"]*+"\s*+\/>/i', '', $svg, 1);

@@ -132,6 +132,11 @@ Vorläufig (M2d):
 - M4: `allowed_iframe_domains` im Admin-Formular auch mit Schema (`https://…`) annehmen bzw. normalisieren, Fehler melden statt still verwerfen
 - M3b: Suche schreibt `requesttoken` per History-Update in die URL (mit Such-POST beheben); an `body` angehängte Poznote-Elemente ohne Formular-Reset prüfen; eigene Overrides brauchen Spezifität ≥ 1,1,0
 - M7: nginx-Beispielkonfiguration sendet `X-Content-Type-Options` doppelt (App setzt ihn bereits) – in Betriebsdoku/Beispiel-Conf bereinigen
+- M3-fix4 (Befunde Thomas, als Nächstes): Audio-Aufnahme (Mikrofon per Feature-Policy), Menüpunkte mit `not_implemented` ausblenden (Markdown einfügen → M4b), Heartbeat darf Sperre nicht neu anlegen (Sperre ohne HTTPS/Web Locks), Dialoge unter NC-Kopfleiste
+- M3-ui1 (Wunsch Thomas): Ordnerzeile mit Kanban- und „+“-Symbol (Hover/Fokus, aktiv und Touch immer sichtbar)
+- M4g: Speed Dial auf Ordnern löst bei offener Notiz noch 409 aus (Rest B52); Tag-Name `speed-dial` bei Eingabe abweisen
+- später: `http://`-iframes erlaubter Hosts auf https beschränken (CSP blockiert sie ohnehin)
+- `check-css.mjs` hängt im Hintergrund beim Beenden (Vordergrund ok) – bei Gelegenheit klären
 - M5: `moveNotes`/`reorder` prüfen bei Teams den Eigentümer (B17); CleanupJob für verwaiste Excalidraw-Vorschauen
 - Tests: Nachlauf-Filter eng halten (`Note`/`Search` treffen Methodennamen → fast volle Suite)
 - M5: `AccessService::filterReadable` und `noteLevel`/`visibleWorkspaceIds` gemeinsam um Teams erweitern (FilterReadableTest sichert ab)
@@ -140,6 +145,11 @@ Vorläufig (M2d):
 ## M4 (laufend)
 - M4-Plan `docs/slices/M4-plan.md`: Slices M4a–M4i. Review `M4-plan-r1` (BLOCKER: Export-Rechte, ZIP-Speicher/Platte, Parser-DoS) → `M4-plan-r2` (FREIGABE, Hinweise als Lead-Auflagen übernommen).
   Lead: Embed-Domains exakte Hosts ohne Public Suffix List; Export nur Anhänge der exportierten Notizen, Verweise über `filterReadable`; Export ≤ 1 GiB, ein ZIP-Export je Benutzer; Render/Umwandlung ≤ 1 MiB.
+- M4a erledigt: Admin-Formular (NC-Verwaltung, nur Admin, CSRF), `EmbedDomainService` = eine Liste exakter Hosts für Sanitizer/CSP/JS (B41, P17 in `markdown-parser.js` + `events-rte-paste.js`), Normalisierung mit Fehlerliste, ab Werk leer (Q1), Grenzwerte, „Neuer Workspace“, Excalidraw-Bild unter CSP ohne Lockerung (pica `wasm-eval`-Meldung geduldet, JS-Rückfall; ADR 0012 Nachtrag). Review `M4a-diff-r1` FREIGABE. Lead: `'` in Workspace-/Ordnernamen bleibt verboten (B20), nur in Tags. Flaky AdminSettingsTest = NC-AppConfig-Cache (3 s) nach CLI-Löschen im Test, kein App-Fehler.
+- M3-fix2 (Befund Thomas: Seite flackert bei Ordner-Aktionen): Fragment `X-Poznote-Fragment: left_col`, Ordner-/Notiz-Aktionen tauschen nur `#left_col` (P18, B49); verschwindet die offene Notiz → Workspace ohne `?note=`. Review r1 BLOCKER (Rechte-Test fehlte) → Test `testLeftColFragmentOwnAndForeign` ergänzt, Reload-404 behoben.
+- M3-fix3 (Befund Thomas: Speed-Dial-Tag, Tag-Filter): Tag-Filter ohne Reload, Parameter bleiben, Zurück/Vor (P19, B50); interner Tag `speed-dial` ausgeblendet (B51); `PUT notes/{id}/tags` liefert Version, kein 409 (B52). Review FREIGABE.
+  Gemeinsam committet (gemeinsame Dateien nicht trennbar). Testnachweis: E2E hell alle 14 Specs, dunkel `tag-filter tree-inplace admin workspace-create lock-return` grün; check-upstream grün (Lead, Vordergrund); PHPUnit sqlite 307 bis auf SQLite-503 durch parallele manuelle Nutzung der Test-Instanz → betroffene Klassen (Isolation, PageIsolation, CoreScenario, EditorPage, AdminSettings) auf pgsql 163/163 OK.
+- Demo-Instanz für Thomas: `dev/demo/` (localhost:8090, PostgreSQL), Agenten fassen sie nie an; Update nach Commit per `dev/demo/update.sh`.
 - Offen für Thomas (vorläufig Lead): Q1 Embed-Domains ab Werk leer (Upstream: YouTube/Bilibili); Q2 Export für jeden mit Leserecht, „alle“-Exporte nur eigene Workspaces.
 
 ## Nächster Schritt

@@ -44,6 +44,47 @@ final class EditorPageTest extends ApiTestCase {
 		}
 	}
 
+	// M3-fix2 / SPEC §4.3 Nr. 10: Fragment left_col (In-place-Neuaufbau des Baums) mit derselben Rechteprüfung wie die Seite
+	public function testLeftColFragmentOwnAndForeign(): void {
+		$left = ['X-Poznote-Fragment: left_col'];
+		$a = $this->createUser('la');
+		$b = $this->createUser('lb');
+		$markA = 'LCA' . bin2hex(random_bytes(4));
+		$markB = 'LCB' . bin2hex(random_bytes(4));
+		[$wsA] = self::newWorkspace($a, 'LcA');
+		[$wsB] = self::newWorkspace($b, 'LcB');
+		$fA = (int)self::ok($a->call('POST', '/folders', ['folder_name' => "Ordner $markA", 'workspace' => $wsA]), 'A Ordner')['folder_id'];
+		$fB = (int)self::ok($b->call('POST', '/folders', ['folder_name' => "Ordner $markB", 'workspace' => $wsB]), 'B Ordner')['folder_id'];
+		$nA = self::newNote($a, $wsA, "Titel $markA", "<p>$markA</p>", $fA);
+		$nB = self::newNote($b, $wsB, "Titel $markB", "<p>$markB</p>", $fB);
+
+		$r = $a->withHeaders($left)->absolute('GET', self::PAGE . '?workspace=' . self::enc($wsA) . "&note=$nA");
+		self::assertSame(200, $r->status, 'A left_col: ' . $r->describe());
+		self::assertStringContainsString('id="left_col"', $r->body, 'A left_col: linke Spalte fehlt');
+		self::assertStringNotContainsString('id="right_col"', $r->body, 'A left_col: rechte Spalte im Fragment');
+		self::assertStringNotContainsString('nextnotes-root', $r->body, 'A left_col: Seitenrahmen im Fragment');
+		self::assertStringContainsString("Titel $markA", $r->body, 'A left_col: eigener Notiztitel fehlt im Baum');
+		self::assertStringContainsString("Ordner $markA", $r->body, 'A left_col: eigener Ordner fehlt im Baum');
+
+		$assertNoB = static function (string $body, string $what) use ($markB): void {
+			self::assertStringNotContainsString($markB, $body, "$what: Titel/Ordnername von B im Body");
+		};
+		// fremde Notiz (mit und ohne fremden Workspace), unbekannte und ungültige IDs → 404 wie die Seite
+		foreach (["?note=$nB", '?workspace=' . self::enc($wsB) . "&note=$nB", '?note=abc', '?note=999999'] as $q) {
+			$page = $a->absolute('GET', self::PAGE . $q);
+			$r = $a->withHeaders($left)->absolute('GET', self::PAGE . $q);
+			self::assertSame(404, $r->status, "A left_col $q: " . $r->describe());
+			self::assertSame($page->status, $r->status, "A left_col $q: Status anders als Seite");
+			$assertNoB($r->body, "A left_col $q");
+			self::assertStringNotContainsString('id="left_col"', $r->body, "A left_col $q: Baum trotz 404");
+		}
+		// fremder Workspace ohne Notiz: kein Inhalt von B (404 oder eigener Baum)
+		$r = $a->withHeaders($left)->absolute('GET', self::PAGE . '?workspace=' . self::enc($wsB));
+		self::assertContains($r->status, [200, 403, 404], 'A left_col fremder Workspace: ' . $r->describe());
+		$assertNoB($r->body, 'A left_col fremder Workspace');
+		self::assertStringNotContainsString('id="right_col"', $r->body, 'A left_col fremder Workspace: rechte Spalte im Fragment');
+	}
+
 	public function testReadShareEditorReadOnly(): void {
 		$a = $this->createUser('ra');
 		$b = $this->createUser('rb');

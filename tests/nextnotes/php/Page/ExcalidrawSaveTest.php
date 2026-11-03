@@ -196,6 +196,8 @@ final class ExcalidrawSaveTest extends ApiTestCase {
 		$r = $a->form(self::APP . 'api_save_excalidraw.php', ['action' => 'save_embedded_diagram', 'note_id' => $md, 'diagram_id' => 'excalidraw-9',
 			'diagram_data' => $huge, 'preview_svg' => self::SVG], true);
 		self::assertSame(413, $r->status, '> 7 MiB: ' . substr($r->describe(), 0, 300));
+		// M4a: Meldung übersetzt (Upstream-Schlüssel attachments.errors.file_too_large) mit Grenze
+		self::assertSame('The file is too large (max: 7 MB).', $r->json()['message'] ?? null, '> 7 MiB: Meldung');
 		self::assertSame($before, self::content($a, $md), '> 7 MiB: Inhalt verändert');
 	}
 

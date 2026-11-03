@@ -3,11 +3,28 @@
 // M3c2 (SPEC §4.3.13, §11.1 P14, ADR 0005, ADR 0012): Slash-Befehl Excalidraw → Editor-Seite im NC-Rahmen → Zeichnen →
 // Speichern und zurück → Vorschau in der Notiz; fremde Sperre → 423 mit Meldung, Zeichnung bleibt, nach Freigabe gespeichert;
 // Lesefreigabe öffnet im Ansichtsmodus ohne Speichern. Je Abschnitt 0 CSP/pageerror/Konsole/≥400.
+// M4a (ADR 0012 Nachtrag M4a): Bild einfügen (PNG 200 KB; 3 MB über 1440 px → Verkleinerung über pica), speichern, neu laden.
+import { deflateSync, crc32 } from 'node:zlib';
 import { runSpec } from './lib/harness.mjs';
 import { apiClient } from './lib/api.mjs';
 import { share } from './lib/docker.mjs';
 
 const RUN = `${process.argv[3]}${Date.now().toString(36)}`;
+
+// PNG aus Zufallspixeln (komprimiert kaum → Dateigröße ≈ w·h·3)
+function png(w, h) {
+	const chunk = (type, data) => {
+		const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+		const td = Buffer.concat([Buffer.from(type), data]);
+		const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(td) >>> 0);
+		return Buffer.concat([len, td, crc]);
+	};
+	const ihdr = Buffer.alloc(13);
+	ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2;
+	const raw = Buffer.alloc((w * 3 + 1) * h);
+	for (let i = 0; i < raw.length; i++) raw[i] = (i % (w * 3 + 1)) === 0 ? 0 : (Math.random() * 256) | 0;
+	return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw, { level: 1 })), chunk('IEND', Buffer.alloc(0))]);
+}
 
 await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	const user = process.env.NN_USER, user2 = process.env.NN_USER2;
@@ -160,6 +177,54 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 		await p2.goto('about:blank');
 		await c2.close();
 	}
+	// D. M4a: Bild einfügen → speichern → Vorschau in der Notiz → neu laden zeigt das Bild im Editor
+	// Chromium nutzt sonst showOpenFilePicker (kein filechooser-Ereignis); ohne ihn fällt browser-fs-access auf <input type=file> zurück
+	await page.addInitScript(() => { delete Window.prototype.showOpenFilePicker; delete window.showOpenFilePicker; });
+	for (const [label, w, h] of [['200KB', 260, 260], ['3MB', 2000, 500]]) {
+		const n3 = await api.note(WS, `Bild ${label} ${RUN}`, null, `<p>Bild ${RUN}</p>`);
+		const did = `excalidraw-img${label}${RUN}`;
+		const bytes = png(w, h);
+		const m = ctx.mark();
+		// ADR 0012 Nachtrag M4a, Fall (b): pica prüft WebAssembly, die NC-CSP blockiert es, Verkleinerung läuft über den JS-Rückfall
+		const off = ctx.allow('csp', /^script-src wasm-eval @.*\/js\/vendor\/excalidraw-dist\/excalidraw-assets\/vendor-[0-9a-f]+\.js:/, 'erwartet: pica-WASM blockiert, JS-Rückfall (ADR 0012 Nachtrag M4a)');
+		await page.goto(ctx.appUrl(`excalidraw_editor.php?note_id=${n3}&diagram_id=${did}&workspace=${encodeURIComponent(WS)}`), { waitUntil: 'networkidle' });
+		ctx.ok(await editorReady(), `D ${label}: Editor geladen`);
+		await page.waitForTimeout(1200);
+		const chooser = page.waitForEvent('filechooser', { timeout: 10000 });
+		await page.click('[data-testid="toolbar-image"]', { force: true });
+		await (await chooser).setFiles({ name: `bild-${label}.png`, mimeType: 'image/png', buffer: bytes });
+		await page.waitForTimeout(1500);
+		await page.mouse.move(600, 420);
+		await page.mouse.click(600, 420);
+		await page.waitForTimeout(2500);
+		const resp = page.waitForResponse((r) => r.url().includes('api_save_excalidraw.php'), { timeout: 30000 }).catch(() => null);
+		await page.click('#saveBtn');
+		const r = await resp;
+		ctx.ok(r?.status() === 200, `D ${label}: Speichern ${bytes.length} B PNG → 200 (HTTP ${r?.status()})`);
+		const saved = await content(n3);
+		const raw = saved.match(/data-excalidraw=(?:"([^"]*)"|'([^']*)')/);
+		const data = (() => { try { return JSON.parse((raw?.[1] ?? raw?.[2])?.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#0?39;/g, "'").replace(/&amp;/g, '&') ?? '{}'); } catch { return {}; } })();
+		const images = (data.elements ?? []).filter((e) => e.type === 'image' && !e.isDeleted);
+		const files = Object.values(data.files ?? {});
+		ctx.ok(images.length === 1 && files.length === 1 && /^data:image\//.test(files[0]?.dataURL ?? ''), `D ${label}: Diagramm enthält das Bild (Elemente ${images.length}, Dateien ${files.length}, ${files[0]?.mimeType ?? '-'}, ${files[0]?.dataURL?.length ?? 0} Zeichen)`);
+		if (w > 1440) ctx.ok((files[0]?.dataURL?.length ?? Infinity) < bytes.length * 4 / 3, `D ${label}: Bild über 1440 px verkleinert gespeichert (JS-Rückfall)`);
+		await page.goto(ctx.appUrl(`excalidraw_editor.php?note_id=${n3}&diagram_id=${did}&workspace=${encodeURIComponent(WS)}`), { waitUntil: 'networkidle' });
+		ctx.ok(await editorReady(), `D ${label}: neu geladen`);
+		await page.waitForTimeout(1500);
+		await ctx.screenshot(page, `image-${label}`);
+		await page.goto(ctx.appUrl(`index.php?workspace=${encodeURIComponent(WS)}&note=${n3}`), { waitUntil: 'networkidle' });
+		const prev = await page.waitForFunction((id) => {
+			const i = document.querySelector(`#entry${id} .excalidraw-container img`);
+			return i && i.complete && i.naturalWidth > 0;
+		}, n3, { timeout: 15000 }).then(() => true, () => false);
+		ctx.ok(prev, `D ${label}: Notiz zeigt die Vorschau mit Bild`);
+		const wasm = ctx.events.slice(m.e).filter((e) => e.kind === 'csp' && e.allowed);
+		ctx.ok(wasm.every((e) => e.text.startsWith('script-src wasm-eval ')), `D ${label}: einzige CSP-Meldung ist pica-WASM (${wasm.length}×)`);
+		ctx.assertClean(`D Bild ${label}`, m);
+		off();
+		await page.goto('about:blank');
+	}
+
 	ctx.ok((await api2.call('GET', `/notes/${n1}`)).status === 200, 'Gegenprobe: Benutzer 2 liest die Notiz per API');
 	await reqCtx2.close();
 });

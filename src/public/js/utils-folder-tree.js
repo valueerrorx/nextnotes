@@ -314,20 +314,33 @@ function keepTreeSelection(items, reloads) {
  * @param {{type: string, id: string|number}} item - The note or folder that was added
  * @param {string|number|null} folderId - Folder it landed in, opened with its ancestors
  */
-function showAddedTreeRow(item, folderId) {
+function showAddedTreeRow(item, folderId, leavingFolderId) {
     var leftCol = document.getElementById('left_col');
 
-    // Pages without the tree (list_folders) have nothing to redraw in place
-    if (!leftCol || typeof window.refreshNotesListAfterFolderAction !== 'function') {
+    // Next Notes (P18): every folder action redraws the tree in place; item may be null.
+    // Open note leaving with leavingFolderId (breadcrumb in #right_col, also when the tree is filtered): workspace without ?note=
+    var openNoteLeaves = !!leavingFolderId && !!(
+        document.querySelector('#right_col .folder-path-segment[data-folder-id="' + leavingFolderId + '"]')
+        || (window.noteid && document.querySelector('#folder-' + leavingFolderId + ' .links_arbo_left[data-note-db-id="' + window.noteid + '"]')));
+    if (openNoteLeaves && typeof window.redirectToWorkspace === 'function') {
         persistFolderStatesFromDOM();
         markFolderPathOpen(folderId);
-        keepTreeSelection([item], true);
+        window.redirectToWorkspace();
+        return Promise.resolve();
+    }
+
+    // Pages without the tree (list_folders) have nothing to redraw in place
+    if (!leftCol || typeof window.refreshNotesListAfterFolderAction !== 'function' || openNoteLeaves) {
+        persistFolderStatesFromDOM();
+        markFolderPathOpen(folderId);
+        if (item) keepTreeSelection([item], true);
         window.location.reload();
-        return;
+        return Promise.resolve();
     }
 
     // refreshNotesListAfterFolderAction() puts the list back where it was scrolled
-    Promise.resolve(window.refreshNotesListAfterFolderAction(folderId)).then(function () {
+    return Promise.resolve(window.refreshNotesListAfterFolderAction(folderId)).then(function () {
+        if (!item) return;
         keepTreeSelection([item], false);
 
         var row = findTreeRow(item);
@@ -477,12 +490,8 @@ function executeEmptyFolder(folderId, folderName) {
         .then(function (response) { return response.json(); })
         .then(function (data) {
             if (data.success) {
-                showNotificationPopup(
-                    (window.t
-                        ? window.t('folders.empty.success_moved_to_trash', { folder: folderName }, 'All notes moved to trash from folder: {{folder}}')
-                        : ('All notes moved to trash from folder: ' + folderName))
-                );
-                location.reload();
+                // Next Notes (P18): no success modal, the redrawn tree is the confirmation
+                showAddedTreeRow(null, null, folderId);
             } else {
                 showNotificationPopup(
                     (window.t ? window.t('folders.errors.generic_prefix', { error: data.error }, 'Error: {{error}}') : ('Error: ' + data.error)),
