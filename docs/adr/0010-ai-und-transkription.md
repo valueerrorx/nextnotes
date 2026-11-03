@@ -17,3 +17,6 @@ Begründung: Der Chat-Werkzeugteil greift tief in Notizen ein (Rechte, Sperren, 
 ## Konsequenzen
 - Inventurzeilen (vormals ADR-offen) → streichen (v1, umgestellt im M0-Nachtrag): A #206, #207, #253, #254, T8; B #51–54, #76, #77, 2.1 #16, #17.
 - Adapter blendet AI-/Mikrofon-Schaltflächen per CSS/`__POZNOTE_HIDDEN_UI_ELEMENTS__` aus; kein Upstream-Edit.
+
+## Nachtrag M3-fix4 (2026-11-03)
+„Audio aufnehmen“ (Upstream `speech-to-text.js`, Dialog `dictateModal`) bleibt: Aufnahme im Browser, Ablage als Anhang der Notiz, kein externer Dienst. Gestrichen bleiben nur Diktat/Transkription (`speechToText: false`, kein `api_transcribe.php`, Dialog ohne Transkribieren-Knopf und Sprachwahl). `speech-to-text.js`/`.css` sind wieder im Bündel. Mikrofon: ADR 0012 Nachtrag M3-fix4.

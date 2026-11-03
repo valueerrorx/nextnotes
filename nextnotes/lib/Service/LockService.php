@@ -41,7 +41,7 @@ class LockService {
 		return $session;
 	}
 
-	/** @return array<string, mixed> POST /notes/{id}/lock und /lock/heartbeat */
+	/** @return array<string, mixed> POST /notes/{id}/lock: einziger Weg, eine Sperre anzulegen */
 	public function acquire(string $uid, int $noteId, string $session): array {
 		$this->access->requireNote($uid, $noteId, 'write');
 		$session = self::session($session);
@@ -50,6 +50,23 @@ class LockService {
 			throw new ConflictException('Note is currently locked for editing', ['lock' => $this->payload($lock, $uid, $session)]);
 		}
 		return ['lock' => $this->payload($lock, $uid, $session), 'taken_over' => false];
+	}
+
+	/**
+	 * POST /lock/heartbeat (B53): verlängert nur die eigene gültige Sperre und legt nie eine an.
+	 * Fremde Sitzung oder fremdes Konto hält → 409 wie Erwerb; keine Sperre → 200 mit lock null (Client bleibt bearbeitbar).
+	 * @return array{lock: ?array<string, mixed>}
+	 */
+	public function heartbeat(string $uid, int $noteId, string $session): array {
+		$this->access->requireNote($uid, $noteId, 'write');
+		$session = self::session($session);
+		$now = $this->time->getTime();
+		$this->locks->extend($noteId, $uid, $session, $now, $now + self::TTL);
+		$lock = $this->locks->findValid($noteId, $now);
+		if ($lock !== null && !$this->holds($lock, $uid, $session)) {
+			throw new ConflictException('Note is currently locked for editing', ['lock' => $this->payload($lock, $uid, $session)]);
+		}
+		return ['lock' => $this->payload($lock, $uid, $session)];
 	}
 
 	// Erwerb/Verlängerung; außerhalb von Transaktionen, damit eine Unique-Verletzung auf PostgreSQL nichts abbricht
@@ -82,7 +99,7 @@ class LockService {
 
 	/**
 	 * Speichern (PATCH, Beacon) wie Upstream validateCurrentNoteEditLock: gültige Sperre einer anderen Sitzung → 423.
-	 * Ohne Sitzung (Skript, Einmal-Schreiber) blockiert nur die Sperre eines anderen Kontos; mit Sitzung ohne Sperre wird sie erworben.
+	 * Ohne Sitzung (Skript, Einmal-Schreiber) blockiert nur die Sperre eines anderen Kontos; ohne Sperre wird keine angelegt (B53).
 	 */
 	public function assertCanSave(string $uid, int $noteId, string $session): void {
 		$session = trim($session);
@@ -91,19 +108,10 @@ class LockService {
 			throw new BadRequestException('Invalid editor session');
 		}
 		$lock = $this->locks->findValid($noteId, $this->time->getTime());
-		if ($session === '') {
-			if ($lock === null || $lock->getHolderUid() === $uid) {
-				return;
-			}
-		} elseif ($lock !== null && $this->holds($lock, $uid, $session)) {
+		if ($lock === null || ($session === '' && $lock->getHolderUid() === $uid) || $this->holds($lock, $uid, $session)) {
 			return;
-		} elseif ($lock === null && strlen($session) <= 64) {
-			$lock = $this->take($noteId, $uid, $session);
-			if ($lock !== null && $this->holds($lock, $uid, $session)) {
-				return;
-			}
 		}
-		$message = $lock !== null ? 'This note is currently being edited by ' . $this->holderName($lock) : 'You no longer hold the edit lock for this note';
+		$message = 'This note is currently being edited by ' . $this->holderName($lock);
 		throw new LockedException($message, ['lock' => $this->payload($lock, $uid, $session)]);
 	}
 

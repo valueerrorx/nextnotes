@@ -53,6 +53,20 @@ class LockMapper extends QBMapper {
 			->executeStatement();
 	}
 
+	// Heartbeat: verlängert nur die gültige Sperre derselben Sitzung desselben Kontos
+	public function extend(int $noteId, string $uid, string $session, int $now, int $expires): int {
+		$qb = $this->db->getQueryBuilder();
+		$expr = $qb->expr();
+		return $qb->update(self::TABLE)
+			->set('last_seen_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT))
+			->set('expires_at', $qb->createNamedParameter($expires, IQueryBuilder::PARAM_INT))
+			->where($expr->eq('note_id', $qb->createNamedParameter($noteId, IQueryBuilder::PARAM_INT)))
+			->andWhere($expr->eq('holder_uid', $qb->createNamedParameter($uid)))
+			->andWhere($expr->eq('holder_session', $qb->createNamedParameter($session)))
+			->andWhere($expr->gt('expires_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT)))
+			->executeStatement();
+	}
+
 	/** @throws \OCP\DB\Exception bei Unique-Verletzung (Sperre existiert) */
 	public function create(int $noteId, string $uid, string $session, int $now, int $expires): void {
 		$qb = $this->db->getQueryBuilder();

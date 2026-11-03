@@ -74,4 +74,5 @@ for (const n of Object.keys(sources)) {
 	if (broken.length) err(`${n}: ${broken.length} Regeln nur durch den Zusatz ungültig, z. B. ${broken.slice(0, 3).join(' | ')}`);
 	if (a === b && !broken.length && lists[n]) console.log(`check-upstream (e2): ${n} ${a} Stilregeln vor/nach Zusatz gleich, ${lists[n].length} Bundle-Regeln geprüft`);
 }
-process.exit(fail ? 1 : 0);
+// natürliches Ende: process.exit() blieb unter Node 24 sporadisch im Worker-Join hängen (M3-fix4)
+process.exitCode = fail ? 1 : 0;

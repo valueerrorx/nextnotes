@@ -22,3 +22,8 @@ Option 1 plus optimistische Prüfung:
 ## Konsequenzen
 - Gleiches API-Verhalten wie Upstream, Frontend unverändert.
 - Uhrzeit nur aus PHP (`ITimeFactory`), DB-Uhr wird nie verwendet.
+
+## Nachtrag M3-fix4 (2026-11-03)
+Nur `POST /notes/{id}/lock` legt eine Sperre an. Heartbeat verlängert ausschließlich die gültige Sperre derselben Sitzung desselben Kontos; fremde Sitzung oder fremdes Konto → 409 mit Halter, keine Sperre → 200 `lock: null` (Upstream-Client bleibt bearbeitbar). Speichern (PATCH, Beacon) legt nie an; fremde gültige Sperre → 423 wie bisher. Grund: späte Heartbeats/Notfall-PATCHs einer verlassenen Seite holten die Sperre nach der Freigabe zurück (SPEC B53).
+
+**Nachtrag M3-fix4 (Web-Lock-Frist):** Chromium sagt `navigator.locks.request(…, {ifAvailable:true})` während des Seitenladens erst spät zu (gemessen 2,2–2,8 s, etwa beim `load`). Die 2-s-Frist läuft deshalb erst ab `load`; eine nach Fristablauf eintreffende Zusage wird sofort freigegeben, damit kein verwaister Lock bleibt. Vorher bekam jeder Tab bei jedem Laden eine neue Sitzungs-ID (Ursache der gemeldeten „anderer Tab bearbeitet“-Meldung nach Reload).

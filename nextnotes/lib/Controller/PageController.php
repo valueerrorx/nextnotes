@@ -321,6 +321,7 @@ class PageController extends Controller {
 	private function page(string $template, string $view, array $params = []): TemplateResponse {
 		$response = new TemplateResponse(Application::APP_ID, $template, $params, TemplateResponse::RENDER_AS_USER);
 		$response->setContentSecurityPolicy($this->cspFactory->forView($view));
+		$response->setFeaturePolicy($this->cspFactory->featurePolicyForView($view));
 		return $response;
 	}
 }

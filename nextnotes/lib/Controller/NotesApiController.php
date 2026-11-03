@@ -91,8 +91,7 @@ class NotesApiController extends ApiController {
 
 	#[NoAdminRequired]
 	public function heartbeatLock(int $id): JSONResponse {
-		$data = $this->locks->acquire($this->uid(), $id, $this->editorSession());
-		return $this->ok(['lock' => $data['lock']]);
+		return $this->ok($this->locks->heartbeat($this->uid(), $id, $this->editorSession()));
 	}
 
 	#[NoAdminRequired]

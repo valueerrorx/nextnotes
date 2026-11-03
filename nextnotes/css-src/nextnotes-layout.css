@@ -143,3 +143,17 @@ body#body-user.excalidraw-editor-page {
 	background-size: cover;
 	background-position: center;
 }
+
+/* Dialoge und Overlays unter der NC-Kopfleiste (M3-fix4): Hintergrund ab Kopfleisten-Unterkante, Inhalt mit Abstand und eigenem Scroll.
+   Doppelte ID hebt über gehobene Upstream-Regeln wie #renameModal.modal (ADR 0017). */
+#body-user#body-user :is(.modal, .alert-modal-overlay, .note-creation-loading-modal, .notification-overlay, .calendar-notes-modal-overlay, .image-preview-modal) {
+	top: var(--header-height);
+	bottom: auto;
+	height: calc(100% - var(--header-height));
+	box-sizing: border-box;
+}
+#body-user#body-user :is(.modal-content, .alert-modal, .note-creation-loading-dialog, .calendar-notes-modal) {
+	/* Overlay-Innenabstand 20 + 16 px, Upstream-Rand oben 5 % der Breite (modals/responsive.css) */
+	max-height: calc(100vh - var(--header-height) - 40px - 5vw);
+	overflow-y: auto;
+}

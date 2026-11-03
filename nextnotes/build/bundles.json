@@ -10,7 +10,6 @@
 		"js/session-guard.js": "ersetzt durch 401-Reload im Adapter (SPEC 4.3.7)",
 		"js/theme-init.js": "Hell/Dunkel nach NC-Theme im Adapter (ADR 0016)",
 		"js/ai-*.js": "AI gestrichen (ADR 0010)",
-		"js/speech-to-text.js": "Spracheingabe gestrichen (ADR 0010)",
 		"js/backup-*.js": "Backup gestrichen (Inventur B 1.4)",
 		"js/restore-import.js": "Restore/Import gestrichen (Inventur B 1.4)",
 		"js/git-*.js": "Git-Sync gestrichen (Inventur B 1.4)",
@@ -19,7 +18,6 @@
 		"css/fonts.css": "Schrift Inter gestrichen, var(--font-face) (ADR 0016)",
 		"css/custom-css.css": "Custom-CSS gestrichen (ADR 0016)",
 		"css/ai-chat.css": "AI gestrichen (ADR 0010)",
-		"css/speech-to-text.css": "Spracheingabe gestrichen (ADR 0010)",
 		"css/offline-banner.css": "PWA/Offline gestrichen (Inventur B 1.5)",
 		"js/calendar.js": "bis M4: Diary-Kalender-Route fehlt (sonst 404 beim Laden), mit DiaryApiController wieder aufnehmen",
 		"js/background-settings.js": "bis M4: api_upload_background.php fehlt (sonst 404 beim Laden), mit CompatController wieder aufnehmen"
@@ -194,7 +192,8 @@
 			"js/note-stats.js",
 			"js/note-subline-menu.js",
 			"js/paste-markdown-modal.js",
-			"js/insert-markdown-modal.js"
+			"js/insert-markdown-modal.js",
+			"js/speech-to-text.js"
 		]
 	},
 	"jsSingle": [
@@ -246,6 +245,7 @@
 			"css/table-picker.css",
 			"css/slash-commands.css",
 			"css/emoji-autocomplete.css",
+			"css/speech-to-text.css",
 			"css/modals/ui-customization.css",
 			"css/ui-customization-panel.css",
 			"css/markdown-syntax.css",

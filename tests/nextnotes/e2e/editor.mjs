@@ -23,6 +23,9 @@ await runSpec(import.meta.url, async (ctx, page, context) => {
 	const noteUrl = (id) => ctx.appUrl(`index.php?workspace=${encodeURIComponent(WS)}${id ? `&note=${id}` : ''}`);
 	const open = async (p, id) => {
 		await p.goto(noteUrl(id), { waitUntil: 'networkidle' });
+		// M3-fix4: Sperrantwort kommt erst nach load (Editor-Sitzung wartet auf Web Lock) → vorher getippt geht verloren (B4 flaky)
+		if (id) await p.waitForFunction((n) => document.readyState === 'complete' && typeof window.isNoteEditLockSettled === 'function'
+			&& window.isNoteEditLockSettled(n), id, { timeout: 15000 }).catch(() => ctx.info(`open(${id}): Sperrantwort nicht abgewartet`));
 		await p.waitForTimeout(600);
 	};
 	const content = async (id) => (await api.must('GET', `/notes/${id}`)).note?.content ?? '';
@@ -185,9 +188,20 @@ await runSpec(import.meta.url, async (ctx, page, context) => {
 		await t2.locator(`#entry${id}`).click({ force: true });
 		await t2.keyboard.type(' zwei');
 		ctx.ok(await waitFor(async () => (await content(id)).includes(`eins${RUN}`)), 'Duplikat: Text aus Tab 1 gespeichert');
+		// M3-fix4: reload() kehrt hier teils vor DOMContentLoaded der neuen Seite zurück → auf neue Seite und Sperrantwort warten.
+		// Zugesichert (SPEC §4.3 Nr. 8) ist die Editor-Sitzung; die Sperre gibt pagehide frei, die wartende Kopie
+		// (Abfrage alle 3 s) darf sie in der Lücke übernehmen → genau ein Tab bearbeitbar, nicht zwingend Tab 1.
+		await t1.evaluate(() => { window.__nnBeforeReload = 1; });
 		await t1.reload({ waitUntil: 'networkidle' });
-		await t1.waitForTimeout(1500);
-		ctx.ok((await t1.locator(`#entry${id}`).getAttribute('contenteditable')) === 'true', 'Reload Tab 1 behält Sperre');
+		await t1.waitForFunction((n) => !window.__nnBeforeReload && document.readyState === 'complete'
+			&& typeof window.isNoteEditLockSettled === 'function' && window.isNoteEditLockSettled(n), id, { timeout: 15000 });
+		await t1.waitForTimeout(800);
+		const s1r = await t1.evaluate(() => sessionStorage.getItem('poznote_editor_session_id'));
+		ctx.ok(s1r === s1, 'Reload Tab 1 behält Editor-Sitzung', `${s1} → ${s1r}`);
+		const e1 = (await t1.locator(`#entry${id}`).getAttribute('contenteditable')) === 'true';
+		const e2 = (await t2.locator(`#entry${id}`).getAttribute('contenteditable')) === 'true';
+		ctx.ok(e1 !== e2, 'Reload Tab 1: genau ein Tab bearbeitbar', `Tab 1 ${e1}, Kopie ${e2}`);
+		if (!e1) ctx.info('Reload: Kopie hat die Sperre in der Reload-Lücke übernommen (zulässig)');
 		ctx.ok(!(await content(id)).includes(' zwei'), 'Duplikat: Kopie hat nichts gespeichert');
 		await t2.close(); await t1.close();
 	}

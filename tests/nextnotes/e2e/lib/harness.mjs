@@ -149,10 +149,10 @@ class Ctx {
 }
 
 /**
- * Startet Browser, Kontext mit Überwachung, meldet an und ruft fn(ctx, page, context, browser).
+ * Startet Browser, Kontext mit Überwachung, meldet an und ruft fn(ctx, page, context, browser). opts.args: Chromium-Startargumente.
  * Exit 0 nur ohne FAIL. Ungefangene Ausnahme = FAIL.
  */
-export async function runSpec(specUrl, fn) {
+export async function runSpec(specUrl, fn, opts = {}) {
 	const [base, theme] = process.argv.slice(2);
 	if (!base || !['light', 'dark'].includes(theme)) {
 		console.error('Aufruf: node <spec>.mjs <base-url> <light|dark>');
@@ -161,7 +161,7 @@ export async function runSpec(specUrl, fn) {
 	const name = basename(fileURLToPath(specUrl), '.mjs');
 	const ctx = new Ctx(base, theme, name);
 	console.log(`spec ${name} (${theme}) gegen ${base}`);
-	const browser = await pw.chromium.launch({ executablePath: process.env.CHROMIUM ?? '/usr/bin/chromium', headless: true });
+	const browser = await pw.chromium.launch({ executablePath: process.env.CHROMIUM ?? '/usr/bin/chromium', headless: true, args: opts.args ?? [] });
 	try {
 		const context = await browser.newContext({ viewport: { width: 1400, height: 900 }, locale: 'de-DE' });
 		await ctx.attach(context);

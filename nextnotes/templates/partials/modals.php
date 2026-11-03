@@ -7,7 +7,7 @@
 // (dazu src/task_list_picker_modal.php, src/task_due_modal.php, src/modals/{folder_icon_modal,icon_color_options,tag_folder_notes_modal}.php)
 // Nur Dialoge der Hauptansicht und des Editors. Weggelassen: Update/What's new, eigenes CSS/Schriften, Admin-Limits,
 // Konten/Passwort, Workspace-Einstellungen und Workspace anlegen (M4), Export (M4), Umwandeln (501 bis M4),
-// Anhang-Auswahl (M3b2), Offline, Spracheingabe, Tagebuch (M4), Hintergrundbild,
+// Anhang-Auswahl (M3b2), Offline, Spracheingabe (Audio-Aufnahme bleibt, ohne Transkription), Tagebuch (M4), Hintergrundbild,
 // Farbpalette/Markdown-Farben/Revisionen/Datumsformat (Einstellungen M4), NC-Glocke statt Benachrichtigungsdialog,
 // E-Mail-Erinnerung (nur NC-Benachrichtigung).
 /** @var \OCA\NextNotes\Service\View\PageTranslator $tr */
@@ -880,6 +880,23 @@ $noteInfoRows = [
         <div class="modal-buttons">
             <button type="button" class="btn-cancel" data-action="close-modal" data-modal="codeBlockLanguageModal"><?php p($tr->t('common.cancel')); ?></button>
             <button type="button" class="btn-danger" data-action="remove-code-block-language"><?php p($tr->t('editor.code_block_language.remove_tag', [], 'Remove tag')); ?></button>
+        </div>
+    </div>
+</div>
+<!-- Audio-Aufnahme (js/speech-to-text.js, Upstream modals.php dictateModal): nur Aufnehmen, ohne Transkription (ADR 0010 Nachtrag M3-fix4) -->
+<div id="dictateModal" class="modal">
+    <div class="modal-content dictate-modal-content">
+        <h3><i class="lucide lucide-mic"></i> <span id="dictateTitle"><?php p($tr->t('audio_recorder.title', [], 'Record audio')); ?></span></h3>
+        <div class="dictate-panel" id="dictateRecordPanel">
+            <div class="dictate-level" id="dictateLevel" aria-hidden="true"><span class="dictate-level-bar" id="dictateLevelBar"></span></div>
+            <div class="dictate-timer"><span id="dictateTimer">0:00</span><span class="dictate-timer-limit"> / <span id="dictateTimerLimit">10:00</span></span></div>
+            <p class="dictate-hint" id="dictateHint"></p>
+        </div>
+        <p class="dictate-error" id="dictateError" hidden></p>
+        <div class="modal-buttons">
+            <button type="button" class="btn-cancel" id="dictateCancelBtn"><?php p($tr->t('common.cancel')); ?></button>
+            <button type="button" class="btn-primary" id="dictateStartBtn"><?php p($tr->t('audio_recorder.start', [], 'Start')); ?></button>
+            <button type="button" class="btn-primary" id="dictateStopBtn" hidden><?php p($tr->t('audio_recorder.stop', [], 'Stop and insert')); ?></button>
         </div>
     </div>
 </div>

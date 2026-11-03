@@ -342,12 +342,17 @@
 		try {
 			if (navigator.locks && typeof navigator.locks.request === 'function') {
 				var releaseSessionLock = null;
-				var holdSession = function (id) {
+				var holdSession = function (id, keepLate) {
 					return new Promise(function (resolve) {
-						// keine Antwort binnen 2 s → wie belegt (neue ID ist sicher)
-						setTimeout(function () { resolve(false); }, 2000);
+						// keine Antwort binnen 2 s → wie belegt (neue ID ist sicher). Frist erst ab load: Chromium stellt
+						// die Zusage während des Ladens zurück (gemessen 2,2–2,8 s nach Anfrage), sonst neue ID bei jedem Laden.
+						var timedOut = false;
+						var arm = function () { setTimeout(function () { timedOut = true; resolve(false); }, 2000); };
+						if (document.readyState === 'complete') arm(); else window.addEventListener('load', arm, { once: true });
 						try {
 							navigator.locks.request('nextnotes-editor-session:' + id, { ifAvailable: true }, function (lock) {
+								// späte Zusage nach Fristablauf (ID schon ersetzt) → sofort freigeben
+								if (timedOut && !keepLate) return undefined;
 								resolve(!!lock);
 								// Lock bis pagehide halten
 								return lock ? new Promise(function (done) { releaseSessionLock = done; }) : undefined;
@@ -366,7 +371,7 @@
 						if (!ok) {
 							sessionGateTo = newEditorSessionId();
 							sessionStorage.setItem(EDITOR_SESSION_KEY, sessionGateTo);
-							holdSession(sessionGateTo);
+							holdSession(sessionGateTo, true);
 						}
 					}).catch(function () { /* Speicher gesperrt: Upstream-Fallback */ }).then(function () { sessionGate = null; });
 				};
@@ -468,6 +473,21 @@
 	document.addEventListener('DOMContentLoaded', function () {
 		document.documentElement.classList.add('nextnotes-ready');
 	});
+
+	// 14. Upstream-t() schon vor globals.js (B54): Skripte mit `tr = window.t || …` beim Laden fingen sonst NC-t(app, text) ein
+	var ncT = typeof window.t === 'function' ? window.t : null;
+	window.t = function (key, vars, fallback) {
+		if (ncT && typeof vars === 'string') return ncT.apply(this, arguments);
+		var cur = window.POZNOTE_I18N && window.POZNOTE_I18N.strings;
+		String(key).split('.').forEach(function (part) {
+			cur = cur && typeof cur === 'object' && Object.prototype.hasOwnProperty.call(cur, part) ? cur[part] : null;
+		});
+		var str = typeof cur === 'string' ? cur : (fallback != null ? String(fallback) : String(key));
+		if (vars && typeof vars === 'object') {
+			Object.keys(vars).forEach(function (k) { str = str.split('{{' + k + '}}').join(String(vars[k])); });
+		}
+		return str;
+	};
 
 	window.NEXTNOTES = {
 		config: config,

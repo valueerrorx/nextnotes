@@ -17,6 +17,7 @@
 - Themes: nur Hell/Dunkel nach Nextcloud-Theme; Zusatz-Themes, CSS- und Font-Upload gestrichen (ADR 0016)
 - Leitprinzip: Original ist Vorlage, kein Zwang; schlank, wartbar, Nextcloud-nativ, einheitlich vor 1:1-Treue. Upstream-Bugs fixen statt übernehmen. Technik entscheidet der Lead.
 - Frontend: Poznote-Frontend behalten (ADR 0013); gezielte Edits in `src/`, gelistet in SPEC §11.1
+- Review-Stufen (Thomas, 2026-11-03): speccritic-Diff-Review nur bei Rechten, Daten/Migration, Sanitizer/CSP/XSS, Sperre oder neuen Endpunkten; reine UI-/CSS-/i18n-Fixes nur Test; kleine Fixes gebündelt; Meilenstein-Pläne weiter mit Review
 - Lead: ADR 0004, 0005, 0006, 0007, 0011, 0012, 0015; Teilentscheidungen in 0003 (Verwaisen nur per Event/Orphan-Check, Einfrieren ohne Teams-App)
 
 ## Entscheidungen für Thomas
@@ -132,7 +133,6 @@ Vorläufig (M2d):
 - M4: `allowed_iframe_domains` im Admin-Formular auch mit Schema (`https://…`) annehmen bzw. normalisieren, Fehler melden statt still verwerfen
 - M3b: Suche schreibt `requesttoken` per History-Update in die URL (mit Such-POST beheben); an `body` angehängte Poznote-Elemente ohne Formular-Reset prüfen; eigene Overrides brauchen Spezifität ≥ 1,1,0
 - M7: nginx-Beispielkonfiguration sendet `X-Content-Type-Options` doppelt (App setzt ihn bereits) – in Betriebsdoku/Beispiel-Conf bereinigen
-- M3-fix4 (Befunde Thomas, als Nächstes): Audio-Aufnahme (Mikrofon per Feature-Policy), Menüpunkte mit `not_implemented` ausblenden (Markdown einfügen → M4b), Heartbeat darf Sperre nicht neu anlegen (Sperre ohne HTTPS/Web Locks), Dialoge unter NC-Kopfleiste
 - M3-ui1 (Wunsch Thomas): Ordnerzeile mit Kanban- und „+“-Symbol (Hover/Fokus, aktiv und Touch immer sichtbar)
 - M4g: Speed Dial auf Ordnern löst bei offener Notiz noch 409 aus (Rest B52); Tag-Name `speed-dial` bei Eingabe abweisen
 - später: `http://`-iframes erlaubter Hosts auf https beschränken (CSP blockiert sie ohnehin)
@@ -149,8 +149,10 @@ Vorläufig (M2d):
 - M3-fix2 (Befund Thomas: Seite flackert bei Ordner-Aktionen): Fragment `X-Poznote-Fragment: left_col`, Ordner-/Notiz-Aktionen tauschen nur `#left_col` (P18, B49); verschwindet die offene Notiz → Workspace ohne `?note=`. Review r1 BLOCKER (Rechte-Test fehlte) → Test `testLeftColFragmentOwnAndForeign` ergänzt, Reload-404 behoben.
 - M3-fix3 (Befund Thomas: Speed-Dial-Tag, Tag-Filter): Tag-Filter ohne Reload, Parameter bleiben, Zurück/Vor (P19, B50); interner Tag `speed-dial` ausgeblendet (B51); `PUT notes/{id}/tags` liefert Version, kein 409 (B52). Review FREIGABE.
   Gemeinsam committet (gemeinsame Dateien nicht trennbar). Testnachweis: E2E hell alle 14 Specs, dunkel `tag-filter tree-inplace admin workspace-create lock-return` grün; check-upstream grün (Lead, Vordergrund); PHPUnit sqlite 307 bis auf SQLite-503 durch parallele manuelle Nutzung der Test-Instanz → betroffene Klassen (Isolation, PageIsolation, CoreScenario, EditorPage, AdminSettings) auf pgsql 163/163 OK.
+- M3-fix4 (Befunde Thomas): Audio-Aufnahme wieder gebündelt, Mikrofon `'self'` nur für Index (ADR 0010/0012); „Markdown einfügen“ (501) ausgeblendet bis M4b, Detektor `menu-501.mjs`; Heartbeat/Speichern legen keine Sperre an (B53); Web-Lock-Frist erst ab `load` – Chromium sagt den Lock beim Laden erst nach 2,2–2,8 s zu, vorher neue Sitzungs-ID bei jedem Laden (Ursache „anderer Tab bearbeitet“, ADR 0005 Nachtrag); Dialoge unter NC-Kopfleiste; `[object Object]` durch frühes Upstream-`t()` (B54). Review (nur Sperre/Policy/Audio, Review-Stufen) FREIGABE, 2 MINOR in SPEC behoben; Bootstrap-Frist-Fix vom Lead geprüft.
+  Testnachweis: Build, check-upstream, check-forbidden-sql rc=0; PHPUnit sqlite Lock* 12 + Nachbarn 156 OK; E2E hell audio-record 18, search-count 13, lock-nolocks 20, dialogs 115, menu-501 89, stripped 126, lock-return 76, attachments-search 137; editor 2× 119 grün (nach Frist-Fix); dunkel dialogs 115.
 - Demo-Instanz für Thomas: `dev/demo/` (localhost:8090, PostgreSQL), Agenten fassen sie nie an; Update nach Commit per `dev/demo/update.sh`.
 - Offen für Thomas (vorläufig Lead): Q1 Embed-Domains ab Werk leer (Upstream: YouTube/Bilibili); Q2 Export für jeden mit Leserecht, „alle“-Exporte nur eigene Workspaces.
 
 ## Nächster Schritt
-M4a – Admin-Formular/Embed-Domains (B41, P17), „Neuer Workspace“, Probe Excalidraw-Bild unter CSP: architekt → speccritic → tester.
+M3-ui1 (Kanban- und „+“-Symbol an Ordnerzeilen, nur Tests), danach M4b. Offen für Thomas: Audio nur als Anhang, ohne Transkription bestätigen.

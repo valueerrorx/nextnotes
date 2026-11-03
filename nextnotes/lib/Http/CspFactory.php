@@ -11,13 +11,16 @@ namespace OCA\NextNotes\Http;
 
 use OCA\NextNotes\Service\EmbedDomainService;
 use OCP\AppFramework\Http\ContentSecurityPolicy;
+use OCP\AppFramework\Http\FeaturePolicy;
 
-/** Einzige Quelle für CSP-Abweichungen (ADR 0012); ohne ADR keine Ausnahme. */
+/** Einzige Quelle für CSP- und Feature-Policy-Abweichungen (ADR 0012); ohne ADR keine Ausnahme. */
 class CspFactory {
 	// Ansichten mit Notizanzeige: iframes (self) und Admin-Embed-Domains (EmbedDomainService)
 	private const NOTE_VIEWS = ['index', 'revisions', 'kanban_content'];
 	// Nur iframes (self): PDF-Vorschau der Anhang-Seite (P13, ADR 0012 Nachtrag M3c1)
 	private const SELF_FRAME_VIEWS = ['attachments'];
+	// Mikrofon (self) nur für die Audio-Aufnahme im Editor (ADR 0012 Nachtrag M3-fix4)
+	private const MICROPHONE_VIEWS = ['index'];
 
 	public function __construct(
 		private EmbedDomainService $embedDomains,
@@ -36,5 +39,13 @@ class CspFactory {
 			$csp->addAllowedFrameDomain("'self'");
 		}
 		return $csp;
+	}
+
+	public function featurePolicyForView(string $view): FeaturePolicy {
+		$policy = new FeaturePolicy();
+		if (in_array($view, self::MICROPHONE_VIEWS, true)) {
+			$policy->addAllowedMicrophoneDomain("'self'");
+		}
+		return $policy;
 	}
 }

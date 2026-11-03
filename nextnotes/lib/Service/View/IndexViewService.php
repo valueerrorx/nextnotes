@@ -102,6 +102,7 @@ class IndexViewService {
 	// Bis zur Portierung erzwungen ausgeblendet (ui-customization.js, __POZNOTE_GLOBAL_HIDDEN_UI_ELEMENTS__)
 	public const FORCED_HIDDEN = [
 		'wsmenu:edit-workspaces', // settings.php: M4
+		'slash:paste-markdown', // convert-html/convert-markdown 501 bis M4b
 	];
 	private const SPEED_DIAL_TAG = 'speed-dial';
 

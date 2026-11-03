@@ -185,14 +185,15 @@ final class LockServiceTest extends ApiTestCase {
 		self::assertSame(423, $a->call('PATCH', "/notes/$n", ['content' => '<p>a</p>'], $s1)->status, 'A/s1 nach Übernahme durch B');
 	}
 
-	// SPEC §11.2 B13: Speichern mit Sitzung ohne Sperre erwirbt sie; ohne Sitzung blockiert nur die Sperre eines anderen Kontos
-	public function testHttpSaveAcquiresLockAndSessionlessSave(): void {
+	// SPEC §11.2 B13/B53: Speichern legt keine Sperre an; ohne Sitzung blockiert nur die Sperre eines anderen Kontos
+	public function testHttpSaveDoesNotAcquireLockAndSessionlessSave(): void {
 		[$a, $b, , , $n] = $this->setUpShared();
 		self::assertNull(self::ok($a->call('GET', "/notes/$n/lock"), 'Status vorher')['lock']);
 		self::ok($a->call('PATCH', "/notes/$n", ['content' => '<p>1</p>'], ['X-Editor-Session-ID: b13-s1']), 'A/s1 speichert ohne Sperre');
-		$st = self::ok($a->call('GET', "/notes/$n/lock", null, ['X-Editor-Session-ID: b13-s1']), 'Status nachher')['lock'];
-		self::assertTrue($st['holder_is_current_editor_session'] ?? false, 'PATCH hat keine Sperre angelegt');
+		self::ok($a->call('POST', "/notes/$n/beacon", ['content' => '<p>1b</p>'], ['X-Editor-Session-ID: b13-s1']), 'A/s1 Beacon ohne Sperre');
+		self::assertNull(self::ok($a->call('GET', "/notes/$n/lock", null, ['X-Editor-Session-ID: b13-s1']), 'Status nach PATCH')['lock'], 'PATCH/Beacon hat eine Sperre angelegt');
 
+		self::ok($a->call('POST', "/notes/$n/lock", ['editor_session_id' => 'b13-s1'], ['X-Editor-Session-ID: b13-s1']), 'A/s1 erwirbt');
 		$s2 = ['X-Editor-Session-ID: b13-s2'];
 		self::assertSame(409, $a->call('POST', "/notes/$n/lock", ['editor_session_id' => 'b13-s2'], $s2)->status, 'A/s2 erwirbt');
 		self::assertSame(423, $a->call('PATCH', "/notes/$n", ['content' => '<p>2</p>'], $s2)->status, 'A/s2 speichert');
