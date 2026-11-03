@@ -4,7 +4,7 @@
 -->
 # Testsetup Next Notes (nur Tests, nicht für den Betrieb)
 
-Benötigt: Docker mit Compose v2 (Profile; getestet mit 5.6.1), `curl`, `jq`, `xmllint`, `php` auf dem Host (Schematest, `make -C nextnotes check-upstream`), Node 20+ (Build `make -C nextnotes build` mit esbuild aus `nextnotes/build/`, einmalig mit Netz `npm ci --prefix nextnotes/build`; danach offline) und `/usr/bin/chromium` (CSP-Prüfung; `playwright-core` wird lokal per `npm ci` in `dev/nextcloud/` installiert, ohne Browser-Download; anderer Pfad über `CHROMIUM=`).
+Benötigt: Docker mit Compose v2 (Profile; getestet mit 5.6.1), `curl`, `jq`, `xmllint`, `php` auf dem Host (Schematest, `make -C nextnotes check-upstream`), Node 20+ (Build `make -C nextnotes build` mit esbuild aus `nextnotes/build/`, einmalig mit Netz `npm ci --prefix nextnotes/build`; danach offline) und `/usr/bin/chromium` (CSP-Prüfung, `check-upstream` (e2); `playwright-core` wird lokal per `npm ci` in `dev/nextcloud/` installiert, ohne Browser-Download; anderer Pfad über `CHROMIUM=`).
 Images (gepinnt): `nextcloud:35.0.2-apache`, `nextcloud:35.0.2-fpm`, `nginx:1.30.6-alpine`, `mariadb:11.4.13`, `postgres:17.11-alpine` (so getestet).
 Die App wird in den Container **kopiert**, nie gemountet: `occ app:remove` löscht das App-Verzeichnis.
 

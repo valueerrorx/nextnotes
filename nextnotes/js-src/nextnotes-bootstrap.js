@@ -32,6 +32,56 @@
 	window.ALLOWED_IFRAME_DOMAINS = Array.isArray(config.allowedIframeDomains) ? config.allowedIframeDomains : [];
 	window.EXCALIDRAW_ASSET_PATH = config.excalidrawAssetPath || '';
 	window.__POZNOTE_HIDDEN_UI_ELEMENTS__ = Array.isArray(config.hiddenUiElements) ? config.hiddenUiElements : [];
+	window.__POZNOTE_GLOBAL_HIDDEN_UI_ELEMENTS__ = Array.isArray(config.globalHiddenUiElements) ? config.globalHiddenUiElements : [];
+	var prefetched = config.prefetchedSettings && typeof config.prefetchedSettings === 'object' ? config.prefetchedSettings : {};
+
+	// JSON-Inseln der Seite (Templates, SPEC §4.6) statt Upstream-Inline-Skripte
+	function readIsland(id) {
+		var el = document.getElementById(id);
+		if (!el) return null;
+		try {
+			return JSON.parse(el.textContent || 'null');
+		} catch (e) {
+			console.warn('nextnotes: JSON-Insel ' + id + ' unlesbar', e);
+			return null;
+		}
+	}
+
+	// Globals der Upstream-Inline-Skripte (index.php, icon_sidebar.php); nur bekannte Namen
+	var GLOBALS = ['DEFAULT_NOTE_TITLES', 'PoznoteMentionMembers', 'TAG_COLORS', 'NOTE_COLOR_PALETTE', 'PoznoteActiveAccountIsOwn', 'calendarTranslations', 'NOTIFICATIONS_TXT'];
+	var pageGlobals = readIsland('nextnotes-globals') || {};
+	GLOBALS.forEach(function (name) {
+		if (Object.prototype.hasOwnProperty.call(pageGlobals, name)) window[name] = pageGlobals[name];
+	});
+
+	// <body>-Klassen/-Attribute und frühe Zustände (Upstream index.php:392-425, 635; icon_sidebar.php:480-499)
+	function applyPageState(state) {
+		if (!state || !document.body) return;
+		var body = document.body;
+		var root = document.documentElement;
+		(state.classes || []).forEach(function (c) { body.classList.add(c); });
+		(state.htmlClasses || []).forEach(function (c) { root.classList.add(c); });
+		Object.keys(state.data || {}).forEach(function (k) { body.setAttribute('data-' + k, String(state.data[k])); });
+		Object.keys(state.style || {}).forEach(function (k) { body.style.setProperty(k, String(state.style[k])); });
+		Object.keys(state.rootStyle || {}).forEach(function (k) { root.style.setProperty(k, String(state.rootStyle[k])); });
+		try {
+			var stored = localStorage.getItem('outlineCollapsed');
+			if (window.innerWidth > 800 && (stored === null || stored === 'true')) root.classList.add('outline-collapsed');
+			if (localStorage.getItem('iconSidebarCollapsed') === 'true') body.classList.add('icon-sidebar-collapsed');
+			var focusParam = new URLSearchParams(window.location.search).get('focus');
+			var focus = focusParam === '1' || focusParam === '0' ? focusParam : localStorage.getItem('focusMode');
+			if (focus === '1' || focus === '2' || focus === 'true') root.classList.add('focus-mode');
+		} catch (e) { /* ohne localStorage Standardzustand */ }
+		// Serverseitig gewählter Workspace in die URL (Skripte lesen location.search)
+		if (state.replaceWorkspace) {
+			try {
+				var url = new URL(window.location.href);
+				url.searchParams.set('workspace', state.replaceWorkspace);
+				history.replaceState(history.state, '', url);
+			} catch (e) { /* URL bleibt */ }
+		}
+	}
+	applyPageState(readIsland('nextnotes-body'));
 
 	// 2. URL-Präfix für Upstream-Pfade
 	function rewrite(url) {
@@ -63,6 +113,18 @@
 		}
 	}
 
+	// Vom Server mitgelieferte Einstellung (InitialState) → kein GET beim Seitenaufbau
+	function prefetchedKey(url) {
+		try {
+			var path = new URL(url, window.location.href).pathname;
+			var prefix = apiBase + '/settings/';
+			var key = path.indexOf(prefix) === 0 ? path.slice(prefix.length) : '';
+			return key !== '' && Object.prototype.hasOwnProperty.call(prefetched, key) ? key : null;
+		} catch (e) {
+			return null;
+		}
+	}
+
 	function token() {
 		return (document.head && document.head.dataset.requesttoken) || (window.OC && window.OC.requestToken) || '';
 	}
@@ -91,6 +153,12 @@
 			var body = JSON.stringify({ success: true, lang: i18n.lang, strings: i18n.strings });
 			return Promise.resolve(new Response(body, { status: 200, headers: { 'Content-Type': 'application/json' } }));
 		}
+		var method = String((init && init.method) || (isRequest ? input.method : 'GET')).toUpperCase();
+		var settingKey = prefetchedKey(target);
+		if (settingKey && method === 'GET') {
+			var answer = JSON.stringify({ success: true, key: settingKey, value: prefetched[settingKey] });
+			return Promise.resolve(new Response(answer, { status: 200, headers: { 'Content-Type': 'application/json' } }));
+		}
 		if (!isAppCall(target)) {
 			return nativeFetch.call(this, target === url ? input : target, init);
 		}
@@ -102,23 +170,36 @@
 		var req = isRequest ? new Request(target, input) : target;
 		return nativeFetch.call(this, req, opts).then(function (resp) {
 			if (resp.status === 401) on401();
+			if (settingKey && method === 'PUT' && resp.ok) {
+				resp.clone().json().then(function (data) {
+					if (data && data.success) prefetched[settingKey] = data.value;
+				}).catch(function () { delete prefetched[settingKey]; });
+			}
 			return resp;
 		});
 	};
 
 	// 5. XMLHttpRequest
+	// Header nur setzen, wenn weder Aufrufer noch NC-Kern (core/src/utils/xhr-request.js) es taten: XHR hängt sonst an
 	var nativeOpen = XMLHttpRequest.prototype.open;
 	var nativeSend = XMLHttpRequest.prototype.send;
+	var nativeSetHeader = XMLHttpRequest.prototype.setRequestHeader;
+	XMLHttpRequest.prototype.setRequestHeader = function (name) {
+		if (this.__nnHeaders) this.__nnHeaders[String(name).toLowerCase()] = true;
+		return nativeSetHeader.apply(this, arguments);
+	};
 	XMLHttpRequest.prototype.open = function (method, url) {
 		var args = Array.prototype.slice.call(arguments);
 		args[1] = rewrite(String(url));
 		this.__nnApp = isAppCall(args[1]);
+		this.__nnHeaders = {};
 		return nativeOpen.apply(this, args);
 	};
 	XMLHttpRequest.prototype.send = function () {
 		if (this.__nnApp) {
-			this.setRequestHeader('requesttoken', token());
-			this.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+			var set = this.__nnHeaders || {};
+			if (!set.requesttoken) this.setRequestHeader('requesttoken', token());
+			if (!set['x-requested-with']) this.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
 			this.addEventListener('loadend', function () {
 				if (this.status === 401) on401();
 			});

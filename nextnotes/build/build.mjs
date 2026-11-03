@@ -1,16 +1,18 @@
 // SPDX-FileCopyrightText: 2026 Thomas Weissel
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Build der App-Assets aus src/ (SPEC §1.2, M3-Plan §1.1); deterministisch, ohne Netz.
-// Aufruf: node build/build.mjs (cwd = nextnotes/); MINIFY=0 schaltet Minify ab, SRC= anderes src/.
+// Aufruf: node build/build.mjs (cwd = nextnotes/); MINIFY=0 schaltet Minify ab, SRC= anderes src/, OUT_DIR= anderes Ziel.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { bumpSpecificity, checkBumped, findBumpAfterPseudo } from './css-bump.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const app = path.resolve(here, '..');
 const src = path.resolve(process.env.SRC ?? path.join(app, '..', 'src'));
 const pub = path.join(src, 'public');
+const outDir = path.resolve(process.env.OUT_DIR ?? app);
 const minify = process.env.MINIFY !== '0';
 
 let esbuild;
@@ -22,7 +24,7 @@ try {
 }
 
 // Ausgaben vorher leeren (deterministisch)
-for (const d of ['js', 'css', 'i18n']) fs.rmSync(path.join(app, d), { recursive: true, force: true });
+for (const d of ['js', 'css', 'i18n']) fs.rmSync(path.join(outDir, d), { recursive: true, force: true });
 
 const bundles = JSON.parse(fs.readFileSync(path.join(here, 'bundles.json'), 'utf8'));
 const outputs = new Set();
@@ -39,7 +41,7 @@ function read(rel) {
 }
 
 function write(rel, data) {
-	const file = path.join(app, rel);
+	const file = path.join(outDir, rel);
 	fs.mkdirSync(path.dirname(file), { recursive: true });
 	fs.writeFileSync(file, data);
 	outputs.add(rel);
@@ -110,8 +112,21 @@ function rewriteFontFamily(css) {
 	return css.replace(/(font(?:-family)?\s*:)([^;{}]*)/gi, (m, prop, value) => prop + value.replace(family, `$1$2${r.to}`));
 }
 
+// Spezifitäts-Zusatz (ADR 0017, css-bump.mjs); Regelzahl gleich, kein Zusatz hinter Pseudo-Element
 function cssFile(rel, outRel) {
-	return rewriteUrls(rewriteFontFamily(stripFontFaces(read(rel))), rel, outRel);
+	const before = rewriteUrls(rewriteFontFamily(stripFontFaces(read(rel))), rel, outRel);
+	const after = bumpSpecificity(before);
+	const errors = checkBumped(before, after);
+	if (errors.length) die(`${rel}: ${errors.slice(0, 5).join('; ')}`);
+	return after;
+}
+
+// Minifizierte Ausgabe erneut prüfen (esbuild darf Selektoren nicht umstellen)
+function writeCss(name, code) {
+	const min = minifyCss(code, name);
+	const bad = findBumpAfterPseudo(min);
+	if (bad.length) die(`${name}: Zusatz hinter Pseudo-Element: ${bad.slice(0, 5).join(' ')}`);
+	write(name, min);
 }
 
 // 1. JS-Gruppen wie index_js.php
@@ -128,13 +143,13 @@ for (const f of bundles.jsSingle) {
 for (const [group, files] of Object.entries(bundles.css)) {
 	const name = `css/nextnotes-${group}.css`;
 	const code = files.map((f) => `/* --- ${f} --- */\n${cssFile(f, name)}\n`).join('');
-	write(name, minifyCss(code, name));
+	writeCss(name, code);
 }
 for (const [out, def] of Object.entries(bundles.cssSingle)) {
 	const name = `css/${out}.css`;
 	let code = cssFile(def.src, name);
 	if (def.media) code = `@media ${def.media} {\n${code}\n}\n`;
-	write(name, minifyCss(code, name));
+	writeCss(name, code);
 }
 for (const f of walk(path.join(app, 'css-src'))) {
 	write(`css/${f}`, fs.readFileSync(path.join(app, 'css-src', f)));
@@ -161,13 +176,18 @@ function merge(base, over) {
 }
 const i18nDir = path.join(src, 'i18n');
 const en = JSON.parse(fs.readFileSync(path.join(i18nDir, 'en.json'), 'utf8'));
+const newNoteTitles = [];
 for (const f of fs.readdirSync(i18nDir).filter((n) => /^[a-z]{2}(-[a-z]{2})?\.json$/.test(n)).sort()) {
 	const lang = f.slice(0, -5);
 	const raw = fs.readFileSync(path.join(i18nDir, f));
 	write(`i18n/${f}`, raw);
 	const strings = lang === 'en' ? en : merge(en, JSON.parse(raw.toString('utf8')));
 	write(`js/i18n/nextnotes-i18n-${lang}.js`, `window.__NEXTNOTES_I18N__=${JSON.stringify({ lang, strings })};\n`);
+	const title = strings?.index?.note?.new_note;
+	if (typeof title === 'string' && title.trim() !== '' && !newNoteTitles.includes(title)) newNoteTitles.push(title);
 }
+// Standardtitel aller Sprachen (Upstream getDefaultNoteTitles) für PageTranslator
+write('i18n/default-note-titles.json', JSON.stringify(newNoteTitles) + '\n');
 
 // 5. Eigene Adapter
 for (const f of walk(path.join(app, 'js-src'))) {

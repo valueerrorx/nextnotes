@@ -11,11 +11,14 @@ namespace OCA\NextNotes\Controller;
 
 use OCA\NextNotes\AppInfo\Application;
 use OCA\NextNotes\Http\CspFactory;
+use OCA\NextNotes\Service\Exception\NotFoundException;
 use OCA\NextNotes\Service\SettingsService;
+use OCA\NextNotes\Service\View\IndexViewService;
 use OCA\NextNotes\Service\View\PageAssets;
 use OCA\NextNotes\Service\View\PageTranslator;
 use OCP\App\IAppManager;
 use OCP\AppFramework\Controller;
+use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\RedirectResponse;
@@ -36,11 +39,12 @@ class PageController extends Controller {
 		private IURLGenerator $urls,
 		private IAppManager $appManager,
 		private SettingsService $settings,
+		private IndexViewService $indexView,
 	) {
 		parent::__construct(Application::APP_ID, $request);
 	}
 
-	// M3a1: leere Seite mit allen Assets der Hauptansicht; Inhalt folgt in M3a2
+	// Hauptansicht (Upstream index.php); fremde/unbekannte ?note= → NC-404 ohne Inhalt
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
 	public function index(): TemplateResponse {
@@ -48,8 +52,20 @@ class PageController extends Controller {
 		$uid = $user?->getUID() ?? '';
 		$lang = $this->translator->languageFor($this->settings->read($uid, 'language'));
 		$this->translator->setLanguage($lang);
-		$this->assets->index($lang);
 		$baseUrl = $this->urls->linkToRoute('nextnotes.page.index');
+		try {
+			$view = $this->indexView->build($uid, $baseUrl, [
+				'note' => $this->request->getParam('note'),
+				'workspace' => $this->request->getParam('workspace'),
+				'folder' => $this->request->getParam('folder'),
+				'open_folder' => $this->request->getParam('open_folder'),
+			]);
+		} catch (NotFoundException) {
+			$response = new TemplateResponse('core', '404', [], TemplateResponse::RENDER_AS_GUEST);
+			$response->setStatus(Http::STATUS_NOT_FOUND);
+			return $response;
+		}
+		$this->assets->index($lang);
 		$assetBase = $this->appManager->getAppWebPath(Application::APP_ID);
 		$this->initialState->provideInitialState('config', [
 			'baseUrl' => $baseUrl,
@@ -61,9 +77,15 @@ class PageController extends Controller {
 			'teamsAvailable' => false, // M5
 			'excalidrawAssetPath' => $assetBase . '/js/vendor/excalidraw-dist/',
 			'allowedIframeDomains' => $this->cspFactory->embedDomains(),
-			'hiddenUiElements' => [],
+			'hiddenUiElements' => $view['hiddenUiElements']['user'],
+			'globalHiddenUiElements' => $view['hiddenUiElements']['forced'],
+			'prefetchedSettings' => $view['prefetchedSettings'],
 		]);
-		return $this->page('main', 'index', ['tr' => $this->translator]);
+		return $this->page('index', 'index', [
+			'tr' => $this->translator,
+			'view' => $view,
+			'baseUrl' => $baseUrl,
+		]);
 	}
 
 	// Spike ADR 0004, leere Seite bis M4

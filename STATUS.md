@@ -1,6 +1,6 @@
 # Status Nextcloud-Port „Next Notes“
 
-**Aktueller Meilenstein:** M3 – Frontend-Grundlage und Editor (M3a1 fertig, weiter M3a2); M1, M2 fertig
+**Aktueller Meilenstein:** M3 – Frontend-Grundlage und Editor (M3a1, M3a2 fertig, weiter M3b); M1, M2 fertig
 
 ## Erledigte Slices
 - Setup: Branch `nextcloud-port`, Agenten unter `.claude/agents/`, `UPSTREAM.md`
@@ -66,6 +66,12 @@ Vorläufig (M2d):
 - M3a1 erledigt: reproduzierbarer Build (`make -C nextnotes build`, esbuild + Lockfile, offline), `check-upstream`, Adapter `nextnotes-bootstrap.js`/`nextnotes-late.js` (Token nur an App-Pfad, 401-Reload-Schutz), i18n als gecachte Datei je Sprache, Theme-Tokens Hell/Dunkel, Schrift folgt NC (`Inter` → `var(--font-face)`, inkl. Legasthenie-Schrift). Keine Änderung in `src/`. Review `M3a1-diff-r1` (BLOCKER: Schrift, ADR-0016-Doku) → `M3a1-diff-r2` (FREIGABE).
   Testnachweis (tester, frische Instanzen NC 35.0.2): Build 2× (2. offline) sha256 identisch, 122 Dateien; check-upstream 0 + 7 Gegenproben rot; E2E `assets.mjs` 82 Prüfungen je Theme grün auf Apache und nginx (0 CSP, 0 Konsolenfehler, 0 ≥400); Budget JS 997 KB/CSS 136 KB gz, 3 API-Requests, TTFB 21 ms; `run-m3.sh sqlite nginx`, `run-m2.sh` (3 DBs), `run-m1.sh` Exit 0; `down.sh all` 0.
 
+- M3a2 erledigt: Hauptansicht im NC-Rahmen (Icon-Leiste, Workspace-Auswahl, Ordnerbaum, Notizliste), `IndexViewService` + `templates/index.php`/`partials/` (nicht `parts/`, Upstream-`.gitignore`), Gestrichenes/M4 in Menüs ausgeblendet, Navigation, fremde/ungültige `?note=` → NC-404, B27 (Ordner per Ahnenkette), B28 (GET ohne Setting-Schreiben; Ausnahme Erstanlage Standard-Workspace §4.4), B29 (doppelter Tasklist-Request). P4/P8 entfallen (SPEC §11.1). Keine Änderung in `src/`.
+  Lead ADR 0017 (Scope-Zuwachs, technisch): Upstream-CSS im Build um +1 ID-Stelle gehoben (`build/css-bump.mjs`), reine Element-Regeln nicht auf NC-Kopf/Popover/Dialoge/Toasts; Prüfung `build/check-css.mjs` (Chromium als Parser, Regelzahl vor/nach gleich, kein Zusatz hinter Pseudo-Element) in `check-upstream` (e2). `check-upstream` braucht Chromium. Review `M3a2-diff-r1` (BLOCKER: ~27 Selektoren hinter Pseudo-Elementen ungültig, Scrollbalken-Regeln fielen still weg) → `M3a2-diff-r2` (FREIGABE). Tester-Befund Dunkel: `*`-Regel traf `#header` selbst → `NOT_NC_CHROME` schließt Elemente selbst aus (Lead-Fix).
+  Lead: `KNOWN_MISSING` in `e2e/stripped.mjs` bleibt vorläufig – Kanban (404 + CSP `script-src-attr` aus `nextnotes-app.js:38`) → M3c; „Ordner/Notiz verschieben“ (pageerror bzw. Konsolenfehler), „+“-Menü ohne Funktion → M3b. Müssen bis M3c-Abschluss leer sein.
+  Testnachweis (tester, frische Instanzen NC 35.0.2, nach allen Fixes): Build 2× (2. offline) identisch, 123 Dateien; check-upstream 0 inkl. (e2), Gegenproben `Inter`/Zusatz hinter Pseudo-Element rot; `run-m3.sh sqlite mariadb pgsql nginx` Exit 0: PHPUnit 231/7404 auf 3 DBs, E2E 20/20 (assets, budget, frame, stripped, xss; Hell/Dunkel; Apache/nginx), Regel-Scan NC-Kopf 24× PASS inkl. geöffneter NC-Menüs, Scrollbalken-Regeln vorhanden; Budget 1 API-Request, keine Duplikate, JS 998 KB/CSS 139 KB gz, TTFB ~25 ms; `run-m1.sh` (4 Umgebungen) und `run-m2.sh` (3 DBs) Exit 0 (nach Build-Fix, vor einzeiligem CSS-Fix); `down.sh all` 0.
+  Lead: Teststufen eingeführt (`.claude/agents/tester.md`): Nachlauf ≤ 10 min nur betroffene Tests, Slice ≤ 30 min sqlite + ein Webserver, volle Matrix nur am Meilenstein-Ende (Feedback Thomas: Tests zu lang).
+
 ## M2 (fertig)
 - Plan `docs/slices/M2-plan.md` r1: Slices M2a (Gerüst, Rechte, Notizen/Ordner/Workspaces/Tags/Papierkorb, M1-Nacharbeit), M2b (Anhänge, Snapshots, Suche, Sperre, Unified Search), M2c (Tasks, Mentions, Erinnerungen, Settings, Konvertierung), M2d (Kontolöschung, Abschlusslauf 3 DBs)
 
@@ -87,9 +93,10 @@ Vorläufig (M2d):
 ## Nacharbeit (vor/mit M2)
 - erledigt in M2a
 - erledigt in M2d: SQLite-503
-- M3a2: doppelter `settings/tasklist_insert_order` beim Seitenaufbau beseitigen und `KNOWN_DUPLICATES` in `budget.mjs` leeren; `X-Requested-With` bei XHR nicht doppelt setzen
+- erledigt in M3a2: doppelter Tasklist-Request, doppeltes `X-Requested-With`, `Inter`-Prüfung
 - M4: `allowed_iframe_domains` im Admin-Formular auch mit Schema (`https://…`) annehmen bzw. normalisieren, Fehler melden statt still verwerfen
-- M3a2: `check-upstream` prüft zusätzlich, dass die gebaute CSS kein `Inter` mehr enthält (M3a1-diff-r2)
+- M3b: Suche schreibt `requesttoken` per History-Update in die URL (mit Such-POST beheben); an `body` angehängte Poznote-Elemente ohne Formular-Reset prüfen; eigene Overrides brauchen Spezifität ≥ 1,1,0
+- Hinweis: CSS-Nesting (`&`) zählt `check-css` nicht mit – bei Upstream-Updates beachten
 
 ## Nächster Schritt
-M3a2 – Seitenrahmen Hauptansicht, Gestrichenes, Navigation (Plan §2 M3a2) inkl. Nacharbeit oben: architekt → tester + speccritic.
+M3b – Editor, Anhänge, Mermaid/KaTeX, Beacon, Sperre, Suche (Plan §2 M3b) inkl. Nacharbeit oben und `KNOWN_MISSING`-Einträge für M3b: architekt → tester + speccritic.

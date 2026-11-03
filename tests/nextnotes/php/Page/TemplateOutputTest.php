@@ -1,0 +1,98 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * SPDX-FileCopyrightText: 2026 Thomas Weissel
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+namespace OCA\NextNotes\Tests\Page;
+
+use OCP\App\IAppManager;
+use OCP\Server;
+use PHPUnit\Framework\TestCase;
+
+// Done M3a2 4 / SPEC §4.6 Ausgaberegel: Grep-Allowlist print_unescaped, JSON-Flags, keine Inline-Skripte/Handler in Templates
+final class TemplateOutputTest extends TestCase {
+	// Erlaubte print_unescaped-Stellen: Datei => Liste der exakten Argumente (Reihenfolge egal)
+	private const ALLOW = [
+		'index.php' => ['json_encode($islandData, $jsonFlags)'],
+	];
+
+	/** @return array<string, string> relativer Pfad => Inhalt */
+	private static function templates(): array {
+		$dir = Server::get(IAppManager::class)->getAppPath('nextnotes') . '/templates';
+		$out = [];
+		$it = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS));
+		foreach ($it as $f) {
+			if ($f->isFile() && str_ends_with($f->getFilename(), '.php')) {
+				$out[substr($f->getPathname(), strlen($dir) + 1)] = (string)file_get_contents($f->getPathname());
+			}
+		}
+		ksort($out);
+		self::assertArrayHasKey('index.php', $out, 'templates/index.php fehlt');
+		return $out;
+	}
+
+	public function testPrintUnescapedOnlyAllowlisted(): void {
+		$found = [];
+		foreach (self::templates() as $file => $src) {
+			preg_match_all('/print_unescaped\s*\((.*?)\)\s*;\s*\?>/s', $src, $m);
+			$total = substr_count($src, 'print_unescaped');
+			self::assertSame($total, count($m[1]), "$file: print_unescaped in unerwarteter Form");
+			foreach ($m[1] as $arg) {
+				$found[$file][] = trim($arg);
+			}
+		}
+		foreach ($found as $file => $args) {
+			$allowed = self::ALLOW[$file] ?? [];
+			sort($args);
+			sort($allowed);
+			self::assertSame($allowed, $args, "$file: print_unescaped außerhalb der Allowlist");
+		}
+		self::assertSame(1, count($found['index.php'] ?? []), 'templates/index.php: genau ein print_unescaped (JSON-Inseln)');
+	}
+
+	public function testJsonIslandFlags(): void {
+		$src = self::templates()['index.php'];
+		self::assertMatchesRegularExpression('/\$jsonFlags\s*=\s*([^;]+);/', $src);
+		preg_match('/\$jsonFlags\s*=\s*([^;]+);/', $src, $m);
+		foreach (['JSON_HEX_TAG', 'JSON_HEX_AMP', 'JSON_HEX_APOS', 'JSON_HEX_QUOT'] as $flag) {
+			self::assertStringContainsString($flag, $m[1], "JSON-Inseln ohne $flag");
+		}
+		self::assertStringNotContainsString('JSON_UNESCAPED_SLASHES', $m[1], 'JSON_UNESCAPED_SLASHES würde </script> zulassen');
+		// jede JSON-Insel als type="application/json"
+		preg_match_all('/<script\b([^>]*)>/i', $src, $s);
+		foreach ($s[1] as $attrs) {
+			self::assertMatchesRegularExpression('/type="application\/json"/', $attrs, 'Skript-Tag ohne type="application/json"');
+		}
+	}
+
+	public function testNoRawOutputOrInlineCode(): void {
+		foreach (self::templates() as $file => $src) {
+			self::assertStringNotContainsString('<?=', $src, "$file: Kurz-Echo ohne Escaping");
+			self::assertDoesNotMatchRegularExpression('/<\?php[^?]*\b(echo|print)\b(?!_unescaped)/', $src, "$file: echo/print ohne Escaping");
+			self::assertDoesNotMatchRegularExpression('/\son[a-z]+\s*=\s*["\']/i', $src, "$file: Inline-Handler on…=");
+			self::assertStringNotContainsStringIgnoringCase('javascript:', $src, "$file: javascript:-URL");
+			preg_match_all('/<script\b([^>]*)>/i', $src, $s);
+			foreach ($s[1] as $attrs) {
+				self::assertMatchesRegularExpression('/type="application\/json"/', $attrs, "$file: ausführbares Inline-Skript");
+			}
+			// data-action nur mit festen Werten (Literal oder Menü-Hilfe p($action) mit Literal-Aufrufen)
+			preg_match_all('/data-action="<\?php\s+p\((.*?)\);\s*\?>"/', $src, $d);
+			foreach ($d[1] as $expr) {
+				self::assertSame('$action', trim($expr), "$file: data-action aus Ausdruck $expr");
+			}
+			preg_match_all('/\$menuItem\(\s*\$\w+\s*,\s*([^,]+),/', $src, $mi);
+			foreach ($mi[1] as $a) {
+				self::assertMatchesRegularExpression("/^'[a-z-]+'$/", trim($a), "$file: Menü-data-action nicht literal: $a");
+			}
+			// style nur mit p() serverseitig geprüfter Werte (SPEC §4.6 Ausnahme)
+			preg_match_all('/style="([^"]*<\?php.*?)"/', $src, $st);
+			foreach ($st[1] as $style) {
+				self::assertMatchesRegularExpression('/^[^<]*(<\?php\s+p\([^;]+\);\s*\?>[^<]*)+$/', $style, "$file: style ohne p(): $style");
+			}
+		}
+	}
+}

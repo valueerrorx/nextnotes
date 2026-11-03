@@ -17,6 +17,8 @@ class PageTranslator {
 	private string $lang = 'en';
 	/** @var array<string, array<string, mixed>> */
 	private array $dicts = [];
+	/** @var ?string[] */
+	private ?array $defaultTitles = null;
 
 	public function __construct(
 		private IAppManager $appManager,
@@ -54,6 +56,16 @@ class PageTranslator {
 	/** @param array<string, scalar> $vars */
 	public function h(string $key, array $vars = [], ?string $default = null): string {
 		return htmlspecialchars($this->t($key, $vars, $default), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+	}
+
+	/** @return string[] Standardtitel neuer Notizen aller Sprachen (Upstream getDefaultNoteTitles; Build: i18n/default-note-titles.json) */
+	public function defaultNoteTitles(): array {
+		if ($this->defaultTitles === null) {
+			$file = $this->appManager->getAppPath(Application::APP_ID) . '/i18n/default-note-titles.json';
+			$data = is_file($file) ? json_decode((string)file_get_contents($file), true) : null;
+			$this->defaultTitles = is_array($data) && $data !== [] ? array_values(array_filter($data, 'is_string')) : ['New note'];
+		}
+		return $this->defaultTitles;
 	}
 
 	private function lookup(string $lang, string $key): ?string {

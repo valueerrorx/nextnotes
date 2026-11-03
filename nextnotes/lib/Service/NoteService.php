@@ -1004,7 +1004,7 @@ class NoteService {
 		}
 		$siblings = $this->notes->findList([$wsId], ['folder_id' => $folderId, 'exclude_id' => $noteId]);
 		$mode = $this->settings->noteListSort($uid);
-		usort($siblings, fn (Note $a, Note $b) => $this->compareNotes($mode, $a, $b));
+		usort($siblings, fn (Note $a, Note $b) => self::compareNotes($mode, $a, $b));
 		$order = array_map(static fn (Note $n) => (int)$n->getId(), $siblings);
 		$byId = [$noteId => $note];
 		foreach ($siblings as $s) {
@@ -1058,7 +1058,7 @@ class NoteService {
 	}
 
 	// Upstream poznoteCompareNotes
-	private function compareNotes(string $mode, Note $a, Note $b): int {
+	public static function compareNotes(string $mode, Note $a, Note $b): int {
 		$byHeading = static fn () => strnatcasecmp(mb_strtolower((string)$a->getHeading()), mb_strtolower((string)$b->getHeading())) ?: ((int)$a->getId() <=> (int)$b->getId());
 		$rank = static fn (?string $t) => ['note' => 0, 'markdown' => 1, 'tasklist' => 2, 'excalidraw' => 3, 'linked' => 4][$t ?: 'note'] ?? 5;
 		return match ($mode) {

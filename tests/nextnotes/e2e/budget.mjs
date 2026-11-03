@@ -11,9 +11,7 @@ const LIMIT_CSS = 230 * KB;
 const LIMIT_API = 8;
 const LIMIT_TTFB_MS = 500;
 // Bekannte doppelte API-Requests: nur mit Begründung und Slice, in dem sie behoben werden
-const KNOWN_DUPLICATES = {
-	'GET settings/tasklist_insert_order': 'M3a1-Befund (Upstream lädt die Einstellung zweimal), an Lead gemeldet; Behebung/Entscheidung M3a2',
-};
+const KNOWN_DUPLICATES = {};
 
 await runSpec(import.meta.url, async (ctx, page, context) => {
 	const path = process.env.NN_BUDGET_PATH ?? 'index.php';

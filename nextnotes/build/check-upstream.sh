@@ -2,7 +2,8 @@
 # SPDX-FileCopyrightText: 2026 Thomas Weissel
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # check-upstream (ADR 0007, M3-Teil): (a) src/-Diff = upstream-patches.txt, (b) Bundles = Upstream-Listen,
-# (c) Kopfkommentar der Templates, (d) Adapter-Namen in src/. Voraussetzung: git, Host-php, node. SRC= prüft (b)/(d) in einer Kopie.
+# (c) Kopfkommentar der Templates, (d) Adapter-Namen in src/, (e) gebaute CSS ohne 'Inter', (e2) Spezifitäts-Zusatz mit Chromium geprüft (ADR 0017).
+# Voraussetzung: git, Host-php, node, Chromium (CHROMIUM=). SRC= prüft (b)/(d)/(e2) in einer Kopie, OUT_DIR= anderes Build-Ziel.
 set -euo pipefail
 app="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 repo="$(cd "$app/.." && pwd)"
@@ -39,6 +40,20 @@ while IFS= read -r t; do
 	fi
 done < <(find "$app/templates" -type f -name '*.php' | sort)
 if [[ $fail -eq 0 ]]; then echo "check-upstream (c): Template-Kopfkommentare vorhanden"; fi
+
+# (e) Gebaute CSS ohne Upstream-Schrift Inter (ADR 0016); setzt make build voraus
+css_out="${OUT_DIR:-$app}/css"
+if ! compgen -G "$css_out/nextnotes-core.css" >/dev/null; then
+	err "Build-Ausgabe css/ fehlt (zuerst make build)"
+elif hits="$(grep -rlw 'Inter' "$css_out" --include='*.css')"; then
+	err "Schrift 'Inter' in gebauter CSS: ${hits//$'\n'/ }"
+else
+	echo "check-upstream (e): gebaute CSS ohne 'Inter'"
+fi
+# (e2) Zusatz nicht hinter Pseudo-Element, Stilregeln vor/nach Zusatz gleich, keine Regel nur durch Zusatz ungültig
+if compgen -G "$css_out/nextnotes-core.css" >/dev/null; then
+	node "$app/build/check-css.mjs" "$src" "$css_out" || fail=1
+fi
 
 if [[ $fail -ne 0 ]]; then
 	echo "check-upstream: ROT" >&2

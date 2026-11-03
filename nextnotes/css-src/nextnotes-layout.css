@@ -47,3 +47,33 @@ html.nextnotes-ready #app-content {
 		visibility: visible;
 	}
 }
+
+/* App-Symbol statt Poznote-Logo in der Icon-Leiste */
+#nextnotes-root .poznote-logo.nextnotes-logo {
+	-webkit-mask-image: url(../img/app.svg);
+	mask-image: url(../img/app.svg);
+}
+
+/*
+ * Reset gegen NC-Kern-CSS (server.css: button/input/select/textarea, max. Spezifität 0,4,1) im App-Bereich:
+ * zurück auf Browser-Standard wie in Poznote; Upstream-Regeln (+1 ID-Stelle, ADR 0017) setzen sich durch.
+ */
+:where(#nextnotes-root) :is(button, input, select, textarea):not(.nn-r1):not(.nn-r2):not(.nn-r3):not(.nn-r4):not(.nn-r5) {
+	width: revert;
+	height: revert;
+	min-height: revert;
+	margin: revert;
+	padding: revert;
+	border: revert;
+	border-radius: revert;
+	background: revert;
+	color: revert;
+	font-size: revert;
+	font-weight: revert;
+	line-height: revert;
+	cursor: revert;
+	outline: revert;
+	box-shadow: revert;
+	appearance: revert;
+	opacity: revert;
+}
