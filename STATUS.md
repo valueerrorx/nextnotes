@@ -116,6 +116,10 @@ Vorläufig (M2d):
   Reviews `M3c2-diff-r1` (BLOCKER) → `r2` (BLOCKER) → Lead-Entscheid nach 2 Runden: Befunde (Sanitizer-DoS/Datenverlust) in r3–r6 behoben, per Fuzz/Lasttest belegt; `M3c2-diff-r3` (BLOCKER Suchtext-Paketlimit) → r8 behoben und getestet.
   Testnachweis: sqlite Teil 1 (B37–B39, ExcalidrawSave u. a. 97 Tests; 16-MiB-Angriffsformen ≤ 0,5 s → 413; Fuzz 3×300k ohne verbliebene Handler), E2E `excalidraw` Hell/Dunkel je 46, 0 CSP. **M3-Abschluss volle Matrix:** `run-m3.sh` sqlite (PHPUnit 274, E2E 9 Specs × Hell/Dunkel), pgsql 274, nginx E2E 9×2, mariadb 274 (nach r7) – alle rc0; Build 2× 129 Dateien reproduzierbar, check-upstream grün; `run-m2.sh` (3 DBs je 274) rc0; `run-m1.sh` (sqlite, mariadb, pgsql, nginx) rc0. Nachlauf r8 sqlite+mariadb: 276 Tests (inkl. İ-Notiz 10,5 MiB → 200 + Suche, Duplikat über Grenze → 413 ohne Teilkopie) grün.
 
+- M3-fix1 erledigt (Befund Thomas): Notiz blieb nach Anhang-Seite/Excalidraw ~90 s „in anderem Tab bearbeitet“ (später Heartbeat holte die Sperre mit alter Sitzung zurück, Adapter erzwang neue Sitzungs-ID je Laden). Fix nur im Adapter (`nextnotes-bootstrap.js` §10): Sitzungs-ID je Tab, belegt per Web Lock solange eine Seite lebt; belegt → neue ID (Duplikat/`window.open` bleiben Nur-Lesen, P7); ohne Web Locks altes Verhalten. SPEC §4.3 Nr. 8.
+  Review `M3-fix1-diff-r1` (BLOCKER: Duplikat über NC-Seite ohne Bootstrap → zwei Tabs gleiche ID) → `r2` (FREIGABE); Hinweis synchroner `locks.request`-Fehler → neue ID (Lead).
+  Testnachweis: E2E `lock-return` (A Anhang, B/C Excalidraw, D Duplikat, E1/E2 Duplikat über Dateien-App, F Zurück) 76 Prüfungen grün, gegen alten Stand rot; `editor` 118, `excalidraw` 46 (sqlite, hell). Firefox/Safari/dunkel nicht getestet.
+
   **M3 fertig** – Frontend im NC-Rahmen, Editor, Anhänge, Suche, Kanban, Revisionen, Excalidraw; volle Matrix grün (2026-11-03).
 
   **M2 fertig** – Kriterien 1–8 je mit Test belegt (RouteDiff, Isolation/IndirectRead/DenyByDefault, CoreScenario/Attachment, WorkspaceName, check-forbidden-sql + 3 DBs, LockService, ReminderJob/UnifiedSearch, UserDeletion).

@@ -148,7 +148,33 @@
 	// 4. fetch
 	var KEEPALIVE_LIMIT = 65536;
 	var nativeFetch = window.fetch;
+	// §10: App-Requests warten, bis die Editor-Sitzung feststeht; vorher eingesetzte ID wird ersetzt
+	var EDITOR_SESSION_KEY = 'poznote_editor_session_id';
+	var sessionGate = null, sessionGateFrom = '', sessionGateTo = '';
+	function newEditorSessionId() {
+		return 'editor-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+	}
+	function swapSession(init) {
+		if (!init || sessionGateFrom === sessionGateTo) return init;
+		var from = sessionGateFrom, to = sessionGateTo, opts = Object.assign({}, init);
+		if (typeof opts.body === 'string') opts.body = opts.body.split(from).join(to);
+		else if (typeof FormData !== 'undefined' && opts.body instanceof FormData) {
+			var keys = [];
+			opts.body.forEach(function (v, k) { if (v === from) keys.push(k); });
+			keys.forEach(function (k) { opts.body.set(k, to); });
+		}
+		if (opts.headers) {
+			var h = new Headers(opts.headers);
+			if (h.get('X-Editor-Session-ID') === from) h.set('X-Editor-Session-ID', to);
+			opts.headers = h;
+		}
+		return opts;
+	}
 	window.fetch = function (input, init) {
+		if (sessionGate && isAppCall(rewrite(input instanceof Request ? input.url : String(input)))) {
+			var self = this;
+			return sessionGate.then(function () { return window.fetch.call(self, input, swapSession(init)); });
+		}
 		var isRequest = typeof Request !== 'undefined' && input instanceof Request;
 		var url = isRequest ? input.url : (input instanceof URL ? input.href : String(input));
 		var target = rewrite(url);
@@ -310,11 +336,55 @@
 	}
 	if (darkQuery && darkQuery.addEventListener) darkQuery.addEventListener('change', applyMode);
 
-	// 10. Neue Editor-Sitzung je Laden außer Reload (B13: duplizierte Tabs = eigene Sitzung)
-	try {
-		var nav = performance.getEntriesByType('navigation')[0];
-		if (!nav || nav.type !== 'reload') sessionStorage.removeItem('poznote_editor_session_id');
-	} catch (e) { /* ohne sessionStorage nutzt Upstream eine Fallback-ID */ }
+	// 10. Editor-Sitzung je Browser-Tab (B13, M3-fix1): Web Lock je ID belegt, solange eine Seite mit ihr lebt (Entladen,
+	// Absturz → frei). Belegt beim Laden → andere lebende Seite (Duplikat, window.open) → neue ID. Sonst bleibt sie im Tab.
+	if (window.top === window) {
+		try {
+			if (navigator.locks && typeof navigator.locks.request === 'function') {
+				var releaseSessionLock = null;
+				var holdSession = function (id) {
+					return new Promise(function (resolve) {
+						// keine Antwort binnen 2 s → wie belegt (neue ID ist sicher)
+						setTimeout(function () { resolve(false); }, 2000);
+						try {
+							navigator.locks.request('nextnotes-editor-session:' + id, { ifAvailable: true }, function (lock) {
+								resolve(!!lock);
+								// Lock bis pagehide halten
+								return lock ? new Promise(function (done) { releaseSessionLock = done; }) : undefined;
+							}).catch(function () { resolve(false); });
+						} catch (e) { resolve(false); } // synchroner Fehler → wie belegt (neue ID)
+					});
+				};
+				var claimSession = function () {
+					var id = sessionStorage.getItem(EDITOR_SESSION_KEY);
+					if (!id) {
+						id = newEditorSessionId();
+						sessionStorage.setItem(EDITOR_SESSION_KEY, id);
+					}
+					sessionGateFrom = sessionGateTo = id;
+					sessionGate = holdSession(id).then(function (ok) {
+						if (!ok) {
+							sessionGateTo = newEditorSessionId();
+							sessionStorage.setItem(EDITOR_SESSION_KEY, sessionGateTo);
+							holdSession(sessionGateTo);
+						}
+					}).catch(function () { /* Speicher gesperrt: Upstream-Fallback */ }).then(function () { sessionGate = null; });
+				};
+				claimSession();
+				window.addEventListener('pagehide', function () {
+					if (releaseSessionLock) releaseSessionLock();
+					releaseSessionLock = null;
+				});
+				window.addEventListener('pageshow', function (e) {
+					if (e.persisted) claimSession();
+				});
+			} else {
+				// ohne Web Locks (kein Secure Context): neue Sitzung je Laden außer Reload
+				var nav = performance.getEntriesByType('navigation')[0];
+				if (!nav || nav.type !== 'reload') sessionStorage.removeItem(EDITOR_SESSION_KEY);
+			}
+		} catch (e) { /* ohne sessionStorage nutzt Upstream eine Fallback-ID */ }
+	}
 
 	// 11. P2: Upstream-Inline-Handler (onclick/onchange) sind data-action; feste Zuordnung Aktion → Upstream-Funktion
 	function idArg(v) {
