@@ -393,8 +393,8 @@ function createInputModal() {
         '<input type="text" id="inputModalInput" placeholder="' + (window.t ? window.t('modals.input.placeholder', null, 'Enter text') : 'Enter text') + '" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">' +
         '</div>' +
         '<div class="modal-buttons">' +
-        '<button type="button" class="btn-cancel" onclick="closeInputModal()">Cancel</button>' +
-        '<button type="button" id="inputModalConfirmBtn" class="btn-primary" onclick="executeInputModalAction()">OK</button>' +
+        '<button type="button" class="btn-cancel" data-action="close-input-modal">Cancel</button>' +
+        '<button type="button" id="inputModalConfirmBtn" class="btn-primary" data-action="confirm-input-modal">OK</button>' +
         '</div>' +
         '</div>' +
         '</div>';

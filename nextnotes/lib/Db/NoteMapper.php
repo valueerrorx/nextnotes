@@ -196,6 +196,23 @@ class NoteMapper extends QBMapper {
 		return array_map('intval', $qb->executeQuery()->fetchFirstColumn());
 	}
 
+	/**
+	 * IDs nicht gelöschter Notizen, deren search_text jeden Begriff enthält (eine Abfrage, nur IDs)
+	 * @param string[] $terms normalisiert
+	 * @return int[]
+	 */
+	public function idsMatchingAll(int $workspaceId, array $terms): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('id')->from(self::TABLE)
+			->where($qb->expr()->eq('workspace_id', $qb->createNamedParameter($workspaceId, IQueryBuilder::PARAM_INT)))
+			->andWhere($qb->expr()->eq('role', $qb->createNamedParameter('note')))
+			->andWhere($qb->expr()->isNull('trashed_at'));
+		foreach ($terms as $term) {
+			$qb->andWhere($qb->expr()->like('search_text', $qb->createNamedParameter('%' . $this->db->escapeLikeParameter((string)$term) . '%')));
+		}
+		return array_map('intval', $qb->executeQuery()->fetchFirstColumn());
+	}
+
 	/** @param int[] $ids */
 	public function deleteByIds(array $ids): void {
 		foreach (array_chunk(array_values(array_unique($ids)), 1000) as $chunk) {

@@ -11,11 +11,15 @@ return [
 	'routes' => [
 		['name' => 'page#index', 'url' => '/', 'verb' => 'GET'],
 		['name' => 'page#index', 'url' => '/index.php', 'verb' => 'GET', 'postfix' => 'php'],
+		// Such-Formular der Hauptansicht (POST mit requesttoken)
+		['name' => 'page#search', 'url' => '/index.php', 'verb' => 'POST'],
 		// Spike ADR 0004: .php-URL im App-Pfad
 		['name' => 'page#dashboard', 'url' => '/dashboard.php', 'verb' => 'GET'],
 		// SPEC §4.2: Upstream-Login/-Logout als Weiterleitung
 		['name' => 'page#login', 'url' => '/login.php', 'verb' => 'GET'],
 		['name' => 'page#logout', 'url' => '/logout.php', 'verb' => 'GET'],
+		// Audio-Einbettung in Notizen (iframe, Chrome zeigt <audio> in contenteditable nicht)
+		['name' => 'page#audioPlayer', 'url' => '/audio_player.php', 'verb' => 'GET'],
 		// API v1, Reihenfolge wie src/public/api/v1/index.php
 		['name' => 'notes_api#resolve', 'url' => '/api/v1/notes/resolve', 'verb' => 'GET'],
 		['name' => 'notes_api#reorder', 'url' => '/api/v1/notes/reorder', 'verb' => 'POST'],

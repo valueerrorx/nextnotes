@@ -25,6 +25,7 @@ use OCA\NextNotes\Service\InputValidator;
 use OCA\NextNotes\Service\MentionService;
 use OCA\NextNotes\Service\NoteSerializer;
 use OCA\NextNotes\Service\NoteService;
+use OCA\NextNotes\Service\SearchService;
 use OCA\NextNotes\Service\SettingsService;
 use OCA\NextNotes\Service\WorkspaceService;
 use OCP\IDateTimeFormatter;
@@ -121,11 +122,12 @@ class IndexViewService {
 		private ReminderMapper $reminders,
 		private AttachmentMapper $attachments,
 		private IDateTimeFormatter $dates,
+		private SearchService $search,
 	) {
 	}
 
 	/**
-	 * @param array<string, mixed> $query note, workspace, folder, open_folder
+	 * @param array<string, mixed> $query note, workspace, folder, open_folder, Suchfelder (SearchService::pageSearch)
 	 * @return array<string, mixed>
 	 * @throws NotFoundException fremde oder unbekannte Notiz in ?note=
 	 */
@@ -151,9 +153,24 @@ class IndexViewService {
 		$openFolder = is_string($query['open_folder'] ?? null) ? $query['open_folder'] : '';
 		$byId = $this->folders->byId($wsId);
 		$notes = $this->notes->findList([$wsId]);
+		$tagMap = $this->tags->tagsFor(array_map(static fn (Note $n) => (int)$n->getId(), $notes));
+		$search = $this->search->pageSearch($notes, $tagMap, $query);
+		if ($search['active']) {
+			// Upstream prepareSearchResults: gewählte Notiz nur, wenn sie trifft, sonst neuester Treffer
+			$notes = array_values(array_filter($notes, static fn (Note $n) => isset($search['ids'][(int)$n->getId()])));
+			if ($note === null || !isset($search['ids'][(int)$note->getId()])) {
+				$latest = null;
+				foreach ($notes as $n) {
+					if ($latest === null || [(int)$n->getUpdatedAt(), (int)$n->getId()] > [(int)$latest->getUpdatedAt(), (int)$latest->getId()]) {
+						$latest = $n;
+					}
+				}
+				$note = $latest !== null ? $this->access->requireNote($uid, (int)$latest->getId(), 'read') : null;
+			}
+		}
 		$noteFolderId = $note?->getFolderId();
 
-		$tree = $this->tree($uid, $baseUrl, $key, $byId, $notes, $sort, $favSort, $note, $folderFilter, $openFolder);
+		$tree = $this->tree($uid, $baseUrl, $key, $byId, $notes, $tagMap, $sort, $favSort, $note, $folderFilter, $openFolder, $search);
 		$titleColor = $this->colorHex($ws->getColor());
 
 		return [
@@ -175,7 +192,8 @@ class IndexViewService {
 			'body' => $this->body($uid, $key, $note === null),
 			'poznoteConfig' => $this->poznoteConfig($uid),
 			'workspaceMap' => $this->workspaceMap($uid),
-			'pageConfig' => $this->pageConfig($uid, $key, $noteFolderId !== null ? ($byId[$noteFolderId] ?? null)?->getName() : null, $canWrite),
+			'pageConfig' => $this->pageConfig($uid, $key, $noteFolderId !== null ? ($byId[$noteFolderId] ?? null)?->getName() : null, $canWrite, $search['active']),
+			'search' => $search,
 			'globals' => $this->globals($uid, $key),
 			'hiddenUiElements' => $this->hiddenUi($uid),
 			'prefetchedSettings' => ['tasklist_insert_order' => $this->value($uid, 'tasklist_insert_order') === 'top' ? 'top' : 'bottom'],
@@ -225,10 +243,17 @@ class IndexViewService {
 		$path = array_map(static fn (Folder $f) => ['id' => (int)$f->getId(), 'name' => (string)$f->getName()], $this->folders->ancestry($folder !== null ? $folderId : null, $byId));
 		// Anhänge ohne die im Inhalt eingebetteten (Upstream poznoteCountDisplayableAttachments)
 		$visible = 0;
+		$links = [];
 		foreach ($this->attachments->findForNotes([$id])[$id] ?? [] as $a) {
-			if (!str_contains($content, 'attachments/' . (int)$a->getId())) {
+			$embedded = str_contains($content, 'attachments/' . (int)$a->getId());
+			if (!$embedded) {
 				$visible++;
 			}
+			// Anhangzeile: im Inhalt eingebettete Bilder verborgen (Upstream note_display.php:501-548)
+			$name = (string)$a->getOriginalName();
+			$isImage = str_starts_with(strtolower((string)$a->getMime()), 'image/')
+				|| in_array(strtolower(pathinfo($name, PATHINFO_EXTENSION)), ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'], true);
+			$links[] = ['id' => (int)$a->getId(), 'name' => $name, 'inline' => $isImage && $embedded];
 		}
 		$hasLinked = $type !== 'linked' && $this->notes->findList([(int)$note->getWorkspaceId()], ['linked_note_id' => $id]) !== [];
 		$display = '';
@@ -283,6 +308,8 @@ class IndexViewService {
 			'folderName' => $folder !== null ? (string)$folder->getName() : '',
 			'folderPath' => $path,
 			'attachments' => $visible,
+			'attachmentLinks' => $this->bool($uid, 'attachment_previews_in_note') ? [] : $links,
+			'attachmentsAtBottom' => $this->bool($uid, 'attachments_at_bottom'),
 			'reminderAt' => (string)NoteSerializer::date($reminder),
 			'hasLinked' => $hasLinked,
 			'linkedNoteId' => $type === 'linked' && $note->getLinkedNoteId() !== null ? (int)$note->getLinkedNoteId() : null,
@@ -362,10 +389,10 @@ class IndexViewService {
 	 * Ordnerbaum mit Notizen (Upstream organizeNotesByFolder, handleFavorites, buildFolderHierarchy, shouldFolderBeOpen)
 	 * @param array<int, Folder> $byId
 	 * @param Note[] $notes
+	 * @param array<int, string[]> $tags Tags je Notiz-ID
 	 * @return array<string, mixed>
 	 */
-	private function tree(string $uid, string $baseUrl, string $key, array $byId, array $notes, string $sort, string $favSort, ?Note $selected, string $folderFilter, string $openFolder): array {
-		$tags = $this->tags->tagsFor(array_map(static fn (Note $n) => (int)$n->getId(), $notes));
+	private function tree(string $uid, string $baseUrl, string $key, array $byId, array $notes, array $tags, string $sort, string $favSort, ?Note $selected, string $folderFilter, string $openFolder, array $search): array {
 		$byNoteId = [];
 		foreach ($notes as $n) {
 			$byNoteId[(int)$n->getId()] = $n;
@@ -374,6 +401,12 @@ class IndexViewService {
 		$linkBase = ['workspace' => $key];
 		if ($folderFilter !== '') {
 			$linkBase['folder'] = $folderFilter;
+		}
+		// Notiz-Links behalten die Suche (Upstream generateNoteLink)
+		$searching = $search['active'];
+		if ($searching) {
+			$linkBase += array_filter(['search' => $search['search'], 'tags_search' => $search['tags'], 'created_from' => $search['from'], 'created_to' => $search['to'],
+				'search_combined' => $search['combined'] ? '1' : ''], static fn (string $v) => $v !== '');
 		}
 
 		$item = function (Note $n) use ($uid, $baseUrl, $linkBase, $tags, $byNoteId, $byId, $selectedId): array {
@@ -462,7 +495,7 @@ class IndexViewService {
 		}
 		$highlight = $this->bool($uid, 'highlight_current_folder_tree');
 
-		$build = function (?int $parent, int $depth) use (&$build, $byId, $inFolder, $sort, $sortNotes, $item, $open, $total, $activeId, $branch, $highlight): array {
+		$build = function (?int $parent, int $depth) use (&$build, $byId, $inFolder, $sort, $sortNotes, $item, $open, $total, $activeId, $branch, $highlight, $searching): array {
 			$children = array_filter($byId, static fn (Folder $f) => $f->getParentId() === $parent);
 			uasort($children, static fn (Folder $a, Folder $b) => FolderService::compare($sort, $a, $b));
 			$out = [];
@@ -470,8 +503,12 @@ class IndexViewService {
 				$sub = $build((int)$id, $depth + 1);
 				$own = array_map($item, $sortNotes($inFolder[$id] ?? [], $sort));
 				$count = count($own) + array_sum(array_map(static fn ($c) => $c['count'], $sub));
+				// Suche: Ordner ohne Treffer weg, mit Treffern offen (Upstream displayFolderRecursive, shouldFolderBeOpen)
+				if ($searching && $count === 0) {
+					continue;
+				}
 				$icon = (string)($f->getIcon() ?? '');
-				$isOpen = $total <= 3 || isset($open[$id]);
+				$isOpen = $total <= 3 || isset($open[$id]) || $searching;
 				$out[] = [
 					'id' => (int)$id,
 					'name' => $f->getName(),
@@ -522,6 +559,9 @@ class IndexViewService {
 
 		$rootFirst = !$this->bool($uid, 'notes_without_folders_after_folders')
 			&& !in_array($sort, ['heading_asc', 'type_asc'], true);
+		if ($searching) {
+			$favFolders = [];
+		}
 		$showFavorites = $folderFilter === '' && ($favorites !== [] || $favFolders !== []);
 
 		return [
@@ -693,9 +733,9 @@ class IndexViewService {
 	}
 
 	/** @return array<string, mixed> #page-config-data (Upstream index.php:938-965) */
-	private function pageConfig(string $uid, string $key, ?string $noteFolder, bool $canWrite): array {
+	private function pageConfig(string $uid, string $key, ?string $noteFolder, bool $canWrite, bool $searchMode): array {
 		return [
-			'isSearchMode' => false,
+			'isSearchMode' => $searchMode,
 			'currentNoteFolder' => $noteFolder,
 			'selectedWorkspace' => $key,
 			'userId' => $uid,

@@ -14,6 +14,9 @@ $tree = $view['tree'];
 $workspace = $view['workspaceKey'];
 $expandLabel = $tr->t('sidebar.expand_all_folders', [], 'Expand all folders');
 $treeOptionsTitle = $tr->t('sidebar.view_options', [], 'View options');
+// Suchzustand (SearchService::pageSearch), Upstream notes_list.php:79-98
+$search = $view['search'];
+$hasDates = $search['from'] !== '' || $search['to'] !== '';
 
 // Eine Notizzeile (renderNoteListItem)
 $renderNote = static function (array $n, string $noteClass) use ($tr, $renderNoteActions, $view): void {
@@ -58,36 +61,39 @@ $renderFolder = static function (array $f, bool $header, bool $rootFirst) use (&
 		<div class="unified-search-container">
 			<div class="searchbar-row searchbar-icon-row">
 				<div class="searchbar-type-icons" id="searchbar-type-icons">
-					<button type="button" id="search-notes-btn" class="searchbar-type-btn searchbar-type-notes active" data-search-type="notes" aria-pressed="true" title="<?php p($tr->t('search.search_in_notes', [], 'Search in notes')); ?>">
+					<button type="button" id="search-notes-btn" class="searchbar-type-btn searchbar-type-notes<?php p($search['inNotes'] ? ' active' : ''); ?>" data-search-type="notes" aria-pressed="<?php p($search['inNotes'] ? 'true' : 'false'); ?>" title="<?php p($tr->t('search.search_in_notes', [], 'Search in notes')); ?>">
 						<i class="lucide lucide-file-alt"></i>
 					</button>
-					<button type="button" id="search-tags-btn" class="searchbar-type-btn searchbar-type-tags active" data-search-type="tags" aria-pressed="true" title="<?php p($tr->t('search.search_in_tags', [], 'Search in tags')); ?>">
+					<button type="button" id="search-tags-btn" class="searchbar-type-btn searchbar-type-tags<?php p($search['inTags'] ? ' active' : ''); ?>" data-search-type="tags" aria-pressed="<?php p($search['inTags'] ? 'true' : 'false'); ?>" title="<?php p($tr->t('search.search_in_tags', [], 'Search in tags')); ?>">
 						<i class="lucide lucide-tag"></i>
 					</button>
 				</div>
-				<div class="searchbar-input-wrapper searchbar-has-date-toggle">
-					<input autocomplete="off" autocapitalize="off" spellcheck="false" id="unified-search" type="text" name="unified_search" class="search form-control searchbar-input" placeholder="<?php p($tr->t('search.placeholder_notes')); ?>" value="" />
-					<button type="button" id="search-date-toggle" class="searchbar-date-toggle" data-action="toggle-date-filter" title="<?php p($tr->t('search.toggle_date_filter', [], 'Toggle date filter')); ?>" aria-label="<?php p($tr->t('search.toggle_date_filter', [], 'Toggle date filter')); ?>" aria-controls="search-date-filter" aria-expanded="false">
+				<div class="searchbar-input-wrapper searchbar-has-date-toggle<?php p($search['active'] ? ' searchbar-has-clear' : ''); ?>">
+					<input autocomplete="off" autocapitalize="off" spellcheck="false" id="unified-search" type="text" name="unified_search" class="search form-control searchbar-input" placeholder="<?php p($tr->t('search.placeholder_notes')); ?>" value="<?php p($search['search'] !== '' ? $search['search'] : $search['tags']); ?>" />
+					<button type="button" id="search-date-toggle" class="searchbar-date-toggle<?php p($hasDates ? ' active' : ''); ?>" data-action="toggle-date-filter" title="<?php p($tr->t('search.toggle_date_filter', [], 'Toggle date filter')); ?>" aria-label="<?php p($tr->t('search.toggle_date_filter', [], 'Toggle date filter')); ?>" aria-controls="search-date-filter" aria-expanded="<?php p($hasDates ? 'true' : 'false'); ?>">
 						<i class="lucide lucide-calendar"></i>
 					</button>
+					<?php if ($search['active']): ?>
+					<button type="button" class="searchbar-clear" title="<?php p($tr->t('search.clear')); ?>" data-action="clear-search"><span class="clear-icon">×</span></button>
+					<?php endif; ?>
 				</div>
 			</div>
-			<div class="search-date-filter" id="search-date-filter" hidden>
+			<div class="search-date-filter<?php p($hasDates ? ' active' : ''); ?>" id="search-date-filter"<?php if (!$hasDates): ?> hidden<?php endif; ?>>
 				<div class="search-date-field">
 					<label for="created-from"><i class="lucide lucide-calendar"></i><span><?php p($tr->t('search.created_from', [], 'Created from')); ?></span></label>
-					<input id="created-from" class="search-date-input" type="date" name="created_from" value="">
+					<input id="created-from" class="search-date-input" type="date" name="created_from" value="<?php p($search['from']); ?>">
 				</div>
 				<div class="search-date-field">
 					<label for="created-to"><i class="lucide lucide-calendar"></i><span><?php p($tr->t('search.created_to', [], 'Created to')); ?></span></label>
-					<input id="created-to" class="search-date-input" type="date" name="created_to" value="">
+					<input id="created-to" class="search-date-input" type="date" name="created_to" value="<?php p($search['to']); ?>">
 				</div>
 			</div>
-			<input type="hidden" id="search-notes-hidden" name="search" value="">
-			<input type="hidden" id="search-tags-hidden" name="tags_search" value="">
+			<input type="hidden" id="search-notes-hidden" name="search" value="<?php p($search['search']); ?>">
+			<input type="hidden" id="search-tags-hidden" name="tags_search" value="<?php p($search['tags']); ?>">
 			<input type="hidden" name="workspace" value="<?php p($workspace); ?>">
-			<input type="hidden" id="search-in-notes" name="search_in_notes" value="1">
-			<input type="hidden" id="search-in-tags" name="search_in_tags" value="1">
-			<input type="hidden" id="search-combined-mode" name="search_combined" value="1">
+			<input type="hidden" id="search-in-notes" name="search_in_notes" value="<?php p($search['inNotes'] ? '1' : ''); ?>">
+			<input type="hidden" id="search-in-tags" name="search_in_tags" value="<?php p($search['inTags'] ? '1' : ''); ?>">
+			<input type="hidden" id="search-combined-mode" name="search_combined" value="<?php p($search['combined'] ? '1' : ''); ?>">
 		</div>
 	</form>
 </div>

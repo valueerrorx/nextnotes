@@ -6,25 +6,7 @@
 // eingeschleuste Bedienelemente wirkungslos (B26); Tags mit '; Verschieben-Dialoge. Je Abschnitt 0 CSP/pageerror/Konsole.
 import { runSpec } from './lib/harness.mjs';
 import { apiClient } from './lib/api.mjs';
-import { execFileSync } from 'node:child_process';
-
-// Lesefreigabe hat keine HTTP-Route (Teams ab M5) → Testhilfe im Nextcloud-Container der Instanz (Port der base-url)
-function shareRead(base, owner, wsName, target) {
-	const port = new URL(base).port;
-	const dk = (...a) => execFileSync('docker', a, { encoding: 'utf8' }).trim();
-	const web = dk('ps', '--filter', `publish=${port}`, '--format', '{{.Names}}').split('\n')[0];
-	const project = dk('inspect', '-f', '{{index .Config.Labels "com.docker.compose.project"}}', web);
-	const nc = dk('ps', '--filter', `label=com.docker.compose.project=${project}`, '--format', '{{.Names}}').split('\n')
-		.find((c) => { try { dk('exec', c, 'php', '-r', "exit(is_file('/var/www/html/occ') ? 0 : 1);"); return true; } catch { return false; } });
-	const php = `require '/var/www/html/lib/base.php';
-		$qb = \\OCP\\Server::get(\\OCP\\IDBConnection::class)->getQueryBuilder();
-		$id = (int)$qb->select('id')->from('nextnotes_workspaces')->where($qb->expr()->eq('owner_type', $qb->createNamedParameter('user')))
-			->andWhere($qb->expr()->eq('owner_id', $qb->createNamedParameter($argv[1])))->andWhere($qb->expr()->eq('name', $qb->createNamedParameter($argv[2])))
-			->executeQuery()->fetchOne();
-		\\OCP\\Server::get(\\OCA\\NextNotes\\Service\\WorkspaceService::class)->share($argv[1], $id, $argv[3], 'read');
-		echo $id;`;
-	return dk('exec', '-u', 'www-data', nc, 'php', '-r', php, '--', owner, wsName, target);
-}
+import { shareRead } from './lib/docker.mjs';
 
 const RUN = Date.now().toString(36);
 

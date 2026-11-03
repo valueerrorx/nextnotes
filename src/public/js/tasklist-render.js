@@ -100,12 +100,12 @@ function renderTasks(tasks, noteId) {
         const dueAt = normalizeTaskDueAt(task.dueAt);
         const dueBellHtml = task.dueReminder ? '<i class="lucide lucide-bell"></i>' : '';
         const dueChipHtml = dueAt
-            ? `<button type="button" class="task-due-chip${(!task.completed && isTaskDueOverdue(dueAt)) ? ' overdue' : ''}" title="${dueTitle}" onclick="openTaskDueDatePicker(${task.id}, ${task.noteId || 'null'}, event)">
+            ? `<button type="button" class="task-due-chip${(!task.completed && isTaskDueOverdue(dueAt)) ? ' overdue' : ''}" title="${dueTitle}" data-action="task-due" data-task-id="${task.id}" data-note-id="${task.noteId || ''}">
                 <i class="lucide lucide-calendar-alt"></i><span>${formatTaskDueDate(dueAt)}</span>${dueBellHtml}
             </button>`
             : '';
         const dueBtnHtml = (!dueAt && !task.completed)
-            ? `<button class="task-due-btn" title="${dueTitle}" onclick="openTaskDueDatePicker(${task.id}, ${task.noteId || 'null'}, event)">
+            ? `<button class="task-due-btn" title="${dueTitle}" data-action="task-due" data-task-id="${task.id}" data-note-id="${task.noteId || ''}">
                 <i class="lucide lucide-calendar-alt"></i>
             </button>`
             : '';
@@ -115,10 +115,10 @@ function renderTasks(tasks, noteId) {
         if (task.completed) {
             // Completed tasks: show delete and drag buttons
             buttonsHtml = `
-            <button class="task-delete-btn" onclick="deleteTask(${task.id}, ${task.noteId || 'null'})">
+            <button class="task-delete-btn" data-action="task-delete" data-task-id="${task.id}" data-note-id="${task.noteId || ''}">
                 <i class="lucide lucide-trash-2"></i>
             </button>
-            <button class="task-move-btn" title="${moveTitle}" onclick="openMoveTaskModal(${task.id}, ${task.noteId || 'null'})">
+            <button class="task-move-btn" title="${moveTitle}" data-action="task-move" data-task-id="${task.id}" data-note-id="${task.noteId || ''}">
                 <i class="lucide-arrow-right"></i>
             </button>
             <div class="task-drag-handle" title="${dragTitle}">
@@ -128,17 +128,17 @@ function renderTasks(tasks, noteId) {
             // Incomplete tasks: individual buttons on desktop, collapsed into a
             // three-dot menu on mobile (visibility handled in tasks.css)
             buttonsHtml = `
-            <button class="task-subtask-btn" title="${subtaskTitle}" onclick="openSubtaskInput(${task.id}, ${task.noteId || 'null'}, event)">
+            <button class="task-subtask-btn" title="${subtaskTitle}" data-action="task-subtask" data-task-id="${task.id}" data-note-id="${task.noteId || ''}">
                 <i class="lucide lucide-corner-down-right"></i>
             </button>
             ${dueBtnHtml}
-            <button class="${favBtnClass}" title="${title}" onclick="toggleImportant(${task.id}, ${task.noteId || 'null'})">
+            <button class="${favBtnClass}" title="${title}" data-action="task-important" data-task-id="${task.id}" data-note-id="${task.noteId || ''}">
                 <i class="${starClass}"></i>
             </button>
-            <button class="task-move-btn" title="${moveTitle}" onclick="openMoveTaskModal(${task.id}, ${task.noteId || 'null'})">
+            <button class="task-move-btn" title="${moveTitle}" data-action="task-move" data-task-id="${task.id}" data-note-id="${task.noteId || ''}">
                 <i class="lucide-arrow-right"></i>
             </button>
-            <button class="task-menu-btn" title="${menuTitle}" onclick="openTaskActionsMenu(${task.id}, ${task.noteId || 'null'}, event)">
+            <button class="task-menu-btn" title="${menuTitle}" data-action="task-menu" data-task-id="${task.id}" data-note-id="${task.noteId || ''}">
                 <i class="lucide lucide-more-vertical"></i>
             </button>
             <div class="task-drag-handle" title="${dragTitle}">
@@ -151,8 +151,8 @@ function renderTasks(tasks, noteId) {
 
         return `
         <div class="task-item ${task.completed ? 'completed' : ''} ${task.important ? 'important' : ''} ${dueAt ? 'has-due' : ''} ${subtasksHtml ? 'has-subtasks' : ''}" data-task-id="${task.id}" draggable="false">
-            <input type="checkbox" class="task-checkbox" ${task.completed ? 'checked' : ''} onchange="toggleTask(${task.id}, ${task.noteId || 'null'})">
-            <span class="task-text" onclick="editTask(${task.id}, ${task.noteId || 'null'})">${linkifyHtml(task.text)}</span>
+            <input type="checkbox" class="task-checkbox" ${task.completed ? 'checked' : ''} data-action="task-toggle" data-task-id="${task.id}" data-note-id="${task.noteId || ''}">
+            <span class="task-text" data-action="task-edit" data-task-id="${task.id}" data-note-id="${task.noteId || ''}">${linkifyHtml(task.text)}</span>
             ${dueChipHtml}
             <div class="task-row-actions">${buttonsHtml}</div>
             ${subtasksHtml}

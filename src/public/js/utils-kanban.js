@@ -85,7 +85,7 @@ function getKanbanErrorHtml() {
     return '<div class="kanban-error" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary);">' +
         '<i class="lucide lucide-alert-triangle" style="font-size: 3rem; margin-bottom: 16px; color: #f59e0b;"></i>' +
         '<p>' + (window.t ? window.t('common.error', null, 'Error') : 'Error') + '</p>' +
-        '<button onclick="closeKanbanView()" class="btn btn-primary" style="margin-top: 16px;">' +
+        '<button data-action="close-kanban-view" class="btn btn-primary" style="margin-top: 16px;">' +
         (window.t ? window.t('common.back_to_notes', null, 'Notes') : 'Notes') + '</button></div>';
 }
 

@@ -442,7 +442,7 @@ function showImageLinkModal(defaultUrl, callback, mode) {
                         <input type="text" id="imageLinkModalInput" placeholder="${t('image_menu.link_modal.url_placeholder', null, 'https://www.example.com')}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;">
                     </div>
                     <div class="modal-buttons">
-                        <button type="button" class="btn-cancel" onclick="closeImageLinkModal()">${t('image_menu.link_modal.cancel', null, 'Cancel')}</button>
+                        <button type="button" class="btn-cancel" data-action="close-image-link-modal">${t('image_menu.link_modal.cancel', null, 'Cancel')}</button>
                         <button type="button" id="imageLinkModalConfirmBtn" class="btn-primary">${t('image_menu.link_modal.ok', null, 'OK')}</button>
                     </div>
                 </div>

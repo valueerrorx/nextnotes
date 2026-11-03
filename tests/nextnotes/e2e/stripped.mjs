@@ -12,8 +12,8 @@ const RUN = `${process.argv[3]}${Date.now().toString(36)}`;
 
 // Bekannt fehlende Funktionen (Smoke): Fehler beim Auslösen werden als WARN gemeldet, nicht rot; nur mit Slice der Behebung
 const KNOWN_MISSING = {
-	// muss bis M3c verschwinden (Kanban-Seite kanban_content.php; CSP-Inline-Handler P2 bis M3b)
-	'open-kanban-view': 'M3c: kanban_content.php fehlt (404); dabei CSP script-src-attr durch Upstream-Inline-Handler (P2, M3b)',
+	// muss bis M3c verschwinden (Kanban-Seite kanban_content.php)
+	'open-kanban-view': 'M3c: kanban_content.php fehlt (404); kein CSP-Fehler mehr (P2 erledigt in M3b2)',
 };
 
 // Seiten, die in M3a2 nicht verlinkt sein dürfen (gestrichen oder erst M4/M3c portiert)

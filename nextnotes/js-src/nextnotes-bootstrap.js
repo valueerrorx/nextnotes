@@ -226,6 +226,23 @@
 		};
 	}
 
+	// 6a. requesttoken nie in die Adresszeile (Such-Formular → history.pushState, unified-search.js)
+	['pushState', 'replaceState'].forEach(function (name) {
+		var native = history[name];
+		history[name] = function (state, title, url) {
+			if (url !== undefined && url !== null) {
+				try {
+					var u = new URL(String(url), window.location.href);
+					if (u.searchParams.has('requesttoken')) {
+						u.searchParams.delete('requesttoken');
+						url = u.href;
+					}
+				} catch (e) { /* URL unverändert */ }
+			}
+			return native.call(history, state, title, url);
+		};
+	});
+
 	// 7. window.open
 	var nativeWindowOpen = window.open;
 	window.open = function (url) {
@@ -297,15 +314,70 @@
 		if (!nav || nav.type !== 'reload') sessionStorage.removeItem('poznote_editor_session_id');
 	} catch (e) { /* ohne sessionStorage nutzt Upstream eine Fallback-ID */ }
 
-	// 11. Klicks auf eingeschleuste App-Bedienelemente im Notizinhalt erreichen die Upstream-Delegation nicht (B26)
+	// 11. P2: Upstream-Inline-Handler (onclick/onchange) sind data-action; feste Zuordnung Aktion → Upstream-Funktion
+	function idArg(v) {
+		return v === undefined || v === '' || v === 'null' || v === 'undefined' ? null : Number(v);
+	}
+	function call(name, args) {
+		var fn = window[name];
+		return typeof fn === 'function' ? fn.apply(window, args) : undefined;
+	}
+	function task(name, withEvent) {
+		return function (el, e) {
+			var args = [idArg(el.dataset.taskId), idArg(el.dataset.noteId)];
+			if (withEvent) args.push(e);
+			return call(name, args);
+		};
+	}
+	function subtask(name) {
+		return function (el) {
+			return call(name, [idArg(el.dataset.taskId), idArg(el.dataset.subtaskId), idArg(el.dataset.noteId)]);
+		};
+	}
+	// Aufgabenlisten werden im Notizinhalt gerendert (Ausnahme vom Klick-Schutz, B26); change = Checkbox
 	var CONTENT_ACTIONS = Object.create(null);
+	CONTENT_ACTIONS['task-toggle'] = { type: 'change', run: task('toggleTask') };
+	CONTENT_ACTIONS['task-edit'] = { type: 'click', run: task('editTask') };
+	CONTENT_ACTIONS['task-delete'] = { type: 'click', run: task('deleteTask') };
+	CONTENT_ACTIONS['task-move'] = { type: 'click', run: task('openMoveTaskModal') };
+	CONTENT_ACTIONS['task-subtask'] = { type: 'click', run: task('openSubtaskInput', true) };
+	CONTENT_ACTIONS['task-important'] = { type: 'click', run: task('toggleImportant') };
+	CONTENT_ACTIONS['task-menu'] = { type: 'click', run: task('openTaskActionsMenu', true) };
+	CONTENT_ACTIONS['task-due'] = { type: 'click', run: task('openTaskDueDatePicker', true) };
+	CONTENT_ACTIONS['subtask-toggle'] = { type: 'change', run: subtask('toggleSubtask') };
+	CONTENT_ACTIONS['subtask-edit'] = { type: 'click', run: subtask('editSubtask') };
+	CONTENT_ACTIONS['subtask-delete'] = { type: 'click', run: subtask('deleteSubtask') };
+	CONTENT_ACTIONS['task-link'] = { type: 'click', run: function (el, e) { return call('handleTaskLinkClick', [e]); } };
+	// Außerhalb des Notizinhalts (Modals, Anhangliste, Kanban-Fehler)
+	var UI_ACTIONS = Object.create(null);
+	UI_ACTIONS['close-input-modal'] = { type: 'click', run: function () { return call('closeInputModal', []); } };
+	UI_ACTIONS['confirm-input-modal'] = { type: 'click', run: function () { return call('executeInputModalAction', []); } };
+	UI_ACTIONS['close-image-link-modal'] = { type: 'click', run: function () { return call('closeImageLinkModal', []); } };
+	UI_ACTIONS['close-kanban-view'] = { type: 'click', run: function () { return call('closeKanbanView', []); } };
+	UI_ACTIONS['delete-attachment'] = { type: 'click', run: function (el) { return call('deleteAttachment', [el.dataset.attachmentId]); } };
+	UI_ACTIONS['transcribe-attachment'] = { type: 'click', run: function (el) { return call('transcribeAttachmentFromList', [el.dataset.attachmentId]); } };
+	// Capture auf document: nach dem Klick-Schutz (window), vor Upstream-Delegation; nur das innerste data-action zählt
+	['click', 'change'].forEach(function (type) {
+		document.addEventListener(type, function (e) {
+			var el = e.target && e.target.closest ? e.target.closest('[data-action]') : null;
+			if (!el) return;
+			var action = el.getAttribute('data-action');
+			var inContent = !!el.closest('.noteentry');
+			var map = inContent ? CONTENT_ACTIONS : UI_ACTIONS;
+			if (!Object.hasOwn(map, action) || map[action].type !== type) return;
+			if (map[action].run(el, e) === false) e.preventDefault();
+		}, true);
+	});
+
+	// 12. Klicks auf eingeschleuste App-Bedienelemente im Notizinhalt erreichen die Upstream-Delegation nicht (B26)
 	var GENERIC_CLASS = /^(lucide(-.*)?|cursor-pointer|hidden|initially-hidden|active|selected|show|open|disabled|is-.*|has-.*)$/;
 	function injectedControl(target) {
 		var entry = target && target.closest ? target.closest('.noteentry') : null;
 		if (!entry) return false;
 		for (var el = target; el && el !== entry; el = el.parentElement) {
 			var action = el.getAttribute('data-action');
-			if (action !== null && !Object.hasOwn(CONTENT_ACTIONS, action)) return true;
+			// data-action entfernt der Sanitizer aus Inhalten: belegte Inhaltsaktion = von der App gerendert (Aufgabenliste)
+			if (action !== null) return !Object.hasOwn(CONTENT_ACTIONS, action);
 			if (el.id && document.querySelectorAll('[id="' + CSS.escape(el.id) + '"]').length > 1) return true;
 			for (var i = 0; i < el.classList.length; i++) {
 				var c = el.classList[i];
@@ -320,7 +392,7 @@
 		}, true);
 	});
 
-	// 12. Inhalt erst nach dem Start zeigen (gegen Flackern; CSS-Rückfall nach 2 s)
+	// 13. Inhalt erst nach dem Start zeigen (gegen Flackern; CSS-Rückfall nach 2 s)
 	document.addEventListener('DOMContentLoaded', function () {
 		document.documentElement.classList.add('nextnotes-ready');
 	});

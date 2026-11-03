@@ -18,6 +18,9 @@ use OCP\IDateTimeZone;
 
 // Suche (Upstream Notes::search, searchIds, resolveReference) und Unified Search; nur sichtbare Workspaces
 class SearchService {
+	// Obergrenze Suchbegriffe der Hauptansicht (eine LIKE-Bedingung je Begriff)
+	public const MAX_TERMS = 20;
+
 	public function __construct(
 		private NoteMapper $notes,
 		private NoteTagMapper $tags,
@@ -127,6 +130,97 @@ class SearchService {
 			$ids[] = $id;
 		}
 		return ['ids' => $ids];
+	}
+
+	/**
+	 * Suche der Hauptansicht (Upstream search_handler.php, initializeSearchParams): POST-Formular oder GET (Tag-Klick, Reload)
+	 * @param Note[] $notes nicht gelöschte Notizen eines Workspace
+	 * @param array<int, string[]> $tagMap Tags je Notiz-ID (vom Aufrufer, einmal je Seitenaufruf)
+	 * @param array<string, mixed> $q Formular-/Query-Parameter
+	 * @return array{active: bool, search: string, tags: string, from: string, to: string, inNotes: bool, inTags: bool, combined: bool, ids: array<int, true>}
+	 */
+	public function pageSearch(array $notes, array $tagMap, array $q): array {
+		$str = static fn (string $k): string => is_scalar($q[$k] ?? null) ? trim((string)$q[$k]) : '';
+		$search = $str('search');
+		$tags = $str('tags_search');
+		$combined = $str('search_combined') === '1';
+		$unified = $str('unified_search');
+		if ($unified !== '') {
+			// Upstream handleUnifiedSearch: Suchfeld schlägt die versteckten Felder
+			$inNotes = $str('search_in_notes') !== '';
+			$inTags = $str('search_in_tags') !== '';
+			if ($combined || ($inNotes && $inTags)) {
+				[$search, $tags, $combined] = [$unified, $unified, true];
+			} elseif ($inNotes || $inTags) {
+				[$search, $tags] = [$inNotes ? $unified : '', $inTags ? $unified : ''];
+			}
+		}
+		// ungültiges Datum = kein Filter (Upstream normalizeDateOnlyFilter)
+		$date = function (string $raw, bool $end): ?int {
+			try {
+				return $this->dateFilter($raw, $end);
+			} catch (BadRequestException) {
+				return null;
+			}
+		};
+		$from = $date($str('created_from'), false);
+		$to = $date($str('created_to'), true);
+		$inNotes = $search !== '' || $str('preserve_notes') === '1' || $combined;
+		$inTags = $tags !== '' || $str('preserve_tags') === '1' || $combined;
+		if (!$inNotes && !$inTags) {
+			[$inNotes, $inTags] = [true, true];
+		}
+		$state = [
+			'active' => $search !== '' || $tags !== '' || $from !== null || $to !== null,
+			'search' => $search,
+			'tags' => $tags,
+			'from' => $from !== null ? $str('created_from') : '',
+			'to' => $to !== null ? $str('created_to') : '',
+			'inNotes' => $inNotes,
+			'inTags' => $inTags,
+			'combined' => $inNotes && $inTags,
+			'ids' => [],
+		];
+		if (!$state['active']) {
+			return $state;
+		}
+		$byId = [];
+		foreach ($notes as $n) {
+			if (($from === null || (int)$n->getCreatedAt() >= $from) && ($to === null || (int)$n->getCreatedAt() <= $to)) {
+				$byId[(int)$n->getId()] = $n;
+			}
+		}
+		$noteHits = null;
+		if ($search !== '') {
+			// jedes Wort bzw. "Phrase" in Titel oder Text (search_text: gefaltet); höchstens MAX_TERMS Begriffe, Rest ignoriert
+			preg_match_all('/"([^"]+)"|\S+/u', $search, $m, PREG_SET_ORDER);
+			$terms = array_map(fn (array $t) => $this->normalizer->fold($t[1] ?? $t[0]), array_slice($m, 0, self::MAX_TERMS));
+			$first = reset($byId);
+			$noteHits = $first === false ? [] : array_fill_keys($this->notes->idsMatchingAll((int)$first->getWorkspaceId(), $terms), true);
+		}
+		$tagHits = null;
+		if ($tags !== '') {
+			$words = array_map(fn (string $w) => $this->normalizer->fold($w), preg_split('/[,\s]+/u', $tags, -1, PREG_SPLIT_NO_EMPTY) ?: []);
+			$tagHits = [];
+			foreach (array_intersect_key($tagMap, $byId) as $id => $list) {
+				$haystack = $this->normalizer->fold(implode(',', $list));
+				foreach ($words as $w) {
+					if (!str_contains($haystack, $w)) {
+						continue 2;
+					}
+				}
+				$tagHits[(int)$id] = true;
+			}
+		}
+		if ($noteHits === null && $tagHits === null) {
+			$ids = array_fill_keys(array_keys($byId), true);
+		} elseif ($noteHits === null || $tagHits === null) {
+			$ids = $noteHits ?? $tagHits;
+		} else {
+			$ids = $combined ? $noteHits + $tagHits : array_intersect_key($noteHits, $tagHits);
+		}
+		$state['ids'] = array_intersect_key($ids, $byId);
+		return $state;
 	}
 
 	/** @return array{id: int, heading: ?string, workspace: ?string} GET /notes/resolve */

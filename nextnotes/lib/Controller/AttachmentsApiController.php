@@ -14,6 +14,7 @@ use OCA\NextNotes\Service\WorkspaceService;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\Attribute\UserRateLimit;
+use OCP\AppFramework\Http\EmptyContentSecurityPolicy;
 use OCP\AppFramework\Http\FileDisplayResponse;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
@@ -62,8 +63,12 @@ class AttachmentsApiController extends ApiController {
 		$response->addHeader('Content-Type', $type);
 		$response->addHeader('Content-Disposition', ($inline ? 'inline' : 'attachment') . '; filename="' . $ascii . '"; filename*=UTF-8\'\'' . rawurlencode($name));
 		$response->addHeader('X-Content-Type-Options', 'nosniff');
-		// PDF-Betrachter der Browser laufen nicht unter sandbox; sonst immer abgeschottet
-		if ($type !== 'application/pdf') {
+		// PDF-Betrachter der Browser laufen nicht unter sandbox; PDF nur im eigenen iFrame (ADR 0012 Nachtrag), sonst abgeschottet
+		if ($type === 'application/pdf') {
+			$csp = new EmptyContentSecurityPolicy();
+			$csp->addAllowedFrameAncestorDomain("'self'");
+			$response->setContentSecurityPolicy($csp);
+		} else {
 			$response->addHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'self'; sandbox");
 		}
 		if (!$download) {

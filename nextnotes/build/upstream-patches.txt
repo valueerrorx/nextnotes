@@ -4,3 +4,12 @@
 src/public/js/note-edit-lock.js
 src/public/js/note-loader.js
 src/public/js/notes.js
+src/public/js/attachments.js
+src/public/js/note-attachment-menu.js
+src/public/js/note-image-actions.js
+src/public/js/tasklist-order-drag.js
+src/public/js/tasklist-render.js
+src/public/js/tasklist-subtasks.js
+src/public/js/ui.js
+src/public/js/utils-kanban.js
+src/public/js/events-drag-drop.js

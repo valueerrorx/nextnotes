@@ -20,7 +20,7 @@ Option 4:
 
 ## Konsequenzen
 - Eigene Regeln in `css-src/`, die Upstream-Elemente überschreiben, brauchen ≥ 1,1,0 (z. B. `#nextnotes-root .klasse`) und stehen nach den Upstream-Bundles.
-- Von Upstream an `body` angehängte Elemente (Menüs, Modals) erhalten Upstream-Regeln mit Klasse wie im App-Bereich; der Formular-Reset gilt dort nicht (NC-Werte nur für Eigenschaften, die Upstream nicht setzt). Prüfen in M3b, ggf. Reset-Bereich erweitern.
+- Von Upstream an `body` angehängte Elemente (Menüs, Modals) erhalten Upstream-Regeln mit Klasse wie im App-Bereich; der Formular-Reset gilt dort nicht (NC-Werte nur für Eigenschaften, die Upstream nicht setzt). Prüfen in M3b, ggf. Reset-Bereich erweitern. Geprüft M3b2 (Hell/Dunkel: Anhang-, Bild-, Slash-Menü, Fälligkeits- und Verschieben-Dialog, Eingabe-Modal): nur das Eingabe-Modal (`ui.js` `#inputModal`) erhält NC-`min-height`/`margin` an Knöpfen und Feld, optisch unauffällig → Reset-Bereich bleibt `#nextnotes-root`.
 - Upstream-Klassen, die zufällig auch NC-Elemente tragen, wirken dort stärker. Smoke M3a2: 0 App-Regeln treffen Elemente in NC-Kopf und Benutzermenü (Regel-Scan im Browser).
 - NC-Fokusring auf Knöpfen (`box-shadow … !important` bei `:focus-visible`) bleibt erhalten.
 - CSS-Größe: gzip 135,7 → 139,0 KB (+2,4 %, Grenze 230 KB).

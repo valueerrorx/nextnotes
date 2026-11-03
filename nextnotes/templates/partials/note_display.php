@@ -6,8 +6,8 @@
 // abgeleitet von src/note_display.php @ 7e2e0b6aa501ba95ac1e9789fd2bb477c281a001
 // Geöffnete Notiz in #right_col. Daten: $note (IndexViewService::noteView), Inhalt beim Speichern durch HtmlSanitizer geprüft.
 // Weggelassen: Teilen/öffentlicher Link (gestrichen), Download/Drucken (Export M4), Umwandeln (501 bis M4),
-// Revisionen und Notiz-Info (revisions.php/api_note_info.php M3c), Aufgabenseite (M4), Audio-Aufnahme und
-// Anhang-Zeile/-Vorschau (M3b2), Excalidraw-Platzhalter-Bereinigung (kein Altbestand).
+// Revisionen und Notiz-Info (revisions.php/api_note_info.php M3c), Aufgabenseite (M4), Audio-Aufnahme,
+// Excalidraw-Platzhalter-Bereinigung (kein Altbestand). Anhang-Vorschauen rendert attachments.js beim Laden.
 /** @var \OCA\NextNotes\Service\View\PageTranslator $tr */
 /** @var array $note */
 $id = (string)$note['id'];
@@ -17,6 +17,15 @@ $editable = $type !== 'markdown' && $note['canWrite'] ? 'true' : 'false';
 $prose = $type === 'note' || $type === 'markdown';
 $btn = static function (string $class, string $action, string $icon, string $title, bool $withId = true) use ($id): void {
 	?><button type="button" class="toolbar-btn <?php p($class); ?>" title="<?php p($title); ?>" data-action="<?php p($action); ?>"<?php if ($withId): ?> data-note-id="<?php p($id); ?>"<?php endif; ?>><i class="lucide <?php p($icon); ?>"></i></button><?php
+};
+// Anhangzeile (Upstream $attachment_links_html), nur ohne Vorschauen; Klick lädt herunter (index-events.js)
+$attachmentsRow = static function () use ($note, $tr, $id): void {
+	if ($note['attachmentLinks'] === []) {
+		return;
+	}
+	$shown = count(array_filter($note['attachmentLinks'], static fn (array $a) => !$a['inline']));
+	$open = $tr->t('attachments.actions.open_attachments', [], 'Open attachments');
+	?><div class="note-attachments-row"<?php if ($shown === 0): ?> style="display: none;"<?php endif; ?>><button type="button" class="icon-attachment-btn" title="<?php p($open); ?>" data-action="show-attachment-dialog" data-note-id="<?php p($id); ?>" aria-label="<?php p($open); ?>"><span class="lucide lucide-paperclip icon_attachment"></span></button><span class="note-attachments-list"><?php foreach ($note['attachmentLinks'] as $i => $a): ?><?php if ($i > 0): ?> <?php endif; ?><a href="#" class="attachment-link"<?php if ($a['inline']): ?> data-is-inline-image="true" style="display: none;"<?php endif; ?> data-action="download-attachment" data-attachment-id="<?php p((string)$a['id']); ?>" data-note-id="<?php p($id); ?>" title="<?php p($tr->t('attachments.actions.download', ['filename' => $a['name']], 'Download {{filename}}')); ?>"><?php p($a['name']); ?></a><?php endforeach; ?></span></div><?php
 };
 $item = static function (string $action, string $icon, string $label, array $data = []) use ($id): void {
 	?><button type="button" class="dropdown-item mobile-toolbar-item" role="menuitem" data-action="<?php p($action); ?>"<?php foreach ($data as $k => $v): ?> data-<?php p($k); ?>="<?php p($v); ?>"<?php endforeach; ?>><i class="lucide <?php p($icon); ?>"></i> <?php p($label); ?></button><?php
@@ -125,6 +134,7 @@ $item = static function (string $action, string $icon, string $label, array $dat
 	</div>
 	<span class="name_tags"><input type="hidden" id="tags<?php p($id); ?>" value="<?php p($note['tags']); ?>"/></span>
 </div>
+<?php if (!$note['attachmentsAtBottom']) { $attachmentsRow(); } ?>
 <input type="hidden" id="folder<?php p($id); ?>" value="<?php p($note['folderName']); ?>"/>
 <input type="hidden" id="folderId<?php p($id); ?>" value="<?php p($note['folderId'] !== null ? (string)$note['folderId'] : ''); ?>"/>
 <h4 class="note-title-heading"<?php if ($note['titleColor'] !== ''): ?> data-title-color="<?php p($note['titleColorRaw']); ?>"<?php endif; ?><?php if ($note['titleSize'] !== null): ?> data-title-size="<?php p((string)$note['titleSize']); ?>" style="--note-title-size: <?php p((string)$note['titleSize']); ?>px;"<?php endif; ?>>
@@ -142,6 +152,7 @@ $item = static function (string $action, string $icon, string $label, array $dat
 <?php else: ?>
 <div class="noteentry" autocomplete="off" autocapitalize="off" spellcheck="<?php p($note['spellcheck'] ? 'true' : 'false'); ?>"<?php if ($note['spellcheck']): ?> lang="<?php p($note['lang']); ?>"<?php endif; ?> id="entry<?php p($id); ?>" data-note-id="<?php p($id); ?>" data-note-heading="<?php p($note['heading']); ?>" data-ph="<?php p($tr->t('index.editor.placeholder_desktop', [], 'Enter text, use / or right-click for command menu, paste images or drop an image at cursor.')); ?>"<?php if ($type === 'note'): ?> data-ph-mobile="<?php p($tr->t('index.editor.placeholder_mobile', [], 'Enter text or paste images here...')); ?>"<?php endif; ?><?php if (!$note['canWrite']): ?> data-nextnotes-readonly="true"<?php endif; ?> contenteditable="<?php p($editable); ?>" data-note-type="<?php p($type); ?>"<?php if ($type === 'tasklist'): ?> data-tasklist-json="<?php p($note['content']); ?>"<?php endif; ?><?php if ($note['linkedNoteId'] !== null): ?> data-linked-note-id="<?php p((string)$note['linkedNoteId']); ?>"<?php endif; ?>><?php print_unescaped($note['display']); ?></div>
 <?php endif; ?>
+<?php if ($note['attachmentsAtBottom']) { $attachmentsRow(); } ?>
 <div class="note-scroll-edge-controls">
 	<button type="button" class="note-scroll-edge-btn note-scroll-top-btn" data-action="scroll-note-top" data-note-id="<?php p($id); ?>" title="<?php p($tr->t('common.scroll_top', [], 'Scroll to top')); ?>" aria-label="<?php p($tr->t('common.scroll_top', [], 'Scroll to top')); ?>" disabled><i class="lucide lucide-arrow-up"></i></button>
 	<button type="button" class="note-scroll-edge-btn note-scroll-bottom-btn" data-action="scroll-note-bottom" data-note-id="<?php p($id); ?>" title="<?php p($tr->t('common.scroll_bottom', [], 'Scroll to bottom')); ?>" aria-label="<?php p($tr->t('common.scroll_bottom', [], 'Scroll to bottom')); ?>" disabled><i class="lucide lucide-arrow-down"></i></button>

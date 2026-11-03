@@ -1,6 +1,6 @@
 # Status Nextcloud-Port „Next Notes“
 
-**Aktueller Meilenstein:** M3 – Frontend-Grundlage und Editor (M3a1, M3a2, M3b1 fertig, weiter M3b2); M1, M2 fertig
+**Aktueller Meilenstein:** M3 – Frontend-Grundlage und Editor (M3a1, M3a2, M3b1, M3b2 fertig, weiter M3c); M1, M2 fertig
 
 ## Erledigte Slices
 - Setup: Branch `nextcloud-port`, Agenten unter `.claude/agents/`, `UPSTREAM.md`
@@ -31,6 +31,7 @@ Vorläufig (M3-Plan O6):
 
 Vorläufig (M3b1):
 - Ohne `?note=` bleibt die rechte Spalte leer (Upstream öffnet die zuletzt bearbeitete Notiz)
+- Nach einer Suche öffnet rechts der neueste Treffer (wie Upstream) (M3b2)
 - Upstream-PR-Kandidaten an Poznote (nur mit Freigabe): P9/B31 (Reload nach Notizöffnen verlässt App), P10/B32 (Tippen während Speichern ging verloren)
 
 Vorläufig (M2d):
@@ -81,6 +82,10 @@ Vorläufig (M2d):
   Testnachweis (sqlite/nginx): PHPUnit voll 235/235 (7486 Assertions); E2E `editor` 118 je Theme (Hell/Dunkel), `stripped` 113, `assets` 82, `budget` 21, `xss` 82, `frame` 143 – 0 CSP/pageerror/Konsolenfehler; check-upstream grün; `down.sh all` 0. Andere DBs/Apache nicht (kein SQL geändert; Teststufe Slice).
   Hinweis: PHPUnit voll dauert ~10 min – bei Nachläufen gefiltert laufen lassen.
 
+- M3b2 erledigt: Anhänge (Zeile, Download, Löschen, Bild-Drop), PDF im iFrame (B22), Audio-Player, Mermaid/KaTeX unter CSP, Such-POST mit Token (requesttoken nie in URL/History), Tag-Klick-Filter, P2 (keine Inline-Handler mehr), P1 (`new Function` entfernt, B3), P3 entfällt, P12 (Anhang-Menü unter App-Pfad). Suche: eine ID-Abfrage `NoteMapper::idsMatchingAll`, max. 20 Begriffe, Tags einmal pro Seite. Keine neuen `print_unescaped`.
+  Review `M3b2-diff-r1` FREIGABE mit Hinweisen (Performance Suche, P1/P3) → vom Lead nachgezogen.
+  Testnachweis: PHPUnit voll sqlite 235/235; nach Fix `PageSearchTest|UnifiedSearchTest` auf sqlite, mariadb, pgsql OK; E2E nginx alle 7 Specs Hell+Dunkel grün (attachments-search 137, editor 118, frame 143, stripped 113, xss 82, assets 82, budget 21), Apache `attachments-search`+`editor` Hell grün inkl. Auslieferungs-Header; 0 CSP/pageerror/Konsolenfehler; check-upstream grün.
+
 ## M2 (fertig)
 - Plan `docs/slices/M2-plan.md` r1: Slices M2a (Gerüst, Rechte, Notizen/Ordner/Workspaces/Tags/Papierkorb, M1-Nacharbeit), M2b (Anhänge, Snapshots, Suche, Sperre, Unified Search), M2c (Tasks, Mentions, Erinnerungen, Settings, Konvertierung), M2d (Kontolöschung, Abschlusslauf 3 DBs)
 
@@ -105,7 +110,8 @@ Vorläufig (M2d):
 - erledigt in M3a2: doppelter Tasklist-Request, doppeltes `X-Requested-With`, `Inter`-Prüfung
 - M4: `allowed_iframe_domains` im Admin-Formular auch mit Schema (`https://…`) annehmen bzw. normalisieren, Fehler melden statt still verwerfen
 - M3b: Suche schreibt `requesttoken` per History-Update in die URL (mit Such-POST beheben); an `body` angehängte Poznote-Elemente ohne Formular-Reset prüfen; eigene Overrides brauchen Spezifität ≥ 1,1,0
+- M7: nginx-Beispielkonfiguration sendet `X-Content-Type-Options` doppelt (App setzt ihn bereits) – in Betriebsdoku/Beispiel-Conf bereinigen
 - Hinweis: CSS-Nesting (`&`) zählt `check-css` nicht mit – bei Upstream-Updates beachten
 
 ## Nächster Schritt
-M3b2 – Anhänge, PDF im iFrame, Mermaid/KaTeX, Such-POST (requesttoken nicht in URL), P2 (CSP-Inline-Handler), Tag-Klick-Filter: architekt → tester + speccritic.
+M3c – Fremdzugriff Seiten-/Kompatibilitätsrouten (inkl. Lesefreigabe → 403 für schreibende Routen), Kanban-Route, `attachments.php`, Revisionen/Notiz-Info, `KNOWN_MISSING` leer, Abschlusslauf volle Matrix (Meilenstein-Ende): architekt → tester + speccritic.

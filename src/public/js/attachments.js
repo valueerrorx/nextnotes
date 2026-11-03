@@ -323,15 +323,15 @@ function displayAttachments(attachments) {
         html += '<small>' + fileSize + ' - ' + uploadDate + '</small>';
         html += '</div>';
         html += '<div class="attachment-actions">';
-        html += '<button onclick="downloadAttachment(\'' + attachment.id + '\')" title="' + titleView + '">';
+        html += '<button data-action="download-attachment" data-attachment-id="' + attachment.id + '" title="' + titleView + '">';
         html += '<i class="lucide lucide-eye"></i>';
         html += '</button>';
         if (canTranscribe && isAudioAttachment(attachment)) {
-            html += '<button onclick="transcribeAttachmentFromList(\'' + attachment.id + '\')" title="' + titleTranscribe + '">';
+            html += '<button data-action="transcribe-attachment" data-attachment-id="' + attachment.id + '" title="' + titleTranscribe + '">';
             html += '<i class="lucide lucide-mic"></i>';
             html += '</button>';
         }
-        html += '<button onclick="deleteAttachment(\'' + attachment.id + '\')" title="' + titleDelete + '" class="delete-btn">';
+        html += '<button data-action="delete-attachment" data-attachment-id="' + attachment.id + '" title="' + titleDelete + '" class="delete-btn">';
         html += '<i class="lucide lucide-trash-2"></i>';
         html += '</button>';
         html += '</div>';
@@ -692,7 +692,7 @@ function updateAttachmentCountInMenu(noteId) {
 
                         // Build the HTML content
                         var openAttachmentsLabel = tr('attachments.actions.open_attachments', {}, 'Open attachments');
-                        var attachmentsHtml = '<button type="button" class="icon-attachment-btn" title="' + openAttachmentsLabel + '" onclick="showAttachmentDialog(\'' + noteId + '\')" aria-label="' + openAttachmentsLabel + '"><span class="lucide lucide-paperclip icon_attachment"></span></button>';
+                        var attachmentsHtml = '<button type="button" class="icon-attachment-btn" title="' + openAttachmentsLabel + '" data-action="show-attachment-dialog" data-note-id="' + noteId + '" aria-label="' + openAttachmentsLabel + '"><span class="lucide lucide-paperclip icon_attachment"></span></button>';
                         attachmentsHtml += '<span class="note-attachments-list">';
 
                         var attachmentLinks = [];
@@ -706,7 +706,7 @@ function updateAttachmentCountInMenu(noteId) {
                                 var dlTitle = tr('attachments.actions.download', { filename: safeFilename }, 'Download {{filename}}');
                                 var linkStyle = isInline ? ' style="display: none;"' : '';
                                 var linkAttr = isInline ? ' data-is-inline-image="true"' : '';
-                                attachmentLinks.push('<a href="#" class="attachment-link"' + linkAttr + linkStyle + ' data-attachment-id="' + att.id + '" data-note-id="' + noteId + '" onclick="downloadAttachment(\'' + att.id + '\', \'' + noteId + '\')" title="' + dlTitle + '">' + safeFilename + '</a>');
+                                attachmentLinks.push('<a href="#" class="attachment-link"' + linkAttr + linkStyle + ' data-attachment-id="' + att.id + '" data-note-id="' + noteId + '" data-action="download-attachment" title="' + dlTitle + '">' + safeFilename + '</a>');
                                 if (!isInline) visibleLinksCountForRow++;
                             }
                         }

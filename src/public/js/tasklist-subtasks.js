@@ -43,9 +43,9 @@ function renderSubtaskRows(task, noteId) {
 
     return getTaskSubtasks(task).map(subtask => `
             <div class="task-subitem ${subtask.completed ? 'completed' : ''}" data-subtask-id="${subtask.id}">
-                <input type="checkbox" class="task-subitem-checkbox" ${subtask.completed ? 'checked' : ''} onchange="toggleSubtask(${task.id}, ${subtask.id}, ${noteId})">
-                <span class="task-subitem-text" onclick="editSubtask(${task.id}, ${subtask.id}, ${noteId})">${linkifyHtml(subtask.text)}</span>
-                <button type="button" class="task-subitem-delete" title="${deleteTitle}" onclick="deleteSubtask(${task.id}, ${subtask.id}, ${noteId})">
+                <input type="checkbox" class="task-subitem-checkbox" ${subtask.completed ? 'checked' : ''} data-action="subtask-toggle" data-task-id="${task.id}" data-subtask-id="${subtask.id}" data-note-id="${noteId}">
+                <span class="task-subitem-text" data-action="subtask-edit" data-task-id="${task.id}" data-subtask-id="${subtask.id}" data-note-id="${noteId}">${linkifyHtml(subtask.text)}</span>
+                <button type="button" class="task-subitem-delete" title="${deleteTitle}" data-action="subtask-delete" data-task-id="${task.id}" data-subtask-id="${subtask.id}" data-note-id="${noteId}">
                     <i class="lucide lucide-x"></i>
                 </button>
             </div>`).join('');

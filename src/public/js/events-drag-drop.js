@@ -166,7 +166,7 @@ function setupNoteDragDropEvents() {
         }
 
         // Handle click/tap events separately
-        var dataOnclick = link.getAttribute('data-onclick') || link.getAttribute('onclick');
+        var dataOnclick = null; // Next Notes P1: no code from DOM attributes (CSP, B3); note links use the normal click handlers
         if (dataOnclick) {
             link.removeAttribute('onclick'); // Remove to avoid conflicts
 
@@ -178,8 +178,7 @@ function setupNoteDragDropEvents() {
                         sessionStorage.setItem('shouldScrollToNote', 'true');
                     }
 
-                    var func = new Function('event', dataOnclick);
-                    func.call(link, evt);
+                    // Next Notes P1: new Function removed (CSP without unsafe-eval, B3)
                 } catch (err) {
                     console.error('Error executing click handler:', err);
                 }

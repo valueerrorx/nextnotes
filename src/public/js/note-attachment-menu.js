@@ -20,7 +20,7 @@
 (function () {
     'use strict';
 
-    var ATTACHMENT_PATH = /^\/api\/v1\/notes\/(\d+)\/attachments\/([A-Za-z0-9_-]+)\/?$/;
+    var ATTACHMENT_PATH = /\/api\/v1\/notes\/(\d+)\/attachments\/([A-Za-z0-9_-]+)\/?$/;
 
     var menuEl = null;
     // Every opening gets a number: the menu waits for the attachment's

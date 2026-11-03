@@ -73,9 +73,9 @@ Jede Slice ist für sich lauffähig (`run-m3.sh` grün) und wird einzeln committ
 ### 1.5 Upstream-Patches in M3 (SPEC §11.1)
 | # | Slice | Datei | Änderung |
 |---|---|---|---|
-| P1 | M3b | `events-drag-drop.js:181` | `new Function` → `data-action`-Registry (B3) |
+| P1 | M3b | `events-drag-drop.js:181` | `new Function` entfernt, `data-onclick` nicht mehr gelesen (B3; erledigt M3b2, ohne Registry) |
 | P2 | M3b | 7 Dateien aus §11.1 | `onclick="…"` in erzeugtem HTML → `data-action` + Delegation |
-| P3 | M3b | `tasklist-render.js:19` u. a. | `action="javascript:void(0)"` → Listener mit `preventDefault` |
+| P3 (entfällt) | M3b | `tasklist-render.js:19` u. a. | `action="javascript:void(0)"`: Submit-Listener rufen bereits `preventDefault`, CSP blockiert den Rückfall (SPEC §11.1, M3b2) |
 | P4 | M3a2 | `index-events.js` | entfällt, wenn der Auslöser `navigate-to-profile` im Template fehlt (Vorschlag); sonst Patch wie §11.1 |
 | P5 | M3b (bedingt) | §11.1 | nur bei gemessenen 404 trotz MutationObserver |
 | P7 (neu) | M3b | `note-edit-lock.js:309` | `isLockHeldByDifferentUser` → „von anderer Editor-Sitzung gehalten“ (`!holder_is_current_editor_session`); Banner, Nur-Lesen und Übernahme-Hinweis auch beim gleichen Konto im zweiten Tab (SPEC B13; Plan-M2 R11). Upstream-PR-Kandidat: nein (folgt aus ADR 0005) |

@@ -181,7 +181,7 @@ function linkifyHtml(text) {
         
         // Use double quotes around attributes and stop propagation on click to avoid editing
         // Add title attribute to show full URL on hover
-        return `<a href="${href}" target="_blank" rel="noopener noreferrer" data-task-url="true" title="${m}" onclick="return handleTaskLinkClick(event);">${displayText}</a>`;
+        return `<a href="${href}" target="_blank" rel="noopener noreferrer" data-task-url="true" title="${m}" data-action="task-link">${displayText}</a>`;
     });
 
     return replaced;

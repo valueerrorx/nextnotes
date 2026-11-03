@@ -11,6 +11,7 @@ namespace OCA\NextNotes\Controller;
 
 use OCA\NextNotes\AppInfo\Application;
 use OCA\NextNotes\Http\CspFactory;
+use OCA\NextNotes\Service\AttachmentService;
 use OCA\NextNotes\Service\Exception\NotFoundException;
 use OCA\NextNotes\Service\SettingsService;
 use OCA\NextNotes\Service\View\IndexViewService;
@@ -40,14 +41,29 @@ class PageController extends Controller {
 		private IAppManager $appManager,
 		private SettingsService $settings,
 		private IndexViewService $indexView,
+		private AttachmentService $attachments,
 	) {
 		parent::__construct(Application::APP_ID, $request);
 	}
+
+	// Suchfelder der Hauptansicht (Upstream initializeSearchParams, handleUnifiedSearch)
+	private const SEARCH_PARAMS = ['search', 'tags_search', 'created_from', 'created_to', 'search_combined', 'unified_search',
+		'search_in_notes', 'search_in_tags', 'preserve_notes', 'preserve_tags'];
 
 	// Hauptansicht (Upstream index.php); fremde/unbekannte ?note= → NC-404 ohne Inhalt
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
 	public function index(): TemplateResponse {
+		return $this->render();
+	}
+
+	// Such-Formular (POST index.php, Upstream search_handler.php); CSRF über das versteckte Feld requesttoken
+	#[NoAdminRequired]
+	public function search(): TemplateResponse {
+		return $this->render();
+	}
+
+	private function render(): TemplateResponse {
 		$user = $this->userSession->getUser();
 		$uid = $user?->getUID() ?? '';
 		$lang = $this->translator->languageFor($this->settings->read($uid, 'language'));
@@ -62,7 +78,7 @@ class PageController extends Controller {
 				'workspace' => $this->request->getParam('workspace'),
 				'folder' => $this->request->getParam('folder'),
 				'open_folder' => $this->request->getParam('open_folder'),
-			]);
+			] + array_combine(self::SEARCH_PARAMS, array_map(fn (string $k) => $this->request->getParam($k), self::SEARCH_PARAMS)));
 		} catch (NotFoundException) {
 			$response = new TemplateResponse('core', '404', [], TemplateResponse::RENDER_AS_GUEST);
 			$response->setStatus(Http::STATUS_NOT_FOUND);
@@ -102,6 +118,30 @@ class PageController extends Controller {
 		}
 		$response = new TemplateResponse(Application::APP_ID, 'fragment', ['tr' => $this->translator, 'note' => $view['note']], TemplateResponse::RENDER_AS_BLANK);
 		$response->setContentSecurityPolicy($this->cspFactory->forView('index'));
+		return $response;
+	}
+
+	// Upstream audio_player.php: nur <audio> für den Anhang; fremde/unbekannte IDs → 404 (Leserecht wie Download)
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function audioPlayer(): TemplateResponse {
+		$note = $this->request->getParam('note');
+		$attachment = $this->request->getParam('attachment');
+		$workspace = $this->request->getParam('workspace');
+		try {
+			if (!is_string($note) || !is_string($attachment) || !ctype_digit($note) || !ctype_digit($attachment)) {
+				throw new NotFoundException('Attachment not found');
+			}
+			$this->attachments->download($this->userSession->getUser()?->getUID() ?? '', (int)$note, (int)$attachment, $workspace);
+		} catch (NotFoundException) {
+			$response = new TemplateResponse('core', '404', [], TemplateResponse::RENDER_AS_BLANK);
+			$response->setStatus(Http::STATUS_NOT_FOUND);
+			return $response;
+		}
+		$src = rtrim($this->urls->linkToRoute('nextnotes.page.index'), '/') . '/api/v1/notes/' . (int)$note . '/attachments/' . (int)$attachment
+			. (is_string($workspace) && $workspace !== '' ? '?' . http_build_query(['workspace' => $workspace]) : '');
+		$response = new TemplateResponse(Application::APP_ID, 'audio_player', ['src' => $src], TemplateResponse::RENDER_AS_BLANK);
+		$response->setContentSecurityPolicy($this->cspFactory->forView('audio_player'));
 		return $response;
 	}
 
