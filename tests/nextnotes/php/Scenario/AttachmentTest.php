@@ -225,13 +225,19 @@ final class AttachmentTest extends ApiTestCase {
 			$st = array_map(static fn ($r) => $r->status, $rs);
 			sort($st);
 			$statuses[] = implode('/', $st);
-			// Invariante überall: nie beide gespeichert. SQLite: Schreibsperre (database is locked) kann 500 liefern
+			// Invariante überall: nie beide gespeichert, nie 500. SQLite: Sperr-Timeout → 503 mit Retry-After (SPEC §4.1)
 			$sqlite = self::db()->getDatabaseProvider() === IDBConnection::PLATFORM_SQLITE;
-			if ($st === [201, 201] || (!$sqlite && $st !== [201, 413]) || ($sqlite && !in_array($st, [[201, 413], [201, 500]], true))) {
+			$allowed = $sqlite ? [[201, 413], [201, 503]] : [[201, 413]];
+			if (!in_array($st, $allowed, true)) {
 				$errors[] = "Runde $round: " . implode(' | ', array_map(static fn ($r) => mb_substr($r->describe(), 0, 160), $rs));
 			}
-			if ($sqlite && $st === [201, 500]) {
-				fwrite(STDERR, "Hinweis SQLite: paralleler Upload Runde $round → 500 (database is locked)\n");
+			foreach ($rs as $r) {
+				if ($r->status === 503 && trim((string)$r->header('Retry-After')) === '') {
+					$errors[] = "Runde $round: 503 ohne Retry-After";
+				}
+			}
+			if ($st === [201, 503]) {
+				fwrite(STDERR, "Hinweis SQLite: paralleler Upload Runde $round → 503 Retry-After=" . implode(',', array_map(static fn ($r) => (string)$r->header('Retry-After'), $rs)) . "\n");
 			}
 			// zurücksetzen: alle Anhänge löschen
 			foreach ([$n1, $n2] as $n) {

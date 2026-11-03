@@ -50,7 +50,7 @@ class WorkspaceService {
 	) {
 	}
 
-	private function reset(): void {
+	public function reset(): void {
 		$this->keys = [];
 		$this->visible = [];
 		$this->access->resetCache();

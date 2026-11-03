@@ -139,9 +139,10 @@ class DuplicateService {
 		if ($wsId !== $src->getWorkspaceId()) {
 			$this->access->requireWorkspace($uid, (int)$src->getWorkspaceId(), 'manage');
 		}
+		$quota = $this->attachments->quotaFor($wsId, $this->attachments->bytesOf([$id]));
 		$created = [];
-		$copy = $this->run(function () use ($src, $id, $wsId, $folderId, $uid, &$created) {
-			$this->attachments->assertQuota($wsId, $this->attachments->bytesOf([$id]));
+		$copy = $this->run(function () use ($src, $wsId, $folderId, $uid, $quota, &$created) {
+			$this->attachments->enforceQuota($quota);
 			return $this->cloneNote($src, $wsId, $folderId, $uid, $created);
 		}, $created);
 		return ['id' => (int)$copy->getId(), 'heading' => $copy->getHeading(), 'message' => 'Note duplicated successfully', 'share_delta' => 0];
@@ -165,9 +166,10 @@ class DuplicateService {
 		$parentId = $folder->getParentId();
 		$name = $this->validator->folderName($this->uniqueFolderName($wsId, $parentId, (string)$folder->getName()));
 		$stats = ['notes' => 0, 'folders' => 0, 'pairs' => []];
+		$quota = $this->attachments->quotaFor($wsId, $this->attachments->bytesOf(array_map(static fn (Note $n) => (int)$n->getId(), $sourceNotes)));
 		$created = [];
-		$newId = $this->run(function () use ($folder, $name, $parentId, $wsId, $byId, $byFolder, $sourceNotes, $uid, &$stats, &$created) {
-			$this->attachments->assertQuota($wsId, $this->attachments->bytesOf(array_map(static fn (Note $n) => (int)$n->getId(), $sourceNotes)));
+		$newId = $this->run(function () use ($folder, $name, $parentId, $wsId, $byId, $byFolder, $uid, $quota, &$stats, &$created) {
+			$this->attachments->enforceQuota($quota);
 			$newId = $this->copyTree($folder, $name, $parentId, $wsId, $byId, $byFolder, $uid, $stats, $created, 0);
 			$this->rewriteLinks($stats['pairs']);
 			return $newId;

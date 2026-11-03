@@ -122,7 +122,9 @@
         "nn_note_upd": [false, ["updated_at"]],
         "nn_note_asg": [false, ["assignment_id"]],
         "nn_note_sub": [true, ["submission_id"]],
-        "nn_note_link": [false, ["linked_note_id"]]
+        "nn_note_link": [false, ["linked_note_id"]],
+        "nn_note_cby": [false, ["created_by"]],
+        "nn_note_uby": [false, ["updated_by"]]
       }
     },
     "nextnotes_note_tags": {
@@ -149,7 +151,8 @@
         "created_at": ["bigint", true, null, null, false]
       },
       "indexes": {
-        "nn_att_note": [false, ["note_id"]]
+        "nn_att_note": [false, ["note_id"]],
+        "nn_att_cby": [false, ["created_by"]]
       }
     },
     "nextnotes_snapshots": {
@@ -165,7 +168,8 @@
         "created_at": ["bigint", true, null, null, false]
       },
       "indexes": {
-        "nn_snap_note": [false, ["note_id", "created_at"]]
+        "nn_snap_note": [false, ["note_id", "created_at"]],
+        "nn_snap_cby": [false, ["created_by"]]
       }
     },
     "nextnotes_reminders": {
@@ -213,7 +217,8 @@
         "updated_at": ["bigint", true, null, null, false]
       },
       "indexes": {
-        "nn_men_uniq": [true, ["note_id", "user_id"]]
+        "nn_men_uniq": [true, ["note_id", "user_id"]],
+        "nn_men_user": [false, ["user_id"]]
       }
     }
   }

@@ -134,24 +134,40 @@ class AttachmentService {
 		}
 	}
 
-	// Quota beim Workspace-Besitzer (Thomas; Team-Workspaces bis M5 einzeln)
-	private function checkQuota(Note $note, int $bytes): void {
-		$this->assertQuota((int)$note->getWorkspaceId(), $bytes);
+	/**
+	 * Quota beim Workspace-Besitzer (Thomas; Team-Workspaces bis M5 einzeln). Vor der Transaktion: Besitzer lesen, Vorprüfung ohne Sperre
+	 * @return array{type: string, id: string, ws: int, bytes: int}|null null = nichts zu prüfen
+	 */
+	public function quotaFor(int $workspaceId, int $bytes): ?array {
+		if ($bytes <= 0) {
+			return null;
+		}
+		$ws = $this->workspaceMapper->find($workspaceId);
+		$quota = ['type' => (string)$ws->getOwnerType(), 'id' => (string)$ws->getOwnerId(), 'ws' => (int)$ws->getId(), 'bytes' => $bytes];
+		$this->checkQuotaSum($quota);
+		return $quota;
 	}
 
-	/** Innerhalb der Transaktion aufrufen, die die Anhänge anlegt: sperrt die Besitzer-Zeilen, parallele Uploads warten */
-	public function assertQuota(int $workspaceId, int $bytes): void {
-		if ($bytes <= 0) {
+	/**
+	 * Erste Anweisung der Transaktion: Besitzer sperren (SQLite: Schreibsperre vor jedem Lesen), dann unter Sperre erneut prüfen
+	 * @param array{type: string, id: string, ws: int, bytes: int}|null $quota
+	 */
+	public function enforceQuota(?array $quota): void {
+		if ($quota === null) {
 			return;
 		}
+		$this->workspaceMapper->lockOwner($quota['type'], $quota['id']);
+		$this->checkQuotaSum($quota);
+	}
+
+	/** @param array{type: string, id: string, ws: int, bytes: int} $quota */
+	private function checkQuotaSum(array $quota): void {
 		$limit = $this->appConfig->getValueInt(Application::APP_ID, 'attachment_quota_mb', 500) * self::MB;
-		$ws = $this->workspaceMapper->find($workspaceId);
-		$this->workspaceMapper->lockOwner((string)$ws->getOwnerType(), (string)$ws->getOwnerId());
-		$wsIds = [(int)$ws->getId()];
-		if ($ws->getOwnerType() === 'user') {
-			$wsIds = array_map(static fn ($w) => (int)$w->getId(), $this->workspaceMapper->findOwned((string)$ws->getOwnerId()));
+		$wsIds = [$quota['ws']];
+		if ($quota['type'] === 'user') {
+			$wsIds = array_map(static fn ($w) => (int)$w->getId(), $this->workspaceMapper->findOwned($quota['id']));
 		}
-		if ($this->attachments->sizeInWorkspaces($wsIds) + $bytes > $limit) {
+		if ($this->attachments->sizeInWorkspaces($wsIds) + $quota['bytes'] > $limit) {
 			throw new TooLargeException('Storage quota exceeded');
 		}
 	}
@@ -259,10 +275,11 @@ class AttachmentService {
 		$original = (string)$file['name'];
 		$name = self::cleanName($original);
 		$mime = $this->mimeOf($tmp, $name);
+		$quota = $this->quotaFor((int)$note->getWorkspaceId(), $size);
 		$created = null;
 		try {
-			$a = $this->tx->run(function () use ($note, $noteId, $name, $mime, $size, $uid, $tmp, &$created) {
-				$this->checkQuota($note, $size);
+			$a = $this->tx->run(function () use ($quota, $noteId, $name, $mime, $size, $uid, $tmp, &$created) {
+				$this->enforceQuota($quota);
 				$a = $this->newRow($noteId, $name, $mime, $size, $uid);
 				$created = $a;
 				$handle = fopen($tmp, 'rb');
@@ -358,12 +375,11 @@ class AttachmentService {
 		$keep = self::referenced((string)$source->getContent(), $noteId, $attachmentId);
 		$needsQuota = $keep || $target->getWorkspaceId() !== $source->getWorkspaceId();
 		$srcFile = $this->fileOf($a);
+		$quota = $needsQuota ? $this->quotaFor((int)$target->getWorkspaceId(), (int)$a->getSize()) : null;
 		$created = null;
 		try {
-			$new = $this->tx->run(function () use ($a, $target, $srcFile, $keep, $uid, $needsQuota, &$created) {
-				if ($needsQuota) {
-					$this->checkQuota($target, (int)$a->getSize());
-				}
+			$new = $this->tx->run(function () use ($a, $target, $srcFile, $keep, $uid, $quota, &$created) {
+				$this->enforceQuota($quota);
 				$new = $this->newRow((int)$target->getId(), (string)$a->getOriginalName(), (string)$a->getMime(), (int)$a->getSize(), $uid);
 				$created = $new;
 				$this->noteFolder((int)$target->getId())->newFile((string)$new->getId(), $srcFile->read());

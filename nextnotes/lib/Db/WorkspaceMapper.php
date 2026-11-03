@@ -44,8 +44,6 @@ class WorkspaceMapper extends QBMapper {
 		return $result;
 	}
 
-	// Eigene Workspaces (nur owner_type=user), optional gefiltert nach kind und Name
-	/** @return Workspace[] */
 	// Leeres UPDATE auf alle Workspaces eines Besitzers: Zeilensperre bis Transaktionsende (SQLite: Schreibsperre), DB-neutral
 	public function lockOwner(string $ownerType, string $ownerId): void {
 		$qb = $this->db->getQueryBuilder();
@@ -55,6 +53,8 @@ class WorkspaceMapper extends QBMapper {
 			->executeStatement();
 	}
 
+	// Eigene Workspaces (nur owner_type=user), optional gefiltert nach kind und Name
+	/** @return Workspace[] */
 	public function findOwned(string $uid, ?string $kind = null, ?string $name = null): array {
 		$qb = $this->db->getQueryBuilder();
 		$qb->select('*')->from(self::TABLE)

@@ -20,7 +20,7 @@ Die App wird in den Container **kopiert**, nie gemountet: `occ app:remove` lösc
 | `run-m1.sh [env…]` | alle Done-Kriterien M1 je Umgebung frisch, danach `down.sh all`; Exit 0 nur wenn alles grün (`KEEP=1` lässt bei Fehlschlag die Umgebung stehen) |
 | `check-forbidden-sql.sh [dir]` | verbotene SQL-/Sitzungsmuster in `nextnotes/lib` (SPEC §13 M2.5); `SELFTEST=1` prüft den Detektor |
 | `run-phpunit.sh <env> [args…]` | PHPUnit aus `tests/nextnotes` im Container (www-data) gegen die Instanz-DB; vorher `composer install -d tests/nextnotes` |
-| `run-m2.sh [env…]` | Done M2 je Umgebung frisch (sqlite, mariadb, pgsql): info.xml, SQL-Prüfung, App, `mysql.utf8mb4`, PHPUnit; `KEEP=1` wie oben |
+| `run-m2.sh [env…]` | Done M2 je Umgebung frisch (sqlite, mariadb, pgsql): info.xml, SQL-Prüfung, App, `mysql.utf8mb4`, PHPUnit; läuft alle Umgebungen durch, Exit 1 wenn eine rot ist; `KEEP=1` lässt rote Umgebungen stehen |
 
 Upstream-Fixtures: `../upstream/up.sh` (Build einmalig mit Netz, Port 8090), `php ../upstream/capture.php upstream tests/nextnotes/fixtures/upstream`, `../upstream/down.sh`.
 

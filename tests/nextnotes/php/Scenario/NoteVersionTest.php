@@ -47,8 +47,15 @@ final class NoteVersionTest extends ApiTestCase {
 		$st = [$res[0]->status, $res[1]->status];
 		sort($st);
 		$desc = $res[0]->describe() . ' | ' . $res[1]->describe();
-		if (Server::get(IConfig::class)->getSystemValueString('dbtype') === 'sqlite3' && in_array(500, $st, true)) {
-			self::markTestIncomplete('SQLite: database is locked: ' . $desc);
+		self::assertNotContains(500, $st, 'nie 500: ' . $desc);
+		if (Server::get(IConfig::class)->getSystemValueString('dbtype') === 'sqlite3' && in_array(503, $st, true)) {
+			// SQLite: Sperr-Timeout → 503 mit Retry-After (SPEC §4.1); die andere Anfrage muss gewonnen haben
+			self::assertSame([200, 503], $st, 'SQLite: ' . $desc);
+			$busy = $res[0]->status === 503 ? $res[0] : $res[1];
+			self::assertNotSame('', trim((string)$busy->header('Retry-After')), '503 ohne Retry-After: ' . $desc);
+			$winner = $res[0]->status === 200 ? '<p>eins</p>' : '<p>zwei</p>';
+			self::assertSame($winner, self::ok($a->call('GET', "/notes/$n"), 'GET')['note']['content']);
+			return;
 		}
 		self::assertSame([200, 409], $st, 'genau einer 409: ' . $desc);
 		$winner = $res[0]->status === 200 ? '<p>eins</p>' : '<p>zwei</p>';

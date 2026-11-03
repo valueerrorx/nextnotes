@@ -1,6 +1,6 @@
 # Status Nextcloud-Port „Next Notes“
 
-**Aktueller Meilenstein:** M2 – Backend-Kern (M2a–M2c fertig, weiter M2d); M1 fertig
+**Aktueller Meilenstein:** M3 – Frontend-Grundlage und Editor (noch nicht begonnen); M1, M2 fertig
 
 ## Erledigte Slices
 - Setup: Branch `nextcloud-port`, Agenten unter `.claude/agents/`, `UPSTREAM.md`
@@ -25,6 +25,9 @@ Vorläufig vom Lead entschieden, zur Durchsicht (M2c):
 - Mentions über NC-Benutzer-ID (`@uid`), Benutzersuche nur nach NC-Sichtbarkeitsregeln
 - Aufgaben-Erinnerung: Markierung für alle sichtbar, Benachrichtigung nur an den, der sie gesetzt hat
 - „Was ist neu“ (Poznote-Releases) wird nie angezeigt
+
+Vorläufig (M2d):
+- Kontolöschung: Notizen, die andere Benutzer in den (geteilten) Workspaces des gelöschten Kontos geschrieben haben, werden mit diesen Workspaces gelöscht (SPEC §8). Alternative wäre Übergabe an einen Freigabe-Empfänger.
 
 ## Entscheidungen Thomas zu M0 (2026-11-02)
 - ADR 0002, 0003, 0010, 0014 angenommen
@@ -66,11 +69,14 @@ Vorläufig vom Lead entschieden, zur Durchsicht (M2c):
 - M2c erledigt: Tasks, Mentions, Erinnerungen (ReminderJob, Notifier, Leserecht, Wiederholung in Benutzerzeitzone, max. 1000 offen/Benutzer), Settings (lazy, Sperrliste, Limits), System, Users, Konvertierung 501; alle 112 API-Routen registriert. Review `M2c-diff-r1` (BLOCKER: task_id ungeprüft, Schreibpfad ohne Schreibrecht im Job) → `M2c-diff-r2` (FREIGABE). SPEC B23–B25.
   Testnachweis: tester (frische Instanzen NC 35.0.2) je DB 222 Tests, nur `testInvalidDueAtTimeOfDay` rot (Uhrzeit ungeprüft); Gegenprobe (`canRead` in `Notifier::prepare` entfernt → 2 Tests rot, zurückgesetzt). Nach Fix (`InputValidator::validDateTime`, Limit auch in `syncReminder`) Endlauf durch architekt mit unveränderten tester-Tests: `run-m2.sh` einzeln frisch sqlite/mariadb/pgsql rc=0, je 222 Tests/7075 Assertions, ohne Warnung; `down.sh all`.
   DNS-Warnung im Test: Ursache NC-App `password_policy` (HIBP-Abfrage beim Anlegen von Testbenutzern), nicht Next Notes; Testumgebung setzt `has_internet_connection=false`.
+- M2d erledigt: Kontolöschung (synchroner Listener neutralisiert alle UID-/Rechte-Spalten, Löschkennung `#<16hex>`, `UserDataDeletionJob`, täglicher `DeletedWorkspaceSweepJob` als Nachlauf mit Fehlerisolation je Kennung), Migration 0.1.1 (5 Indizes), SQLite-Sperr-Timeout/Deadlock → 503 mit Retry-After, `run-m2.sh` über alle DBs mit Gesamt-Exit. Review `M2d-diff-r1` (BLOCKER: Löschung nach Abbruch nicht fortgesetzt) → `M2d-diff-r2` (FREIGABE, Hinweis Fehlerisolation umgesetzt).
+  Testnachweis (tester, frische Instanzen NC 35.0.2): `run-m1.sh` (sqlite, mariadb, pgsql, nginx) Exit 0; `run-m2.sh sqlite mariadb pgsql` Exit 0, je 225 Tests/7267 Assertions; grep §13 M2.5 0 Treffer; Gegenprobe (`ws_shares`-Neutralisierung entfernt → UserDeletionTest rot, zurückgesetzt); `down.sh all` 0.
+  **M2 fertig** – Kriterien 1–8 je mit Test belegt (RouteDiff, Isolation/IndirectRead/DenyByDefault, CoreScenario/Attachment, WorkspaceName, check-forbidden-sql + 3 DBs, LockService, ReminderJob/UnifiedSearch, UserDeletion).
 - Offen für M3: PDF-Vorschau im iFrame (CSP, s. o.); `requesttoken` im Beacon-FormData (B4); Sperr-Banner bei gleichem Konto in zweitem Tab (R11); Escaping von Tags mit `'` im Frontend.
 
 ## Nacharbeit (vor/mit M2)
 - erledigt in M2a
-- M2d: SQLite-Schreibsperre bei parallelen Uploads liefert 500 (LockWaitTimeoutException) → sauber als 503 mit Retry-After abbilden; Workspace/Summe vor Transaktion lesen, `lockOwner` als erste Anweisung (M2b-diff-r2)
+- erledigt in M2d: SQLite-503
 
 ## Nächster Schritt
-M2d – Kontolöschung (Listener synchron + UserDataDeletionJob), Nacharbeit SQLite-503, Abschlusslauf M2 auf 3 DBs (Plan §2 M2d): architekt → tester + speccritic.
+M3 – Frontend-Grundlage und Editor (SPEC §13 M3): architekt plant M3 (Slices, Build, Adapter `nextnotes-bootstrap.js`, §11.1-Patches, Offen-für-M3-Punkte) → speccritic → Umsetzung.
