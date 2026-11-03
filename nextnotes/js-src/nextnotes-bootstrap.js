@@ -1,0 +1,226 @@
+/**
+ * SPDX-FileCopyrightText: 2026 Thomas Weissel
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+// Adapter vor allen Upstream-Skripten (SPEC §4.3): Konfiguration, URL-Präfix, CSRF, Beacon, 401, i18n, Hell/Dunkel.
+(function () {
+	'use strict';
+
+	// 1. Konfiguration aus dem InitialState (Base64-JSON, core/templates/layout.initial-state.php)
+	function readState(key) {
+		var el = document.getElementById('initial-state-nextnotes-' + key);
+		if (!el) return null;
+		try {
+			var bin = atob(el.value);
+			var bytes = new Uint8Array(bin.length);
+			for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+			return JSON.parse(new TextDecoder().decode(bytes));
+		} catch (e) {
+			console.warn('nextnotes: InitialState ' + key + ' unlesbar', e);
+			return null;
+		}
+	}
+
+	var config = readState('config') || {};
+	var baseUrl = String(config.baseUrl || '/index.php/apps/nextnotes/').replace(/\/?$/, '/');
+	var apiBase = String(config.apiBase || baseUrl + 'api/v1').replace(/\/$/, '');
+	var appPath = baseUrl.replace(/\/index\.php\//, '/');
+	var origin = window.location.origin;
+
+	var i18n = window.__NEXTNOTES_I18N__ || { lang: 'en', strings: {} };
+	window.POZNOTE_I18N = { lang: i18n.lang, strings: i18n.strings };
+	window.ALLOWED_IFRAME_DOMAINS = Array.isArray(config.allowedIframeDomains) ? config.allowedIframeDomains : [];
+	window.EXCALIDRAW_ASSET_PATH = config.excalidrawAssetPath || '';
+	window.__POZNOTE_HIDDEN_UI_ELEMENTS__ = Array.isArray(config.hiddenUiElements) ? config.hiddenUiElements : [];
+
+	// 2. URL-Präfix für Upstream-Pfade
+	function rewrite(url) {
+		if (typeof url !== 'string') return url;
+		var u = url;
+		if (u.indexOf(origin + '/') === 0) u = u.slice(origin.length);
+		var m = /^(?:\.\/)?\/?api\/v1(?=[/?#]|$)(.*)$/.exec(u);
+		if (m) return apiBase + m[1];
+		if (/^\/audio_player\.php(?=[?#]|$)/.test(u)) return baseUrl + u.slice(1);
+		return url;
+	}
+
+	// Gleicher Ursprung und App-Pfad → braucht requesttoken
+	function isAppCall(url) {
+		try {
+			var target = new URL(url, window.location.href);
+			if (target.origin !== origin) return false;
+			return target.pathname.indexOf(baseUrl) === 0 || target.pathname.indexOf(appPath) === 0;
+		} catch (e) {
+			return false;
+		}
+	}
+
+	function isI18nCall(url) {
+		try {
+			return new URL(url, window.location.href).pathname === apiBase + '/system/i18n';
+		} catch (e) {
+			return false;
+		}
+	}
+
+	function token() {
+		return (document.head && document.head.dataset.requesttoken) || (window.OC && window.OC.requestToken) || '';
+	}
+
+	// 3. 401 → einmal neu laden (NC-Login mit Rücksprung); < 30 s nach dem letzten Reload nicht erneut
+	var RELOAD_KEY = 'nextnotes-401-reload';
+	function on401() {
+		var last = 0;
+		try { last = Number(sessionStorage.getItem(RELOAD_KEY)) || 0; } catch (e) { last = 0; }
+		if (Date.now() - last < 30000) {
+			var msg = typeof window.t === 'function' ? window.t('errors.session_expired', null, 'Session expired. Please reload the page.') : 'Session expired. Please reload the page.';
+			if (typeof window.showNotificationPopup === 'function') window.showNotificationPopup(msg, 'error');
+			return;
+		}
+		try { sessionStorage.setItem(RELOAD_KEY, String(Date.now())); } catch (e) { /* ohne Speicher trotzdem neu laden */ }
+		window.location.reload();
+	}
+
+	// 4. fetch
+	var nativeFetch = window.fetch;
+	window.fetch = function (input, init) {
+		var isRequest = typeof Request !== 'undefined' && input instanceof Request;
+		var url = isRequest ? input.url : (input instanceof URL ? input.href : String(input));
+		var target = rewrite(url);
+		if (isI18nCall(target)) {
+			var body = JSON.stringify({ success: true, lang: i18n.lang, strings: i18n.strings });
+			return Promise.resolve(new Response(body, { status: 200, headers: { 'Content-Type': 'application/json' } }));
+		}
+		if (!isAppCall(target)) {
+			return nativeFetch.call(this, target === url ? input : target, init);
+		}
+		var opts = Object.assign({}, init || {});
+		var headers = new Headers(opts.headers || (isRequest ? input.headers : undefined));
+		if (!headers.has('requesttoken')) headers.set('requesttoken', token());
+		if (!headers.has('X-Requested-With')) headers.set('X-Requested-With', 'XMLHttpRequest');
+		opts.headers = headers;
+		var req = isRequest ? new Request(target, input) : target;
+		return nativeFetch.call(this, req, opts).then(function (resp) {
+			if (resp.status === 401) on401();
+			return resp;
+		});
+	};
+
+	// 5. XMLHttpRequest
+	var nativeOpen = XMLHttpRequest.prototype.open;
+	var nativeSend = XMLHttpRequest.prototype.send;
+	XMLHttpRequest.prototype.open = function (method, url) {
+		var args = Array.prototype.slice.call(arguments);
+		args[1] = rewrite(String(url));
+		this.__nnApp = isAppCall(args[1]);
+		return nativeOpen.apply(this, args);
+	};
+	XMLHttpRequest.prototype.send = function () {
+		if (this.__nnApp) {
+			this.setRequestHeader('requesttoken', token());
+			this.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+			this.addEventListener('loadend', function () {
+				if (this.status === 401) on401();
+			});
+		}
+		return nativeSend.apply(this, arguments);
+	};
+
+	// 6. sendBeacon: Token im Formular oder in der URL (Request::passesCSRFCheck)
+	if (navigator.sendBeacon) {
+		var nativeBeacon = navigator.sendBeacon.bind(navigator);
+		navigator.sendBeacon = function (url, data) {
+			var target = rewrite(String(url));
+			if (isAppCall(target)) {
+				if (typeof FormData !== 'undefined' && data instanceof FormData) {
+					if (!data.has('requesttoken')) data.append('requesttoken', token());
+				} else {
+					target += (target.indexOf('?') === -1 ? '?' : '&') + 'requesttoken=' + encodeURIComponent(token());
+				}
+			}
+			return nativeBeacon(target, data);
+		};
+	}
+
+	// 7. window.open
+	var nativeWindowOpen = window.open;
+	window.open = function (url) {
+		var args = Array.prototype.slice.call(arguments);
+		if (typeof url === 'string') args[0] = rewrite(url);
+		return nativeWindowOpen.apply(window, args);
+	};
+
+	// 8. Sicherheitsnetz für src/href in JS-erzeugtem Markup (SPEC §4.3.4)
+	function fixAttr(el, name) {
+		var v = el.getAttribute(name);
+		if (!v) return;
+		var r = rewrite(v);
+		if (r !== v) el.setAttribute(name, r);
+	}
+	function fixTree(node) {
+		if (node.nodeType !== 1) return;
+		if (node.hasAttribute('src')) fixAttr(node, 'src');
+		if (node.hasAttribute('href')) fixAttr(node, 'href');
+		var list = node.querySelectorAll('[src^="/api/v1/"],[src^="/audio_player.php"],[href^="/api/v1/"],[href^="/audio_player.php"]');
+		for (var i = 0; i < list.length; i++) {
+			fixAttr(list[i], 'src');
+			fixAttr(list[i], 'href');
+		}
+	}
+	new MutationObserver(function (records) {
+		for (var i = 0; i < records.length; i++) {
+			var r = records[i];
+			if (r.type === 'attributes') fixAttr(r.target, r.attributeName);
+			else for (var j = 0; j < r.addedNodes.length; j++) fixTree(r.addedNodes[j]);
+		}
+	}).observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['src', 'href'] });
+
+	// 9. Hell/Dunkel nach NC-Theme (ADR 0016); theme-manager.js wendet es über die Shims an
+	var darkQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+	function ncMode() {
+		var themes = ((document.body && document.body.getAttribute('data-themes')) || '').split(',');
+		if (themes.indexOf('dark') !== -1 || themes.indexOf('dark-highcontrast') !== -1) return 'dark';
+		if (themes.indexOf('light') !== -1 || themes.indexOf('light-highcontrast') !== -1) return 'light';
+		return darkQuery && darkQuery.matches ? 'dark' : 'light';
+	}
+	window.__poznoteThemeStorage = { get: ncMode, set: function () {} };
+	window.__poznoteThemeList = [
+		{ id: 'light', mode: 'light', icon: 'lucide-sun' },
+		{ id: 'dark', mode: 'dark', icon: 'lucide-moon' },
+	];
+	function applyMode() {
+		var mode = ncMode();
+		if (typeof window.applyTheme === 'function') {
+			window.applyTheme(mode, false);
+			return;
+		}
+		var root = document.documentElement;
+		root.setAttribute('data-theme', mode);
+		root.classList.toggle('theme-dark', mode === 'dark');
+		root.classList.toggle('theme-light', mode !== 'dark');
+	}
+	applyMode();
+	if (document.body) {
+		new MutationObserver(function () {
+			if (document.documentElement.getAttribute('data-theme') !== ncMode()) applyMode();
+		}).observe(document.body, { attributes: true });
+	}
+	if (darkQuery && darkQuery.addEventListener) darkQuery.addEventListener('change', applyMode);
+
+	// 10. Neue Editor-Sitzung je Laden außer Reload (B13: duplizierte Tabs = eigene Sitzung)
+	try {
+		var nav = performance.getEntriesByType('navigation')[0];
+		if (!nav || nav.type !== 'reload') sessionStorage.removeItem('poznote_editor_session_id');
+	} catch (e) { /* ohne sessionStorage nutzt Upstream eine Fallback-ID */ }
+
+	// 11. Inhalt erst nach dem Start zeigen (gegen Flackern; CSS-Rückfall nach 2 s)
+	document.addEventListener('DOMContentLoaded', function () {
+		document.documentElement.classList.add('nextnotes-ready');
+	});
+
+	window.NEXTNOTES = {
+		config: config,
+		url: rewrite,
+		requestToken: token,
+	};
+})();

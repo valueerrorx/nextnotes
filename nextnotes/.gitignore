@@ -1,7 +1,9 @@
 # SPDX-FileCopyrightText: 2026 Thomas Weissel
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Build-Ausgaben (ab M2)
+# Build-Ausgaben (make build)
 /js/
 /css/
 /i18n/
-/vendor-assets/
+# Root-.gitignore (Upstream) ignoriert build/; Build-Quellen der App sind eingecheckt
+!/build/
+/build/node_modules/

@@ -1,0 +1,10 @@
+{
+  "name": "nextnotes-build",
+  "private": true,
+  "description": "Build der Next-Notes-Assets aus src/ (nur esbuild)",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

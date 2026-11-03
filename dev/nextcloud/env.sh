@@ -12,6 +12,8 @@ NN_ADMIN_USER=admin
 NN_ADMIN_PASS=admin
 NN_TEST_USER=alice
 NN_TEST_PASS='NextNotes-Alice-2026!'
+NN_TEST_USER2=bob
+NN_TEST_PASS2='NextNotes-Bob-2026!'
 NN_NC_VERSION=35.0.2
 
 # Alle Aufrufe mit Zeitlimit, damit ein hängender Webserver nicht blockiert

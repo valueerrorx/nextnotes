@@ -20,3 +20,7 @@ Option 2:
 - Inventur: A #209, #210, #211 bleiben „streichen“; B #73, #74, #75 und 2.1 #7, #8, #9 korrigiert auf „streichen“; Inter-Zeile (B 4.3) → streichen.
 - Theme-Menüeinträge werden per Adapter ausgeblendet (Upstream-Option `__POZNOTE_HIDDEN_UI_ELEMENTS__` bzw. CSS), kein Upstream-Edit.
 - Hoher Kontrast/Legastheniker-Schrift von NC wirken automatisch über die Variablen.
+
+## Nachtrag M3a1 (2026-11-03)
+- `--pz-accent-text` (und `--pz-accent-text-hover`, `--pz-accent-strong`, `--pz-link`) → `var(--color-primary-element-light-text)` statt `--color-primary-element-text`. Grund: Upstream nutzt `--pz-accent-text` als Akzentfarbe für Text auf normalem Grund (`tokens.css`, Links, gewählte Einträge); `--color-primary-element-text` ist Text *auf* der Primärfläche (meist weiß) und wäre auf hellem Grund unlesbar. Text auf Akzentflächen bleibt `--pz-text-inverse` → `--color-primary-element-text`.
+- Schrift: Der Build ersetzt `Inter` in `font-family`/`font`-Werten der Upstream-CSS durch `var(--font-face)` (auch vor `!important`) und entfernt die `@font-face`-Regeln für `webfonts/` (`bundles.json` `fontFamilyRewrite`, `stripFontFace`; kein Patch in `src/`). Damit wirken NC-Schrift und Legasthenie-Schrift auch im Editor.

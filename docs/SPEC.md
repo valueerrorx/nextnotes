@@ -35,11 +35,11 @@ Grundlagen: `docs/INVENTORY.md` (Inventur A/B), `docs/adr/0002`–`0016`.
 │  │  ├─ BackgroundJob/  Listener/  Notification/  Search/  Teams/  Settings/  Command/  UserMigration/
 │  │  ├─ Http/CspFactory.php            einzige Stelle für CSP-Abweichungen (ADR 0012)
 │  ├─ templates/                        von src/public/*.php abgeleitete Ansichten + Partials (ADR 0004)
-│  ├─ js-src/nextnotes-bootstrap.js     Adapter (§4.3), eigenes JS (Austeilen/Einsammeln)
-│  ├─ css-src/nextnotes-tokens.css      Token-Mapping (ADR 0016), Layout-Korrekturen im NC-Rahmen
-│  ├─ build/bundles.json, build.sh, check-upstream.sh, upstream-patches.txt (Dateiliste zu §11.1)
+│  ├─ js-src/nextnotes-bootstrap.js, nextnotes-late.js   Adapter (§4.3), eigenes JS (Austeilen/Einsammeln)
+│  ├─ css-src/nextnotes-tokens.css, nextnotes-layout.css  Token-Mapping (ADR 0016), Layout-Korrekturen im NC-Rahmen
+│  ├─ build/bundles.json, build.mjs, package.json (+Lock, esbuild), check-upstream.sh (+ .mjs, upstream-lists.php), upstream-patches.txt (Dateiliste zu §11.1)
 │  ├─ Makefile                          build | dist | check-upstream | lint
-│  ├─ js/ css/ i18n/ img/ vendor-assets/   Build-Ausgabe (nicht eingecheckt)
+│  ├─ js/ (inkl. vendor/, i18n/) css/ (inkl. vendor/) i18n/   Build-Ausgabe (nicht eingecheckt); img/ eingecheckt
 │  └─ COPYING, LICENCE (Upstream-MIT), README.md, CHANGELOG.md
 ├─ dev/nextcloud/          Docker-Testsetup (NC 35, MariaDB/PostgreSQL/SQLite, Circles), nur Tests
 ├─ tests/nextnotes/        PHPUnit + Playwright (Rolle tester)
@@ -49,9 +49,9 @@ Grundlagen: `docs/INVENTORY.md` (Inventur A/B), `docs/adr/0002`–`0016`.
 ### 1.2 Build (`make -C nextnotes build`, reproduzierbar)
 1. Kopiert `src/public/js/**` (ohne gestrichene Dateien laut `bundles.json`: `offline-*`, `pwa/*`, `sw.js`, `two-factor.js`, `login-page.js`, `ai-*.js`, `speech-to-text.js`, `backup-*.js`, `restore-import.js`, `git-*.js` …) in den Build (Upstream-Änderungen sind bereits direkt in `src/`, §11.1).
 2. Konkateniert nach den Gruppen aus `src/public/index_js.php` (`head`, `app`) in `nextnotes/js/nextnotes-head.js`, `nextnotes/js/nextnotes-app.js` (klassische Skripte, Endung `.js`, nie `.mjs` – ADR 0006). Seiten-spezifische Skripte einzeln.
-3. CSS analog (`index_css.php`, `css_assets.php`, `dark_mode_css.php`) → `nextnotes/css/*.css`; `nextnotes-tokens.css` danach.
-4. Vendor (`codemirror-dist`, `excalidraw-dist` + Assets, `mermaid`, `katex`, `highlight`, `Sortable`) unverändert nach `nextnotes/vendor-assets/`; Excalidraw-Assetpfad per InitialState.
-5. `src/i18n/*.json` → `nextnotes/i18n/`. PHP-Abhängigkeiten per Composer (`league/commonmark`, `league/html-to-markdown`, Namespace-Präfix per Build-Schritt gegen Konflikte mit anderen Apps); keine Upstream-PHP-Dateien im Paket. Ausgabe-Parität zur Upstream-Konvertierung über Fixture-Tests. Konvertierung (`/convert-*`, `/notes/{id}/convert`) kommt mit dem Export in M4; dort fällt die Wahl Port der Upstream-Parser (`src/markdown_parser.php`, `src/html_to_markdown.php`) vs. league. Bis dahin Rechteprüfung + 501 (Lead, M2-plan r2).
+3. CSS analog (`index_css.php`, `css_assets.php`, `dark_mode_css.php`) → `nextnotes/css/*.css`; `nextnotes-tokens.css` danach. `css/index-mobile.css` → `nextnotes-mobile.css` in `@media (max-width: 800px)` (ersetzt das `media`-Attribut, das `addStyle` nicht kennt). `@font-face`-Regeln mit `webfonts/` (Inter) entfallen im Build, `Inter` in `font-family`/`font`-Werten wird zu `var(--font-face)` (ADR 0016 Nachtrag; `bundles.json`). Bis M4 ausgeschlossen: `calendar.js`, `background-settings.js` (rufen beim Laden die M4-Routen `api/v1/calendar/*.php` bzw. `api_upload_background.php`).
+4. Vendor (`codemirror-dist`, `excalidraw-dist` + Assets, `mermaid`, `katex`, `highlight`, `Sortable`) unverändert nach `nextnotes/js/vendor/`, Stylesheets (`katex.min.css` + Fonts, `url()` umgeschrieben) nach `nextnotes/css/vendor/` – `Util::addScript`/`addStyle` laden nur aus `js/`/`css/` (M3-plan r2); Excalidraw-Assetpfad per InitialState. Einzige Build-Abhängigkeit: `esbuild` (gepinnt, Lockfile, Minify nur Whitespace/Syntax).
+5. `src/i18n/*.json` → `nextnotes/i18n/` (für `/system/i18n`) und `nextnotes/js/i18n/nextnotes-i18n-<lang>.js` (mit `en` als Rückfall eingemischt, §1.4). PHP-Abhängigkeiten per Composer (`league/commonmark`, `league/html-to-markdown`, Namespace-Präfix per Build-Schritt gegen Konflikte mit anderen Apps); keine Upstream-PHP-Dateien im Paket. Ausgabe-Parität zur Upstream-Konvertierung über Fixture-Tests. Konvertierung (`/convert-*`, `/notes/{id}/convert`) kommt mit dem Export in M4; dort fällt die Wahl Port der Upstream-Parser (`src/markdown_parser.php`, `src/html_to_markdown.php`) vs. league. Bis dahin Rechteprüfung + 501 (Lead, M2-plan r2).
 6. Keine Netzwerkzugriffe, keine Zeitstempel in Ausgaben; gleiche Eingabe → gleiche Prüfsummen.
 `make dist` packt `nextnotes/` ohne `*-src`, `build`, `tests` als `nextnotes-<version>.tar.gz`.
 
@@ -63,9 +63,9 @@ Zielversion nur Nextcloud 35 (entschieden, Thomas 2026-11-02): `info.xml` `<next
 
 ### 1.4 Laufzeit
 - PageController liefert je Ansicht eine `TemplateResponse` (ADR 0004), lädt Bundles per `OCP\Util::addScript('nextnotes', …)` / `addStyle`, Daten per `IInitialState::provideInitialState`.
-- Reihenfolge der Skripte: `nextnotes-bootstrap.js` → `nextnotes-head.js` → `nextnotes-app.js` → Seitenskript (alle `defer`, Reihenfolge bleibt).
+- Reihenfolge der Skripte: `i18n/nextnotes-i18n-<lang>.js` → `nextnotes-bootstrap.js` → `nextnotes-head.js` → Einzelskripte (CodeMirror, `lazy-libs`, highlight) → `nextnotes-app.js` → `nextnotes-late.js` → Seitenskript (alle `defer`, Reihenfolge bleibt).
 - Settings: Benutzer über `OCP\Config\IUserConfig` (@since 32), Admin über `IAppConfig` + `OCP\Settings\ISettings` (Admin-Abschnitt: Embed-Domains, Anhangsgrenzen, Quota).
-- i18n: Upstream-Wörterbücher unverändert; Sprache aus `IL10N::getLanguageCode()` abgebildet (`de_DE`→`de`, `zh_CN`→`zh-cn`, `pt_BR`/`pt_PT`→`pt`, sonst `en`). Wörterbuch per InitialState statt `/system/i18n`-Request (Route bleibt für Kompatibilität).
+- i18n: Upstream-Wörterbücher unverändert; Sprache aus `IL10N::getLanguageCode()` abgebildet (`de_DE`→`de`, `zh_CN`→`zh-cn`, `pt_BR`/`pt_PT`→`pt`, sonst `en`). Wörterbuch als statische, vom Browser gecachte JS-Datei je Sprache (nicht InitialState: ≈ 300 KB je Seite, nicht cachebar); der Adapter beantwortet `/system/i18n` daraus ohne Netz-Request (Route bleibt für Kompatibilität; M3-plan r2, O1).
 
 ---
 
@@ -294,7 +294,7 @@ Vereinfachungen M2c: Erinnerungen gehören dem Empfänger (`user_id`), nicht der
 | `api_save_excalidraw.php`, `api_download_note.php`, `api_export_note.php`, `api_export_folder.php`, `api_export_entries.php`, `api_export_structured.php`, `api_export_attachments.php`, `api_import_dropped_notes.php`, `api_note_info.php`, `api_upload_background.php`, `api_attachments.php` (nur Download, Alt-URLs) | `/apps/nextnotes/<gleicher Dateiname>` | `CompatController` | Download-GETs `#[NoCSRFRequired]` |
 | `storage-stats-user.php?fragment=1` | `/apps/nextnotes/storage-stats-user.php` | `CompatController` | ADR 0002 |
 | Seiten (`index.php`, `dashboard.php`, …) | `/apps/nextnotes/<gleicher Dateiname>` | `PageController` | ADR 0004 (Spike M1) |
-| `login.php`, `logout.php` | `/apps/nextnotes/login.php` → Redirect auf NC-Login mit `redirect_url`; `logout.php` → NC-Logout-URL | `PageController` | für `session-guard.js` |
+| `login.php`, `logout.php` | `/apps/nextnotes/login.php` → App-Startseite (Abgemeldete leitet NC selbst auf den Login mit Rücksprung); `logout.php` → App-Startseite, Abmelden nur über das NC-Menü (eine Weiterleitung auf die Logout-URL mit Token hebelte deren CSRF-Schutz aus; M3a1) | `PageController` | Sicherheitsnetz für alte Links |
 | Alles mit Status „streichen“ in Inventur A/B | nicht registriert → 404 | – | |
 | Neu: `/api/v1/assignments…`, `/api/v1/submissions…` | §9.5 | `AssignmentController` | M6 |
 
@@ -305,9 +305,11 @@ Vereinfachungen M2c: Erinnerungen gehören dem Empfänger (`user_id`), nicht der
 4. Sicherheitsnetz: `MutationObserver` schreibt `src`/`href` mit `/api/v1/` oder `/audio_player.php` auf die App-Basis um (für im JS erzeugtes Markup).
 5. Hell/Dunkel: setzt `html[data-theme]` aus den NC-Body-Attributen `data-theme-*` (ADR 0016) und beobachtet Änderungen.
 6. Event-Delegation für Aktionen, deren Inline-Handler in Templates entfernt wurden (`data-action`-Muster wie Upstream).
+7. Ergänzungen (M3-plan r2): `window.open` wird wie `fetch` umgeschrieben; 401 → einmal `location.reload()` (NC-Login mit Rücksprung), Schleifenschutz per Zeitstempel in `sessionStorage` (< 30 s kein zweiter Reload), ersetzt `session-guard.js`; `fetch` auf `…/system/i18n` wird aus dem vorgeladenen Wörterbuch beantwortet; `window.__poznoteThemeStorage`/`__poznoteThemeList` lassen `theme-manager.js` den NC-Modus anwenden; neue Editor-Sitzungs-ID je Laden außer Reload (duplizierte Tabs = eigene Sitzung, B13); frühes Speichern bei `visibilitychange` → `hidden`.
+8. `nextnotes-late.js` (nach dem App-Bundle) setzt `poznoteAssetUrl`, `poznoteEnsureScript/Mermaid/Katex` auf den App-Pfad, weil Upstream sie seitenrelativ setzt. Die Namen prüft `check-upstream`.
 
 ### 4.4 Workspace-Schlüssel
-Upstream adressiert Workspaces per Name (`/workspaces/{name}`, `?workspace=`). Schlüssel = Name bei eigenen Workspaces; bei Team- oder geteilten Workspaces `"<Name> (<Team- bzw. Besitzername>)"`, falls der Name in der sichtbaren Menge sonst doppelt wäre. Bleibt der Schlüssel doppelt (gleicher Name und Besitzername): `"<Name> (<Besitzername>, #<id>)"`; diese Langform wird immer akzeptiert. `WorkspaceService::resolveKey(uid, key)` bildet zurück; unbekannt → 404 (M2-plan r2). Rename-Bodies werden ohne Zusatz gespeichert.
+Upstream adressiert Workspaces per Name (`/workspaces/{name}`, `?workspace=`). Schlüssel = Name bei eigenen Workspaces; bei Team- oder geteilten Workspaces `"<Name> (<Team- bzw. Besitzername>)"`, falls der Name in der sichtbaren Menge sonst doppelt wäre. Bleibt der Schlüssel doppelt (gleicher Name und Besitzername): `"<Name> (<Besitzername>, #<id>)"`; diese Langform wird immer akzeptiert. `WorkspaceService::resolveKey(uid, key)` bildet zurück; unbekannt → 404 (M2-plan r2). Seiten (`index.php?workspace=` u. a.): unbekannter Schlüssel → Standard-Workspace des Benutzers statt 404 (kein Leck, nur sichtbare Workspaces werden aufgelöst; M3-plan r2, O3). Rename-Bodies werden ohne Zusatz gespeichert.
 
 ### 4.5 CSRF und Attribute
 - Alle schreibenden Routen (POST/PUT/PATCH/DELETE): CSRF-Prüfung aktiv (kein `NoCSRFRequired`). NC prüft CSRF bei jeder Methode ohne `NoCSRFRequired` (`SecurityMiddleware::isInvalidCSRFRequired`), daher auch GET-API-Aufrufe über den Adapter mit Token.
@@ -317,6 +319,7 @@ Upstream adressiert Workspaces per Name (`/workspaces/{name}`, `?workspace=`). S
 
 ### 4.6 CSP
 Jede `TemplateResponse` erhält ihre Policy aus `Http\CspFactory` (ADR 0006, 0012). Templates enthalten keine ausführbaren Inline-Skripte und keine `on…=`-Handler; Daten über InitialState oder JSON-Inseln (`type="application/json"`).
+**Ausgaberegel Templates** (M3-plan r2): jede `$_`-Ausgabe mit `p()` bzw. escapender Übersetzungshilfe; JSON-Inseln mit `JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT`; `print_unescaped` nur für mit `HtmlSanitizer` gespeicherten Notizinhalt, JSON nach dieser Regel und feste Bausteine (Allowlist, per Test geprüft); Benutzerdaten nie in `data-action`, `style`, `on…`.
 
 ---
 
@@ -448,6 +451,8 @@ Regel (Thomas): gezielte direkte Änderungen in `src/` sind erlaubt; jede steht 
 | P4 | `public/js/index-events.js` (:561, :1548) | Verweis auf nicht existierende `profile.php` entfernen | Bug B1 | ja |
 | P5 (bedingt) | JS, das root-absolute `src` für Bilder/iframes erzeugt (`slash-command.js`, `attachments.js`, `markdown-parser.js`, `note-attachment-menu.js`, `events-utils.js`) | Präfix über `window.NEXTNOTES.url()` | nur falls der MutationObserver (§4.3.4) 404-Vorabladungen nicht verhindert (M3 messen) | ja (Upstream unter Unterpfad betreibbar) |
 | P6 (bedingt) | `public/js/navigation.js` | Seiten-URLs über Basis | nur falls Spike `.php`-Routen scheitert (ADR 0004) | ja |
+| P7 | `public/js/note-edit-lock.js` (:309) | `isLockHeldByDifferentUser` prüft die Editor-Sitzung statt des Kontos → Banner/Nur-Lesen auch im zweiten Tab desselben Kontos | B13, ADR 0005 | nein |
+| P8 (bedingt) | `public/js/unified-search.js`, `note-loader.js`, `notes-list-events.js`, `search-highlight.js`, `keyboard-shortcuts.js`, `tabs.js`, `syntax-highlight.js` | ID `unified-search` → `pz-unified-search` | Kollision mit `#unified-search` im NC-Header; nur nach Bestätigung im Browser (M3a2) | ja |
 Templates (`nextnotes/templates/`) sind abgeleitete Kopien, keine Patches; Herkunft im Kopfkommentar. Jede neue Änderung in `src/` braucht einen Eintrag hier.
 
 ### 11.2 Bekannte Upstream-Bugs
@@ -474,10 +479,11 @@ Templates (`nextnotes/templates/`) sind abgeleitete Kopien, keine Patches; Herku
 | B19 | `src/lib/html-sanitize.php` (Attributprüfung) | Schema mit Whitespace/Steuerzeichen (`java&#9;script:`) wird in `href`/`src` nicht erkannt | nach Entity-Decoding Whitespace/Steuerzeichen entfernen, dann Schema prüfen |
 | B20 | `NotesController`/`FoldersController`/`WorkspacesController` (Icon, Farben, Namen, Tags) | ungültige Werte werden still bereinigt oder ungeprüft gespeichert | `InputValidator`: Verstoß → 400, nichts gespeichert; Markup-Zeichen (`<`, `>`, `"`, Backtick) und Steuerzeichen in Tags/Namen verboten, Apostroph `'` in Tags erlaubt (Ausgabe wird escapt) |
 | B21 | `src/api/v1/controllers/AttachmentsController.php` `move`, `NotesController.php` `duplicate` | Anhänge/Notizkopien konnten aus geteilten Workspaces in eigene kopiert werden (wie B17) | Ziel braucht `write`, Quelle in anderem Workspace `manage`, sonst 403 |
-| B22 | `src/api/v1/controllers/AttachmentsController.php` Download | SVG wird inline ausgeliefert (nur durch CSP geschützt) | inline nur PDF, `image/*` außer SVG, Audio, Video, passive Textformate (als Text); SVG, HTML und Rest immer `attachment`; `nosniff` überall; CSP `default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'self'; sandbox` außer PDF (Browser-PDF-Viewer rendern nicht unter `sandbox`, PDF behält NC-Standard-CSP); Plan M2 §2 M2b |
+| B22 | `src/api/v1/controllers/AttachmentsController.php` Download | SVG wird inline ausgeliefert (nur durch CSP geschützt) | inline nur PDF, `image/*` außer SVG, Audio, Video, passive Textformate (als Text); SVG, HTML und Rest immer `attachment`; `nosniff` überall; CSP `default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'self'; sandbox` außer PDF (Browser-PDF-Viewer rendern nicht unter `sandbox`, PDF erhält `frame-ancestors 'self'` statt `'none'` der leeren Standard-CSP, damit die PDF-Vorschau im iFrame der Notiz lädt (ADR 0012 Nachtrag, M3)); Plan M2 §2 M2b |
 | B23 | `src/api/v1/controllers/RemindersController.php` `scheduleNextTaskOccurrence` | vergleicht `(string)$t['id']` mit der gespeicherten Aufgaben-ID; Gleitkomma-IDs werden dabei auf 14 Stellen gerundet → wiederkehrende Aufgaben-Erinnerung findet ihre Aufgabe nie | IDs immer mit voller Genauigkeit (`TaskService::idString`) |
 | B24 | `src/api/v1/controllers/SettingsController.php` `update` | beliebige Schlüssel und Wertgrößen je Benutzer speicherbar (unbegrenzter Speicher) | Schlüsselregel, Wert ≤ 64 KiB, ≤ 300 Schlüssel (§2.2) |
 | B25 | `src/api/v1/controllers/TasksController.php` `readTaskFields` | `due_at` nur per `strtotime` geprüft, ungültige Tage/Uhrzeiten (z. B. `2026-02-30`, `T25:99`) werden gespeichert | `InputValidator::validDateTime` (Datum, Stunde ≤ 23, Minute/Sekunde ≤ 59) für `due_at` und `reminder_at`, sonst 400 |
+| B26 | `src/lib/html-sanitize.php:283` | `button` mit beliebigem `data-action` in Notizinhalten erlaubt → eingeschleuste Knöpfe lösen über die `data-action`-Delegation UI-Aktionen im Recht des Lesers aus (geteilte Workspaces) | `HtmlSanitizer`: `data-action` nur mit Werten, die Upstream selbst in Inhalte schreibt (Allowlist, M3b), sonst entfernt |
 Weitere Funde während der Slices werden hier ergänzt.
 
 ## 12. Risiken
@@ -524,7 +530,7 @@ Testmatrix: Docker-Testsetup `dev/nextcloud/` mit **NC 35 (35.0.x)**. „3 DBs�
 1. Playwright: Notiz anlegen, Text eingeben, neu laden → Inhalt da; Bild-Anhang einfügen → angezeigt; Markdown-Notiz mit Mermaid-Block → `svg` gerendert; KaTeX-Formel → `.katex` vorhanden.
 2. Das Szenario läuft in NC-Hell und NC-Dunkel; Hintergrund der App entspricht `--color-main-background`.
 3. Auf jeder besuchten Seite: 0 `securitypolicyviolation`-Ereignisse, 0 Antworten 404 auf `/api/v1/…` oder `/audio_player.php` ohne App-Präfix.
-4. Tab schließen während ungespeicherter Änderung → Inhalt per Beacon gespeichert (Request mit gültigem `requesttoken`, HTTP 200).
+4. Tab schließen während ungespeicherter Änderung → Inhalt gespeichert (Upstream nutzt zuerst `fetch` mit `keepalive`); zusätzlich Beacon-Pfad erzwungen → Request mit gültigem `requesttoken`, HTTP 200, Inhalt gespeichert; ohne Token 412.
 5. `make -C nextnotes build` zweimal → identische Prüfsummen aller Ausgabedateien; `git diff --name-only <Upstream-Basis> -- src/` enthält nur Dateien aus §11.1.
 6. Fremdzugriff Seiten- und Kompatibilitätsrouten: Benutzer B ruft für eine Notiz von A `index.php?note=<id>` (inkl. Fragment-Modus), `excalidraw_editor.php`, `revisions.php`, `attachments.php`, `kanban_content.php` (Ordner von A), `api_download_note.php`, `api_export_note.php`, `api_export_folder.php`, `api_note_info.php`, `api_save_excalidraw.php`, `workspaces.php` (Aktionen auf Workspace von A) und den Anhang-Download auf → jeweils 404 (bzw. 403 bei lesbar, aber nicht schreibbar), kein Inhalt von A in der Antwort.
 

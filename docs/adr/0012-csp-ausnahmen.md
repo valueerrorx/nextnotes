@@ -24,3 +24,6 @@ Nicht erlaubt: `unsafe-eval`, `unsafe-inline` für Skripte, externe Skript-/Font
 ## Konsequenzen
 - CSP wird in einer Fabrik `Http\CspFactory` gebaut; jede Abweichung ist dort sichtbar und getestet.
 - Playwright prüft je Ansicht: keine CSP-Verletzung; auf `excalidraw_editor.php` zusätzlich, dass Bilder einfügen funktioniert.
+
+## Nachtrag M3 (2026-11-03)
+PDF-Anhänge (`GET …/attachments/{id}`, inline) erhalten `frame-ancestors 'self'` (`EmptyContentSecurityPolicy::addAllowedFrameAncestorDomain`, @since 13). Die leere Standard-CSP von Nicht-Template-Antworten setzt `'none'` und blockiert die PDF-Vorschau im iFrame der Notiz (`attachments.js`). `'self'` entspricht dem NC-Standard für Seiten und dem `X-Frame-Options: SAMEORIGIN` des Webservers; `frame-src` der Seiten bleibt unverändert. Übrige Anhänge behalten `sandbox` (SPEC B22).

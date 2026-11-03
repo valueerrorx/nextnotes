@@ -1,6 +1,6 @@
 # Status Nextcloud-Port „Next Notes“
 
-**Aktueller Meilenstein:** M3 – Frontend-Grundlage und Editor (noch nicht begonnen); M1, M2 fertig
+**Aktueller Meilenstein:** M3 – Frontend-Grundlage und Editor (M3a1 fertig, weiter M3a2); M1, M2 fertig
 
 ## Erledigte Slices
 - Setup: Branch `nextcloud-port`, Agenten unter `.claude/agents/`, `UPSTREAM.md`
@@ -25,6 +25,9 @@ Vorläufig vom Lead entschieden, zur Durchsicht (M2c):
 - Mentions über NC-Benutzer-ID (`@uid`), Benutzersuche nur nach NC-Sichtbarkeitsregeln
 - Aufgaben-Erinnerung: Markierung für alle sichtbar, Benachrichtigung nur an den, der sie gesetzt hat
 - „Was ist neu“ (Poznote-Releases) wird nie angezeigt
+
+Vorläufig (M3-Plan O6):
+- Marke in der Oberfläche: „Next Notes“ mit App-Icon; Poznote-GitHub-, Doku- und Spenden-Links entfernt; Herkunft „Basiert auf Poznote von Timothé Poznanski (MIT)“ im Über-Dialog
 
 Vorläufig (M2d):
 - Kontolöschung: Notizen, die andere Benutzer in den (geteilten) Workspaces des gelöschten Kontos geschrieben haben, werden mit diesen Workspaces gelöscht (SPEC §8). Alternative wäre Übergabe an einen Freigabe-Empfänger.
@@ -56,7 +59,14 @@ Vorläufig (M2d):
 - Leitlinie (Thomas, 2026-11-02): Reihenfolge M2b→M2c→M2d→M3 beibehalten; Lead entscheidet wo möglich selbst. Ziel: bugfrei, performant, einfache UI, MS Teams nur als lose Orientierung (bekannte Begriffe/Abläufe), nicht kopieren – Poznote-UI ist Basis, eigene bessere Lösungen erwünscht
 - M2b: Anhang-Quote zählt gegen den Workspace-Besitzer (auch bei Uploads durch Freigabe-Empfänger/Team)
 
-## M2 (laufend)
+## M3 (laufend)
+- M3-Plan `docs/slices/M3-plan.md`: Slices M3a1 (Build, check-upstream, Adapter, i18n, Theme), M3a2 (Seitenrahmen, Gestrichenes, Navigation), M3b (Editor, Anhänge, Mermaid/KaTeX, Beacon, Sperre, Suche), M3c (Fremdzugriff Seiten-/Kompatibilitätsrouten, Abschluss). Review `M3-plan-r1` (BLOCKER: XSS-Ausgaberegel, Gestrichenes in Menüs, Such-POST ohne Token, Lesefreigabe-Fall) → `M3-plan-r2` (FREIGABE mit Auflage M3b).
+  Lead: i18n als gecachte Datei je Sprache (SPEC §1.4); Export-Menüpunkte bis M4 ausgeblendet; unbekannter `?workspace=` → Standard-Workspace (§4.4); duplizierter Tab → Nur-Lesen als Done-Test; PDF `frame-ancestors 'self'` (ADR 0012 Nachtrag).
+  Lead B26: `data-action` in Notizinhalten wird vom Sanitizer ganz entfernt (Allowlist nur bei belegter Upstream-Fundstelle); Klick-Delegation ignoriert Ziele im Notizinhalt; Kollision eingeschleuster `id`/Klassen mit App-Elementen wird in M3b behandelt und getestet.
+- M3a1 erledigt: reproduzierbarer Build (`make -C nextnotes build`, esbuild + Lockfile, offline), `check-upstream`, Adapter `nextnotes-bootstrap.js`/`nextnotes-late.js` (Token nur an App-Pfad, 401-Reload-Schutz), i18n als gecachte Datei je Sprache, Theme-Tokens Hell/Dunkel, Schrift folgt NC (`Inter` → `var(--font-face)`, inkl. Legasthenie-Schrift). Keine Änderung in `src/`. Review `M3a1-diff-r1` (BLOCKER: Schrift, ADR-0016-Doku) → `M3a1-diff-r2` (FREIGABE).
+  Testnachweis (tester, frische Instanzen NC 35.0.2): Build 2× (2. offline) sha256 identisch, 122 Dateien; check-upstream 0 + 7 Gegenproben rot; E2E `assets.mjs` 82 Prüfungen je Theme grün auf Apache und nginx (0 CSP, 0 Konsolenfehler, 0 ≥400); Budget JS 997 KB/CSS 136 KB gz, 3 API-Requests, TTFB 21 ms; `run-m3.sh sqlite nginx`, `run-m2.sh` (3 DBs), `run-m1.sh` Exit 0; `down.sh all` 0.
+
+## M2 (fertig)
 - Plan `docs/slices/M2-plan.md` r1: Slices M2a (Gerüst, Rechte, Notizen/Ordner/Workspaces/Tags/Papierkorb, M1-Nacharbeit), M2b (Anhänge, Snapshots, Suche, Sperre, Unified Search), M2c (Tasks, Mentions, Erinnerungen, Settings, Konvertierung), M2d (Kontolöschung, Abschlusslauf 3 DBs)
 
 - Plan-Review `M2-plan-r1` (BLOCKER: Middleware 401/412, UID-Wiederverwendung, Body-IDs, Erinnerungen, Sperre vs. ADR 0005) → `M2-plan-r2` (FREIGABE). Lead: ADR 0005 gilt (409/423, Übernahme nur selbe Sitzung, Upstream-Abweichung B13); Netz einmalig für composer/Fixture-Build, Fixtures eingecheckt.
@@ -77,6 +87,9 @@ Vorläufig (M2d):
 ## Nacharbeit (vor/mit M2)
 - erledigt in M2a
 - erledigt in M2d: SQLite-503
+- M3a2: doppelter `settings/tasklist_insert_order` beim Seitenaufbau beseitigen und `KNOWN_DUPLICATES` in `budget.mjs` leeren; `X-Requested-With` bei XHR nicht doppelt setzen
+- M4: `allowed_iframe_domains` im Admin-Formular auch mit Schema (`https://…`) annehmen bzw. normalisieren, Fehler melden statt still verwerfen
+- M3a2: `check-upstream` prüft zusätzlich, dass die gebaute CSS kein `Inter` mehr enthält (M3a1-diff-r2)
 
 ## Nächster Schritt
-M3 – Frontend-Grundlage und Editor (SPEC §13 M3): architekt plant M3 (Slices, Build, Adapter `nextnotes-bootstrap.js`, §11.1-Patches, Offen-für-M3-Punkte) → speccritic → Umsetzung.
+M3a2 – Seitenrahmen Hauptansicht, Gestrichenes, Navigation (Plan §2 M3a2) inkl. Nacharbeit oben: architekt → tester + speccritic.

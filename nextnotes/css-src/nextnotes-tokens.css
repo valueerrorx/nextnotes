@@ -1,0 +1,73 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Thomas Weissel
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+/* Poznote-Tokens auf NC-Variablen (ADR 0016). Auf body, weil NC die Theme-Variablen dort setzt ([data-theme-*]).
+   Nicht umgelenkt (folgen html[data-theme] aus tokens.css): --pz-color-*, --pz-syntax-*, --pz-excalidraw-*,
+   --pz-weight-*, --pz-mark*, --pz-neutral*, --pz-disabled, --pz-scrollbar*, --pz-tooltip-*, RGB-Kanäle ohne NC-Gegenstück. */
+body {
+	--pz-bg: var(--color-main-background);
+	--pz-text-inverse: var(--color-primary-element-text);
+	--pz-text: var(--color-main-text);
+	--pz-text-strong: var(--color-main-text);
+	--pz-text-secondary: var(--color-text-maxcontrast);
+	--pz-text-muted: var(--color-text-maxcontrast);
+	--pz-text-subtle: var(--color-text-maxcontrast);
+
+	--pz-border-light: var(--color-border);
+	--pz-border: var(--color-border);
+	--pz-border-strong: var(--color-border-dark);
+
+	--pz-surface: var(--color-background-hover);
+	--pz-surface-hover: var(--color-background-dark);
+	--pz-surface-sunken: var(--color-background-dark);
+	--pz-surface-strong: var(--color-background-darker);
+	--pz-surface-strong-hover: var(--color-border-dark);
+	--pz-chrome-bg: var(--color-background-hover);
+	--pz-sidebar-bg: var(--color-background-hover);
+	--pz-sidebar-surface: var(--color-main-background);
+	--pz-code-bg: var(--color-background-hover);
+	--pz-tabbar-bg: var(--color-main-background);
+	--pz-tab-bg: var(--color-background-dark);
+	--pz-tab-hover-bg: var(--color-background-darker);
+	--pz-tab-active-bg: var(--color-main-background);
+
+	--pz-accent: var(--color-primary-element);
+	--pz-accent-hover: var(--color-primary-element-hover);
+	--pz-accent-soft: var(--color-primary-element-light);
+	--pz-accent-strong: var(--color-primary-element-light-text);
+	--pz-accent-text: var(--color-primary-element-light-text);
+	--pz-accent-text-hover: var(--color-primary-element-light-text);
+	--pz-link: var(--color-primary-element-light-text);
+	--pz-active-bg: var(--color-primary-element-light);
+	--pz-selection: color-mix(in srgb, var(--color-primary-element) 22%, transparent);
+	--pz-icon: var(--color-text-maxcontrast);
+	--pz-icon-hover: var(--color-primary-element);
+	--pz-shadow-rgb: var(--color-box-shadow-rgb);
+
+	--pz-danger: var(--color-error);
+	--pz-danger-hover: var(--color-error-hover);
+	--pz-danger-soft: color-mix(in srgb, var(--color-error) 15%, var(--color-main-background));
+	--pz-danger-strong: var(--color-error-text);
+	--pz-danger-text: var(--color-error-text);
+	--pz-danger-text-hover: var(--color-error-hover);
+	--pz-success: var(--color-success);
+	--pz-success-hover: var(--color-success-hover);
+	--pz-success-soft: color-mix(in srgb, var(--color-success) 15%, var(--color-main-background));
+	--pz-success-strong: var(--color-success-text);
+	--pz-success-text: var(--color-success-text);
+	--pz-success-text-hover: var(--color-success-hover);
+	--pz-warning: var(--color-warning);
+	--pz-warning-hover: var(--color-warning-hover);
+	--pz-warning-soft: color-mix(in srgb, var(--color-warning) 15%, var(--color-main-background));
+	--pz-warning-strong: var(--color-warning-text);
+	--pz-warning-text: var(--color-warning-text);
+	--pz-warning-text-hover: var(--color-warning-hover);
+
+	--pz-radius-sm: var(--border-radius-small);
+	--pz-radius: var(--border-radius);
+	--pz-radius-lg: var(--border-radius-element);
+	--pz-radius-xl: var(--border-radius-large);
+	--pz-radius-2xl: var(--border-radius-container-large, 16px);
+	--pz-radius-pill: var(--border-radius-pill);
+}
