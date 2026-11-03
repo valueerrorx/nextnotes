@@ -1,6 +1,6 @@
 # Status Nextcloud-Port „Next Notes“
 
-**Aktueller Meilenstein:** M4 (Planung); M1, M2, M3 fertig
+**Aktueller Meilenstein:** M4 (Plan freigegeben, weiter M4a); M1, M2, M3 fertig
 
 ## Erledigte Slices
 - Setup: Branch `nextcloud-port`, Agenten unter `.claude/agents/`, `UPSTREAM.md`
@@ -137,5 +137,10 @@ Vorläufig (M2d):
 - M5: `AccessService::filterReadable` und `noteLevel`/`visibleWorkspaceIds` gemeinsam um Teams erweitern (FilterReadableTest sichert ab)
 - Hinweis: CSS-Nesting (`&`) zählt `check-css` nicht mit – bei Upstream-Updates beachten
 
+## M4 (laufend)
+- M4-Plan `docs/slices/M4-plan.md`: Slices M4a–M4i. Review `M4-plan-r1` (BLOCKER: Export-Rechte, ZIP-Speicher/Platte, Parser-DoS) → `M4-plan-r2` (FREIGABE, Hinweise als Lead-Auflagen übernommen).
+  Lead: Embed-Domains exakte Hosts ohne Public Suffix List; Export nur Anhänge der exportierten Notizen, Verweise über `filterReadable`; Export ≤ 1 GiB, ein ZIP-Export je Benutzer; Render/Umwandlung ≤ 1 MiB.
+- Offen für Thomas (vorläufig Lead): Q1 Embed-Domains ab Werk leer (Upstream: YouTube/Bilibili); Q2 Export für jeden mit Leserecht, „alle“-Exporte nur eigene Workspaces.
+
 ## Nächster Schritt
-M4 – Plan `docs/slices/M4-plan.md` (Export, `calendar.js`/`background-settings.js`, `allowed_iframe_domains` normalisieren, `api_download_note` für verknüpfte Notizen, „Neuer Workspace“, Excalidraw-Bild einfügen unter CSP): architekt plant → speccritic → Slices.
+M4a – Admin-Formular/Embed-Domains (B41, P17), „Neuer Workspace“, Probe Excalidraw-Bild unter CSP: architekt → speccritic → tester.
