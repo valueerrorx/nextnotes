@@ -122,6 +122,7 @@ class IndexViewService {
 		private AttachmentMapper $attachments,
 		private IDateTimeFormatter $dates,
 		private SearchService $search,
+		private PageFrameService $frame,
 	) {
 	}
 
@@ -381,23 +382,7 @@ class IndexViewService {
 				return $this->workspaces->resolveKey($uid, $key);
 			}
 		}
-		$candidates = [$requested];
-		$default = $this->value($uid, 'default_workspace');
-		if (!in_array($default, ['', '__last_opened__', '__last_opened_device__'], true)) {
-			$candidates[] = $default;
-		}
-		$candidates[] = $this->value($uid, 'last_opened_workspace');
-		foreach ($candidates as $candidate) {
-			if ($candidate === '' || $candidate === '__last_opened__') {
-				continue;
-			}
-			try {
-				return $this->workspaces->resolveKey($uid, $candidate);
-			} catch (NotFoundException) {
-				// unbekannt oder nicht sichtbar: nächster Kandidat (SPEC §4.4)
-			}
-		}
-		return $this->workspaces->defaultWorkspace($uid);
+		return $this->frame->workspace($uid, $requested);
 	}
 
 	/**

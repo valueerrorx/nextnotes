@@ -97,9 +97,12 @@ final class ControllerAttributeTest extends TestCase {
 		'CompatController::exportEntries', 'CompatController::exportStructured', 'CompatController::exportAttachments',
 		// M3c2: Editor-Seite, GET ohne Seiteneffekt (Speichern über api_save_excalidraw.php mit CSRF)
 		'PageController::excalidrawEditor',
+		// M4e: Listen-Seiten, GET ohne Seiteneffekt (Papierkorb-?sort= wird nicht gespeichert, B58)
+		'PageController::trash', 'PageController::listTags', 'PageController::listFolders', 'PageController::attachmentsList',
+		'PageController::notesManager', 'PageController::create',
 	];
 	// M3c2: schreibende Kompatibilitätsrouten (POST) prüfen CSRF
-	private const PAGE_COMPAT_CSRF = ['PageController::search', 'CompatController::noteInfo', 'CompatController::saveExcalidraw', 'CompatController::workspaces', 'CompatController::importDroppedNotes'];
+	private const PAGE_COMPAT_CSRF = ['PageController::search', 'PageController::trashSearch', 'CompatController::noteInfo', 'CompatController::saveExcalidraw', 'CompatController::workspaces', 'CompatController::importDroppedNotes'];
 
 	public function testPageAndCompatControllerAttributes(): void {
 		$errors = [];

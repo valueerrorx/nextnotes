@@ -370,7 +370,8 @@ function handleAttachmentClick(e) {
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
-    return div.innerHTML;
+    // Next Notes P23 (B60): also escape quotes, the result lands in attribute values
+    return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function escapeRegExp(text) {

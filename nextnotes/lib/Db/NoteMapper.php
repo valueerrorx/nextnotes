@@ -213,6 +213,106 @@ class NoteMapper extends QBMapper {
 	}
 
 	/**
+	 * Inhaltsanfang je Notiz (Vorschau der Papierkorb-Seite), höchstens $chars Zeichen aus der DB
+	 * @param int[] $ids
+	 * @return array<int, string>
+	 */
+	public function contentPrefixes(array $ids, int $chars): array {
+		$out = [];
+		foreach (array_chunk(array_values(array_unique($ids)), 1000) as $chunk) {
+			$qb = $this->db->getQueryBuilder();
+			$qb->select('id')
+				->selectAlias($qb->func()->substring('content', $qb->createNamedParameter(1, IQueryBuilder::PARAM_INT), $qb->createNamedParameter($chars, IQueryBuilder::PARAM_INT)), 'prefix')
+				->from(self::TABLE)
+				->where($qb->expr()->in('id', $qb->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY)));
+			$res = $qb->executeQuery();
+			while ($row = $res->fetch()) {
+				$c = $row['prefix'];
+				$out[(int)$row['id']] = is_resource($c) ? (string)stream_get_contents($c) : (string)$c;
+			}
+			$res->closeCursor();
+		}
+		return $out;
+	}
+
+	/**
+	 * Papierkorb eines Workspace: Anzahl (Begriffe UND-verknüpft über search_text), mit $after nur ältere als der Cursor
+	 * @param ?array{0: int, 1: int} $after [Zeitstempel, id] der letzten gezeigten Notiz
+	 */
+	public function countTrashed(int $workspaceId, array $terms, bool $byCreated = false, ?array $after = null): int {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select($qb->func()->count('id', 'cnt'))->from(self::TABLE);
+		$this->trashedWhere($qb, $workspaceId, $terms, $byCreated, $after);
+		$res = $qb->executeQuery();
+		$count = (int)$res->fetchOne();
+		$res->closeCursor();
+		return $count;
+	}
+
+	/**
+	 * Papierkorb eines Workspace: nächste $limit nach Löschdatum bzw. Anlage (neueste zuerst, Keyset ab $after), ohne Inhalt
+	 * @param string[] $terms gefaltete Suchbegriffe
+	 * @param ?array{0: int, 1: int} $after [Zeitstempel, id] der letzten gezeigten Notiz
+	 * @return Note[]
+	 */
+	public function findTrashedPage(int $workspaceId, array $terms, bool $byCreated, int $limit, ?array $after = null): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select(...self::LIST_COLUMNS)->from(self::TABLE);
+		$this->trashedWhere($qb, $workspaceId, $terms, $byCreated, $after);
+		$qb->orderBy($byCreated ? 'created_at' : 'trashed_at', 'DESC')->addOrderBy('id', 'DESC')->setMaxResults($limit);
+		return $this->findEntities($qb);
+	}
+
+	/**
+	 * @param string[] $terms
+	 * @param ?array{0: int, 1: int} $after
+	 */
+	private function trashedWhere(IQueryBuilder $qb, int $workspaceId, array $terms, bool $byCreated = false, ?array $after = null): void {
+		$qb->where($qb->expr()->eq('workspace_id', $qb->createNamedParameter($workspaceId, IQueryBuilder::PARAM_INT)))
+			->andWhere($qb->expr()->eq('role', $qb->createNamedParameter('note')))
+			->andWhere($qb->expr()->isNotNull('trashed_at'));
+		foreach ($terms as $term) {
+			$qb->andWhere($qb->expr()->like('search_text', $qb->createNamedParameter('%' . $this->db->escapeLikeParameter($term) . '%')));
+		}
+		if ($after !== null) {
+			// Keyset: (Zeit, id) kleiner als der Cursor; stabil, auch wenn gezeigte Notizen inzwischen fehlen
+			$col = $byCreated ? 'created_at' : 'trashed_at';
+			$ts = $qb->createNamedParameter($after[0], IQueryBuilder::PARAM_INT);
+			$qb->andWhere($qb->expr()->orX(
+				$qb->expr()->lt($col, $ts),
+				$qb->expr()->andX($qb->expr()->eq($col, $ts), $qb->expr()->lt('id', $qb->createNamedParameter($after[1], IQueryBuilder::PARAM_INT))),
+			));
+		}
+	}
+
+	/**
+	 * Notizen je Ordner eines Workspace (ohne Papierkorb, ohne Wurzel); mit $tag nur Notizen mit diesem Tag
+	 * @return array<int, int> folder_id => Anzahl
+	 */
+	public function countByFolder(int $workspaceId, ?string $tag = null): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('n.folder_id')->selectAlias($qb->func()->count('n.id'), 'cnt')->from(self::TABLE, 'n')
+			->where($qb->expr()->eq('n.workspace_id', $qb->createNamedParameter($workspaceId, IQueryBuilder::PARAM_INT)))
+			->andWhere($qb->expr()->eq('n.role', $qb->createNamedParameter('note')))
+			->andWhere($qb->expr()->isNull('n.trashed_at'))
+			->andWhere($qb->expr()->isNotNull('n.folder_id'))
+			->groupBy('n.folder_id');
+		if ($tag !== null) {
+			$qb->innerJoin('n', NoteTagMapper::TABLE, 't', $qb->expr()->andX(
+				$qb->expr()->eq('t.note_id', 'n.id'),
+				$qb->expr()->eq('t.tag', $qb->createNamedParameter($tag)),
+			));
+		}
+		$out = [];
+		$res = $qb->executeQuery();
+		while ($row = $res->fetch()) {
+			$out[(int)$row['folder_id']] = (int)$row['cnt'];
+		}
+		$res->closeCursor();
+		return $out;
+	}
+
+	/**
 	 * Ziele von [[…]] in einem Workspace (B47): per ID oder Kandidaten per Titel (search_text beginnt mit dem gefalteten Titel), ohne Papierkorb
 	 * @param int[] $ids
 	 * @param string[] $foldedTitles

@@ -25,6 +25,14 @@ return [
 		['name' => 'page#attachments', 'url' => '/attachments.php', 'verb' => 'GET'],
 		['name' => 'page#kanbanContent', 'url' => '/kanban_content.php', 'verb' => 'GET'],
 		['name' => 'page#excalidrawEditor', 'url' => '/excalidraw_editor.php', 'verb' => 'GET'],
+		// Listen-Seiten (M4e)
+		['name' => 'page#trash', 'url' => '/trash.php', 'verb' => 'GET'],
+		['name' => 'page#trashSearch', 'url' => '/trash.php', 'verb' => 'POST'],
+		['name' => 'page#listTags', 'url' => '/list_tags.php', 'verb' => 'GET'],
+		['name' => 'page#listFolders', 'url' => '/list_folders.php', 'verb' => 'GET'],
+		['name' => 'page#attachmentsList', 'url' => '/attachments_list.php', 'verb' => 'GET'],
+		['name' => 'page#notesManager', 'url' => '/notes_manager.php', 'verb' => 'GET'],
+		['name' => 'page#create', 'url' => '/create.php', 'verb' => 'GET'],
 		// Admin-Formular (Settings\AdminSettings), nur Admins
 		['name' => 'admin_settings#save', 'url' => '/admin/settings', 'verb' => 'POST'],
 		// Kompatibilitätsrouten (SPEC §4.2): Upstream-Einzeldateien unter gleichem Namen

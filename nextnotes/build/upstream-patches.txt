@@ -29,3 +29,6 @@ src/public/js/sidebar-file-import.js
 src/public/js/revisions-page.js
 src/public/js/katex/katex.min.js
 src/public/js/katex/katex.min.css
+src/public/js/attachments-list.js
+src/public/js/list_folders.js
+src/public/js/utils-menus.js

@@ -15,7 +15,8 @@
     // depth and its subfolders the following rows of greater depth.
     const filterInput = document.getElementById('filterInput');
     const clearFilterBtn = document.getElementById('clearFilterBtn');
-    const folderItems = Array.from(document.querySelectorAll('.folder-item'));
+    // Next Notes (P24): let, refreshFolderList() swaps the rows
+    let folderItems = Array.from(document.querySelectorAll('.folder-item'));
     const filterStats = document.getElementById('filterStats');
     const treeToolbar = document.getElementById('foldersTreeToolbar');
     const toggleAllBtn = document.getElementById('toggleAllFoldersBtn');
@@ -28,7 +29,7 @@
     };
 
     const depthOf = item => parseInt(item.getAttribute('data-depth'), 10) || 0;
-    const collapsibleItems = folderItems.filter(item => item.getAttribute('data-has-children') === '1');
+    let collapsibleItems = folderItems.filter(item => item.getAttribute('data-has-children') === '1');
 
     // Folded folders, remembered per account in this browser. Ids of folders
     // that no longer have subfolders are dropped on load.
@@ -177,6 +178,32 @@
     }
 
     applyFolderVisibility();
+
+    // Next Notes (P24): folder actions redraw #foldersList in place (server sends only the list), no page reload
+    function refreshFolderList() {
+        const list = document.getElementById('foldersList');
+        return fetch('list_folders.php' + workspaceQuery('?'), {
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-Poznote-Fragment': 'folders_list' }
+        })
+            .then(function(response) {
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.text();
+            })
+            .then(function(html) {
+                const fresh = new DOMParser().parseFromString(html, 'text/html').getElementById('foldersList');
+                if (!list || !fresh) throw new Error('folder list missing');
+                list.innerHTML = fresh.innerHTML;
+                folderItems = Array.from(list.querySelectorAll('.folder-item'));
+                collapsibleItems = folderItems.filter(item => item.getAttribute('data-has-children') === '1');
+                applyFolderVisibility();
+            })
+            .catch(function(error) {
+                console.error('list_folders: refresh failed', error);
+                window.location.reload();
+            });
+    }
+    window.refreshFolderListPage = refreshFolderList;
 
     // Folder actions
     //
@@ -420,7 +447,7 @@
             .then(window.readApiJson)
             .then(function(data) {
                 if (data.success) {
-                    window.location.reload();
+                    refreshFolderList();
                 } else if (typeof showNotificationPopup === 'function') {
                     showNotificationPopup(window.apiErrorMessage(data, 'Error updating favorites'), 'error');
                 }

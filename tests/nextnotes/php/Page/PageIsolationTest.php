@@ -190,6 +190,35 @@ final class PageIsolationTest extends ApiTestCase {
 		self::assertSame($before, self::dump($a->uid), 'Fremdzugriff hat Daten von A verändert');
 	}
 
+	// M4e Done 2: Listen-Seiten mit A's Workspace-Parameter → B's Standard-Workspace (200, kein 404), keine Titel/Tags/Ordner/Anhänge von A
+	public function testListPagesForeignWorkspaceFallsBackToOwn(): void {
+		$x = $this->fixture();
+		['a' => $a, 'b' => $b, 'mark' => $mark, 'n' => $n] = $x;
+		$wq = 'workspace=' . self::enc($x['ws']);
+		self::ok($a->call('PUT', "/notes/$n/tags", ['tags' => ["tag$mark"], 'workspace' => $x['ws']]), 'Tag A');
+		$gone = self::newNote($a, $x['ws'], "Weg $mark", "<p>Papierkorb $mark</p>");
+		self::ok($a->call('DELETE', "/notes/$gone?$wq"), 'Papierkorb A');
+		$before = self::dump($a->uid);
+		foreach (['trash.php', 'list_tags.php', 'list_folders.php', 'attachments_list.php', 'notes_manager.php', 'create.php'] as $p) {
+			foreach (["$p?$wq", "$p?workspace=" . $x['wsId'], $p] as $path) {
+				$r = self::get($b, $path);
+				self::assertSame(200, $r->status, "B $path: " . $r->describe());
+				self::assertStringNotContainsString($mark, $r->body, "B $path: Daten von A im Body");
+				self::assertStringNotContainsString(htmlspecialchars($x['ws']), $r->body, "B $path: Workspace-Name von A");
+				self::assertStringContainsString('replaceWorkspace', $r->body, "B $path: Rahmen vorhanden");
+			}
+		}
+		// Papierkorb-Suche per POST auf A's Workspace
+		$post = $b->form(self::APP . 'trash.php', ['search' => 'Weg', 'workspace' => $x['ws']]);
+		self::assertSame(200, $post->status, 'B POST trash.php: ' . $post->describe());
+		self::assertStringNotContainsString($mark, $post->body, 'B POST trash.php: Daten von A');
+		self::assertSame($before, self::dump($a->uid), 'A unverändert');
+		// A sieht die eigenen Daten
+		self::assertStringContainsString("Weg $mark", self::get($a, "trash.php?$wq")->body, 'A: Papierkorb');
+		self::assertStringContainsString("tag$mark", self::get($a, "list_tags.php?$wq")->body, 'A: Tag');
+		self::assertStringContainsString("Board $mark", self::get($a, "list_folders.php?$wq")->body, 'A: Ordner');
+	}
+
 	public function testReadShareReads200WritesForbidden(): void {
 		$x = $this->fixture();
 		['a' => $a, 'b' => $b, 'mark' => $mark, 'n' => $n, 'f' => $f, 'at' => $at] = $x;

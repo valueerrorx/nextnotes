@@ -28,6 +28,15 @@ final class TemplateOutputTest extends TestCase {
 		// Notizinhalt, beim Speichern durch HtmlSanitizer::sanitizeForType geprüft (Lead M3b1); Tasklist-JSON wird nicht ausgegeben
 		// (Gegenprobe: EditorPageTest::testTasklistContentNeverRenderedUnsanitized)
 		'partials/note_display.php' => ['$note[\'display\']'],
+		// M4e: Listen-Seiten; Papierkorb-Vorschau = TrashViewService::preview (renderSnapshot/toClient bzw. eigener escapender Tasklisten-Renderer)
+		'trash.php' => ['json_encode($islandData, $jsonFlags)'],
+		// M4e-fix: Karten als Partial (Seite und Fragment „Mehr laden“)
+		'partials/trash_cards.php' => ['$card[\'html\']'],
+		'list_tags.php' => ['json_encode($islandData, $jsonFlags)'],
+		'list_folders.php' => ['json_encode($islandData, $jsonFlags)'],
+		'attachments_list.php' => ['json_encode($islandData, $jsonFlags)'],
+		'notes_manager.php' => ['json_encode($islandData, $jsonFlags)'],
+		'create.php' => ['json_encode($islandData, $jsonFlags)'],
 	];
 
 	/** @return array<string, string> relativer Pfad => Inhalt */
@@ -66,7 +75,9 @@ final class TemplateOutputTest extends TestCase {
 
 	/** @return array<string, array{string}> Templates mit JSON-Inseln */
 	public static function islandTemplates(): array {
-		return ['index.php' => ['index.php'], 'revisions.php' => ['revisions.php'], 'attachments.php' => ['attachments.php'], 'excalidraw_editor.php' => ['excalidraw_editor.php'], 'export_print.php' => ['export_print.php']];
+		return ['index.php' => ['index.php'], 'revisions.php' => ['revisions.php'], 'attachments.php' => ['attachments.php'], 'excalidraw_editor.php' => ['excalidraw_editor.php'], 'export_print.php' => ['export_print.php'],
+			'trash.php' => ['trash.php'], 'list_tags.php' => ['list_tags.php'], 'list_folders.php' => ['list_folders.php'], 'attachments_list.php' => ['attachments_list.php'],
+			'notes_manager.php' => ['notes_manager.php'], 'create.php' => ['create.php']];
 	}
 
 	#[\PHPUnit\Framework\Attributes\DataProvider('islandTemplates')]

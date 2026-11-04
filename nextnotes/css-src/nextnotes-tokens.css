@@ -45,12 +45,12 @@ body {
 	--pz-icon-hover: var(--color-primary-element);
 	--pz-shadow-rgb: var(--color-box-shadow-rgb);
 
-	--pz-danger: var(--color-error);
-	--pz-danger-hover: var(--color-error-hover);
-	--pz-danger-soft: color-mix(in srgb, var(--color-error) 15%, var(--color-main-background));
+	--pz-danger: var(--color-element-error);
+	--pz-danger-hover: color-mix(in srgb, var(--color-element-error) 85%, var(--color-main-text));
+	--pz-danger-soft: color-mix(in srgb, var(--color-element-error) 15%, var(--color-main-background));
 	--pz-danger-strong: var(--color-error-text);
 	--pz-danger-text: var(--color-error-text);
-	--pz-danger-text-hover: var(--color-error-hover);
+	--pz-danger-text-hover: var(--color-element-error);
 	--pz-success: var(--color-success);
 	--pz-success-hover: var(--color-success-hover);
 	--pz-success-soft: color-mix(in srgb, var(--color-success) 15%, var(--color-main-background));
@@ -70,4 +70,9 @@ body {
 	--pz-radius-xl: var(--border-radius-large);
 	--pz-radius-2xl: var(--border-radius-container-large, 16px);
 	--pz-radius-pill: var(--border-radius-pill);
+}
+
+/* Schrift auf Gefahr-Flächen (H3, M4e-fix): Seitenhintergrund statt Primär-Text; hell weiß wie bisher, dunkel dunkel auf #FF5050 (≥ 4.5:1) */
+body :is(.btn-danger, .btn-delete, .alert-modal-button.primary.danger, .badge-inactive, .mention-badge, .update-badge) {
+	--pz-text-inverse: var(--color-main-background);
 }

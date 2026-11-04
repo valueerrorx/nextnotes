@@ -70,6 +70,28 @@ class NoteTagMapper extends QBMapper {
 		return array_values(array_unique($out));
 	}
 
+	/**
+	 * Notizen je Tag in einem Workspace, ohne Papierkorb (Tag-Seite)
+	 * @return array<string, int>
+	 */
+	public function countsInWorkspace(int $workspaceId): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('t.tag')->selectAlias($qb->func()->count('t.note_id'), 'cnt')
+			->from(self::TABLE, 't')
+			->innerJoin('t', NoteMapper::TABLE, 'n', $qb->expr()->eq('n.id', 't.note_id'))
+			->where($qb->expr()->eq('n.workspace_id', $qb->createNamedParameter($workspaceId, IQueryBuilder::PARAM_INT)))
+			->andWhere($qb->expr()->isNull('n.trashed_at'))
+			->andWhere($qb->expr()->eq('n.role', $qb->createNamedParameter('note')))
+			->groupBy('t.tag');
+		$out = [];
+		$res = $qb->executeQuery();
+		while ($row = $res->fetch()) {
+			$out[(string)$row['tag']] = (int)$row['cnt'];
+		}
+		$res->closeCursor();
+		return $out;
+	}
+
 	public function add(int $noteId, string $tag): void {
 		$this->db->insertIgnoreConflict(self::TABLE, ['note_id' => $noteId, 'tag' => $tag]);
 	}

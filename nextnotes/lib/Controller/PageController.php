@@ -19,9 +19,13 @@ use OCA\NextNotes\Service\SettingsService;
 use OCA\NextNotes\Service\SnapshotService;
 use OCA\NextNotes\Service\View\IndexViewService;
 use OCA\NextNotes\Service\View\KanbanViewService;
+use OCA\NextNotes\Service\View\FolderListViewService;
 use OCA\NextNotes\Service\View\NotePageViewService;
 use OCA\NextNotes\Service\View\PageAssets;
+use OCA\NextNotes\Service\View\PageFrameService;
 use OCA\NextNotes\Service\View\PageTranslator;
+use OCA\NextNotes\Service\View\TagListViewService;
+use OCA\NextNotes\Service\View\TrashViewService;
 use OCP\App\IAppManager;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
@@ -52,6 +56,10 @@ class PageController extends Controller {
 		private NotePageViewService $pageView,
 		private ExcalidrawService $excalidraw,
 		private EmbedDomainService $embedDomains,
+		private PageFrameService $pageFrame,
+		private TrashViewService $trashView,
+		private TagListViewService $tagListView,
+		private FolderListViewService $folderListView,
 	) {
 		parent::__construct(Application::APP_ID, $request);
 	}
@@ -294,6 +302,98 @@ class PageController extends Controller {
 		$response = new TemplateResponse(Application::APP_ID, 'audio_player', ['src' => $src], TemplateResponse::RENDER_AS_BLANK);
 		$response->setContentSecurityPolicy($this->cspFactory->forView('audio_player'));
 		return $response;
+	}
+
+	// Upstream trash.php: Papierkorb des Workspace (je 50, Vorschau); ?sort= ohne Speichern (B58); X-Poznote-Fragment: trash_cards → nächste Karten ab ?after=
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function trash(): TemplateResponse {
+		if ($this->request->getHeader('X-Poznote-Fragment') === 'trash_cards') {
+			$uid = $this->userSession->getUser()?->getUID() ?? '';
+			$this->language($uid);
+			$frame = $this->pageFrame->frame($uid, $this->request->getParam('workspace'));
+			$trash = $this->trashView->build($uid, $frame, $this->request->getParam('sort'), $this->request->getParam('search'), $this->request->getParam('after'));
+			$response = new TemplateResponse(Application::APP_ID, 'fragment_trash', ['tr' => $this->translator, 'frame' => $frame, 'trash' => $trash], TemplateResponse::RENDER_AS_BLANK);
+			$response->setContentSecurityPolicy($this->cspFactory->forView('trash'));
+			return $response;
+		}
+		return $this->listPage('trash', fn (string $uid, array $frame) => [
+			'trash' => $this->trashView->build($uid, $frame, $this->request->getParam('sort'), $this->request->getParam('search')),
+		]);
+	}
+
+	// Such-Formular des Papierkorbs (POST trash.php); CSRF über das versteckte Feld requesttoken
+	#[NoAdminRequired]
+	public function trashSearch(): TemplateResponse {
+		return $this->trash();
+	}
+
+	// Upstream list_tags.php: Tags des Workspace mit Anzahl und Farbe
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function listTags(): TemplateResponse {
+		return $this->listPage('list_tags', fn (string $uid, array $frame) => ['tags' => $this->tagListView->build($uid, $frame)]);
+	}
+
+	// Upstream list_folders.php: Ordnerbaum des Workspace mit Aktionen über die Ordner-API; X-Poznote-Fragment: folders_list → nur #foldersList (P24)
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function listFolders(): TemplateResponse {
+		if ($this->request->getHeader('X-Poznote-Fragment') === 'folders_list') {
+			$uid = $this->userSession->getUser()?->getUID() ?? '';
+			$this->language($uid);
+			$frame = $this->pageFrame->frame($uid, $this->request->getParam('workspace'));
+			$response = new TemplateResponse(Application::APP_ID, 'fragment_folders', ['tr' => $this->translator, 'frame' => $frame,
+				'folders' => $this->folderListView->build($uid, $frame)], TemplateResponse::RENDER_AS_BLANK);
+			$response->setContentSecurityPolicy($this->cspFactory->forView('list_folders'));
+			return $response;
+		}
+		return $this->listPage('list_folders', fn (string $uid, array $frame) => ['folders' => $this->folderListView->build($uid, $frame)]);
+	}
+
+	// Upstream attachments_list.php: Liste lädt attachments-list.js über notes/with-attachments
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function attachmentsList(): TemplateResponse {
+		return $this->listPage('attachments_list');
+	}
+
+	// Upstream notes_manager.php: Liste und Mehrfachaktionen lädt notes-manager.js über die Notiz-API
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function notesManager(): TemplateResponse {
+		return $this->listPage('notes_manager');
+	}
+
+	// Upstream create.php: Erstellen-Hub (Notiz, Markdown, Aufgabenliste, Ordner; Tagebuch ab M4f)
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function create(): TemplateResponse {
+		return $this->listPage('create', fn () => ['globals' => ['DEFAULT_NOTE_TITLES' => $this->translator->defaultNoteTitles()]]);
+	}
+
+	/**
+	 * Rahmen der Listen-Seiten (M4e): Icon-Leiste, Workspace wie die Hauptansicht (unbekannt → Standard, §4.4), eigenes Bündel
+	 * @param ?callable(string, array): array<string, mixed> $data
+	 */
+	private function listPage(string $page, ?callable $data = null): TemplateResponse {
+		$uid = $this->userSession->getUser()?->getUID() ?? '';
+		$lang = $this->language($uid);
+		$baseUrl = $this->urls->linkToRoute('nextnotes.page.index');
+		$frame = $this->pageFrame->frame($uid, $this->request->getParam('workspace'));
+		$extra = $data !== null ? $data($uid, $frame) : [];
+		$this->assets->page($page, $lang);
+		$this->provideConfig($uid, $baseUrl, $lang, [
+			'hiddenUiElements' => IndexViewService::FORCED_HIDDEN,
+			'globalHiddenUiElements' => IndexViewService::FORCED_HIDDEN,
+		]);
+		return $this->page($page, $page, [
+			'tr' => $this->translator,
+			'baseUrl' => $baseUrl,
+			'frame' => $frame,
+			'currentPage' => $page . '.php',
+			'view' => ['workspaceKey' => $frame['workspaceKey'], 'iconPalette' => IndexViewService::iconPalette()],
+		] + $extra);
 	}
 
 	// Spike ADR 0004, leere Seite bis M4

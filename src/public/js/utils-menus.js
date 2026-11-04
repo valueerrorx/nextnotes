@@ -379,6 +379,11 @@ function syncSpeedDialAfterFolderChange(noteIds, inSpeedDial) {
         });
     });
     if (!document.querySelector('.note-actions-toggle')) {
+        // Next Notes (P24): list_folders redraws its list in place
+        if (typeof window.refreshFolderListPage === 'function') {
+            window.refreshFolderListPage();
+            return;
+        }
         setTimeout(function() { window.location.reload(); }, 1000);
     }
 }

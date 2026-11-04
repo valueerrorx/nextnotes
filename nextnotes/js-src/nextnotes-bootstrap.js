@@ -75,10 +75,13 @@
 			if (focus === '1' || focus === '2' || focus === 'true') root.classList.add('focus-mode');
 		} catch (e) { /* ohne localStorage Standardzustand */ }
 		// Serverseitig gewählter Workspace in die URL (Skripte lesen location.search)
-		if (state.replaceWorkspace) {
+		// replaceQuery: weitere Parameter, z. B. Suchbegriff nach POST trash.php (Neuladen/Zurücksetzen per GET, B59)
+		var query = state.replaceQuery && typeof state.replaceQuery === 'object' ? state.replaceQuery : {};
+		if (state.replaceWorkspace || Object.keys(query).length) {
 			try {
 				var url = new URL(window.location.href);
-				url.searchParams.set('workspace', state.replaceWorkspace);
+				if (state.replaceWorkspace) url.searchParams.set('workspace', state.replaceWorkspace);
+				Object.keys(query).forEach(function (k) { url.searchParams.set(k, String(query[k])); });
 				history.replaceState(history.state, '', url);
 			} catch (e) { /* URL bleibt */ }
 		}

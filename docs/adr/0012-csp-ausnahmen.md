@@ -42,3 +42,6 @@ NC sendet `Feature-Policy: … microphone 'none'`. Die Hauptansicht (`index`) er
 
 ## Nachtrag M4c (2026-11-04)
 Druckansicht `export_print` (`api_export_note.php?format=html&disposition=inline`) erhält dieselbe Policy wie die Notizansicht: `frame-src 'self'` und je Embed-Domain `https://<host>` (`CspFactory::NOTE_VIEWS`), damit eingebettete Videos auch im Druck erscheinen. Keine weitere Lockerung; KaTeX/Mermaid kommen aus dem App-Pfad, Skript über NC-Nonce.
+
+## Nachtrag M4e (2026-11-04)
+Papierkorb: `trash` gehört zu `NOTE_VIEWS` und bekommt dieselbe Policy wie `index` (`frame-src 'self'` + Embed-Domains aus `EmbedDomainService`), weil die Papierkorb-Vorschau bereinigten Notizinhalt mit erlaubten Einbettungen zeigt. Nicht lockerer als `index`; keine weitere Ausnahme. Review `M4e-r1` (Blocker: fehlender Nachtrag) damit erledigt.

@@ -732,6 +732,134 @@
 			"omit": {
 				"js/excalidraw-dist/excalidraw-bundle.iife.js": "Vendor unverändert (js/vendor/excalidraw-dist), eigenes Skript vor dem Seitenbündel (PageAssets::page)"
 			}
+		},
+		"trash": {
+			"js": [
+				"js/theme-manager.js",
+				"js/globals.js",
+				"js/workspaces-core.js",
+				"js/workspaces-create.js",
+				"js/workspaces-share.js",
+				"js/workspaces-actions.js",
+				"js/workspaces-page.js",
+				"js/request-errors.js",
+				"js/notes.js",
+				"js/ui.js",
+				"js/date-time-format.js",
+				"js/attachments.js",
+				"js/utils-note-create.js",
+				"js/utils-folders.js",
+				"js/utils-updates.js",
+				"js/utils-move-folder.js",
+				"js/utils-folder-tree.js",
+				"js/utils-move-note.js",
+				"js/utils-export-create.js",
+				"js/utils-menus.js",
+				"js/utils-note-rename.js",
+				"js/utils-kanban.js",
+				"js/search-highlight.js",
+				"js/toolbar-popups.js",
+				"js/toolbar-editor-utils.js",
+				"js/toolbar-format.js",
+				"js/toolbar-md-offsets.js",
+				"js/toolbar-inline.js",
+				"js/toolbar-emoji.js",
+				"js/toolbar-links.js",
+				"js/toolbar-tables.js",
+				"js/checklist.js",
+				"js/bulletlist.js",
+				"js/main.js",
+				"js/navigation.js",
+				"js/icon-sidebar-toggle.js",
+				"js/trash.js"
+			]
+		},
+		"list_tags": {
+			"js": [
+				"js/theme-manager.js",
+				"js/globals.js",
+				"js/navigation.js",
+				"js/icon-sidebar-toggle.js",
+				"js/request-errors.js",
+				"js/modal-alerts.js",
+				"js/tag-actions.js",
+				"js/list_tags.js",
+				"js/clickable-tags.js"
+			]
+		},
+		"list_folders": {
+			"js": [
+				"js/theme-manager.js",
+				"js/globals.js",
+				"js/navigation.js",
+				"js/icon-sidebar-toggle.js",
+				"js/request-errors.js",
+				"js/modal-alerts.js",
+				"js/ui.js",
+				"js/utils-note-create.js",
+				"js/utils-folders.js",
+				"js/utils-updates.js",
+				"js/utils-move-folder.js",
+				"js/utils-folder-tree.js",
+				"js/utils-move-note.js",
+				"js/utils-export-create.js",
+				"js/utils-menus.js",
+				"js/utils-note-rename.js",
+				"js/utils-kanban.js",
+				"js/share.js",
+				"js/color-palette.js",
+				"js/folder-icon.js",
+				"js/modals-events.js",
+				"js/list_folders.js"
+			]
+		},
+		"attachments_list": {
+			"js": [
+				"js/theme-manager.js",
+				"js/navigation.js",
+				"js/icon-sidebar-toggle.js",
+				"js/attachments-list.js"
+			]
+		},
+		"notes_manager": {
+			"js": [
+				"js/theme-manager.js",
+				"js/navigation.js",
+				"js/icon-sidebar-toggle.js",
+				"js/date-time-format.js",
+				"js/notes-manager.js"
+			]
+		},
+		"create": {
+			"js": [
+				"js/theme-manager.js",
+				"js/globals.js",
+				"js/workspaces-core.js",
+				"js/workspaces-create.js",
+				"js/workspaces-share.js",
+				"js/workspaces-actions.js",
+				"js/workspaces-page.js",
+				"js/navigation.js",
+				"js/request-errors.js",
+				"js/modal-alerts.js",
+				"js/ui.js",
+				"js/utils-note-create.js",
+				"js/utils-folders.js",
+				"js/utils-updates.js",
+				"js/utils-move-folder.js",
+				"js/utils-folder-tree.js",
+				"js/utils-move-note.js",
+				"js/utils-export-create.js",
+				"js/utils-menus.js",
+				"js/utils-note-rename.js",
+				"js/utils-kanban.js",
+				"js/linked-note-selector.js",
+				"js/modals-events.js",
+				"js/notes.js",
+				"js/folder-hierarchy.js",
+				"js/ui-customization.js",
+				"js/icon-sidebar-toggle.js"
+			]
 		}
 	}
 }

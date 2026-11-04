@@ -62,7 +62,8 @@ function saveFolderName() {
             if (data.success) {
                 closeModal('editFolderModal');
                 // Folder renamed successfully - no notification needed
-                location.reload();
+                // Next Notes (P24): redraw in place (tree or list_folders), reload only without either
+                showAddedTreeRow(null, null);
             } else {
                 showNotificationPopup(
                     (window.t ? window.t('folders.errors.generic_prefix', { error: data.error }, 'Error: {{error}}') : ('Error: ' + data.error)),
@@ -327,6 +328,11 @@ function showAddedTreeRow(item, folderId, leavingFolderId) {
         markFolderPathOpen(folderId);
         window.redirectToWorkspace();
         return Promise.resolve();
+    }
+
+    // Next Notes (P24): list_folders redraws its own list in place
+    if (!leftCol && typeof window.refreshFolderListPage === 'function') {
+        return Promise.resolve(window.refreshFolderListPage());
     }
 
     // Pages without the tree (list_folders) have nothing to redraw in place
