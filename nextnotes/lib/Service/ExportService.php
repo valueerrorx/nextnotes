@@ -19,7 +19,6 @@ use OCA\NextNotes\Service\Exception\TooLargeException;
 use OCA\NextNotes\Service\View\IndexViewService;
 use OCA\NextNotes\Service\View\PageTranslator;
 use OCP\IDateTimeZone;
-use OCP\ITempManager;
 
 /**
  * Export einer Notiz (Upstream api_export_note.php, api_download_note.php; Plan M4 §1.3, SPEC §4.5).
@@ -29,8 +28,6 @@ use OCP\ITempManager;
  */
 class ExportService {
 	public const FORMATS = ['html', 'markdown', 'json', 'html_embedded'];
-	// Unkomprimierte Gesamtgröße eines Exports (Plan M4 §1.3)
-	public const MAX_EXPORT_BYTES = 1073741824;
 	// Base64 im Speicher (html_embedded): ~4/3 der Bilder plus Kopien
 	public const MAX_EMBED_BYTES = 33554432;
 	private const IMG_TAG = '/<img\b[^<>]*+>/i';
@@ -52,7 +49,7 @@ class ExportService {
 		private SettingsService $settings,
 		private IndexViewService $indexView,
 		private IDateTimeZone $timeZone,
-		private ITempManager $temp,
+		private ExportArchive $archive,
 	) {
 	}
 
@@ -102,7 +99,7 @@ class ExportService {
 		if ($own === []) {
 			return self::file(ExportFormatter::styledHtml($body, $title, $tags), ExportFormatter::fileName($title) . '.html', 'text/html');
 		}
-		$body = $this->toZipPaths($body, $note, $own);
+		$body = self::zipPaths($body, (int)$note->getId(), $own);
 		$html = ExportFormatter::styledHtml($body, $title, $tags, ExportFormatter::attachmentLinks(array_values($own), $body));
 		return $this->zip(ExportFormatter::fileName($title), '.html', $html, $own);
 	}
@@ -172,32 +169,50 @@ class ExportService {
 			throw new BadRequestException('Markdown export is only available for markdown and tasklist notes');
 		}
 		$folderId = $note->getFolderId();
-		$tz = $this->timeZone->getTimeZone();
-		$date = static fn (?int $ts): string => $ts === null ? '' : (new \DateTime('@' . $ts))->setTimezone($tz)->format('Y-m-d H:i:s');
-		$md = ExportFormatter::frontMatter([
-			'title' => $title !== '' ? $title : 'New note',
-			'tags' => $this->tagsOf($note),
-			'folder' => $folderId !== null ? FolderService::pathOf((int)$folderId, $this->folders->byId((int)$note->getWorkspaceId())) : null,
-			'tasklist' => $type === 'tasklist',
-			'favorite' => (int)$note->getFavorite() === 1,
-			'created' => $date($note->getCreatedAt()),
-			'updated' => $date($note->getUpdatedAt()),
-		]);
+		$md = $this->frontMatter($note, $this->tagsOf($note), $folderId !== null ? FolderService::pathOf((int)$folderId, $this->folders->byId((int)$note->getWorkspaceId())) : null, $type === 'tasklist');
 		$own = $this->ownAttachments($note);
 		if ($own === []) {
 			return self::file($md . $content, ExportFormatter::fileName($title) . '.md', 'text/markdown');
 		}
-		$content = $this->toZipPaths($content, $note, $own);
+		$content = self::zipPaths($content, (int)$note->getId(), $own);
 		return $this->zip(ExportFormatter::fileName($title), '.md', $md . $content . ExportFormatter::attachmentMarkdown(array_values($own), $content), $own);
 	}
 
 	/**
-	 * Anhänge der exportierten Notiz mit vorhandener Datei (B47: nie die anderer Notizen)
+	 * Front Matter einer Notiz (Upstream addFrontMatterToMarkdown), Zeiten in der Server-Zeitzone
+	 * @param list<string> $tags
+	 */
+	public function frontMatter(Note $note, array $tags, ?string $folderPath, bool $tasklist): string {
+		$tz = $this->timeZone->getTimeZone();
+		$date = static fn (?int $ts): string => $ts === null ? '' : (new \DateTime('@' . $ts))->setTimezone($tz)->format('Y-m-d H:i:s');
+		$title = (string)($note->getHeading() ?? '');
+		return ExportFormatter::frontMatter([
+			'title' => $title !== '' ? $title : 'New note',
+			'tags' => $tags,
+			'folder' => $folderPath,
+			'tasklist' => $tasklist,
+			'favorite' => (int)$note->getFavorite() === 1,
+			'created' => $date($note->getCreatedAt()),
+			'updated' => $date($note->getUpdatedAt()),
+		]);
+	}
+
+	/**
+	 * Anhänge der exportierten Notiz (B47: nie die anderer Notizen)
 	 * @return array<int, array{id: int, name: string, mime: string, file: string, size: int, entity: Attachment}>
 	 */
 	private function ownAttachments(Note $note): array {
+		return self::attachmentEntries($this->attachments->forNotes([(int)$note->getId()])[(int)$note->getId()] ?? []);
+	}
+
+	/**
+	 * Anhänge mit Dateiname im ZIP (<id>.<ext>, wie Upstream)
+	 * @param Attachment[] $list
+	 * @return array<int, array{id: int, name: string, mime: string, file: string, size: int, entity: Attachment}>
+	 */
+	public static function attachmentEntries(array $list): array {
 		$out = [];
-		foreach ($this->attachments->forNotes([(int)$note->getId()])[(int)$note->getId()] ?? [] as $a) {
+		foreach ($list as $a) {
 			$name = (string)$a->getOriginalName();
 			$ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
 			$id = (int)$a->getId();
@@ -208,13 +223,15 @@ class ExportService {
 	}
 
 	/**
-	 * Verweise /api/v1/notes/<eigene>/attachments/<eigener Anhang> → attachments/<datei> (Upstream exportAs*Zip); Fremdes bleibt
+	 * Verweise /api/v1/notes/<eigene>/attachments/<eigener Anhang> → <prefix><datei> (Upstream exportAs*Zip); Fremdes bleibt (B47)
 	 * @param array<int, array{file: string}> $own
 	 */
-	private function toZipPaths(string $content, Note $note, array $own): string {
-		$id = (int)$note->getId();
-		return Pcre::replaceCallback('#/api/v1/notes/(\d++)/attachments/(\d++)#', static fn (array $m): string => (int)$m[1] === $id && isset($own[(int)$m[2]])
-			? 'attachments/' . $own[(int)$m[2]]['file'] : $m[0], $content);
+	public static function zipPaths(string $content, int $noteId, array $own, string $prefix = 'attachments/'): string {
+		if ($own === [] || !str_contains($content, '/attachments/')) {
+			return $content;
+		}
+		return Pcre::replaceCallback('#/api/v1/notes/(\d++)/attachments/(\d++)#', static fn (array $m): string => (int)$m[1] === $noteId && isset($own[(int)$m[2]])
+			? $prefix . $own[(int)$m[2]]['file'] : $m[0], $content);
 	}
 
 	/**
@@ -314,65 +331,32 @@ class ExportService {
 	}
 
 	/**
-	 * ZIP mit Hauptdatei und Anhängen (Plan M4 §1.3): Temp-Ordner, Anhänge gestreamt, Ordner im finally gelöscht;
-	 * zurück kommt die geöffnete ZIP-Datei (Platz wird nach dem Request frei)
+	 * ZIP mit Hauptdatei und Anhängen (Upstream exportAs*Zip) über ExportArchive
 	 * @param array<int, array{file: string, size: int, entity: Attachment}> $own
 	 * @return array<string, mixed>
 	 */
 	private function zip(string $base, string $ext, string $main, array $own): array {
-		$total = strlen($main) + array_sum(array_map(static fn (array $a): int => $a['size'], $own));
-		if ($total > self::MAX_EXPORT_BYTES) {
-			throw new TooLargeException('Export too large (max ' . intdiv(self::MAX_EXPORT_BYTES, 1048576) . ' MB)');
-		}
-		$dir = $this->temp->getTemporaryFolder('nextnotes-export');
-		if ($dir === false) {
-			throw new \RuntimeException('No temporary folder for the export');
-		}
-		$dir = rtrim($dir, '/');
-		try {
-			$path = $dir . '/export.zip';
-			$zip = new \ZipArchive();
-			if ($zip->open($path, \ZipArchive::CREATE | \ZipArchive::EXCL) !== true) {
-				throw new \RuntimeException('Cannot create export archive');
+		ExportArchive::checkSize(strlen($main) + array_sum(array_map(static fn (array $a): int => $a['size'], $own)));
+		return $this->archive->build($base . '.zip', function (ExportArchive $zip) use ($base, $ext, $main, $own): void {
+			$zip->addString($base . $ext, $main);
+			foreach ($own as $a) {
+				$this->addAttachment($zip, 'attachments/' . $a['file'], $a['entity']);
 			}
-			$zip->addFromString($base . $ext, $main);
-			foreach ($own as $id => $a) {
-				$tmp = $dir . '/a' . $id;
-				try {
-					$in = $this->attachments->fileFor($a['entity'])->read();
-				} catch (NotFoundException) {
-					continue;
-				}
-				$out = fopen($tmp, 'wb');
-				if (!is_resource($in) || $out === false) {
-					throw new \RuntimeException('Cannot copy attachment for the export');
-				}
-				stream_copy_to_stream($in, $out);
-				fclose($in);
-				fclose($out);
-				$zip->addFile($tmp, 'attachments/' . $a['file']);
-			}
-			if (!$zip->close()) {
-				throw new \RuntimeException('Cannot write export archive');
-			}
-			$handle = fopen($path, 'rb');
-			$stat = $handle !== false ? fstat($handle) : false;
-			if ($handle === false || $stat === false) {
-				throw new \RuntimeException('Cannot read export archive');
-			}
-			return ['kind' => 'zip', 'stream' => $handle, 'size' => (int)$stat['size'], 'name' => $base . '.zip', 'mime' => 'application/zip'];
-		} finally {
-			self::removeDir($dir);
-		}
+		});
 	}
 
-	private static function removeDir(string $dir): void {
-		foreach ((array)scandir($dir) as $f) {
-			if ($f !== '.' && $f !== '..' && is_string($f)) {
-				@unlink($dir . '/' . $f);
-			}
+	/** Anhang gestreamt ins ZIP; Datei fehlt → ausgelassen */
+	public function addAttachment(ExportArchive $zip, string $path, Attachment $a): bool {
+		try {
+			$in = $this->attachments->fileFor($a)->read();
+		} catch (NotFoundException) {
+			return false;
 		}
-		@rmdir($dir);
+		if (!is_resource($in)) {
+			throw new \RuntimeException('Cannot copy attachment for the export');
+		}
+		$zip->addStream($path, $in);
+		return true;
 	}
 
 	/** @return array{kind: string, body: string, name: string, mime: string} */

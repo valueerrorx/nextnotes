@@ -25,7 +25,7 @@ const FORBIDDEN_TEXT = [
 	/papierkorb|\btrash\b|tagebuch|\bdiary\b|\bgraph\b|einstellungen|settings|arbeitsbereiche bearbeiten|edit workspaces|über poznote|about/i,
 ];
 
-const NOTE_EXPORT_ACTIONS = new Set(['show-export-modal', 'select-export-type', 'print-note']);
+const NOTE_EXPORT_ACTIONS = new Set(['show-export-modal', 'select-export-type', 'print-note', 'download-folder']);
 
 // Browser: sichtbare Bedienelemente/Texte außerhalb der NC-Oberfläche
 async function visibleUi(page) {
@@ -44,7 +44,7 @@ async function visibleUi(page) {
 			const own = [...e.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join(' ').replace(/\s+/g, ' ').trim();
 			const attrs = ['data-action', 'data-selector', 'href', 'data-workspace-url', 'data-url', 'title', 'aria-label', 'id'].map((a) => [a, e.getAttribute(a)]).filter(([, v]) => v);
 			if (!own && !attrs.length) continue;
-			out.push({ tag: e.tagName.toLowerCase(), text: own, attrs: Object.fromEntries(attrs), userData: !!e.closest('.note-title, .folder-name, .workspace-title-text, .workspace-menu-item[data-workspace-name]:not(.workspace-menu-action)') });
+			out.push({ tag: e.tagName.toLowerCase(), text: own, attrs: Object.fromEntries(attrs), userData: !!e.closest('.note-title, .folder-name, .workspace-title-text, .workspace-menu-item[data-workspace-name]:not(.workspace-menu-action)'), act: e.closest('[data-action]')?.getAttribute('data-action') ?? null });
 		}
 		return out;
 	});
@@ -54,8 +54,8 @@ function forbiddenIn(items) {
 	const bad = [];
 	for (const it of items) {
 		if (it.userData) continue; // Namen aus Testdaten
-		// M4c: Notiz herunterladen/exportieren/drucken ist portiert (Ordner-Export erst M4d)
-		if (NOTE_EXPORT_ACTIONS.has(it.attrs['data-action']) || it.attrs['data-selector'] === '.btn-download') continue;
+		// M4c/M4d: Notiz herunterladen/exportieren/drucken und Ordner herunterladen sind portiert
+		if (NOTE_EXPORT_ACTIONS.has(it.attrs['data-action']) || NOTE_EXPORT_ACTIONS.has(it.act) || it.attrs['data-selector'] === '.btn-download') continue;
 		const urls = [it.attrs.href, it.attrs['data-workspace-url'], it.attrs['data-url']].filter(Boolean);
 		for (const u of urls) if (FORBIDDEN_PAGES.test(u)) bad.push(`${it.tag} ${u}`);
 		for (const s of [it.text, it.attrs.title, it.attrs['aria-label']].filter(Boolean)) {

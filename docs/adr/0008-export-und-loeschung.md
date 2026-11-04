@@ -25,6 +25,9 @@ Option 2, mit Aufbewahrung aller Abgaben:
 - **Admin**: `occ nextnotes:export-user <uid> <ziel.zip>`, `occ nextnotes:delete-user-data <uid>` (Auskunft/Löschung ohne Kontolöschung; gleiche Regeln wie Kontolöschung, Abgaben bleiben), `occ nextnotes:assignment:transfer`.
 - Kein eigenes Aktivitätsprotokoll in v1 (T20, B #41): weniger personenbezogene Daten. NC-Activity optional später.
 
+## Nachtrag M4d (2026-11-04)
+Der Benutzer-ZIP-Export aus M4d („alle Notizen“, „strukturiert“, „Anhänge“) umfasst die eigenen Workspaces ohne Abgaben, Abgabe-Kopien und Vorlagen (`role='note'`); Ordner `kind=assignments` erscheinen dort höchstens als leere Ordner. Abgaben (inkl. Feedback) exportiert der Benutzer über M6 (Ansicht der eigenen Abgaben) und `IMigrator` (M7); der Satz „Umfang: … eigene Abgaben“ gilt damit für den Gesamtumfang, nicht für den M4d-ZIP.
+
 ## Datenschutzhinweis
 Die Aufbewahrung von Abgaben nach Kontolöschung oder Austritt schränkt das Recht auf Löschung ein. Sie braucht eine Rechtsgrundlage (DSGVO Art. 17 Abs. 3 lit. b – rechtliche Verpflichtung, z. B. schulrechtliche Aufbewahrungspflicht nach Landesrecht; lit. e – Rechtsansprüche) und eine **Aufbewahrungsfrist, die die Schule festlegt** und im Verarbeitungsverzeichnis dokumentiert. Die App setzt keine Frist durch; die Löschung nach Fristablauf erledigt die Lehrkraft selbst (Aufgabe löschen, d). README/Admin-Doku weisen darauf hin. Kein zusätzlicher Admin-Löschbefehl geplant.
 

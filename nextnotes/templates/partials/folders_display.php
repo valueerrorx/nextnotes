@@ -5,7 +5,7 @@
  */
 // abgeleitet von src/folders_display.php @ 7e2e0b6aa501ba95ac1e9789fd2bb477c281a001
 // Nur Markup (generateFolderActions, renderFolderActionsMenu, generateNoteActions, renderNoteActionsMenu); Baumdaten liefert IndexViewService.
-// Weggelassen: Ordner herunterladen (Export, M4), Teilen/öffentliche Links und Offline (gestrichen).
+// Weggelassen: Teilen/öffentliche Links und Offline (gestrichen).
 /** @var array $_ */
 /** @var \OCA\NextNotes\Service\View\PageTranslator $tr */
 
@@ -54,6 +54,7 @@ $renderFolderActionsMenu = static function (string $workspace, bool $iconOpensKa
 	$menuItem($i, 'cut-folder', 'lucide-scissors', $tr->t('notes_list.folder_actions.cut_folder', [], 'Cut'), '', 'Ctrl+X');
 	$menuItem($i, 'paste-into-folder', 'lucide-clipboard-paste', $tr->t('notes_list.folder_actions.paste_into_folder', [], 'Paste into folder'), '', 'Ctrl+V');
 	$sep();
+	$menuItem($i, 'download-folder', 'lucide-download', $tr->t('notes_list.folder_actions.download_folder', [], 'Download folder'), 'requires-notes');
 	$menuItem($i, 'tag-folder-notes', 'lucide-tag', $tr->t('modals.tag_folder_notes.title', [], 'Tag all notes'), 'requires-notes');
 	$menuItem($i, 'toggle-folder-speed-dial', 'lucide-zap', $tr->t('speed_dial.add', [], 'Add to speed dial'), 'requires-notes speed-dial-state-off');
 	$menuItem($i, 'toggle-folder-speed-dial', 'lucide-zap', $tr->t('speed_dial.remove', [], 'Remove from speed dial'), 'requires-notes speed-dial-state-on active-state');

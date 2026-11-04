@@ -156,6 +156,63 @@ class NoteMapper extends QBMapper {
 	}
 
 	/**
+	 * Notizen per ID ohne Inhalt (jede Rolle; Export: Ziele verknüpfter Notizen)
+	 * @param int[] $ids
+	 * @return Note[]
+	 */
+	public function findListByIds(array $ids): array {
+		$result = [];
+		foreach (array_chunk(array_values(array_unique($ids)), 1000) as $chunk) {
+			$qb = $this->db->getQueryBuilder();
+			$qb->select(...self::LIST_COLUMNS)->from(self::TABLE)
+				->where($qb->expr()->in('id', $qb->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY)));
+			array_push($result, ...$this->findEntities($qb));
+		}
+		return $result;
+	}
+
+	/**
+	 * Inhaltsgröße in Byte je Notiz (Export-Grenze vor dem Packen, Plan M4 §1.3)
+	 * @param int[] $ids
+	 * @return array<int, int>
+	 */
+	public function contentBytes(array $ids): array {
+		$out = [];
+		foreach (array_chunk(array_values(array_unique($ids)), 1000) as $chunk) {
+			$qb = $this->db->getQueryBuilder();
+			$qb->select('id')->selectAlias($qb->func()->octetLength('content'), 'bytes')->from(self::TABLE)
+				->where($qb->expr()->in('id', $qb->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY)));
+			$res = $qb->executeQuery();
+			while ($row = $res->fetch()) {
+				$out[(int)$row['id']] = (int)$row['bytes'];
+			}
+			$res->closeCursor();
+		}
+		return $out;
+	}
+
+	/**
+	 * Inhalt je Notiz (Export lädt stückweise)
+	 * @param int[] $ids
+	 * @return array<int, string>
+	 */
+	public function contentByIds(array $ids): array {
+		$out = [];
+		foreach (array_chunk(array_values(array_unique($ids)), 1000) as $chunk) {
+			$qb = $this->db->getQueryBuilder();
+			$qb->select('id', 'content')->from(self::TABLE)
+				->where($qb->expr()->in('id', $qb->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY)));
+			$res = $qb->executeQuery();
+			while ($row = $res->fetch()) {
+				$c = $row['content'];
+				$out[(int)$row['id']] = is_resource($c) ? (string)stream_get_contents($c) : (string)$c;
+			}
+			$res->closeCursor();
+		}
+		return $out;
+	}
+
+	/**
 	 * Ziele von [[…]] in einem Workspace (B47): per ID oder Kandidaten per Titel (search_text beginnt mit dem gefalteten Titel), ohne Papierkorb
 	 * @param int[] $ids
 	 * @param string[] $foldedTitles

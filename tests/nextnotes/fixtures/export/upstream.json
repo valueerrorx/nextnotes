@@ -1,0 +1,139 @@
+{
+    "folder": {
+        "files": [
+            "Html eins_{N1}.html",
+            "Leer/.gitkeep",
+            "README.md",
+            "Sub/MD zwei_{N2}.md",
+            "attachments/{A1}.png"
+        ],
+        "frontmatter": {
+            "Sub/MD zwei_{N2}.md": [
+                "title",
+                "tags",
+                "folder",
+                "favorite",
+                "created",
+                "updated"
+            ]
+        },
+        "manifest": []
+    },
+    "entries": {
+        "files": [
+            "index.html",
+            "{N1}.html",
+            "{N2}.md",
+            "{N3}.html",
+            "{N4}.html",
+            "{N5}.md",
+            "{N6}.html"
+        ],
+        "frontmatter": {
+            "{N2}.md": [
+                "title",
+                "tags",
+                "folder",
+                "favorite",
+                "created",
+                "updated"
+            ],
+            "{N5}.md": [
+                "title",
+                "favorite",
+                "created",
+                "updated"
+            ]
+        },
+        "manifest": []
+    },
+    "structured": {
+        "files": [
+            "Ordner Ä/Html eins.html",
+            "Ordner Ä/Leer/.gitkeep",
+            "Ordner Ä/Sub/MD zwei.md",
+            "README.md",
+            "Uncategorized/MD fünf.md",
+            "Uncategorized/TL.md",
+            "Zweiter/Html vier.html",
+            "attachments/{A1}.png",
+            "attachments/{A2}.txt"
+        ],
+        "frontmatter": {
+            "Ordner Ä/Sub/MD zwei.md": [
+                "title",
+                "tags",
+                "folder",
+                "favorite",
+                "created",
+                "updated"
+            ],
+            "Uncategorized/MD fünf.md": [
+                "title",
+                "favorite",
+                "created",
+                "updated"
+            ],
+            "Uncategorized/TL.md": [
+                "title",
+                "type",
+                "favorite",
+                "created",
+                "updated"
+            ]
+        },
+        "manifest": []
+    },
+    "structured_ws": {
+        "files": [
+            "Ordner Ä/Html eins.html",
+            "Ordner Ä/Leer/.gitkeep",
+            "Ordner Ä/Sub/MD zwei.md",
+            "README.md",
+            "Uncategorized/MD fünf.md",
+            "Uncategorized/TL.md",
+            "Zweiter/Html vier.html",
+            "attachments/{A1}.png",
+            "attachments/{A2}.txt"
+        ],
+        "frontmatter": {
+            "Ordner Ä/Sub/MD zwei.md": [
+                "title",
+                "tags",
+                "folder",
+                "favorite",
+                "created",
+                "updated"
+            ],
+            "Uncategorized/MD fünf.md": [
+                "title",
+                "favorite",
+                "created",
+                "updated"
+            ],
+            "Uncategorized/TL.md": [
+                "title",
+                "type",
+                "favorite",
+                "created",
+                "updated"
+            ]
+        },
+        "manifest": []
+    },
+    "attachments": {
+        "files": [
+            "files/{A1}.png",
+            "files/{A2}.txt",
+            "files/{A3}.txt",
+            "index.html",
+            "poznote_attachments_metadata.json"
+        ],
+        "frontmatter": [],
+        "manifest": [
+            "note_id,note_heading,attachment_data|id,filename,original_filename,file_size,file_type,uploaded_at|files/{A1}.png|N2",
+            "note_id,note_heading,attachment_data|id,filename,original_filename,file_size,file_type,uploaded_at|files/{A2}.txt|N4",
+            "note_id,note_heading,attachment_data|id,filename,original_filename,file_size,file_type,uploaded_at|files/{A3}.txt|N6"
+        ]
+    }
+}

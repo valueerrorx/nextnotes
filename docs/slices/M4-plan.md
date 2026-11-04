@@ -133,7 +133,7 @@ Reihenfolge = Tabelle. M4c/M4d hängen an M4b (Konvertierung), M4h an M4d (Expor
 **App**
 - `CompatController::{exportFolder, exportEntries, exportStructured, exportAttachments}` → `ExportService` (§1.3), Routen `api_export_entries.php`, `api_export_structured.php`, `api_export_attachments.php`. Parameter `skip_s3_attachments` ignoriert (S3 gestrichen). ZIP-Bau, Aufräumen, Gesamtgrenze 1 GiB und Referenz-Regeln nach §1.3.
 - `BackgroundJob/ExportTempCleanupJob` (`TimedJob`, 1 h, `info.xml`) nach §1.3.
-- Ordner-Menü „Herunterladen“ (`utils-folders.js:483`) wieder sichtbar; Notizlisten-Menü „Alle exportieren“ (`utils-note-create.js:570`) sichtbar.
+- Ordner-Menü „Herunterladen“ (`utils-folders.js:483`) wieder sichtbar. ~~Notizlisten-Menü „Alle exportieren“ (`utils-note-create.js:570`) sichtbar.~~ Gestrichen (M4d-fix): `startDownload` hat im Upstream keinen UI-Aufrufer (nur `main.js:357`), daher nichts einzublenden; „alle Notizen“ bleibt über `api_export_entries.php` bzw. Backup-Export erreichbar.
 
 **Done M4d**
 1. Je Export: ZIP öffnet (`ZipArchive::open` ok), Aufbau wie Upstream (Dateiliste gegen Fixture eines Upstream-Exports derselben Testdaten, erzeugt mit Upstream-Code per Host-PHP), Front Matter-Schlüssel gleich, Anhänge unter gleichem Pfad, `poznote_attachments_metadata.json` gültig.
@@ -279,10 +279,11 @@ Weitere Funde im Slice ergänzen.
 | Q2 | Darf ein Freigabe-Empfänger einen geteilten Workspace/Ordner/eine Notiz als Datei/ZIP exportieren? **Vorläufig (Lead):** wer lesen darf, darf exportieren (Einzelnotiz/Ordner/Workspace); „alle Notizen“/„alle Anhänge“ nur eigene Workspaces (ADR 0008). Kriterien „bedingt Q2“: M4c.4, M4d.3, M4i Krit. 5 (Lesefreigabe-Fälle) | Datenschutz, bei Thomas angefragt | **[THOMAS]** |
 
 ## Lead-Auflagen aus Review r2 (verbindlich für die Slices)
-- M4d: höchstens ein laufender ZIP-Export je Benutzer (Sperre über `IMemcache::add`, sonst 429); `Content-Length` aus `fstat` der ausgelieferten Datei.
+- M4d: höchstens ein laufender ZIP-Export je Benutzer (Sperre über `IMemcache::add`, sonst 429; umgesetzt mit `ILockingProvider`, s. SPEC §4.5); `Content-Length` aus `fstat` der ausgelieferten Datei.
 - M4c: die 1-MiB-Render-Grenze (413) gilt nur für Formate mit Umwandlung; Markdown-Export einer Markdown-Notiz ist nicht begrenzt (Fall in M4c.1).
 - M4a: Admin-Hinweis nennt, dass der Sanitizer iframes nicht gelisteter Hosts beim Speichern dauerhaft entfernt.
 - M4d: Schwelle `ExportTempCleanupJob` = max(1 h, `max_execution_time` + Reserve); im Slice festhalten und testen.
+  Lead-Annahme (M4d-fix): Der Job läuft im Cron-CLI, dort ist `max_execution_time` 0 → es gilt 1 h; laufende Exporte schützt die mtime-Prüfung (Ordner und Dateien werden fortlaufend geschrieben). Löschung mitten im Bau führt nur zu einem Fehler, nicht zu einem Datenleck.
 
 ## Lead-Nachtrag nach M4b (2026-11-04)
 - Render-/Umwandlungsgrenze ist **384 KiB** (`ConversionService::MAX_RENDER_INPUT`, SPEC §4.5), nicht 1 MiB; es gibt keine eigene Klasse `ConversionLimits`. M4c/M4f verwenden diese Konstante.

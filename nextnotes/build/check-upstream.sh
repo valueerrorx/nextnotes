@@ -71,7 +71,7 @@ while read -r up sum port; do
 done < "$app/build/upstream-ported.txt"
 if [[ $fail -eq 0 ]]; then echo "check-upstream (f): $n nachgebaute Upstream-Dateien unverändert"; fi
 # (g) Regex in Parser-/Import-/Export-Ports nur über Pcre (Plan M4 §1.2, B46)
-if hits="$(grep -rnE '\bpreg_[a-z_]+\(' "$app/lib/Service/Convert" "$app/lib/Service/ImportService.php" $(ls "$app"/lib/Service/Export*.php 2>/dev/null))"; then
+if hits="$(grep -rnE '\bpreg_[a-z_]+\(' "$app/lib/Service/Convert" "$app/lib/Service/ImportService.php" $(ls "$app"/lib/Service/Export*.php "$app"/lib/Service/ZipExportService.php 2>/dev/null))"; then
 	err "direktes preg_* statt Pcre: ${hits//$'\n'/ }"
 else
 	echo "check-upstream (g): kein direktes preg_* in Convert/Import/Export"

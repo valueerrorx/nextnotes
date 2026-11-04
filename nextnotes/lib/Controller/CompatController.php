@@ -25,10 +25,12 @@ use OCA\NextNotes\Service\ExcalidrawService;
 use OCA\NextNotes\Service\ExportService;
 use OCA\NextNotes\Service\FolderService;
 use OCA\NextNotes\Service\ImportService;
+use OCA\NextNotes\Service\Pcre;
 use OCA\NextNotes\Service\SettingsService;
 use OCA\NextNotes\Service\View\PageAssets;
 use OCA\NextNotes\Service\View\PageTranslator;
 use OCA\NextNotes\Service\WorkspaceService;
+use OCA\NextNotes\Service\ZipExportService;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\Attribute\UserRateLimit;
@@ -61,6 +63,7 @@ class CompatController extends ApiController {
 		private ExcalidrawService $excalidraw,
 		private ImportService $import,
 		private ExportService $export,
+		private ZipExportService $zipExport,
 		private CspFactory $cspFactory,
 		private PageAssets $assets,
 		private IAppManager $appManager,
@@ -151,14 +154,19 @@ class CompatController extends ApiController {
 		return $response;
 	}
 
+	// attachment mit ASCII-Ersatzname und RFC 5987 (Ordnernamen mit Umlauten, Upstream poznoteContentDisposition)
+	private static function disposition(string $name): string {
+		$ascii = Pcre::replace('/[^A-Za-z0-9 ._()-]/u', '_', $name);
+		return 'attachment; filename="' . $ascii . '"' . ($ascii !== $name ? "; filename*=UTF-8''" . rawurlencode($name) : '');
+	}
+
 	/** @param array<string, mixed> $r ExportService-Ergebnis file|zip: immer Download, nosniff (B48) */
 	private static function fileResponse(array $r): Response {
 		if ($r['kind'] === 'zip') {
 			$response = new StreamResponse($r['stream']);
 			$response->addHeader('Content-Type', $r['mime']);
 			$response->addHeader('Content-Length', (string)$r['size']);
-			// Name aus ExportFormatter::fileName: nur [A-Za-z0-9 _-]
-			$response->addHeader('Content-Disposition', 'attachment; filename="' . $r['name'] . '"');
+			$response->addHeader('Content-Disposition', self::disposition((string)$r['name']));
 		} else {
 			$response = new DataDownloadResponse($r['body'], $r['name'], $r['mime']);
 		}
@@ -167,20 +175,36 @@ class CompatController extends ApiController {
 		return $response;
 	}
 
-	// Upstream api_export_folder.php: Rechteprüfung, Export folgt mit ExportService (M4, Plan-O2)
+	// Upstream api_export_folder.php: Ordner mit Unterordnern als ZIP (M4d)
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
-	public function exportFolder(): JSONResponse {
-		$raw = $this->param('folder_id');
-		if (!is_string($raw) || !ctype_digit($raw)) {
-			throw new NotFoundException('Folder not found');
-		}
-		$folder = $this->access->requireFolder($this->uid(), (int)$raw, 'read');
-		$ws = $this->workspaces->resolveOptional($this->uid(), $this->param('workspace'));
-		if ($ws !== null && $ws->getId() !== $folder->getWorkspaceId()) {
-			throw new NotFoundException('Folder not found');
-		}
-		throw new NotImplementedException('not_implemented');
+	#[UserRateLimit(limit: 10, period: 60)]
+	public function exportFolder(): Response {
+		return self::fileResponse($this->zipExport->folder($this->uid(), $this->param('folder_id'), $this->param('workspace')));
+	}
+
+	// Upstream api_export_entries.php: alle Notizen (eigene Workspaces bzw. ?workspace=) als <id>.html|md
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	#[UserRateLimit(limit: 10, period: 60)]
+	public function exportEntries(): Response {
+		return self::fileResponse($this->zipExport->entries($this->uid(), $this->param('workspace')));
+	}
+
+	// Upstream api_export_structured.php: Ordnerstruktur mit Anhängen; skip_s3_attachments ohne Wirkung (S3 gestrichen)
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	#[UserRateLimit(limit: 10, period: 60)]
+	public function exportStructured(): Response {
+		return self::fileResponse($this->zipExport->structured($this->uid(), $this->param('workspace')));
+	}
+
+	// Upstream api_export_attachments.php: Anhänge eigener Workspaces ohne Papierkorb (B45)
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	#[UserRateLimit(limit: 10, period: 60)]
+	public function exportAttachments(): Response {
+		return self::fileResponse($this->zipExport->attachments($this->uid()));
 	}
 
 	// Alt-URL api_attachments.php?action=download (SPEC §10): gleiche Auslieferung wie GET /notes/{n}/attachments/{a}

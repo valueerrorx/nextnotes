@@ -28,7 +28,12 @@
   "Maximum file size (MiB)": "Maximale Dateigröße (MiB)",
   "Attachment quota per user (MiB)": "Speicherkontingent für Anhänge je Benutzer (MiB)",
   "Exports are limited to 1 GiB. Larger attachments can only be downloaded individually, not as part of an export.": "Exporte sind auf 1 GiB begrenzt. Größere Anhänge lassen sich nur einzeln herunterladen, nicht als Teil eines Exports.",
-  "Save": "Speichern"
+  "Save": "Speichern",
+  "Export not possible": "Export nicht möglich",
+  "Another export is still running – please wait a moment and try again.": "Es läuft noch ein Export – bitte kurz warten und erneut versuchen.",
+  "Export too large (max. 1 GiB).": "Export zu groß (max. 1 GiB).",
+  "Not found or no access.": "Nicht gefunden oder kein Zugriff.",
+  "Back to Next Notes": "Zurück zu Next Notes"
  },
  "pluralForm": "nplurals=2; plural=(n != 1);"
 }

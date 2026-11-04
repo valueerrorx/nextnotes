@@ -86,6 +86,11 @@ class AccessService {
 		return array_values(array_unique($ids));
 	}
 
+	/** @return int[] eigene Workspaces (owner_type=user), ohne Freigaben (ADR 0008: „alle“-Exporte) */
+	public function ownWorkspaceIds(string $uid): array {
+		return array_map(static fn (Workspace $w) => (int)$w->getId(), $this->workspaces->findOwned($uid));
+	}
+
 	/** @return int[] Workspaces mit Schreibrecht */
 	public function writableWorkspaceIds(string $uid): array {
 		$ids = array_map(static fn (Workspace $w) => (int)$w->getId(), $this->workspaces->findOwned($uid));

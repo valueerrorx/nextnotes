@@ -168,7 +168,10 @@ final class ApiClient {
 
 	private static function handle(string $method, string $url, ?array $json, array $headers, ?string $userpwd, ?string $cookieJar = null, ?string $form = null): \CurlHandle {
 		$ch = curl_init($url);
-		$headers[] = 'Accept: application/json';
+		// eigenes Accept (z. B. text/html wie ein Browser-Link) hat Vorrang
+		if (preg_grep('/^Accept:/i', $headers) === []) {
+			$headers[] = 'Accept: application/json';
+		}
 		$opts = [
 			CURLOPT_CUSTOMREQUEST => $method,
 			CURLOPT_RETURNTRANSFER => true,

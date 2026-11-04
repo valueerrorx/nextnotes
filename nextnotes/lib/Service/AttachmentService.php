@@ -246,17 +246,17 @@ class AttachmentService {
 		}
 	}
 
-	/** Erzeugte Datei (Excalidraw-Vorschau) als Anhang; Aufrufer hält die Transaktion (enforceQuota zuerst), bei Fehler discardNew */
+	/** Erzeugte Datei (Excalidraw-Vorschau, Base64-Bild) als Anhang; Aufrufer hält die Transaktion (enforceQuota zuerst) */
 	public function createFromString(int $noteId, string $name, string $mime, string $data, string $uid): Attachment {
 		$a = $this->newRow($noteId, $name, $mime, strlen($data), $uid);
+		$this->removeOnRollback($noteId, (int)$a->getId());
 		$this->noteFolder($noteId)->newFile((string)$a->getId(), $data);
 		return $a;
 	}
 
-	// Datei eines zurückgerollten Anhangs sofort entfernen
-	public function discardNew(int $noteId, int $attachmentId): void {
-		$this->queueFileDeletion($noteId, $attachmentId);
-		$this->cleanup->flush();
+	// Neue Datei verschwindet mit dem Rollback dieser oder einer äußeren Ebene; fremde Löschaufträge bleiben unberührt
+	private function removeOnRollback(int $noteId, int $attachmentId): void {
+		$this->tx->onRollback(fn () => $this->deleteFileNow($noteId, $attachmentId));
 	}
 
 	// Anhang ohne Verweis entfernen: Zeile sofort, Datei nach dem Commit; unbekannt → nichts
@@ -319,32 +319,23 @@ class AttachmentService {
 		$name = self::cleanName($original);
 		$mime = $this->mimeOf($tmp, $name);
 		$quota = $this->quotaFor((int)$note->getWorkspaceId(), $size);
-		$created = null;
-		try {
-			$a = $this->tx->run(function () use ($quota, $noteId, $name, $mime, $size, $uid, $tmp, &$created) {
-				$this->enforceQuota($quota);
-				$a = $this->newRow($noteId, $name, $mime, $size, $uid);
-				$created = $a;
-				$handle = fopen($tmp, 'rb');
-				if ($handle === false) {
-					throw new BadRequestException('Invalid uploaded file');
-				}
-				try {
-					$this->noteFolder($noteId)->newFile((string)$a->getId(), $handle);
-				} finally {
-					if (is_resource($handle)) {
-						fclose($handle);
-					}
-				}
-				return $a;
-			});
-		} catch (\Throwable $e) {
-			if ($created !== null) {
-				$this->queueFileDeletion($noteId, (int)$created->getId());
-				$this->cleanup->flush();
+		$a = $this->tx->run(function () use ($quota, $noteId, $name, $mime, $size, $uid, $tmp) {
+			$this->enforceQuota($quota);
+			$a = $this->newRow($noteId, $name, $mime, $size, $uid);
+			$this->removeOnRollback($noteId, (int)$a->getId());
+			$handle = fopen($tmp, 'rb');
+			if ($handle === false) {
+				throw new BadRequestException('Invalid uploaded file');
 			}
-			throw $e;
-		}
+			try {
+				$this->noteFolder($noteId)->newFile((string)$a->getId(), $handle);
+			} finally {
+				if (is_resource($handle)) {
+					fclose($handle);
+				}
+			}
+			return $a;
+		});
 		return ['message' => 'File uploaded successfully', 'attachment_id' => (string)$a->getId(), 'filename' => $original];
 	}
 
@@ -420,26 +411,17 @@ class AttachmentService {
 		$needsQuota = $keep || $target->getWorkspaceId() !== $source->getWorkspaceId();
 		$srcFile = $this->fileOf($a);
 		$quota = $needsQuota ? $this->quotaFor((int)$target->getWorkspaceId(), (int)$a->getSize()) : null;
-		$created = null;
-		try {
-			$new = $this->tx->run(function () use ($a, $target, $srcFile, $keep, $uid, $quota, &$created) {
-				$this->enforceQuota($quota);
-				$new = $this->newRow((int)$target->getId(), (string)$a->getOriginalName(), (string)$a->getMime(), (int)$a->getSize(), $uid);
-				$created = $new;
-				$this->noteFolder((int)$target->getId())->newFile((string)$new->getId(), $srcFile->read());
-				if (!$keep) {
-					$this->attachments->delete($a);
-					$this->queueFileDeletion((int)$a->getNoteId(), (int)$a->getId());
-				}
-				return $new;
-			});
-		} catch (\Throwable $e) {
-			if ($created !== null) {
-				$this->queueFileDeletion((int)$target->getId(), (int)$created->getId());
-				$this->cleanup->flush();
+		$new = $this->tx->run(function () use ($a, $target, $srcFile, $keep, $uid, $quota) {
+			$this->enforceQuota($quota);
+			$new = $this->newRow((int)$target->getId(), (string)$a->getOriginalName(), (string)$a->getMime(), (int)$a->getSize(), $uid);
+			$this->removeOnRollback((int)$target->getId(), (int)$new->getId());
+			$this->noteFolder((int)$target->getId())->newFile((string)$new->getId(), $srcFile->read());
+			if (!$keep) {
+				$this->attachments->delete($a);
+				$this->queueFileDeletion((int)$a->getNoteId(), (int)$a->getId());
 			}
-			throw $e;
-		}
+			return $new;
+		});
 		return [
 			'message' => 'Attachment moved successfully',
 			'attachment_id' => (string)$new->getId(),

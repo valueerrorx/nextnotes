@@ -182,31 +182,22 @@ class ExcalidrawService {
 	private function write(string $uid, int $id, ?string $preview, string $previewName, callable $place): void {
 		$note = $this->notes->find($id);
 		$quota = $preview !== null ? $this->attachments->quotaFor((int)$note->getWorkspaceId(), strlen($preview)) : null;
-		$created = null;
-		try {
-			$this->tx->run(function () use ($uid, $id, $preview, $previewName, $place, $quota, &$created) {
-				$this->attachments->enforceQuota($quota);
-				$this->notes->lockRow($id);
-				$note = $this->notes->find($id);
-				if ($preview !== null) {
-					$created = $this->attachments->createFromString($id, $previewName, 'image/svg+xml', $preview, $uid);
+		// neue Vorschau-Datei entfernt Transaction::onRollback (createFromString)
+		$this->tx->run(function () use ($uid, $id, $preview, $previewName, $place, $quota) {
+			$this->attachments->enforceQuota($quota);
+			$this->notes->lockRow($id);
+			$note = $this->notes->find($id);
+			$created = $preview !== null ? $this->attachments->createFromString($id, $previewName, 'image/svg+xml', $preview, $uid) : null;
+			[$content, $replaced] = $place((string)($note->getContent() ?? ''), (string)($note->getType() ?: 'note'), $created !== null ? (int)$created->getId() : null);
+			// Revision des alten Stands zuerst, damit eine dort sichtbare Vorschau erhalten bleibt
+			$this->snapshots->autoBefore($note, $uid);
+			foreach (array_unique($replaced) as $old) {
+				if (!self::references($content, $id, $old) && !$this->snapshotMapper->contains($id, '/notes/' . $id . '/attachments/' . $old . '"')) {
+					$this->attachments->retire($id, $old);
 				}
-				[$content, $replaced] = $place((string)($note->getContent() ?? ''), (string)($note->getType() ?: 'note'), $created !== null ? (int)$created->getId() : null);
-				// Revision des alten Stands zuerst, damit eine dort sichtbare Vorschau erhalten bleibt
-				$this->snapshots->autoBefore($note, $uid);
-				foreach (array_unique($replaced) as $old) {
-					if (!self::references($content, $id, $old) && !$this->snapshotMapper->contains($id, '/notes/' . $id . '/attachments/' . $old . '"')) {
-						$this->attachments->retire($id, $old);
-					}
-				}
-				$this->noteService->saveContent($note, $content, $uid);
-			});
-		} catch (\Throwable $e) {
-			if ($created !== null) {
-				$this->attachments->discardNew($id, (int)$created->getId());
 			}
-			throw $e;
-		}
+			$this->noteService->saveContent($note, $content, $uid);
+		});
 	}
 
 	private static function references(string $content, int $noteId, int $attachmentId): bool {

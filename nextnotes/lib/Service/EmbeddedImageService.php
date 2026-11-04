@@ -23,7 +23,6 @@ class EmbeddedImageService {
 
 	public function __construct(
 		private AttachmentService $attachments,
-		private Transaction $tx,
 	) {
 	}
 
@@ -75,9 +74,8 @@ class EmbeddedImageService {
 		$adopted = [];
 		foreach ($prepared['images'] as $url => $img) {
 			$name = AttachmentService::generatedName($img['alt'], $img['ext'], 'image');
+			// Datei verschwindet mit dem Rollback (createFromString, M4b-r1 MINOR 1)
 			$a = $this->attachments->createFromString($noteId, $name, $img['mime'], $img['data'], $uid);
-			// Zeile verschwindet mit dem Rollback, die Datei nicht (M4b-r1 MINOR 1)
-			$this->tx->onRollback(fn () => $this->attachments->deleteFileNow($noteId, (int)$a->getId()));
 			$ids[$url] = (string)$a->getId();
 			$adopted[] = ['url' => $url, 'id' => (string)$a->getId()];
 		}

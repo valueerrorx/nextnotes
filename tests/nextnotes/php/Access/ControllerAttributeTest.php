@@ -93,6 +93,8 @@ final class ControllerAttributeTest extends TestCase {
 		'PageController::index', 'PageController::dashboard', 'PageController::login', 'PageController::logout',
 		'PageController::audioPlayer', 'PageController::revisions', 'PageController::attachments', 'PageController::kanbanContent',
 		'CompatController::downloadNote', 'CompatController::exportNote', 'CompatController::exportFolder', 'CompatController::attachments',
+		// M4d: ZIP-Exporte, GET-Downloads ohne Seiteneffekt
+		'CompatController::exportEntries', 'CompatController::exportStructured', 'CompatController::exportAttachments',
 		// M3c2: Editor-Seite, GET ohne Seiteneffekt (Speichern über api_save_excalidraw.php mit CSRF)
 		'PageController::excalidrawEditor',
 	];

@@ -24,6 +24,37 @@ class ExportFormatter {
 		return $name !== '' ? $name : 'poznote-export';
 	}
 
+	// Upstream sanitizeFilename (Pfadteil im ZIP), zusätzlich ohne Steuerzeichen
+	public static function zipName(string $name): string {
+		$name = str_replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], '_', $name);
+		$name = trim(Pcre::replace('/[\x00-\x1f\x7f]/', '_', $name), '. ');
+		return $name !== '' ? $name : 'Untitled';
+	}
+
+	// Upstream api_export_structured.php: Leerzeichen/Sonderzeichen → _, mehrfache _ zusammengefasst
+	public static function asciiName(string $name): string {
+		$name = trim(Pcre::replace('/_+/', '_', Pcre::replace('/[^a-zA-Z0-9_-]/', '_', Pcre::replace('/\s+/', '_', $name))), '_');
+		return $name !== '' ? $name : 'export';
+	}
+
+	/**
+	 * download-Attribut an Links auf exportierte Anhänge (Upstream addDownloadAttributesToAttachmentLinks)
+	 * @param array<string, string> $names Dateiname im ZIP => Originalname
+	 */
+	public static function downloadAttributes(string $html, array $names): string {
+		if ($html === '' || !str_contains($html, 'attachments/')) {
+			return $html;
+		}
+		return Pcre::replaceCallback('#<a\b[^>]*href=("|\')(?:\.\./)*+attachments/([^"\'?\#]+)(?:[?\#][^"\']*+)?\1[^>]*+>#i', static function (array $m) use ($names): string {
+			$tag = $m[0];
+			if (stripos($tag, 'note-attachment-preview-media') !== false || Pcre::match('/\sdownload\b/i', Pcre::replace('/"[^"]*+"|\'[^\']*+\'/', '""', $tag))) {
+				return $tag;
+			}
+			$name = $names[$m[2]] ?? '';
+			return '<a' . ($name !== '' ? ' download="' . self::h($name) . '"' : ' download') . substr($tag, 2);
+		}, $html);
+	}
+
 	/**
 	 * YAML Front Matter (Upstream addFrontMatterToMarkdown, mit type: tasklist für den Re-Import)
 	 * @param array{title: string, tags: list<string>, folder: ?string, tasklist: bool, favorite: bool, created: string, updated: string} $m
