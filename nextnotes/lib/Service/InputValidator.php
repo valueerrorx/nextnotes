@@ -32,6 +32,7 @@ class InputValidator {
 
 	public function __construct(
 		private IDBConnection $db,
+		private NotePalette $palette,
 	) {
 	}
 
@@ -56,14 +57,10 @@ class InputValidator {
 		throw new BadRequestException('Invalid color: expected a palette id or a #rrggbb value');
 	}
 
+	// Palette des angemeldeten Benutzers (M4h, Farben verwalten); unbekannte ID → null
 	public function colorHex(?string $stored): ?string {
-		if ($stored === null || $stored === '') {
-			return null;
-		}
-		if ($stored[0] === '#') {
-			return $stored;
-		}
-		return self::PALETTE[$stored] ?? null;
+		$hex = $this->palette->hex($stored);
+		return $hex === '' ? null : $hex;
 	}
 
 	// Icon-Farbe wie poznoteIsSafeCssColor; '' = keine

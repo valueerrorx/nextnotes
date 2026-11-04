@@ -40,7 +40,18 @@
   "Someone mentioned you in {note}": "Jemand hat dich in {note} erwähnt",
   "The tag \"%1$s\" is reserved. Use \"%2$s\" in the menu of the note.": "Der Tag „%1$s“ ist reserviert. Nutze „%2$s“ im Menü der Notiz.",
   "Your speed dial is empty.": "Deine Schnellwahl ist leer.",
-  "To add a tile, use \"%s\" in the menu of a note or folder. A tile opens the first link of the note, or the note itself; its icon is the first image of the note or the first letter of the title. A note with several links becomes a group of tiles, a horizontal line starts a new row.": "Um eine Kachel hinzuzufügen, nutze „%s“ im Menü einer Notiz oder eines Ordners. Eine Kachel öffnet den ersten Link der Notiz oder die Notiz selbst; ihr Symbol ist das erste Bild der Notiz oder der Anfangsbuchstabe des Titels. Eine Notiz mit mehreren Links wird zu einer Gruppe von Kacheln, eine horizontale Linie beginnt eine neue Zeile."
+  "To add a tile, use \"%s\" in the menu of a note or folder. A tile opens the first link of the note, or the note itself; its icon is the first image of the note or the first letter of the title. A note with several links becomes a group of tiles, a horizontal line starts a new row.": "Um eine Kachel hinzuzufügen, nutze „%s“ im Menü einer Notiz oder eines Ordners. Eine Kachel öffnet den ersten Link der Notiz oder die Notiz selbst; ihr Symbol ist das erste Bild der Notiz oder der Anfangsbuchstabe des Titels. Eine Notiz mit mehreren Links wird zu einer Gruppe von Kacheln, eine horizontale Linie beginnt eine neue Zeile.",
+  "All my workspaces": "Alle meine Arbeitsbereiche",
+  "Choose for how many days one automatic revision per day is kept.": "Wähle, wie viele Tage lang eine automatische Version pro Tag aufbewahrt wird.",
+  "Download the attachments of all your own workspaces in a single ZIP archive.": "Lade die Anhänge aller deiner eigenen Arbeitsbereiche in einem ZIP-Archiv herunter.",
+  "Enter the workspace name to confirm. Its notes and folders are moved to another of your workspaces.": "Gib zur Bestätigung den Namen des Arbeitsbereichs ein. Seine Notizen und Ordner werden in einen anderen deiner Arbeitsbereiche verschoben.",
+  "Export the notes of all your own workspaces as files, organized in their folders.": "Exportiere die Notizen aller deiner eigenen Arbeitsbereiche als Dateien, geordnet nach ihren Ordnern.",
+  "Language and time zone": "Sprache und Zeitzone",
+  "Nextcloud settings": "Nextcloud-Einstellungen",
+  "Next Notes is based on Poznote by Timothé Poznanski and is updated through the Nextcloud app store.": "Next Notes basiert auf Poznote von Timothé Poznanski und wird über den Nextcloud-App-Store aktualisiert.",
+  "Next Notes uses the language and time zone of your Nextcloud account.": "Next Notes verwendet die Sprache und Zeitzone deines Nextcloud-Kontos.",
+  "Profile and security": "Profil und Sicherheit",
+  "Your name, e-mail address, password, two-factor authentication and app passwords are managed in your Nextcloud settings.": "Name, E-Mail-Adresse, Passwort, Zwei-Faktor-Authentifizierung und App-Passwörter verwaltest du in deinen Nextcloud-Einstellungen."
  },
  "pluralForm": "nplurals=2; plural=(n != 1);"
 }

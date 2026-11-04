@@ -1161,6 +1161,12 @@
             if (!badge) return;
 
             var count = getSnapshotsKeepCount(value);
+            // Next Notes P29: without safety revisions the badge names the days only
+            if (!document.getElementById('snapshotsSafetyKeepCountInput')) {
+                badge.textContent = tr('modals.snapshots.badge', { count: count }, count + ' days per note');
+                badge.className = 'setting-status enabled';
+                return;
+            }
             getSetting('snapshots_safety_keep_count', function (safetyValue) {
                 var safety = getSafetySnapshotsKeepCount(safetyValue);
                 badge.textContent = tr(

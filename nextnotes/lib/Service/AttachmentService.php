@@ -166,6 +166,18 @@ class AttachmentService {
 		$this->checkQuotaSum($quota);
 	}
 
+	/**
+	 * Belegung und Quote des Benutzers (Einstellungen → Speicher): Anhänge aller eigenen Workspaces, Freigaben zählen beim Besitzer
+	 * @return array{used: int, limit: int}
+	 */
+	public function usage(string $uid): array {
+		$wsIds = array_map(static fn ($w) => (int)$w->getId(), $this->workspaceMapper->findOwned($uid));
+		return [
+			'used' => $wsIds === [] ? 0 : $this->attachments->sizeInWorkspaces($wsIds),
+			'limit' => $this->appConfig->getValueInt(Application::APP_ID, 'attachment_quota_mb', self::DEFAULT_QUOTA_MB) * self::MB,
+		];
+	}
+
 	/** @param array{type: string, id: string, ws: int, bytes: int} $quota */
 	private function checkQuotaSum(array $quota): void {
 		$limit = $this->appConfig->getValueInt(Application::APP_ID, 'attachment_quota_mb', self::DEFAULT_QUOTA_MB) * self::MB;

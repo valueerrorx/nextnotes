@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Service\View;
 
+use OCA\NextNotes\Service\NotePalette;
 use OCA\NextNotes\Db\AttachmentMapper;
 use OCA\NextNotes\Db\Folder;
 use OCA\NextNotes\Db\Note;
@@ -21,7 +22,6 @@ use OCA\NextNotes\Service\ContentUrlRewriter;
 use OCA\NextNotes\Service\Exception\NotFoundException;
 use OCA\NextNotes\Service\FolderService;
 use OCA\NextNotes\Service\HtmlSanitizer;
-use OCA\NextNotes\Service\InputValidator;
 use OCA\NextNotes\Service\MentionService;
 use OCA\NextNotes\Service\NoteSerializer;
 use OCA\NextNotes\Service\NoteService;
@@ -101,10 +101,8 @@ class IndexViewService {
 		'#d946ef' => '--pz-color-magenta', '#ec4899' => '--pz-color-pink', '#f43f5e' => '--pz-color-red',
 		'#64748b' => '--pz-color-gray', '#78716c' => '--pz-color-gray', '#111827' => '--pz-text',
 	];
-	// Bis zur Portierung erzwungen ausgeblendet (ui-customization.js, __POZNOTE_GLOBAL_HIDDEN_UI_ELEMENTS__)
-	public const FORCED_HIDDEN = [
-		'wsmenu:edit-workspaces', // settings.php: M4
-	];
+	// Bis zur Portierung erzwungen ausgeblendet (ui-customization.js, __POZNOTE_GLOBAL_HIDDEN_UI_ELEMENTS__); seit M4h leer
+	public const FORCED_HIDDEN = [];
 	private const SPEED_DIAL_TAG = 'speed-dial';
 
 	/** @var array<string, string> */
@@ -125,6 +123,7 @@ class IndexViewService {
 		private IDateTimeFormatter $dates,
 		private SearchService $search,
 		private PageFrameService $frame,
+		private NotePalette $palette,
 		private IL10N $l,
 	) {
 	}
@@ -176,7 +175,7 @@ class IndexViewService {
 		$shown = $note !== null ? $this->access->resolveLinked($uid, $note) : null;
 
 		$tree = $this->tree($uid, $baseUrl, $key, $byId, $notes, $tagMap, $sort, $favSort, $note, $folderFilter, $openFolder, $search);
-		$titleColor = self::colorHex($ws->getColor());
+		$titleColor = $this->palette->hex($ws->getColor());
 
 		return [
 			'workspaceKey' => $key,
@@ -639,11 +638,6 @@ class IndexViewService {
 		return $color;
 	}
 
-	public static function colorHex(?string $stored): string {
-		$hex = $stored === null || $stored === '' ? '' : ($stored[0] === '#' ? $stored : (InputValidator::PALETTE[$stored] ?? ''));
-		return preg_match('/^#[0-9a-f]{3,8}$/i', $hex) ? $hex : '';
-	}
-
 	/** @return array<string, mixed> Klassen/Attribute für <body> (Upstream index.php:480-635), setzt der Adapter */
 	/**
 	 * Lese-Einstellungen für die Druckansicht (Upstream generatePrintHtml): body-Klassen und Schriftgröße
@@ -789,10 +783,7 @@ class IndexViewService {
 			$members = [];
 		}
 		$tagColors = json_decode($this->value($uid, 'tag_colors'), true);
-		$palette = [];
-		foreach (InputValidator::PALETTE as $id => $hex) {
-			$palette[] = ['id' => $id, 'name' => $t('note_color.names.' . $id, ucfirst($id)), 'hex' => $hex];
-		}
+		$palette = $this->palette->entries($uid);
 		return [
 			'DEFAULT_NOTE_TITLES' => $this->tr->defaultNoteTitles(),
 			'PoznoteMentionMembers' => $members,
@@ -830,8 +821,8 @@ class IndexViewService {
 		];
 	}
 
-	/** @return array{user: string[], forced: string[]} */
-	private function hiddenUi(string $uid): array {
+	/** @return array{user: string[], forced: string[]} Elementsichtbarkeit (Einstellung hidden_ui_elements), auch für die übrigen Seiten */
+	public function hiddenUi(string $uid): array {
 		$user = json_decode($this->value($uid, 'hidden_ui_elements'), true);
 		$user = is_array($user) ? array_values(array_filter($user, static fn ($k) => is_string($k) && strlen($k) <= 100)) : [];
 		return ['user' => array_values(array_unique(array_merge(self::FORCED_HIDDEN, $user))), 'forced' => self::FORCED_HIDDEN];

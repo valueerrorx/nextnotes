@@ -6,7 +6,7 @@
 // abgeleitet von src/public/dashboard.php @ 7e2e0b6aa501ba95ac1e9789fd2bb477c281a001
 // Dashboard: Karten der Notizen nach Ordnern (dashboard-page.js), Bereich ein/mehrere/alle Workspaces oder Tag. Daten: PageController::dashboard, DashboardViewService.
 // Abweichungen: Icon-Leiste im NC-Rahmen, Inline-Skripte → JSON-Insel (DASHBOARD_DATA, Texte), <body>-Attribute über die Insel; ohne AI-Chat (ADR 0010),
-// ohne Kontext-Anpassungspanel, ohne „Workspaces verwalten“/„Farben verwalten“ (Einstellungen M4h); Bereich wird nicht per GET gespeichert (P28).
+// ohne Kontext-Anpassungspanel; „Workspaces/Farben verwalten“ über data-action open-app-url (CSP); Bereich wird nicht per GET gespeichert (P28).
 /** @var array $_ */
 /** @var \OCA\NextNotes\Service\View\PageTranslator $tr */
 $tr = $_['tr'];
@@ -182,6 +182,7 @@ $colorTitle = $t('note_color.modal_title', 'Note color');
 				</div>
 			</div>
 			<div class="modal-buttons">
+				<button type="button" class="dashboard-scope-manage-btn" data-action="open-app-url" data-url="<?php p($_['baseUrl'] . 'settings.php?' . http_build_query(['workspace' => $_['frame']['workspaceKey']]) . '#section=settings-workspaces-section-grid'); ?>" title="<?php p($t('dashboard.scope.manage_workspaces', 'Manage workspaces')); ?>" aria-label="<?php p($t('dashboard.scope.manage_workspaces', 'Manage workspaces')); ?>"><i class="lucide lucide-layers"></i> <span class="dashboard-scope-manage-label"><?php p($t('dashboard.scope.manage_workspaces', 'Manage workspaces')); ?></span></button>
 				<button type="button" class="btn-cancel" data-action="close-workspace-switcher-modal"><?php p($t('common.close', 'Close')); ?></button>
 				<button type="button" class="btn-primary" id="dashboardScopeApplyBtn" disabled><?php p($t('common.apply', 'Apply')); ?></button>
 			</div>
@@ -194,6 +195,7 @@ $colorTitle = $t('note_color.modal_title', 'Note color');
 			<p class="note-color-modal-subtitle" id="noteColorModalNoteTitle"></p>
 			<div class="note-color-grid" id="noteColorGrid"></div>
 			<div class="modal-buttons">
+				<button type="button" class="note-color-manage-btn" data-action="open-app-url" data-url="<?php p($_['baseUrl'] . 'settings.php?' . http_build_query(['workspace' => $_['frame']['workspaceKey'], 'open' => 'note-colors']) . '#note-color-palette-card'); ?>" title="<?php p($t('note_color.manage_button', 'Manage colors')); ?>" aria-label="<?php p($t('note_color.manage_button', 'Manage colors')); ?>"><i class="lucide lucide-palette"></i> <span class="note-color-btn-label"><?php p($t('note_color.manage_button', 'Manage colors')); ?></span></button>
 				<button type="button" class="btn-danger" id="noteColorClearBtn" title="<?php p($t('note_color.remove', 'Remove color')); ?>" aria-label="<?php p($t('note_color.remove', 'Remove color')); ?>"><i class="lucide lucide-eraser"></i> <span class="note-color-btn-label"><?php p($t('note_color.remove', 'Remove color')); ?></span></button>
 				<button type="button" class="btn-cancel" data-action="close-note-color-modal"><?php p($t('common.cancel', 'Cancel')); ?></button>
 				<button type="button" class="btn-primary" id="noteColorApplyBtn"><?php p($t('common.apply', 'Apply')); ?></button>

@@ -6,7 +6,7 @@
 // abgeleitet von src/public/diary.php @ 7e2e0b6aa501ba95ac1e9789fd2bb477c281a001
 // Tagebuch: Karten je Monat, Journal-Ansicht (diary-page.js, Einträge über api/v1/diary/entries.php). Daten: PageController::diary, DiaryViewService.
 // Abweichungen: Icon-Leiste im NC-Rahmen, Inline-Skripte → JSON-Inseln (DIARY_DATA, calendarTranslations) und Bootstrap (Journal vor dem Zeichnen),
-// Seitenklassen am App-Element statt <body>, ohne „Farben verwalten“ (Einstellungen M4h), ohne „Markdown farbig“, ohne Schreibrecht keine Anlege-Knöpfe.
+// Seitenklassen am App-Element statt <body>, „Farben verwalten“ über data-action open-app-url, ohne „Markdown farbig“, ohne Schreibrecht keine Anlege-Knöpfe.
 /** @var array $_ */
 /** @var \OCA\NextNotes\Service\View\PageTranslator $tr */
 $tr = $_['tr'];
@@ -129,6 +129,7 @@ $boardPrefix = 'diary';
 			<p class="note-color-modal-subtitle" id="noteColorModalNoteTitle"></p>
 			<div class="note-color-grid" id="noteColorGrid" role="radiogroup"></div>
 			<div class="modal-buttons">
+				<button type="button" class="note-color-manage-btn" data-action="open-app-url" data-url="<?php p($_['baseUrl'] . 'settings.php?' . http_build_query(['workspace' => $_['frame']['workspaceKey'], 'open' => 'note-colors']) . '#note-color-palette-card'); ?>" title="<?php p($t('note_color.manage_button', 'Manage colors')); ?>" aria-label="<?php p($t('note_color.manage_button', 'Manage colors')); ?>"><i class="lucide lucide-palette"></i> <span class="note-color-btn-label"><?php p($t('note_color.manage_button', 'Manage colors')); ?></span></button>
 				<button type="button" class="btn-danger" id="noteColorClearBtn" title="<?php p($t('note_color.remove', 'Remove color')); ?>" aria-label="<?php p($t('note_color.remove', 'Remove color')); ?>"><i class="lucide lucide-eraser"></i> <span class="note-color-btn-label"><?php p($t('note_color.remove', 'Remove color')); ?></span></button>
 				<button type="button" class="btn-cancel" data-action="close-note-color-modal"><?php p($t('common.cancel', 'Cancel')); ?></button>
 				<button type="button" class="btn-primary" id="noteColorApplyBtn"><?php p($t('common.apply', 'Apply')); ?></button>

@@ -193,6 +193,14 @@ class SettingsService {
 			}
 			return 'custom';
 		}
+		if ($key === NotePalette::SETTING) {
+			// Upstream sanitizeNoteColorPalette; leer = Standardpalette
+			$clean = $raw === '' ? [] : NotePalette::sanitize($raw);
+			if ($raw !== '' && $clean === []) {
+				throw new BadRequestException('invalid note color palette');
+			}
+			return $clean === [] ? '' : (string)json_encode($clean, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+		}
 		if ($key === 'favorites_icon_color') {
 			$color = strtolower($raw);
 			if ($color !== '' && !preg_match('/^#[0-9a-f]{6}$/', $color)) {

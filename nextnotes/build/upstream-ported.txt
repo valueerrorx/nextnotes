@@ -21,3 +21,4 @@ src/public/api/v1/calendar/notes-by-date.php c4121ec99ed1fff177584745610d1c325d4
 src/public/api/v1/calendar/notes-on-date.php 01e99ffead6afbdfa3de192ac0e0939b7de41d8e2eb4e0baeee18b12b34f11ae lib/Service/DiaryService.php
 src/public/api/v1/diary/diaries.php b309113bbf9923283ff1fd18244ea68d92ce6c9d6df46fd152561d3e0bcdf5b3 lib/Service/DiaryService.php
 src/public/api/v1/diary/entries.php 02ea10bf5298742b8af19a9470e7ac41f751141b5d5be78f9a03f3d52ac260ae lib/Service/DiaryService.php
+src/lib/note-colors.php d02a62f32e3403a463560b8b55b12279e384aeda0c5b986404bdf51f36b0e993 lib/Service/NotePalette.php

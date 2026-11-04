@@ -21,6 +21,11 @@
 		}
 	}
 
+	// 0. Bis zum Start nicht bedienbar (gegen Klick/Fokus im unsichtbaren Inhalt); Rückfall nach 2 s wie im CSS
+	var appContent = document.getElementById('app-content');
+	function releaseContent() { if (appContent) appContent.inert = false; }
+	if (appContent) { appContent.inert = true; setTimeout(releaseContent, 2000); }
+
 	var config = readState('config') || {};
 	var baseUrl = String(config.baseUrl || '/index.php/apps/nextnotes/').replace(/\/?$/, '/');
 	var apiBase = String(config.apiBase || baseUrl + 'api/v1').replace(/\/$/, '');
@@ -52,7 +57,8 @@
 	// Globals der Upstream-Inline-Skripte (index.php, icon_sidebar.php); nur bekannte Namen
 	var GLOBALS = ['DEFAULT_NOTE_TITLES', 'PoznoteMentionMembers', 'TAG_COLORS', 'NOTE_COLOR_PALETTE', 'PoznoteActiveAccountIsOwn', 'calendarTranslations', 'NOTIFICATIONS_TXT', 'DIARY_DATA',
 		'NOTE_COLOR_TXT', 'DASHBOARD_DATA', 'DASHBOARD_PIN_TXT', 'DASHBOARD_REORDER_TXT', 'DASHBOARD_SHOW_MORE_TXT', 'DASHBOARD_SCOPE_TXT',
-		'DASHBOARD_MODIFIED_TXT', 'DASHBOARD_TAG_FILTER_TXT', 'DASHBOARD_NOTE_MODAL_TXT', 'NEXTNOTES_TXT'];
+		'DASHBOARD_MODIFIED_TXT', 'DASHBOARD_TAG_FILTER_TXT', 'DASHBOARD_NOTE_MODAL_TXT', 'NEXTNOTES_TXT',
+		'NOTE_COLOR_DEFAULT_PALETTE', 'NOTE_COLOR_LOCALIZED_NAMES', 'NOTE_COLOR_KNOWN_NAMES'];
 	var pageGlobals = readIsland('nextnotes-globals') || {};
 	GLOBALS.forEach(function (name) {
 		if (Object.prototype.hasOwnProperty.call(pageGlobals, name)) window[name] = pageGlobals[name];
@@ -467,6 +473,12 @@
 	UI_ACTIONS['close-kanban-view'] = { type: 'click', run: function () { return call('closeKanbanView', []); } };
 	UI_ACTIONS['delete-attachment'] = { type: 'click', run: function (el) { return call('deleteAttachment', [el.dataset.attachmentId]); } };
 	UI_ACTIONS['transcribe-attachment'] = { type: 'click', run: function (el) { return call('transcribeAttachmentFromList', [el.dataset.attachmentId]); } };
+	// Upstream onclick="window.location.href='settings.php…'" (Farben/Workspaces verwalten): nur Ziele in der App
+	UI_ACTIONS['open-app-url'] = { type: 'click', run: function (el) {
+		var target = new URL(el.getAttribute('data-url') || '', window.location.href);
+		if (target.origin === origin && (target.pathname.indexOf(appPath) === 0 || target.pathname.indexOf(indexPath) === 0)) window.location.href = target.href;
+		return false;
+	} };
 	// Capture auf document: nach dem Klick-Schutz (window), vor Upstream-Delegation; nur das innerste data-action zählt
 	['click', 'change'].forEach(function (type) {
 		document.addEventListener(type, function (e) {
@@ -505,6 +517,7 @@
 
 	// 13. Inhalt erst nach dem Start zeigen (gegen Flackern; CSS-Rückfall nach 2 s)
 	document.addEventListener('DOMContentLoaded', function () {
+		releaseContent();
 		document.documentElement.classList.add('nextnotes-ready');
 	});
 

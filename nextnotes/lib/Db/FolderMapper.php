@@ -45,6 +45,27 @@ class FolderMapper extends QBMapper {
 		return $result;
 	}
 
+	/**
+	 * Ordner je Workspace (Einstellungen, Workspace-Liste)
+	 * @param int[] $workspaceIds
+	 * @return array<int, int> workspace_id => Anzahl
+	 */
+	public function countByWorkspace(array $workspaceIds): array {
+		$out = [];
+		foreach (array_chunk(array_values(array_unique($workspaceIds)), 1000) as $chunk) {
+			$qb = $this->db->getQueryBuilder();
+			$qb->select('workspace_id')->selectAlias($qb->func()->count('id'), 'cnt')->from(self::TABLE)
+				->where($qb->expr()->in('workspace_id', $qb->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY)))
+				->groupBy('workspace_id');
+			$res = $qb->executeQuery();
+			while ($row = $res->fetch()) {
+				$out[(int)$row['workspace_id']] = (int)$row['cnt'];
+			}
+			$res->closeCursor();
+		}
+		return $out;
+	}
+
 	/** @return Folder[] */
 	public function findInWorkspace(int $workspaceId): array {
 		return $this->findInWorkspaces([$workspaceId]);

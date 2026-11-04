@@ -6,8 +6,8 @@
 // abgeleitet von src/icon_sidebar.php @ 7e2e0b6aa501ba95ac1e9789fd2bb477c281a001
 // Icon-Leiste: App-Symbol „Next Notes“ als Startseiten-Link, Einträge der portierten Seiten (M4e: Erstellen, Notizen, Ordner,
 // Tags, Anhänge, Papierkorb; M4f: Aufgaben, Tagebuch; M4g: Dashboard, Graph, Speed Dial, Erwähnungen nur mit geteiltem Workspace und Zähler).
-// Weggelassen bis zur Portierung: Einstellungen/Über (M4h); gestrichen: Teilen-Seite, Offline, Theme-Umschalter, Abmelden, Konten, Git,
-// Profil-/Farb-/Reihenfolge-Modals.
+// Unten Einstellungen und Über (M4h, beide settings.php, Über mit ?open=about); gestrichen: Teilen-Seite, Offline, Theme-Umschalter,
+// Abmelden, Konten, Git, Profil-/Farb-/Reihenfolge-Modals.
 /** @var array $_ */
 /** @var \OCA\NextNotes\Service\View\PageTranslator $tr */
 $homeLabel = $tr->t('common.home', [], 'Home');
@@ -29,6 +29,11 @@ $railItems = [
 	['id' => 'iconSidebarTagsBtn', 'group' => 'collections', 'page' => 'list_tags.php', 'icon' => 'lucide-tags', 'label' => $tr->t('notes_list.system_folders.tags', [], 'Tags')],
 	['id' => 'iconSidebarAttachmentsBtn', 'group' => 'collections', 'page' => 'attachments_list.php', 'icon' => 'lucide-paperclip', 'label' => $tr->t('notes_list.system_folders.attachments', [], 'Attachments')],
 	['id' => 'iconSidebarTrashBtn', 'group' => 'utility', 'page' => 'trash.php', 'icon' => 'lucide-trash-2', 'label' => $tr->t('notes_list.system_folders.trash', [], 'Trash')],
+];
+$railAbout = $railPage === 'settings.php' && ($_['railAbout'] ?? false);
+$railBottom = [
+	['id' => 'iconSidebarSettingsBtn', 'href' => $_['baseUrl'] . 'settings.php' . $railQuery, 'icon' => 'lucide-settings', 'label' => $tr->t('sidebar.settings', [], 'Settings'), 'active' => $railPage === 'settings.php' && !$railAbout],
+	['id' => 'iconSidebarAboutBtn', 'href' => $_['baseUrl'] . 'settings.php' . $railQuery . '&open=about', 'icon' => 'lucide-info-circle', 'label' => $tr->t('settings.categories.documentation', [], 'About'), 'active' => $railAbout],
 ];
 $railGroup = null;
 ?>
@@ -53,7 +58,13 @@ $railGroup = null;
 	<button type="button" id="iconSidebarOverflowBtn" class="icon-sidebar-btn" title="<?php p($overflowLabel); ?>" aria-label="<?php p($overflowLabel); ?>" aria-haspopup="true" aria-expanded="false" aria-controls="iconSidebarOverflowMenu">
 		<i class="lucide lucide-more-horizontal"></i>
 	</button>
-	<div class="icon-sidebar-bottom"></div>
+	<div class="icon-sidebar-bottom">
+	<?php foreach ($railBottom as $railItem): ?>
+		<a href="<?php p($railItem['href']); ?>" id="<?php p($railItem['id']); ?>" class="icon-sidebar-btn<?php if ($railItem['active']): ?> icon-sidebar-btn-active<?php endif; ?>" title="<?php p($railItem['label']); ?>" aria-label="<?php p($railItem['label']); ?>"<?php if ($railItem['active']): ?> aria-current="page"<?php endif; ?>>
+			<i class="lucide <?php p($railItem['icon']); ?>"></i>
+		</a>
+	<?php endforeach; ?>
+	</div>
 </nav>
 <div id="iconSidebarOverflowMenu" role="menu" aria-labelledby="iconSidebarOverflowBtn"></div>
 <button type="button" id="iconSidebarToggle" title="<?php p($railToggleLabel); ?>" aria-label="<?php p($railToggleLabel); ?>" aria-expanded="true" aria-controls="icon_sidebar">

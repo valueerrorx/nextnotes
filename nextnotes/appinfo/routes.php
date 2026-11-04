@@ -39,6 +39,8 @@ return [
 		// Tagebuch und Aufgaben (M4f)
 		['name' => 'page#diary', 'url' => '/diary.php', 'verb' => 'GET'],
 		['name' => 'page#tasks', 'url' => '/tasks.php', 'verb' => 'GET'],
+		// Persönliche Einstellungen (M4h)
+		['name' => 'page#settings', 'url' => '/settings.php', 'verb' => 'GET'],
 		// Admin-Formular (Settings\AdminSettings), nur Admins
 		['name' => 'admin_settings#save', 'url' => '/admin/settings', 'verb' => 'POST'],
 		// Kompatibilitätsrouten (SPEC §4.2): Upstream-Einzeldateien unter gleichem Namen
@@ -52,6 +54,8 @@ return [
 		['name' => 'compat#attachments', 'url' => '/api_attachments.php', 'verb' => 'GET'],
 		['name' => 'compat#saveExcalidraw', 'url' => '/api_save_excalidraw.php', 'verb' => 'POST'],
 		['name' => 'compat#workspaces', 'url' => '/workspaces.php', 'verb' => 'POST'],
+		['name' => 'compat#workspacesPage', 'url' => '/workspaces.php', 'verb' => 'GET'],
+		['name' => 'compat#storageStatsUser', 'url' => '/storage-stats-user.php', 'verb' => 'GET'],
 		['name' => 'compat#importDroppedNotes', 'url' => '/api_import_dropped_notes.php', 'verb' => 'POST'],
 		['name' => 'compat#background', 'url' => '/api_upload_background.php', 'verb' => 'GET'],
 		['name' => 'compat#backgroundUpload', 'url' => '/api_upload_background.php', 'verb' => 'POST'],

@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Service\View;
 
+use OCA\NextNotes\Service\NotePalette;
 use OCA\NextNotes\Db\Folder;
 use OCA\NextNotes\Db\Note;
 use OCA\NextNotes\Db\NoteMapper;
@@ -43,6 +44,7 @@ class KanbanViewService {
 		private SettingsService $settings,
 		private SearchTextNormalizer $text,
 		private IDateTimeZone $timeZone,
+		private NotePalette $palette,
 	) {
 	}
 
@@ -202,7 +204,7 @@ class KanbanViewService {
 		$colors = [];
 		foreach ($tags as $tag) {
 			$raw = $tagColors[$tag] ?? null;
-			$colors[] = is_string($raw) ? IndexViewService::colorHex($raw) : '';
+			$colors[] = is_string($raw) ? $this->palette->hex($raw) : '';
 		}
 		return [
 			'note' => $n,
@@ -210,7 +212,7 @@ class KanbanViewService {
 			'title' => (string)($n->getHeading() ?? ''),
 			'completed' => (int)$n->getKanbanCompleted() > 0,
 			'colorRaw' => $ownColor,
-			'colorHex' => IndexViewService::colorHex($color),
+			'colorHex' => $this->palette->hex($color),
 			'tags' => $tags,
 			'tagColors' => $colors,
 			'updated' => $n->getUpdatedAt() !== null ? $this->local((int)$n->getUpdatedAt(), 'd/m H:i') : '',

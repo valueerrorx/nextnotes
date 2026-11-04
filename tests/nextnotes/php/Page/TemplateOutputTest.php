@@ -45,6 +45,8 @@ final class TemplateOutputTest extends TestCase {
 		'graph.php' => ['json_encode($island, $jsonFlags)'],
 		'speed_dial.php' => ['json_encode($island, $jsonFlags)'],
 		'mentions.php' => ['json_encode($island, $jsonFlags)'],
+		// M4h: Einstellungen (Inseln: Body-Attribute, Paletten-Globals, page-config-data)
+		'settings.php' => ['json_encode($islandData, $jsonFlags)'],
 	];
 
 	/** @return array<string, string> relativer Pfad => Inhalt */
@@ -85,7 +87,7 @@ final class TemplateOutputTest extends TestCase {
 	public static function islandTemplates(): array {
 		return ['index.php' => ['index.php'], 'revisions.php' => ['revisions.php'], 'attachments.php' => ['attachments.php'], 'excalidraw_editor.php' => ['excalidraw_editor.php'], 'export_print.php' => ['export_print.php'],
 			'trash.php' => ['trash.php'], 'list_tags.php' => ['list_tags.php'], 'list_folders.php' => ['list_folders.php'], 'attachments_list.php' => ['attachments_list.php'],
-			'notes_manager.php' => ['notes_manager.php'], 'create.php' => ['create.php']];
+			'notes_manager.php' => ['notes_manager.php'], 'create.php' => ['create.php'], 'settings.php' => ['settings.php']];
 	}
 
 	#[\PHPUnit\Framework\Attributes\DataProvider('islandTemplates')]

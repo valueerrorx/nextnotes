@@ -945,6 +945,49 @@
 				"js/request-errors.js",
 				"js/mentions-page.js"
 			]
+		},
+		"settings": {
+			"js": [
+				"js/request-errors.js",
+				"js/modal-alerts.js",
+				"js/icon-sidebar-toggle.js",
+				"js/theme-manager.js",
+				"js/globals.js",
+				"js/ui.js",
+				"js/utils-note-create.js",
+				"js/utils-folders.js",
+				"js/utils-move-folder.js",
+				"js/utils-folder-tree.js",
+				"js/utils-move-note.js",
+				"js/utils-export-create.js",
+				"js/utils-menus.js",
+				"js/utils-note-rename.js",
+				"js/utils-kanban.js",
+				"js/font-size-settings.js",
+				"js/copy-code-on-focus.js",
+				"js/modals-events.js",
+				"js/navigation.js",
+				"js/workspaces-core.js",
+				"js/workspaces-create.js",
+				"js/workspaces-share.js",
+				"js/workspaces-actions.js",
+				"js/workspaces-page.js",
+				"js/workspace-background.js",
+				"js/settings-page.js",
+				"js/ui-customization.js",
+				"js/panel-back.js"
+			],
+			"omit": {
+				"js/background-settings.js": "Hintergrund nur in der Hauptansicht; isIndexPage() hielte /index.php/apps/nextnotes/settings.php für die Hauptansicht",
+				"js/utils-updates.js": "Update-Prüfung gestrichen (/system/updates nicht geroutet, Version kommt vom NC-App-Store)",
+				"js/ui-customization-panel.js": "kein Kontext-Anpassungspanel auf den Seiten (Elementsichtbarkeit über ui-customization.js und Einstellungen)",
+				"js/change-password.js": "Konto/Passwort verwaltet Nextcloud (Inventur B 1.3)",
+				"js/app-passwords.js": "App-Passwörter verwaltet Nextcloud (Inventur B 1.3)",
+				"js/connected-apps.js": "OAuth/MCP gestrichen (Inventur B 1.4)",
+				"js/statistics-token.js": "Admin-Werkzeuge gestrichen (Inventur B 1.4)",
+				"js/custom-logo.js": "Admin-Werkzeuge gestrichen (Inventur B 1.4)",
+				"js/delete-account.js": "Konto löschen verwaltet Nextcloud (Inventur B 1.3)"
+			}
 		}
 	}
 }

@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Service\View;
 
+use OCA\NextNotes\Service\NotePalette;
 use OCA\NextNotes\Db\Folder;
 use OCA\NextNotes\Db\FolderMapper;
 use OCA\NextNotes\Db\Note;
@@ -47,6 +48,7 @@ class DashboardViewService {
 		private InputValidator $validator,
 		private IDateTimeZone $timeZone,
 		private PageTranslator $tr,
+		private NotePalette $palette,
 	) {
 	}
 
@@ -79,10 +81,7 @@ class DashboardViewService {
 			'colors' => (object)$scope['colors'],
 		];
 		$tagColors = json_decode($this->settings->get($uid, 'tag_colors', ''), true);
-		$palette = [];
-		foreach (InputValidator::PALETTE as $id => $hex) {
-			$palette[] = ['id' => $id, 'name' => $this->tr->t('note_color.names.' . $id, [], ucfirst($id)), 'hex' => $hex];
-		}
+		$palette = $this->palette->entries($uid);
 		return [
 			'globals' => ['TAG_COLORS' => is_array($tagColors) ? (object)$tagColors : new \stdClass(), 'NOTE_COLOR_PALETTE' => $palette],
 			'data' => $data,
@@ -107,7 +106,7 @@ class DashboardViewService {
 			$key = $keys[(int)$ws->getId()];
 			$ids[$key] = (int)$ws->getId();
 			$tags[$key] = $this->validator->workspaceTags((string)($ws->getTags() ?? ''));
-			$hex = IndexViewService::colorHex($ws->getColor());
+			$hex = $this->palette->hex($ws->getColor());
 			if ($hex !== '') {
 				$colors[$key] = $hex;
 			}
@@ -180,7 +179,7 @@ class DashboardViewService {
 				'icon' => IndexViewService::iconClass((string)($f->getIcon() ?? ''), 'lucide-folder'),
 				'color' => IndexViewService::iconColor((string)($f->getIconColor() ?? '')) ?: null,
 				'cardColor' => (string)($f->getColor() ?? ''),
-				'cardColorHex' => IndexViewService::colorHex($f->getColor()),
+				'cardColorHex' => $this->palette->hex($f->getColor()),
 				'pinned' => (int)$f->getPinned() > 0,
 				'favorite' => $favoritesOnly && (int)$f->getFavorite() > 0,
 				'notes' => [],
@@ -342,7 +341,7 @@ class DashboardViewService {
 				'icon' => trim((string)($n->getIcon() ?? '')) !== '' ? IndexViewService::iconClass((string)$n->getIcon(), 'lucide-file-text') : '',
 				'iconColor' => IndexViewService::iconColor((string)($n->getIconColor() ?? '')),
 				'color' => (string)($n->getColor() ?? ''),
-				'colorHex' => IndexViewService::colorHex($n->getColor()),
+				'colorHex' => $this->palette->hex($n->getColor()),
 				'pinned' => (int)$n->getPinned() > 0,
 			];
 		}

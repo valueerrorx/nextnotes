@@ -48,6 +48,7 @@ class WorkspaceService {
 		private ReminderMapper $reminders,
 		private MentionHandledMapper $mentions,
 		private BackgroundFiles $backgrounds,
+		private SettingsService $settings,
 	) {
 	}
 
@@ -243,6 +244,7 @@ class WorkspaceService {
 			$newName = $this->validator->workspaceName($newName);
 		}
 		$oldName = $ws->getName();
+		$oldKeys = $this->keys($uid);
 		$this->tx->run(function () use ($uid, $ws, $newName, $oldName, $hasTags, $tags, $hasColor, $color) {
 			if ($newName !== '' && $newName !== $oldName) {
 				if ($this->workspaces->findOwned($uid, 'normal', $newName) !== []) {
@@ -260,6 +262,16 @@ class WorkspaceService {
 			$this->workspaces->update($ws);
 		});
 		$this->reset();
+		// Wie Upstream workspaces.php rename: Standard-/zuletzt geöffneter Workspace folgen ihrem Schlüssel (auch gleichnamige fremde, deren Schlüssel sich verschiebt)
+		if ($ws->getName() !== $oldName) {
+			$newKeys = $this->keys($uid);
+			foreach (['default_workspace', 'last_opened_workspace'] as $setting) {
+				$id = array_search($this->settings->get($uid, $setting), $oldKeys, true);
+				if ($id !== false && isset($newKeys[$id]) && $newKeys[$id] !== $oldKeys[$id]) {
+					$this->settings->set($uid, $setting, $newKeys[$id]);
+				}
+			}
+		}
 		return [
 			'old_name' => $oldName,
 			'new_name' => $ws->getName(),

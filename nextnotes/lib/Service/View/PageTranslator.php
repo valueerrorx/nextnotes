@@ -58,6 +58,20 @@ class PageTranslator {
 		return htmlspecialchars($this->t($key, $vars, $default), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 	}
 
+	/** @return array<string, string> Zeichenketten unter $key (aktive Sprache, sonst en), z. B. Legende der Datumsmuster */
+	public function strings(string $key): array {
+		foreach ([$this->lang, 'en'] as $lang) {
+			$cur = $this->dict($lang);
+			foreach (explode('.', $key) as $part) {
+				$cur = is_array($cur) && array_key_exists($part, $cur) ? $cur[$part] : null;
+			}
+			if (is_array($cur) && $cur !== []) {
+				return array_filter($cur, 'is_string');
+			}
+		}
+		return [];
+	}
+
 	/** @return string[] Standardtitel neuer Notizen aller Sprachen (Upstream getDefaultNoteTitles; Build: i18n/default-note-titles.json) */
 	public function defaultNoteTitles(): array {
 		if ($this->defaultTitles === null) {

@@ -30,6 +30,7 @@ use OCA\NextNotes\Service\Pcre;
 use OCA\NextNotes\Service\SettingsService;
 use OCA\NextNotes\Service\View\PageAssets;
 use OCA\NextNotes\Service\View\PageTranslator;
+use OCA\NextNotes\Service\View\SettingsViewService;
 use OCA\NextNotes\Service\WorkspaceService;
 use OCA\NextNotes\Service\ZipExportService;
 use OCP\AppFramework\Http;
@@ -40,11 +41,13 @@ use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\FileDisplayResponse;
 use OCP\App\IAppManager;
 use OCP\AppFramework\Http\JSONResponse;
+use OCP\AppFramework\Http\RedirectResponse;
 use OCP\AppFramework\Http\Response;
 use OCP\AppFramework\Http\StreamResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IDateTimeFormatter;
 use OCP\IRequest;
+use OCP\IURLGenerator;
 use OCP\IUserManager;
 use OCP\IUserSession;
 
@@ -70,6 +73,8 @@ class CompatController extends ApiController {
 		private PageAssets $assets,
 		private IAppManager $appManager,
 		private BackgroundService $backgrounds,
+		private SettingsViewService $settingsView,
+		private IURLGenerator $urls,
 	) {
 		parent::__construct($request, $userSession, $workspaces);
 	}
@@ -346,5 +351,41 @@ class CompatController extends ApiController {
 	#[NoAdminRequired]
 	public function backgroundDelete(): JSONResponse {
 		return $this->ok($this->backgrounds->delete($this->uid(), $this->param('workspace'), $this->param('scope')));
+	}
+
+	// Upstream workspaces.php ohne Aktion (alter Link, Lesezeichen): die Liste steht in den Einstellungen; ?new=1 öffnet den Anlage-Dialog
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function workspacesPage(): RedirectResponse {
+		$query = [];
+		$workspace = $this->param('workspace');
+		if (is_string($workspace) && trim($workspace) !== '' && trim($workspace) !== '__last_opened__') {
+			$query['workspace'] = trim($workspace);
+		}
+		if ($this->param('new') === '1') {
+			$query['open'] = 'new-workspace';
+		}
+		$url = $this->urls->linkToRoute('nextnotes.page.settings') . ($query !== [] ? '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986) : '');
+		return new RedirectResponse($url . '#section=settings-workspaces-section-grid');
+	}
+
+	// Upstream storage-stats-user.php?fragment=1: Zahlen des Benutzers für die Einstellungen; ohne fragment → Einstellungen, Bereich Konto
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function storageStatsUser(): Response {
+		$uid = $this->uid();
+		if ($this->param('fragment') !== '1') {
+			return new RedirectResponse($this->urls->linkToRoute('nextnotes.page.settings') . '?open=account');
+		}
+		$this->tr->setLanguage($this->tr->languageFor($this->settings->read($uid, 'language')));
+		$workspace = $this->param('workspace');
+		$response = new TemplateResponse(Application::APP_ID, 'storage_stats_user', [
+			'tr' => $this->tr,
+			'stats' => $this->settingsView->storage($uid),
+			'baseUrl' => $this->urls->linkToRoute('nextnotes.page.index'),
+			'workspace' => is_string($workspace) ? trim($workspace) : '',
+		], TemplateResponse::RENDER_AS_BLANK);
+		$response->setContentSecurityPolicy($this->cspFactory->forView('settings'));
+		return $response;
 	}
 }

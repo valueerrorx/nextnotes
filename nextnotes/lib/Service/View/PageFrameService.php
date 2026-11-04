@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Service\View;
 
+use OCA\NextNotes\Service\NotePalette;
 use OCA\NextNotes\Db\Workspace;
 use OCA\NextNotes\Service\AccessService;
 use OCA\NextNotes\Service\Exception\NotFoundException;
@@ -21,6 +22,7 @@ class PageFrameService {
 		private AccessService $access,
 		private WorkspaceService $workspaces,
 		private SettingsService $settings,
+		private NotePalette $palette,
 	) {
 	}
 
@@ -57,7 +59,7 @@ class PageFrameService {
 			'workspace' => $ws,
 			'wsId' => (int)$ws->getId(),
 			'workspaceKey' => $key,
-			'workspaceColor' => IndexViewService::colorHex($ws->getColor()),
+			'workspaceColor' => $this->palette->hex($ws->getColor()),
 			'canWrite' => $this->access->workspaceLevel($uid, $ws) >= AccessService::WRITE,
 			'replaceWorkspace' => $requested !== $key ? $key : null,
 			'dateTimeFormat' => preg_match('/^[A-Za-z0-9_:.-]{1,40}$/', $format) ? $format : 'default',

@@ -338,6 +338,33 @@ class NoteMapper extends QBMapper {
 	}
 
 	/**
+	 * Notizen je Workspace, ohne bzw. im Papierkorb (Einstellungen: Workspace-Liste, Speicher)
+	 * @param int[] $workspaceIds
+	 * @return array<int, array{active: int, trash: int}>
+	 */
+	public function countByWorkspace(array $workspaceIds): array {
+		$out = [];
+		foreach (array_chunk(array_values(array_unique($workspaceIds)), 1000) as $chunk) {
+			foreach (['active' => false, 'trash' => true] as $field => $trashed) {
+				$qb = $this->db->getQueryBuilder();
+				$qb->select('workspace_id')->selectAlias($qb->func()->count('id'), 'cnt')->from(self::TABLE)
+					->where($qb->expr()->in('workspace_id', $qb->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY)))
+					->andWhere($qb->expr()->eq('role', $qb->createNamedParameter('note')))
+					->andWhere($trashed ? $qb->expr()->isNotNull('trashed_at') : $qb->expr()->isNull('trashed_at'))
+					->groupBy('workspace_id');
+				$res = $qb->executeQuery();
+				while ($row = $res->fetch()) {
+					$id = (int)$row['workspace_id'];
+					$out[$id] ??= ['active' => 0, 'trash' => 0];
+					$out[$id][$field] = (int)$row['cnt'];
+				}
+				$res->closeCursor();
+			}
+		}
+		return $out;
+	}
+
+	/**
 	 * Notizen je Ordner eines Workspace (ohne Papierkorb, ohne Wurzel); mit $tag nur Notizen mit diesem Tag
 	 * @return array<int, int> folder_id => Anzahl
 	 */

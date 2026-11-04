@@ -28,6 +28,7 @@ use OCA\NextNotes\Service\View\NotePageViewService;
 use OCA\NextNotes\Service\View\PageAssets;
 use OCA\NextNotes\Service\View\PageFrameService;
 use OCA\NextNotes\Service\View\PageTranslator;
+use OCA\NextNotes\Service\View\SettingsViewService;
 use OCA\NextNotes\Service\View\SpeedDialViewService;
 use OCA\NextNotes\Service\View\TagListViewService;
 use OCA\NextNotes\Service\View\TrashViewService;
@@ -70,6 +71,7 @@ class PageController extends Controller {
 		private DashboardViewService $dashboardView,
 		private SpeedDialViewService $speedDialView,
 		private MentionService $mentions,
+		private SettingsViewService $settingsView,
 	) {
 		parent::__construct(Application::APP_ID, $request);
 	}
@@ -445,9 +447,10 @@ class PageController extends Controller {
 		$frame ??= $this->pageFrame->frame($uid, $this->request->getParam('workspace'));
 		$extra = $data !== null ? $data($uid, $frame) : [];
 		$this->assets->page($page, $lang);
+		$hidden = $this->indexView->hiddenUi($uid);
 		$this->provideConfig($uid, $baseUrl, $lang, [
-			'hiddenUiElements' => IndexViewService::FORCED_HIDDEN,
-			'globalHiddenUiElements' => IndexViewService::FORCED_HIDDEN,
+			'hiddenUiElements' => $hidden['user'],
+			'globalHiddenUiElements' => $hidden['forced'],
 		]);
 		return $this->page($page, $page, [
 			'tr' => $this->translator,
@@ -495,6 +498,23 @@ class PageController extends Controller {
 			'showHandled' => $showHandled,
 			'mentions' => $this->mentions->page($uid, $showHandled),
 		]);
+	}
+
+	// Upstream settings.php: persönliche Einstellungen; Workspaces-Bereich (workspaces_section.php), Hintergrundbild je Workspace (B43)
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function settings(): TemplateResponse {
+		return $this->listPage('settings', function (string $uid): array {
+			$page = $this->settingsView->build($uid);
+			return [
+				'settingsPage' => $page,
+				'uid' => $uid,
+				'appVersion' => $this->appManager->getAppVersion(Application::APP_ID),
+				'ncLanguageUrl' => $this->urls->linkToRoute('settings.PersonalSettings.index', ['section' => 'language-locale']),
+				'ncProfileUrl' => $this->urls->linkToRoute('settings.PersonalSettings.index', ['section' => 'profile-contact']),
+				'railAbout' => $this->request->getParam('open') === 'about',
+			];
+		});
 	}
 
 	// Upstream-Login (SPEC §4.2): angemeldet zur App; abgemeldet leitet NC selbst auf den Login mit Rücksprung

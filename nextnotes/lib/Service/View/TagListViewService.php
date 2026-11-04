@@ -9,8 +9,8 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Service\View;
 
+use OCA\NextNotes\Service\NotePalette;
 use OCA\NextNotes\Db\NoteTagMapper;
-use OCA\NextNotes\Service\InputValidator;
 use OCA\NextNotes\Service\SettingsService;
 use OCA\NextNotes\Service\TagService;
 
@@ -20,6 +20,7 @@ class TagListViewService {
 		private NoteTagMapper $tags,
 		private SettingsService $settings,
 		private PageTranslator $tr,
+		private NotePalette $palette,
 	) {
 	}
 
@@ -42,7 +43,7 @@ class TagListViewService {
 				continue;
 			}
 			$stored = $map[mb_strtolower(trim($tag))] ?? null;
-			$hex = strtolower(IndexViewService::colorHex(is_string($stored) ? $stored : null));
+			$hex = strtolower($this->palette->hex(is_string($stored) ? $stored : null));
 			if ($hex === '') {
 				$uncolored = true;
 			} else {
@@ -52,10 +53,7 @@ class TagListViewService {
 		}
 		$colors = array_keys($used);
 		sort($colors);
-		$palette = [];
-		foreach (InputValidator::PALETTE as $id => $hex) {
-			$palette[] = ['id' => $id, 'name' => $this->tr->t('note_color.names.' . $id, [], ucfirst($id)), 'hex' => $hex];
-		}
+		$palette = $this->palette->entries($uid);
 		return [
 			'tags' => $out,
 			'colors' => $colors,

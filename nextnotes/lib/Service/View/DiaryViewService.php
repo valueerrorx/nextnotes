@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Service\View;
 
+use OCA\NextNotes\Service\NotePalette;
 use OCA\NextNotes\Db\Note;
 use OCA\NextNotes\Db\NoteMapper;
 use OCA\NextNotes\Db\NoteTagMapper;
@@ -42,6 +43,7 @@ class DiaryViewService {
 		private PageTranslator $tr,
 		private IDateTimeZone $timeZone,
 		private InputValidator $validator,
+		private NotePalette $palette,
 	) {
 	}
 
@@ -132,7 +134,7 @@ class DiaryViewService {
 				'icon' => (string)($n->getIcon() ?? '') !== '' ? IndexViewService::iconClass((string)$n->getIcon(), 'lucide-file') : '',
 				'iconColor' => IndexViewService::iconColor((string)($n->getIconColor() ?? '')),
 				'color' => $color,
-				'colorHex' => IndexViewService::colorHex($color),
+				'colorHex' => $this->palette->hex($color),
 				'_created' => (int)$n->getCreatedAt(),
 			];
 		}
@@ -145,10 +147,7 @@ class DiaryViewService {
 
 		$folderPath = $rootName . '/' . $now->format('Y') . '/' . $now->format('m');
 		$t = fn (string $k, string $d) => $this->tr->t($k, [], $d);
-		$palette = [];
-		foreach (InputValidator::PALETTE as $pid => $hex) {
-			$palette[] = ['id' => $pid, 'name' => $this->tr->t('note_color.names.' . $pid, [], ucfirst($pid)), 'hex' => $hex];
-		}
+		$palette = $this->palette->entries($uid);
 		$data = [
 			'notes' => $cards,
 			'todayNoteId' => $todayId,

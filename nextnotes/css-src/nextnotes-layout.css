@@ -31,20 +31,24 @@ body {
 	font-family: var(--font-face);
 }
 
-/* Gegen Flackern: sichtbar, sobald der Adapter startet; Rückfall nach 2 s ohne JS */
+/* Gegen Flackern: sichtbar und bedienbar, sobald der Adapter startet; Rückfall nach 2 s ohne JS (inert setzt der Adapter).
+   opacity statt visibility: ui-customization.js prüft visibility und blendete sonst Abschnitte vor dem Start aus */
 #app-content {
-	visibility: hidden;
+	opacity: 0;
+	pointer-events: none;
 	animation: nextnotes-reveal 0s linear 2s forwards;
 }
 
 html.nextnotes-ready #app-content {
-	visibility: visible;
+	opacity: 1;
+	pointer-events: auto;
 	animation: none;
 }
 
 @keyframes nextnotes-reveal {
 	to {
-		visibility: visible;
+		opacity: 1;
+		pointer-events: auto;
 	}
 }
 

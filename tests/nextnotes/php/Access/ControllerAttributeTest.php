@@ -104,6 +104,8 @@ final class ControllerAttributeTest extends TestCase {
 		'PageController::diary', 'PageController::tasks',
 		// M4g: Graph, Speed Dial, Erwähnungen (GET schreibt keinen Erledigt-Zähler), Hintergrundbild-Status/-Bild (B43)
 		'PageController::graph', 'PageController::speedDial', 'PageController::mentions', 'CompatController::background',
+		// M4h: Einstellungen, workspaces.php GET (Weiterleitung), Speicher-Fragment; GET ohne Seiteneffekt
+		'PageController::settings', 'CompatController::workspacesPage', 'CompatController::storageStatsUser',
 	];
 	// M3c2: schreibende Kompatibilitätsrouten (POST) prüfen CSRF
 	private const PAGE_COMPAT_CSRF = ['PageController::search', 'PageController::trashSearch', 'CompatController::noteInfo', 'CompatController::saveExcalidraw', 'CompatController::workspaces', 'CompatController::importDroppedNotes',
