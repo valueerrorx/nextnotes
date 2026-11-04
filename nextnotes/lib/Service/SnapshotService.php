@@ -186,6 +186,15 @@ class SnapshotService {
 		$this->thin((int)$note->getId(), $this->keepDaysFor($note));
 	}
 
+	// Vor einer Typ-Umwandlung immer (ohne 10-Minuten-Regel), damit der alte Typ wiederherstellbar bleibt (M4b)
+	public function beforeConversion(Note $note, string $uid): void {
+		if (self::isEmptyContent((string)$note->getContent(), (string)$note->getType())) {
+			return;
+		}
+		$this->insert($note, 'auto', $uid);
+		$this->thin((int)$note->getId(), $this->keepDaysFor($note));
+	}
+
 	/** @return array<string, mixed> GET /notes/{id}/snapshots */
 	public function list(string $uid, int $noteId): array {
 		$note = $this->access->requireNote($uid, $noteId, 'read');

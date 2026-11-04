@@ -97,7 +97,7 @@ final class ControllerAttributeTest extends TestCase {
 		'PageController::excalidrawEditor',
 	];
 	// M3c2: schreibende Kompatibilitätsrouten (POST) prüfen CSRF
-	private const PAGE_COMPAT_CSRF = ['PageController::search', 'CompatController::noteInfo', 'CompatController::saveExcalidraw', 'CompatController::workspaces'];
+	private const PAGE_COMPAT_CSRF = ['PageController::search', 'CompatController::noteInfo', 'CompatController::saveExcalidraw', 'CompatController::workspaces', 'CompatController::importDroppedNotes'];
 
 	public function testPageAndCompatControllerAttributes(): void {
 		$errors = [];

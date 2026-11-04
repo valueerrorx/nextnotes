@@ -283,3 +283,8 @@ Weitere Funde im Slice ergänzen.
 - M4c: die 1-MiB-Render-Grenze (413) gilt nur für Formate mit Umwandlung; Markdown-Export einer Markdown-Notiz ist nicht begrenzt (Fall in M4c.1).
 - M4a: Admin-Hinweis nennt, dass der Sanitizer iframes nicht gelisteter Hosts beim Speichern dauerhaft entfernt.
 - M4d: Schwelle `ExportTempCleanupJob` = max(1 h, `max_execution_time` + Reserve); im Slice festhalten und testen.
+
+## Lead-Nachtrag nach M4b (2026-11-04)
+- Render-/Umwandlungsgrenze ist **384 KiB** (`ConversionService::MAX_RENDER_INPUT`, SPEC §4.5), nicht 1 MiB; es gibt keine eigene Klasse `ConversionLimits`. M4c/M4f verwenden diese Konstante.
+- Done 2 (Laufzeit): Zielmarke ≤ 1 s auf Produktionshardware; im Testcontainer gilt < 1,5 s als bestanden (`ConversionTest`).
+- Kanban-Vorschau wie Upstream (Text + Links aus den ersten 4 KiB, ohne Render-Pipeline); B46 ohne 4096-Grenze bei voller Parität.

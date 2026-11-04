@@ -260,6 +260,8 @@
 
         var formData = new FormData();
         files.forEach(function (file) { formData.append('files[]', file); });
+        // Next Notes P20: PHP drops files beyond max_file_uploads silently; the count lets the server refuse instead
+        formData.append('file_count', String(files.length));
 
         var workspace = (typeof selectedWorkspace !== 'undefined' && selectedWorkspace)
             ? selectedWorkspace

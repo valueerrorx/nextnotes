@@ -80,6 +80,28 @@ final class ApiClient {
 	}
 
 	/**
+	 * Mehrere Dateien als files[] (wie FormData im Browser) an eine Kompatibilitätsroute (ohne API-Präfix)
+	 * @param list<array{0: string, 1: string}> $files [Dateiname, Bytes]
+	 */
+	public function uploadFiles(string $path, array $files, array $fields = []): Response {
+		$post = [];
+		foreach ($files as $i => [$name, $bytes]) {
+			$post['files[' . $i . ']'] = new \CURLStringFile($bytes, $name, 'application/octet-stream');
+		}
+		$ch = curl_init(self::baseUrl() . $path);
+		curl_setopt_array($ch, [
+			CURLOPT_CUSTOMREQUEST => 'POST',
+			CURLOPT_RETURNTRANSFER => true,
+			CURLOPT_HEADER => true,
+			CURLOPT_TIMEOUT => 120,
+			CURLOPT_USERPWD => $this->uid . ':' . $this->secret,
+			CURLOPT_HTTPHEADER => array_merge($this->extraHeaders, ['Accept: application/json']),
+			CURLOPT_POSTFIELDS => $post + array_map('strval', $fields),
+		]);
+		return self::toResponse($ch, (string)curl_exec($ch));
+	}
+
+	/**
 	 * Mehrere Uploads gleichzeitig (curl_multi); $uploads = [[Pfad, Dateiname, Bytes], …]
 	 * @return Response[]
 	 */

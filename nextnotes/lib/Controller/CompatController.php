@@ -21,11 +21,13 @@ use OCA\NextNotes\Service\Exception\NotFoundException;
 use OCA\NextNotes\Service\Exception\TooLargeException;
 use OCA\NextNotes\Service\ExcalidrawService;
 use OCA\NextNotes\Service\FolderService;
+use OCA\NextNotes\Service\ImportService;
 use OCA\NextNotes\Service\SettingsService;
 use OCA\NextNotes\Service\View\PageTranslator;
 use OCA\NextNotes\Service\WorkspaceService;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
+use OCP\AppFramework\Http\Attribute\UserRateLimit;
 use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\FileDisplayResponse;
 use OCP\AppFramework\Http\JSONResponse;
@@ -49,6 +51,7 @@ class CompatController extends ApiController {
 		private IDateTimeFormatter $dates,
 		private IUserManager $users,
 		private ExcalidrawService $excalidraw,
+		private ImportService $import,
 	) {
 		parent::__construct($request, $userSession, $workspaces);
 	}
@@ -247,5 +250,13 @@ class CompatController extends ApiController {
 				$this->workspaces->requireByKey($uid, $name, 'manage');
 				throw new NotImplementedException('not_implemented');
 		}
+	}
+
+	// Upstream api_import_dropped_notes.php (Dateien auf die Seitenleiste ziehen, M4b); workspace Pflicht (B44), kein ZIP (ADR 0009)
+	#[NoAdminRequired]
+	#[UserRateLimit(limit: 20, period: 60)]
+	public function importDroppedNotes(): JSONResponse {
+		$r = $this->import->importDropped($this->uid(), $this->request->getUploadedFile('files'), $this->param('workspace'), $this->param('folder_id'), $this->param('file_count'));
+		return $this->ok(['message' => $r['message'], 'error' => $r['error']]);
 	}
 }

@@ -5,7 +5,7 @@
  */
 // abgeleitet von src/note_display.php @ 7e2e0b6aa501ba95ac1e9789fd2bb477c281a001
 // Geöffnete Notiz in #right_col. Daten: $note (IndexViewService::noteView), Inhalt beim Speichern durch HtmlSanitizer geprüft.
-// Weggelassen: Teilen/öffentlicher Link (gestrichen), Download/Drucken (Export M4), Umwandeln (501 bis M4),
+// Weggelassen: Teilen/öffentlicher Link (gestrichen), Download/Drucken (Export M4c),
 // Aufgabenseite (M4), Audio-Aufnahme,
 // Excalidraw-Platzhalter-Bereinigung (kein Altbestand). Anhang-Vorschauen rendert attachments.js beim Laden.
 /** @var \OCA\NextNotes\Service\View\PageTranslator $tr */
@@ -72,6 +72,7 @@ $item = static function (string $action, string $icon, string $label, array $dat
 	<?php $btn('btn-duplicate note-action-btn', 'duplicate-note', 'lucide-copy', $tr->t('common.duplicate', [], 'Duplicate')); ?>
 	<?php $btn('btn-move note-action-btn', 'show-move-folder-dialog', 'lucide-folder-output', $tr->t('common.move', [], 'Move')); ?>
 	<?php if ($type !== 'linked' && !$note['hasLinked']): ?><?php $btn('btn-create-linked-note note-action-btn', 'create-linked-note', 'lucide-link', $tr->t('editor.toolbar.create_linked_note'), false); ?><?php endif; ?>
+	<?php if ($prose && $note['canWrite']): ?><button type="button" class="toolbar-btn btn-convert note-action-btn" data-action="show-convert-modal" data-note-id="<?php p($id); ?>" data-convert-to="<?php p($type === 'markdown' ? 'html' : 'markdown'); ?>" title="<?php p($type === 'markdown' ? $tr->t('index.toolbar.convert_to_html', [], 'Convert to rich text') : $tr->t('index.toolbar.convert_to_markdown', [], 'Convert to Markdown')); ?>"><i class="lucide lucide-refresh-cw-alt"></i></button><?php endif; ?>
 	<?php if ($prose): ?><?php $btn('btn-search-replace note-action-btn', 'open-search-replace-modal', 'lucide-search', $tr->t('editor.toolbar.search_replace', [], 'Search and replace')); ?><?php endif; ?>
 	<?php $btn('btn-snapshot note-action-btn', 'show-snapshot', 'lucide-history', $tr->t('snapshot.menu_item', [], 'Revisions')); ?>
 	<button type="button" id="note-history-forward" class="toolbar-btn btn-history-nav btn-history-forward history-disabled" title="<?php p($tr->t('editor.toolbar.go_forward', [], 'Go forward')); ?>" disabled><i class="lucide lucide-circle-chevron-right"></i></button>
@@ -94,6 +95,7 @@ $item = static function (string $action, string $icon, string $label, array $dat
 			<button type="button" class="dropdown-item mobile-toolbar-item speed-dial-state-off" role="menuitem" data-action="toggle-speed-dial" data-note-id="<?php p($id); ?>"><i class="lucide lucide-zap"></i> <?php p($tr->t('speed_dial.add', [], 'Add to speed dial')); ?></button>
 			<?php endif; ?>
 			<?php if (!$note['archive']): ?><?php $item('archive-note', 'lucide-archive', $tr->t('archive.menu_item', [], 'Archive note'), ['note-id' => $id, 'note-title' => $note['heading']]); ?><?php endif; ?>
+			<?php if ($prose && $note['canWrite']): ?><?php $item('trigger-mobile-action', 'lucide-refresh-cw-alt', $type === 'markdown' ? $tr->t('index.toolbar.convert_to_html', [], 'Convert to rich text') : $tr->t('index.toolbar.convert_to_markdown', [], 'Convert to Markdown'), ['selector' => '.btn-convert']); ?><?php endif; ?>
 		</div>
 	</div>
 </div>

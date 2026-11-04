@@ -205,9 +205,9 @@ final class IsolationTest extends ApiTestCase {
 			'PATCH /notes/{}/tasks/{}/subtasks/{}' => ['owned', 'cases' => [['path' => '/notes/{tl}/tasks/{task}/subtasks/{sub}', 'body' => ['completed' => true]]]],
 			'DELETE /notes/{}/tasks/{}/subtasks/{}' => ['owned', 'cases' => [['path' => '/notes/{tl}/tasks/{task}/subtasks/{sub}', 'body' => []]]],
 			// Konvertierung: Rechteprüfung, dann 501 (SPEC §1.2.5)
-			'POST /notes/{}/convert' => ['owned', 'cases' => [['path' => '/notes/{n1}/convert', 'body' => ['target' => 'markdown'], 'control' => 501]]],
-			'POST /convert-html' => ['excluded', 'path' => '/convert-html', 'body' => ['html' => '<p>x</p>'], 'status' => 501, 'reason' => 'zustandslos, keine Objekt-ID; 501 bis M4'],
-			'POST /convert-markdown' => ['excluded', 'path' => '/convert-markdown', 'body' => ['markdown' => 'x'], 'status' => 501, 'reason' => 'zustandslos, keine Objekt-ID; 501 bis M4'],
+			'POST /notes/{}/convert' => ['owned', 'cases' => [['path' => '/notes/{n1}/convert', 'body' => ['target' => 'markdown']]]],
+			'POST /convert-html' => ['excluded', 'path' => '/convert-html', 'body' => ['html' => '<p>x</p>'], 'status' => 200, 'reason' => 'zustandslos, keine Objekt-ID (M4b)'],
+			'POST /convert-markdown' => ['excluded', 'path' => '/convert-markdown', 'body' => ['markdown' => 'x'], 'status' => 200, 'reason' => 'zustandslos, keine Objekt-ID (M4b)'],
 			// Erinnerungen
 			'GET /notes/{}/reminder' => ['owned', 'cases' => [['path' => '/notes/{n1}/reminder']]],
 			'POST /notes/{}/reminder' => ['owned', 'cases' => [['path' => '/notes/{n1}/reminder', 'body' => ['reminder_at' => '2030-01-01T10:00:00Z']]]],

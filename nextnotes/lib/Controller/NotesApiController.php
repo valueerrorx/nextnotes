@@ -9,12 +9,11 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Controller;
 
-use OCA\NextNotes\Service\AccessService;
 use OCA\NextNotes\Service\AttachmentService;
 use OCA\NextNotes\Service\ChangesService;
+use OCA\NextNotes\Service\ConversionService;
 use OCA\NextNotes\Service\DuplicateService;
 use OCA\NextNotes\Service\Exception\BadRequestException;
-use OCA\NextNotes\Service\Exception\NotImplementedException;
 use OCA\NextNotes\Service\InputValidator;
 use OCA\NextNotes\Service\LockService;
 use OCA\NextNotes\Service\NoteSerializer;
@@ -22,6 +21,7 @@ use OCA\NextNotes\Service\NoteService;
 use OCA\NextNotes\Service\SearchService;
 use OCA\NextNotes\Service\WorkspaceService;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\UserRateLimit;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
 use OCP\IUserSession;
@@ -39,7 +39,7 @@ class NotesApiController extends ApiController {
 		private LockService $locks,
 		private DuplicateService $duplicates,
 		private AttachmentService $attachments,
-		private AccessService $access,
+		private ConversionService $conversion,
 	) {
 		parent::__construct($request, $userSession, $workspaces);
 	}
@@ -262,22 +262,21 @@ class NotesApiController extends ApiController {
 		return $this->ok(['note_id' => $id, 'completed' => $completed]);
 	}
 
-	// Konvertierung folgt mit dem Export in M4 (SPEC §1.2.5); Rechte wie Upstream vorher geprüft
+	// Umwandlung HTML ↔ Markdown (SPEC §1.2.5, M4b)
 	#[NoAdminRequired]
 	public function convert(int $id): JSONResponse {
-		$this->access->requireNote($this->uid(), $id, 'write');
-		throw new NotImplementedException('not_implemented');
+		return $this->ok($this->conversion->convertNote($this->uid(), $id, $this->param('target'), $this->editorSession()));
 	}
 
 	#[NoAdminRequired]
+	#[UserRateLimit(limit: 60, period: 60)]
 	public function convertHtml(): JSONResponse {
-		$this->uid();
-		throw new NotImplementedException('not_implemented');
+		return $this->ok($this->conversion->convertHtml($this->uid(), $this->param('html')));
 	}
 
 	#[NoAdminRequired]
+	#[UserRateLimit(limit: 60, period: 60)]
 	public function convertMarkdown(): JSONResponse {
-		$this->uid();
-		throw new NotImplementedException('not_implemented');
+		return $this->ok($this->conversion->convertMarkdown($this->uid(), $this->param('markdown')));
 	}
 }

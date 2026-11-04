@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Controller;
 
+use OCA\NextNotes\Service\ConversionService;
 use OCA\NextNotes\Service\NoteService;
 use OCA\NextNotes\Service\SnapshotService;
 use OCA\NextNotes\Service\WorkspaceService;
@@ -25,6 +26,7 @@ class SnapshotsApiController extends ApiController {
 		WorkspaceService $workspaces,
 		private SnapshotService $snapshots,
 		private NoteService $notes,
+		private ConversionService $conversion,
 	) {
 		parent::__construct($request, $userSession, $workspaces);
 	}
@@ -55,7 +57,12 @@ class SnapshotsApiController extends ApiController {
 
 	#[NoAdminRequired]
 	public function show(int $id): JSONResponse {
-		return $this->ok($this->snapshots->show($this->uid(), $id, $this->str('snapshot_key'), $this->date()));
+		$data = $this->snapshots->show($this->uid(), $id, $this->str('snapshot_key'), $this->date());
+		// ?render=1: Markdown-Snapshot zusätzlich als HTML (Revisionen-Vorschau, SPEC §2.2); > MAX_RENDER_INPUT → 413
+		if ($this->flag('render') && ($data['snapshot']['type'] ?? '') === 'markdown') {
+			$data['snapshot']['html'] = $this->conversion->renderSnapshot($this->uid(), (string)$data['snapshot']['content']);
+		}
+		return $this->ok($data);
 	}
 
 	#[NoAdminRequired]

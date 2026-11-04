@@ -230,6 +230,19 @@ class AttachmentService {
 		return $this->attachments->insert($a);
 	}
 
+	public function maxFileBytes(): int {
+		return $this->appConfig->getValueInt(Application::APP_ID, 'attachment_max_file_mb', self::DEFAULT_MAX_FILE_MB) * self::MB;
+	}
+
+	// Anzeigename für erzeugte Anhänge (Base64-Bild, M4b); ungültig → $fallback
+	public static function generatedName(string $base, string $ext, string $fallback): string {
+		try {
+			return self::cleanName(trim($base) . '.' . $ext);
+		} catch (BadRequestException) {
+			return $fallback . '.' . $ext;
+		}
+	}
+
 	/** Erzeugte Datei (Excalidraw-Vorschau) als Anhang; Aufrufer hält die Transaktion (enforceQuota zuerst), bei Fehler discardNew */
 	public function createFromString(int $noteId, string $name, string $mime, string $data, string $uid): Attachment {
 		$a = $this->newRow($noteId, $name, $mime, strlen($data), $uid);
@@ -295,7 +308,7 @@ class AttachmentService {
 			throw new BadRequestException('Invalid uploaded file');
 		}
 		$size = (int)filesize($tmp);
-		$maxMb = $this->appConfig->getValueInt(Application::APP_ID, 'attachment_max_file_mb', self::DEFAULT_MAX_FILE_MB);
+		$maxMb = intdiv($this->maxFileBytes(), self::MB);
 		if ($size > $maxMb * self::MB) {
 			throw new TooLargeException('File too large (max ' . $maxMb . 'MB)');
 		}

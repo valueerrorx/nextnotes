@@ -55,6 +55,27 @@ if compgen -G "$css_out/nextnotes-core.css" >/dev/null; then
 	node "$app/build/check-css.mjs" "$src" "$css_out" || fail=1
 fi
 
+# (f) Nachgebaute Upstream-Logik: Basis-Hash je Upstream-Datei unverändert (build/upstream-ported.txt)
+n=0
+while read -r up sum port; do
+	[[ -z "$up" || "$up" == \#* ]] && continue
+	n=$((n + 1))
+	file="$src/${up#src/}"
+	[[ -f "$app/$port" ]] || err "upstream-ported.txt: Port $port fehlt"
+	if [[ ! -f "$file" ]]; then
+		err "upstream-ported.txt: $up fehlt"
+	elif [[ "$(sha256sum "$file" | cut -d' ' -f1)" != "$sum" ]]; then
+		err "$up geändert: Port prüfen ($port), dann Hash in build/upstream-ported.txt aktualisieren"
+	fi
+done < "$app/build/upstream-ported.txt"
+if [[ $fail -eq 0 ]]; then echo "check-upstream (f): $n nachgebaute Upstream-Dateien unverändert"; fi
+# (g) Regex in Parser-/Import-/Export-Ports nur über Pcre (Plan M4 §1.2, B46)
+if hits="$(grep -rnE '\bpreg_[a-z_]+\(' "$app/lib/Service/Convert" "$app/lib/Service/ImportService.php" $(ls "$app"/lib/Service/ExportFormatter.php 2>/dev/null))"; then
+	err "direktes preg_* statt Pcre: ${hits//$'\n'/ }"
+else
+	echo "check-upstream (g): kein direktes preg_* in Convert/Import/Export"
+fi
+
 if [[ $fail -ne 0 ]]; then
 	echo "check-upstream: ROT" >&2
 	exit 1

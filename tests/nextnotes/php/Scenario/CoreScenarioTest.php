@@ -308,9 +308,9 @@ final class CoreScenarioTest extends ApiTestCase {
 		$this->rec('GET /shared', $a->call('GET', '/shared' . $q));
 		self::assertSame($a->uid, $this->rec('GET /users/me', $a->call('GET', '/users/me'))['username']);
 		self::assertSame($b->uid, $this->rec('GET /users/lookup/{username}', $a->call('GET', '/users/lookup/' . self::enc($b->uid)))['username']);
-		$this->recAny('POST /notes/{id}/convert', $a->call('POST', "/notes/$m1/convert", ['target' => 'markdown']), 501);
-		$this->recAny('POST /convert-html', $a->call('POST', '/convert-html', ['html' => '<p><b>x</b></p>']), 501);
-		$this->recAny('POST /convert-markdown', $a->call('POST', '/convert-markdown', ['markdown' => '**x**']), 501);
+		$this->recAny('POST /notes/{id}/convert', $a->call('POST', "/notes/$m1/convert", ['target' => 'markdown']), 200);
+		$this->recAny('POST /convert-html', $a->call('POST', '/convert-html', ['html' => '<p><b>x</b></p>']), 200);
+		$this->recAny('POST /convert-markdown', $a->call('POST', '/convert-markdown', ['markdown' => '**x**']), 200);
 	}
 
 	private function compareFixtures(): void {

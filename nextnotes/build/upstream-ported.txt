@@ -1,0 +1,9 @@
+# Nachgebaute Upstream-Logik (Plan M4 §1.2, ADR 0007): <Upstream-Datei> <sha256 der Basis> <Port>
+# Abweichender Hash → check-upstream rot: Port prüfen (build/port-convert.php für Parser), dann Hash aktualisieren.
+src/markdown_parser.php 0277369d412eede1b9f10a4128504a66bd5ab4c61772209ef9fb7c7e475764f0 lib/Service/Convert/MarkdownRenderer.php
+src/html_to_markdown.php d0da9cdb880352a5a04d0d728422bdf24d56600c04dcc2016f8c5dea07dedf42 lib/Service/Convert/HtmlToMarkdown.php
+src/lib/ai-note-diagrams.php 5c6d9491676778a5cae1eee07ed82eb2f81b3b6796bbd3030ebb00c02e245119 lib/Service/Convert/EmbeddedDiagrams.php
+src/lib/html-sanitize.php 206fc2e2f39f6419d6201d7b819c187885e4db8a05c4125057497f9d0a121334 lib/Service/Convert/MediaTags.php
+src/import_helpers.php 06bf52911a3ddf8e78967cd4c591bd31814fd9e2267119519850602a5b3d26e8 lib/Service/ImportService.php
+src/public/api_import_dropped_notes.php a0526774fac2b07fe47ab971361122d6474f3bf57330e8615c458f11749bfde7 lib/Service/ImportService.php
+src/lib/checklists.php e1c11ac10240fa857f93e1517b0b3160cb40ed80acb2df38e4e37f8d7afde82e lib/Service/View/KanbanViewService.php

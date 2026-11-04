@@ -25,3 +25,4 @@ src/public/js/inline-tree-edit.js
 src/public/js/utils-folders.js
 src/public/js/utils-move-folder.js
 src/public/js/clickable-tags.js
+src/public/js/sidebar-file-import.js

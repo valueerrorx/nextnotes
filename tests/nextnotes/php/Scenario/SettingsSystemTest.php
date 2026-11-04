@@ -147,23 +147,20 @@ final class SettingsSystemTest extends ApiTestCase {
 	}
 
 	// Konvertierung: Rechteprüfung, dann 501 ohne Inhalt (SPEC §1.2.5, Plan O2)
-	public function testConversionNotImplemented(): void {
+	// M4b: Umwandlung umgesetzt; fremde Notiz 404 ohne Inhalt, zustandslose Umwandlung ohne Datenänderung
+	public function testConversionRights(): void {
 		$a = $this->createUser('ca');
 		$b = $this->createUser('cb');
 		$mark = 'cmk' . bin2hex(random_bytes(4));
 		[$ws] = self::newWorkspace($a, 'Conv');
 		$n = self::newNote($a, $ws, "Konv $mark", "<p>$mark</p>");
 		$before = self::dump($a->uid);
-		$r = $a->call('POST', "/notes/$n/convert", ['target' => 'markdown']);
-		self::assertSame(501, $r->status, $r->describe());
-		self::assertSame(['success' => false, 'error' => 'not_implemented'], $r->json());
 		$r = $b->call('POST', "/notes/$n/convert", ['target' => 'markdown']);
 		self::assertSame(404, $r->status, $r->describe());
 		self::assertStringNotContainsString($mark, $r->body);
 		foreach (['/convert-html' => ['html' => "<p>$mark</p>"], '/convert-markdown' => ['markdown' => "**$mark**"]] as $p => $body) {
 			$r = $b->call('POST', $p, $body);
-			self::assertSame(501, $r->status, "$p: " . $r->describe());
-			self::assertStringNotContainsString($mark, $r->body);
+			self::assertSame(200, $r->status, "$p: " . $r->describe());
 		}
 		self::assertSame($before, self::dump($a->uid), 'Konvertierung ändert Daten');
 	}

@@ -41,7 +41,7 @@ final class Pcre {
 		return $result === false ? self::fail() : $result;
 	}
 
-	private static function fail(): never {
+	public static function fail(): never {
 		$code = preg_last_error();
 		if ($code === PREG_BAD_UTF8_ERROR || $code === PREG_BAD_UTF8_OFFSET_ERROR) {
 			throw new BadRequestException('Invalid UTF-8 in content');

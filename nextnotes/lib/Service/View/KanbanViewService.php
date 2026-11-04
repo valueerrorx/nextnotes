@@ -18,6 +18,7 @@ use OCA\NextNotes\Service\AccessService;
 use OCA\NextNotes\Service\Exception\NotFoundException;
 use OCA\NextNotes\Service\FolderService;
 use OCA\NextNotes\Service\NoteService;
+use OCA\NextNotes\Service\Pcre;
 use OCA\NextNotes\Service\SearchTextNormalizer;
 use OCA\NextNotes\Service\SettingsService;
 use OCA\NextNotes\Service\TagService;
@@ -29,6 +30,8 @@ use OCP\IDateTimeZone;
 class KanbanViewService {
 	private const MAX_DEPTH = 10;
 	private const EXCERPT = 220;
+	// Vorschau nur aus dem Anfang der Notiz (Plan M4b): Aufwand je Karte begrenzt
+	private const PREVIEW_BYTES = 4096;
 
 	public function __construct(
 		private AccessService $access,
@@ -179,7 +182,7 @@ class KanbanViewService {
 		$content = (string)($source->getContent() ?? '');
 		$tasks = null;
 		$taskDue = '';
-		$excerpt = '';
+		$excerpt = [];
 		if ($type === 'tasklist') {
 			$tasks = [];
 			foreach (TaskService::cleanTasks($content) as $i => $t) {
@@ -191,8 +194,7 @@ class KanbanViewService {
 				}
 			}
 		} else {
-			$plain = $this->text->plainText($content, $type);
-			$excerpt = mb_strlen($plain) > self::EXCERPT ? mb_substr($plain, 0, self::EXCERPT) . '...' : $plain;
+			$excerpt = $this->excerpt($content, $type);
 		}
 		$due = $taskDue !== '' ? $taskDue : $reminderDue;
 		$now = $this->local(time(), 'Y-m-d\TH:i');
@@ -221,6 +223,70 @@ class KanbanViewService {
 			'taskNoteId' => (int)$source->getId(),
 			'excerpt' => $excerpt,
 		];
+	}
+
+	/**
+	 * Vorschau mit klickbaren Links (Upstream buildNoteCardPreview + renderKanbanSnippet, #1672): Linktext zwischen \x02/\x03
+	 * @return list<array{text: string, href: ?string, noteId: ?int}>
+	 */
+	private function excerpt(string $content, string $type): array {
+		$head = str_replace(["\x02", "\x03"], '', mb_strcut($content, 0, self::PREVIEW_BYTES, 'UTF-8'));
+		$links = [];
+		if ($type === 'markdown') {
+			$destination = '\((?:[^()]++|\([^()]*+\))*+\)';
+			$head = Pcre::replace('/!\[[^\]]*+\]' . $destination . '/', ' ', $head);
+			$head = Pcre::replaceCallback('/\[([^\]]*+)\](' . $destination . ')/', static function (array $m) use (&$links): string {
+				$links[] = trim((string)(Pcre::split('/\s+/', trim(substr($m[2], 1, -1)))[0] ?? ''), '<>');
+				return "\x02" . $m[1] . "\x03";
+			}, $head);
+		} else {
+			// nur bis zum letzten </a>: Öffner dahinter finden kein Ende (linear, vgl. B46)
+			$cut = strripos($head, '</a>');
+			if ($cut !== false) {
+				$cut += 4;
+				$head = Pcre::replaceCallback('/<a\b([^>]*+)>((?:[^<]++|<(?!\/a>))*+)<\/a>/i', static function (array $m) use (&$links): string {
+					$href = '';
+					if (Pcre::match('/\bdata-note-id\s*=\s*["\']?(\d+)/i', $m[1], $h)) {
+						$href = 'index.php?note=' . $h[1];
+					} elseif (Pcre::match('/\bhref\s*=\s*(?:"([^"]*)"|\'([^\']*)\')/i', $m[1], $h)) {
+						$href = html_entity_decode($h[1] !== '' ? $h[1] : ($h[2] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+					}
+					$links[] = $href;
+					return "\x02" . $m[2] . "\x03";
+				}, substr($head, 0, $cut)) . substr($head, $cut);
+			}
+		}
+		$plain = $this->text->plainText($head, $type);
+		$out = [];
+		$visible = 0;
+		$href = null;
+		$noteId = null;
+		$i = 0;
+		foreach (Pcre::split('/([\x02\x03])/', $plain, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY) as $part) {
+			if ($part === "\x02" || $part === "\x03") {
+				[$href, $noteId] = $part === "\x02" ? self::linkTarget((string)($links[$i++] ?? '')) : [null, null];
+				continue;
+			}
+			$room = self::EXCERPT - $visible;
+			$cutText = mb_strlen($part) > $room;
+			$part = $cutText ? mb_substr($part, 0, $room) : $part;
+			$out[] = ['text' => $part, 'href' => $href, 'noteId' => $noteId];
+			$visible += mb_strlen($part);
+			if ($cutText) {
+				$out[] = ['text' => '...', 'href' => null, 'noteId' => null];
+				break;
+			}
+		}
+		return $out;
+	}
+
+	/** @return array{0: ?string, 1: ?int} interne Notiz (index.php?note=ID) oder http(s)/mailto; sonst kein Link */
+	private static function linkTarget(string $href): array {
+		if (Pcre::match('/(?:^|\/)index\.php\?[^#\s]*\bnote=(\d+)\b|^\?[^#\s]*\bnote=(\d+)\b/', $href, $m)) {
+			$id = (int)(($m[1] ?? '') !== '' ? $m[1] : $m[2]);
+			return ['index.php?note=' . $id, $id];
+		}
+		return Pcre::match('/^(https?:\/\/|mailto:)/i', $href) ? [$href, null] : [null, null];
 	}
 
 	private function local(int $ts, string $format): string {

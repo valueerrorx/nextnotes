@@ -63,6 +63,7 @@ class NoteService {
 		private ReminderMapper $reminders,
 		private MentionHandledMapper $mentions,
 		private INotificationManager $notifications,
+		private EmbeddedImageService $images,
 	) {
 	}
 
@@ -403,7 +404,7 @@ class NoteService {
 
 	/** @return array<string, mixed> PATCH /notes/{id} */
 	public function update(string $uid, int $id, array $in, string $ifMatch, string $session): array {
-		$this->access->requireNote($uid, $id, 'write');
+		$writable = $this->access->requireNote($uid, $id, 'write');
 		// ADR 0005: gültige Sperre einer anderen Sitzung → 423, danach Versionsprüfung → 409
 		$this->locks->assertCanSave($uid, $id, $session);
 		$expected = trim((string)($in['if_version'] ?? ''));
@@ -415,114 +416,136 @@ class NoteService {
 		$content = $in['content'] ?? $in['entry'] ?? null;
 		$tagList = array_key_exists('tags', $in) ? $this->validator->noteTags($in['tags']) : null;
 		$stateHash = (isset($in['state_hash']) && is_string($in['state_hash']) && preg_match('/^[0-9a-f-]{1,80}$/', $in['state_hash'])) ? $in['state_hash'] : null;
+		// Base64-Bilder einer HTML-Notiz → Anhänge (Upstream #1471, M4b); Grenzen vor der Transaktion, nichts geändert bei 413
+		$images = is_scalar($content) && $writable->getType() === 'note' ? $this->images->prepare((string)$content, (int)$writable->getWorkspaceId()) : null;
+		$created = [];
+		try {
+			return $this->tx->run(function () use ($uid, $id, $in, $expected, $newHeading, $content, $tagList, $stateHash, $images, &$created) {
+				$this->attachments->enforceQuota($images['quota'] ?? null);
+				return $this->updateLocked($uid, $id, $in, $expected, $newHeading, $content, $tagList, $stateHash, $images, $created);
+			});
+		} catch (\Throwable $e) {
+			$this->images->discard($created);
+			throw $e;
+		}
+	}
 
-		return $this->tx->run(function () use ($uid, $id, $in, $expected, $newHeading, $content, $tagList, $stateHash) {
-			// Versionsprüfung und Schreiben unter Zeilensperre (wie Aufgaben): keine verlorene Änderung
-			$this->notes->lockRow($id);
-			$note = $this->notes->find($id);
-			$current = NoteSerializer::version($note);
-			if ($expected !== '' && $expected !== '*' && !hash_equals($current, $expected)) {
-				throw new ConflictException('Version conflict: the note was modified since the version you provided', [
-					'code' => 'version_conflict',
-					'current' => [
-						'version' => $current,
-						'updated' => NoteSerializer::date($note->getUpdatedAt()),
-						'heading' => $note->getHeading(),
-						'content' => $this->urls->toClient((string)$note->getContent()),
-					],
-				]);
+	/** @return array<string, mixed> */
+	private function updateLocked(string $uid, int $id, array $in, string $expected, ?string $newHeading, mixed $content, ?array $tagList, ?string $stateHash, ?array $images, array &$created): array {
+		// Versionsprüfung und Schreiben unter Zeilensperre (wie Aufgaben): keine verlorene Änderung
+		$this->notes->lockRow($id);
+		$note = $this->notes->find($id);
+		$current = NoteSerializer::version($note);
+		if ($expected !== '' && $expected !== '*' && !hash_equals($current, $expected)) {
+			throw new ConflictException('Version conflict: the note was modified since the version you provided', [
+				'code' => 'version_conflict',
+				'current' => [
+					'version' => $current,
+					'updated' => NoteSerializer::date($note->getUpdatedAt()),
+					'heading' => $note->getHeading(),
+					'content' => $this->urls->toClient((string)$note->getContent()),
+				],
+			]);
+		}
+		$oldHeading = (string)$note->getHeading();
+		$heading = $newHeading ?? $oldHeading;
+		if ($content !== null || $heading !== $oldHeading || $tagList !== null) {
+			$this->snapshots->autoBefore($note, $uid);
+		}
+		$sourceWs = (int)$note->getWorkspaceId();
+		$wsId = $sourceWs;
+		$ws = null;
+		if (is_string($in['workspace'] ?? null) && trim($in['workspace']) !== '') {
+			$ws = $this->workspaces->requireByKey($uid, trim($in['workspace']), 'write');
+			$wsId = (int)$ws->getId();
+			if ($wsId !== $sourceWs) {
+				$this->access->requireWorkspace($uid, $sourceWs, 'manage');
 			}
-			$oldHeading = (string)$note->getHeading();
-			$heading = $newHeading ?? $oldHeading;
-			if ($content !== null || $heading !== $oldHeading || $tagList !== null) {
-				$this->snapshots->autoBefore($note, $uid);
-			}
-			$sourceWs = (int)$note->getWorkspaceId();
-			$wsId = $sourceWs;
-			$ws = null;
-			if (is_string($in['workspace'] ?? null) && trim($in['workspace']) !== '') {
-				$ws = $this->workspaces->requireByKey($uid, trim($in['workspace']), 'write');
-				$wsId = (int)$ws->getId();
-				if ($wsId !== $sourceWs) {
-					$this->access->requireWorkspace($uid, $sourceWs, 'manage');
+		}
+		$folderId = $note->getFolderId();
+		$folderGiven = array_key_exists('folder_id', $in) && $in['folder_id'] !== null;
+		if ($folderGiven) {
+			$folderId = (int)$in['folder_id'] ?: null;
+			if ($folderId !== null) {
+				$f = $this->access->requireFolder($uid, $folderId, 'write');
+				if ($f->getWorkspaceId() !== $wsId) {
+					throw new BadRequestException('folder_id must be a folder of the target workspace');
 				}
 			}
-			$folderId = $note->getFolderId();
-			$folderGiven = array_key_exists('folder_id', $in) && $in['folder_id'] !== null;
-			if ($folderGiven) {
-				$folderId = (int)$in['folder_id'] ?: null;
-				if ($folderId !== null) {
-					$f = $this->access->requireFolder($uid, $folderId, 'write');
-					if ($f->getWorkspaceId() !== $wsId) {
-						throw new BadRequestException('folder_id must be a folder of the target workspace');
-					}
-				}
-			}
-			$path = $in['folder'] ?? $in['folder_name'] ?? null;
-			$pathApplied = false;
-			if (!$folderGiven && is_string($path)) {
-				$pathApplied = true;
-				$path = trim($path);
-				if ($path === '') {
-					$folderId = null;
-				} else {
-					$folderId = $this->folderService->resolvePath($ws ?? $this->access->requireWorkspace($uid, $wsId, 'write'), $path, true);
-					if ($folderId === null) {
-						throw new NotFoundException('Folder not found');
-					}
-				}
-			}
-			if ($wsId !== $sourceWs && !$folderGiven && !$pathApplied) {
+		}
+		$path = $in['folder'] ?? $in['folder_name'] ?? null;
+		$pathApplied = false;
+		if (!$folderGiven && is_string($path)) {
+			$pathApplied = true;
+			$path = trim($path);
+			if ($path === '') {
 				$folderId = null;
-			}
-			if ($heading !== $oldHeading || $folderId !== $note->getFolderId() || $wsId !== $sourceWs) {
-				$heading = $this->notes->headingExists($wsId, $folderId, $heading, (int)$note->getId())
-					? $this->uniqueHeading($wsId, $folderId, $heading, (int)$note->getId())
-					: $heading;
-			}
-			$now = $this->now();
-			$note->setHeading($heading);
-			$note->setWorkspaceId($wsId);
-			$note->setFolderId($folderId);
-			$note->setUpdatedAt($now);
-			$note->setUpdatedBy($uid);
-			if ($content !== null) {
-				$this->applyContent($note, is_scalar($content) ? (string)$content : '');
 			} else {
-				$this->refreshSearch($note);
-			}
-			$version = NoteSerializer::version($note);
-			$note->setClientStateHash($stateHash);
-			$note->setClientStateVersion($stateHash !== null ? $version : null);
-			$this->notes->update($note);
-			if ($tagList !== null) {
-				$this->tags->replace((int)$note->getId(), $tagList);
-			}
-			$linked = [];
-			if ($heading !== $oldHeading) {
-				$writable = $this->access->writableWorkspaceIds($uid);
-				foreach ($this->notes->findList($writable, ['linked_note_id' => (int)$note->getId()], true) as $link) {
-					$link->setHeading($heading);
-					$link->setUpdatedAt($now);
-					$link->setUpdatedBy($uid);
-					$this->refreshSearch($link);
-					$this->notes->update($link);
-					$linked[] = (int)$link->getId();
+				$folderId = $this->folderService->resolvePath($ws ?? $this->access->requireWorkspace($uid, $wsId, 'write'), $path, true);
+				if ($folderId === null) {
+					throw new NotFoundException('Folder not found');
 				}
 			}
-			$display = (new \DateTime('@' . $now))->setTimezone($this->timeZone->getTimeZone())->format('d/m/Y H:i');
-			$out = ['note' => [
-				'id' => (int)$note->getId(),
-				'heading' => $heading,
-				'updated' => NoteSerializer::date($now),
-				'updated_display' => $display,
-				'version' => $version,
-			]];
-			if ($linked !== []) {
-				$out['updated_linked_notes'] = $linked;
+		}
+		if ($wsId !== $sourceWs && !$folderGiven && !$pathApplied) {
+			$folderId = null;
+		}
+		if ($heading !== $oldHeading || $folderId !== $note->getFolderId() || $wsId !== $sourceWs) {
+			$heading = $this->notes->headingExists($wsId, $folderId, $heading, (int)$note->getId())
+				? $this->uniqueHeading($wsId, $folderId, $heading, (int)$note->getId())
+				: $heading;
+		}
+		$now = $this->now();
+		$note->setHeading($heading);
+		$note->setWorkspaceId($wsId);
+		$note->setFolderId($folderId);
+		$note->setUpdatedAt($now);
+		$note->setUpdatedBy($uid);
+		$adopted = [];
+		if ($content !== null) {
+			$content = is_scalar($content) ? (string)$content : '';
+			if ($images !== null && $note->getType() === 'note') {
+				['content' => $content, 'adopted' => $adopted] = $this->images->store($images, $id, $content, $uid, $created);
 			}
-			return $out;
-		});
+			$this->applyContent($note, $content);
+		} else {
+			$this->refreshSearch($note);
+		}
+		$version = NoteSerializer::version($note);
+		$note->setClientStateHash($stateHash);
+		$note->setClientStateVersion($stateHash !== null ? $version : null);
+		$this->notes->update($note);
+		if ($tagList !== null) {
+			$this->tags->replace((int)$note->getId(), $tagList);
+		}
+		$linked = [];
+		if ($heading !== $oldHeading) {
+			$writable = $this->access->writableWorkspaceIds($uid);
+			foreach ($this->notes->findList($writable, ['linked_note_id' => (int)$note->getId()], true) as $link) {
+				$link->setHeading($heading);
+				$link->setUpdatedAt($now);
+				$link->setUpdatedBy($uid);
+				$this->refreshSearch($link);
+				$this->notes->update($link);
+				$linked[] = (int)$link->getId();
+			}
+		}
+		$display = (new \DateTime('@' . $now))->setTimezone($this->timeZone->getTimeZone())->format('d/m/Y H:i');
+		$out = ['note' => [
+			'id' => (int)$note->getId(),
+			'heading' => $heading,
+			'updated' => NoteSerializer::date($now),
+			'updated_display' => $display,
+			'version' => $version,
+		]];
+		if ($linked !== []) {
+			$out['updated_linked_notes'] = $linked;
+		}
+		// Editor tauscht data:-Adressen gegen die Anhänge (Upstream adopted_attachments)
+		if ($adopted !== []) {
+			$out['adopted_attachments'] = array_map(fn (array $a) => $a + ['new_url' => $this->urls->toClient('/api/v1/notes/' . $id . '/attachments/' . $a['id'])], $adopted);
+		}
+		return $out;
 	}
 
 	// sendBeacon beim Verlassen der Seite (FormData)
@@ -650,6 +673,16 @@ class NoteService {
 			$n->setApp(Application::APP_ID)->setObject('note', (string)$id);
 			$this->notifications->markProcessed($n);
 		}
+	}
+
+	// Umwandlung HTML ↔ Markdown (ConversionService): in dessen Transaktion unter Zeilensperre; Rechte/Sperre prüft der Aufrufer
+	public function storeConverted(Note $note, string $type, string $content, string $uid): void {
+		$this->snapshots->beforeConversion($note, $uid);
+		$note->setType($type);
+		$this->applyContent($note, $content);
+		$note->setUpdatedAt($this->now());
+		$note->setUpdatedBy($uid);
+		$this->notes->update($note);
 	}
 
 	// Inhalt aus der Aufgaben-API bzw. dem Erinnerungsjob speichern; Rechte prüft der Aufrufer

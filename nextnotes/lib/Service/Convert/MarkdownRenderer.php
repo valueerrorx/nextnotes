@@ -1,0 +1,1920 @@
+<?php
+
+/**
+ * SPDX-FileCopyrightText: 2026 Thomas Weissel, Timothé Poznanski (Upstream, MIT)
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+namespace OCA\NextNotes\Service\Convert;
+
+use DOMDocument;
+use DOMElement;
+use DOMXPath;
+
+// Port von src/markdown_parser.php (M4b, SPEC §1.2.5; Basis-Hash in build/upstream-ported.txt): Markdown → HTML
+// Rohfassung per build/port-convert.php, Änderungen von Hand nur mit Kommentar „B46“. Ohne strict_types wie Upstream.
+final class MarkdownRenderer {
+	use \OCA\NextNotes\Service\PcreCalls;
+
+	/**
+	 * Simple markdown to HTML parser for Poznote
+	 * Extracted from public_note.php for reusability
+	 */
+
+	/**
+	 * Helper function: Sanitize HTML tag attributes
+	 * Only keeps safe attributes and escapes their values
+	 * 
+	 * @param string $attrs Raw attributes string
+	 * @param array $allowedAttrs List of allowed attribute names
+	 * @param array $booleanAttrs List of boolean attribute names (e.g., 'controls', 'muted')
+	 * @return string Safe attributes string ready for HTML
+	 */
+	public static function sanitizeAttributes($attrs, $allowedAttrs, $booleanAttrs = []) {
+	    $safeAttrs = [];
+	    
+	    // Extract and sanitize individual attributes
+	    self::pregMatchAll('/([\w-]+)\s*=\s*["\']([^"\']*)["\']/', $attrs, $attrMatches, PREG_SET_ORDER);
+	    foreach ($attrMatches as $attr) {
+	        $attrName = strtolower($attr[1]);
+	        $attrValue = $attr[2];
+	        
+	        // Only allow safe attributes
+	        if (in_array($attrName, $allowedAttrs)) {
+	            $safeAttrs[] = $attrName . '="' . htmlspecialchars($attrValue, ENT_QUOTES, 'UTF-8') . '"';
+	        }
+	    }
+	    
+	    // Handle boolean attributes (e.g., controls, muted, allowfullscreen)
+	    foreach ($booleanAttrs as $boolAttr) {
+	        if (stripos($attrs, $boolAttr) !== false && !in_array($boolAttr, array_map(function($a) { return explode('=', $a)[0]; }, $safeAttrs))) {
+	            $safeAttrs[] = $boolAttr;
+	        }
+	    }
+	    
+	    return implode(' ', $safeAttrs);
+	}
+
+	/**
+	 * Attributes kept on raw <details>/<summary>/<u> tags written in Markdown.
+	 * Only `class` (safe token characters) and, for <details>, the boolean `open`
+	 * survive: everything else (inline event handlers, style, id, ...) is dropped
+	 * before the tag is re-emitted into the rendered HTML.
+	 */
+	public static function sanitizeMarkdownPassthroughTagAttrs($tag, $attrs) {
+	    $safe = '';
+	    if (self::pregMatch('/(?:^|\s)class\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'=<>`]+))/i', $attrs, $m)) {
+	        $class = trim(self::pregReplace('/[^\w\s-]/', '', ($m[1] ?? '') !== '' ? $m[1] : ((($m[2] ?? '') !== '') ? $m[2] : ($m[3] ?? ''))));
+	        if ($class !== '') {
+	            $safe .= ' class="' . htmlspecialchars($class, ENT_QUOTES, 'UTF-8') . '"';
+	        }
+	    }
+	    if ($tag === 'details' && self::pregMatch('/(?:^|\s)open(?=\s|=|\/|$)/i', $attrs)) {
+	        $safe .= ' open';
+	    }
+	    return $safe;
+	}
+
+	/**
+	 * Parse markdown content and convert it to HTML
+	 * 
+	 * @param string $text Markdown content
+	 * @return string HTML content
+	 */
+	public static function markdownUsesPlainCodeBlockLanguage($language) {
+	    $normalizedLanguage = is_string($language) ? strtolower(trim($language)) : '';
+	    return $normalizedLanguage === 'normal' || $normalizedLanguage === 'code';
+	}
+
+	public static function markdownUsesSyntaxHighlightLanguage($language) {
+	    $normalizedLanguage = is_string($language) ? strtolower(trim($language)) : '';
+	    if ($normalizedLanguage === '') {
+	        return false;
+	    }
+
+	    $highlightLanguages = [
+	        'bash' => true, 'sh' => true, 'c' => true, 'cpp' => true, 'c++' => true, 'csharp' => true, 'cs' => true, 'c#' => true,
+	        'css' => true, 'diff' => true, 'patch' => true, 'go' => true, 'graphql' => true, 'gql' => true, 'ini' => true,
+	        'java' => true, 'javascript' => true, 'js' => true, 'jsx' => true, 'mjs' => true, 'cjs' => true, 'json' => true,
+	        'kotlin' => true, 'less' => true, 'lua' => true, 'makefile' => true, 'markdown' => true, 'md' => true,
+	        'objectivec' => true, 'objc' => true, 'perl' => true, 'php' => true, 'php-template' => true,
+	        'plaintext' => true, 'text' => true, 'txt' => true, 'python' => true, 'py' => true, 'gyp' => true, 'ipython' => true,
+	        'python-repl' => true, 'pycon' => true, 'r' => true, 'ruby' => true, 'rb' => true, 'rust' => true, 'rs' => true,
+	        'scss' => true, 'shell' => true, 'console' => true, 'shellsession' => true, 'sql' => true, 'swift' => true,
+	        'typescript' => true, 'ts' => true, 'tsx' => true, 'mts' => true, 'cts' => true, 'vbnet' => true, 'wasm' => true,
+	        'xml' => true, 'html' => true, 'xhtml' => true, 'svg' => true, 'yaml' => true, 'yml' => true,
+	    ];
+
+	    return isset($highlightLanguages[$normalizedLanguage]);
+	}
+
+	public static function markdownUsesPlainFormattingCodeBlockLanguage($language) {
+	    $normalizedLanguage = is_string($language) ? strtolower(trim($language)) : '';
+	    return self::markdownUsesPlainCodeBlockLanguage($normalizedLanguage) || !self::markdownUsesSyntaxHighlightLanguage($normalizedLanguage);
+	}
+
+	public static function markdownGetPlainCodeBlockDisplayLanguage($language) {
+	    if (self::markdownUsesPlainCodeBlockLanguage($language)) {
+	        return 'CODE';
+	    }
+
+	    return trim((string)$language) ?: 'CODE';
+	}
+
+	public static function applyMarkdownPlainCodeInlineStyles($html) {
+	    $html = self::pregReplace('/\*\*\*(?=\S)(.*?\S)\*\*\*/s', '<strong><em>$1</em></strong>', $html);
+	    $html = self::pregReplace('/\*\*(?=\S)(.*?\S)\*\*/s', '<strong>$1</strong>', $html);
+	    $html = self::pregReplace('/(?<!\*)\*(?!\*)(?=\S)(.*?\S)(?<!\*)\*(?!\*)/s', '<em>$1</em>', $html);
+	    $html = self::pregReplace('/~~(?=\S)(.*?\S)~~/s', '<del>$1</del>', $html);
+	    $html = self::pregReplace('/==(?=\S)(.*?\S)==/s', '<mark>$1</mark>', $html);
+	    $html = self::pregReplace('/&lt;u&gt;(?=\S)(.*?\S)&lt;\/u&gt;/si', '<u>$1</u>', $html);
+
+	    return $html;
+	}
+
+	public static function renderMarkdownPlainCodeBlockContent($code) {
+	    $protectedSpans = [];
+	    $spanIndex = 0;
+
+	    $text = self::pregReplaceCallback('/<span\s+style=(["\'])(.*?)\1>([^<]*)<\/span>/i', function($matches) use (&$protectedSpans, &$spanIndex) {
+	        $placeholder = "\x00MDCODESPAN" . $spanIndex . "\x00";
+	        $styleAttr = htmlspecialchars($matches[2], ENT_QUOTES, 'UTF-8');
+	        $content = self::applyMarkdownPlainCodeInlineStyles(htmlspecialchars($matches[3], ENT_QUOTES, 'UTF-8'));
+	        $protectedSpans[$spanIndex] = '<span style="' . $styleAttr . '">' . $content . '</span>';
+	        $spanIndex++;
+	        return $placeholder;
+	    }, (string)$code);
+
+	    $html = self::applyMarkdownPlainCodeInlineStyles(htmlspecialchars($text, ENT_QUOTES, 'UTF-8'));
+
+	    return self::pregReplaceCallback('/\x00MDCODESPAN(\d+)\x00/', function($matches) use ($protectedSpans) {
+	        $index = (int)$matches[1];
+	        return isset($protectedSpans[$index]) ? $protectedSpans[$index] : $matches[0];
+	    }, $html);
+	}
+
+	public static function protectMarkdownBackslashEscapes($text, &$protectedEscapes, &$escapeIndex) {
+	    $escapableChars = "!\"#\$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
+	    $charClass = '[' . self::pregQuote($escapableChars, '/') . ']';
+
+	    return self::pregReplaceCallback('/\\\\(' . $charClass . ')(\1*)/', function($matches) use (&$protectedEscapes, &$escapeIndex) {
+	        $repeated = isset($matches[2]) ? $matches[2] : '';
+	        // A backslash escapes a whole run of a delimiter ("\**"), but a
+	        // bracket or a parenthesis on its own: in "[x](https://a.b/c\(d\))"
+	        // the last ")" closes the link. Same in js/markdown-parser.js.
+	        $rest = '';
+	        if (strpos('()[]', $matches[1]) !== false) {
+	            $rest = $repeated;
+	            $repeated = '';
+	        }
+	        $literal = $matches[1] . $repeated;
+	        $placeholder = "\x00MDESC" . $escapeIndex . "\x00";
+	        $protectedEscapes[$escapeIndex] = htmlspecialchars($literal, ENT_QUOTES, 'UTF-8');
+	        $escapeIndex++;
+	        return $placeholder . $rest;
+	    }, $text);
+	}
+
+	public static function restoreMarkdownBackslashEscapes($html, $protectedEscapes) {
+	    return self::pregReplaceCallback('/\x00MDESC(\d+)\x00/', function($matches) use ($protectedEscapes) {
+	        $index = (int)$matches[1];
+	        return isset($protectedEscapes[$index]) ? $protectedEscapes[$index] : $matches[0];
+	    }, $html);
+	}
+
+	public static function trimMarkdownTableWhitespace($text) {
+	    return trim((string)$text, " \t\n\r\v");
+	}
+
+	public static function getMarkdownTableCells($line) {
+	    $trimmed = self::trimMarkdownTableWhitespace($line);
+	    if ($trimmed === '' || strpos($trimmed, '|') === false) {
+	        return [];
+	    }
+
+	    if (substr($trimmed, 0, 1) === '|') {
+	        $trimmed = substr($trimmed, 1);
+	    }
+	    if (substr($trimmed, -1) === '|') {
+	        $trimmed = substr($trimmed, 0, -1);
+	    }
+
+	    return array_map([self::class, 'trimMarkdownTableWhitespace'], explode('|', $trimmed));
+	}
+
+	public static function isMarkdownTableRowLine($line) {
+	    return count(self::getMarkdownTableCells($line)) > 0;
+	}
+
+	public static function isMarkdownTableSeparatorLine($line) {
+	    $trimmed = self::trimMarkdownTableWhitespace($line);
+	    if ($trimmed === '' || strpos($trimmed, '|') === false) {
+	        return false;
+	    }
+
+	    $cells = self::getMarkdownTableCells($trimmed);
+	    if (count($cells) === 0) {
+	        return false;
+	    }
+
+	    foreach ($cells as $cell) {
+	        if (!self::pregMatch('/^:?-+:?$/', self::trimMarkdownTableWhitespace($cell))) {
+	            return false;
+	        }
+	    }
+
+	    return true;
+	}
+
+	public static function isMarkdownTableStart($line, $nextLine) {
+	    if (!self::isMarkdownTableRowLine($line) || self::isMarkdownTableSeparatorLine($line) || !self::isMarkdownTableSeparatorLine($nextLine)) {
+	        return false;
+	    }
+
+	    return count(self::getMarkdownTableCells($line)) === count(self::getMarkdownTableCells($nextLine));
+	}
+
+	public static function getMarkdownTableAlignments($line) {
+	    return array_map(function($cell) {
+	        $marker = self::trimMarkdownTableWhitespace($cell);
+	        $alignLeft = strpos($marker, ':') === 0;
+	        $alignRight = substr($marker, -1) === ':';
+
+	        if ($alignLeft && $alignRight) return 'center';
+	        if ($alignRight) return 'right';
+	        if ($alignLeft) return 'left';
+	        return '';
+	    }, self::getMarkdownTableCells($line));
+	}
+
+	/*
+	 * Table formulas (discussion #1586): a cell holding =SUM(col), =AVG(row),
+	 * =MIN(col), =MAX(row), =COUNT(col) or =PRODUCT(row) shows the sum, average,
+	 * minimum, maximum, count or product of its column or row.
+	 * Same rules as js/table-formulas.js, which renders the preview: keep the
+	 * two in step.
+	 */
+
+	/**
+	 * Reads a source cell such as "=SUM(col)" or "**=avg(row)**".
+	 * @return array{formula:string,open:string,close:string}|null
+	 */
+	public static function parseMarkdownTableFormulaToken($text) {
+	    if (!self::pregMatch('/^([*_~]*)=\s*(sum|avg|average|min|max|count|prod|product)\s*\(\s*(col|column|row)\s*\)([*_~]*)$/i', trim((string)$text), $m)) {
+	        return null;
+	    }
+	    $name = strtolower($m[2]);
+	    $kind = $name === 'average' ? 'avg' : ($name === 'product' ? 'prod' : $name);
+	    return [
+	        'formula' => $kind . '-' . (strtolower($m[3]) === 'row' ? 'row' : 'col'),
+	        'open' => $m[1],
+	        'close' => $m[4],
+	    ];
+	}
+
+	/**
+	 * Reads a cell as a number: "1 234,56 €", "$1,234.56", "-12", "45%".
+	 * Anything else around the digits ("Phase 2", "3 kg", a date) is text.
+	 * @return array{value:float,decimals:int,comma:bool,prefix:string,suffix:string}|null
+	 */
+	public static function parseTableFormulaNumber($text) {
+	    $s = trim((string)self::pregReplace('/[\s\x{00a0}\x{202f}\x{2009}]+/u', ' ', (string)$text));
+	    $s = trim((string)self::pregReplace('/^[*_~`]+|[*_~`]+$/', '', $s));
+	    if (!self::pregMatch('/^([-+\x{2212}]?)\s*(\p{Sc}|[A-Z]{3})?(\s*)([-+\x{2212}]?)\s*(\d(?:[\d.,\' ]*\d)?|[.,]\d+)(\s*)(%|\p{Sc}|[A-Z]{3})?$/u', $s, $m)) {
+	        return null;
+	    }
+	    $m += array_fill(0, 8, '');
+	    if ($m[1] !== '' && $m[4] !== '') {
+	        return null;
+	    }
+
+	    $body = $m[5];
+	    $dots = substr_count($body, '.');
+	    $commas = substr_count($body, ',');
+	    $decimalSep = '';
+	    if ($dots && $commas) {
+	        $decimalSep = strrpos($body, '.') > strrpos($body, ',') ? '.' : ',';
+	    } elseif ($commas === 1 && !self::pregMatch('/^\d{1,3},\d{3}$/', $body)) {
+	        $decimalSep = ',';
+	    } elseif ($dots === 1) {
+	        $decimalSep = '.';
+	    }
+
+	    $cut = $decimalSep !== '' ? strrpos($body, $decimalSep) : strlen($body);
+	    $whole = substr($body, 0, $cut);
+	    $fraction = (string)substr($body, $cut + 1);
+	    // Separators left in the whole part must group thousands, which keeps
+	    // dates and phone numbers out
+	    if (!self::pregMatch('/^\d*$/', $whole) && !self::pregMatch('/^\d{1,3}(?:[.,\' ]\d{3})+$/', $whole)) {
+	        return null;
+	    }
+	    if (!self::pregMatch('/^\d*$/', $fraction)) {
+	        return null;
+	    }
+
+	    $digits = (string)self::pregReplace('/\D/', '', $whole);
+	    $value = (float)(($digits !== '' ? $digits : '0') . '.' . ($fraction !== '' ? $fraction : '0'));
+	    $sign = $m[1] !== '' ? $m[1] : $m[4];
+	    if ($sign === '-' || $sign === "\u{2212}") {
+	        $value = -$value;
+	    }
+
+	    return [
+	        'value' => $value,
+	        'decimals' => strlen($fraction),
+	        'comma' => $decimalSep === ',',
+	        'prefix' => $m[2] !== '' ? $m[2] . $m[3] : '',
+	        'suffix' => $m[7] !== '' ? $m[6] . $m[7] : '',
+	    ];
+	}
+
+	/**
+	 * Whether the numbers carry different currencies or units ("2 €" and "$3",
+	 * or euros and a percentage): no total of those means anything
+	 */
+	public static function hasTableFormulaMixedUnits(array $numbers) {
+	    $unit = null;
+	    foreach ($numbers as $n) {
+	        $own = trim($n['prefix']) !== '' ? trim($n['prefix']) : trim($n['suffix']);
+	        if ($own === '') {
+	            continue;
+	        }
+	        if ($unit === null) {
+	            $unit = $own;
+	        } elseif ($own !== $unit) {
+	            return true;
+	        }
+	    }
+	    return false;
+	}
+
+	/**
+	 * What a formula cell shows when its cells cannot be computed together
+	 */
+	public static function getTableFormulaIncompatibleText() {
+	    $fallback = 'Incompatible formula';
+	    return self::hasTr() ? self::tr('table.context_menu.formula_incompatible', [], $fallback) : $fallback;
+	}
+
+	/**
+	 * The one currency (or unit sign) found among the numbers, '' when they
+	 * disagree. A product reads "2" x "2,50 €" as euros.
+	 */
+	public static function getTableFormulaCommonAffix(array $numbers, $key, $ignoreEmpty) {
+	    $found = null;
+	    foreach ($numbers as $n) {
+	        if ($ignoreEmpty && $n[$key] === '') {
+	            continue;
+	        }
+	        if ($found === null) {
+	            $found = $n[$key];
+	        } elseif (trim($found) !== trim($n[$key])) {
+	            return '';
+	        }
+	    }
+	    return $found ?? '';
+	}
+
+	/**
+	 * The text a formula cell shows for the given cells of its line. The result
+	 * takes the decimals, decimal separator and currency of the cells.
+	 */
+	public static function computeTableFormula($formula, array $texts) {
+	    $kind = explode('-', $formula)[0];
+	    $numbers = [];
+	    foreach ($texts as $text) {
+	        $parsed = self::parseTableFormulaNumber($text);
+	        if ($parsed === null) {
+	            continue;
+	        }
+	        // In a product a percentage is a rate: 200 x 20% is 40
+	        if ($kind === 'prod' && trim($parsed['suffix']) === '%') {
+	            $parsed['value'] /= 100;
+	            $parsed['rate_decimals'] = 2;
+	            $parsed['suffix'] = '';
+	        }
+	        $numbers[] = $parsed;
+	    }
+	    if ($kind === 'count') {
+	        return (string)count($numbers);
+	    }
+	    if (!$numbers) {
+	        return '0';
+	    }
+	    if (self::hasTableFormulaMixedUnits($numbers)) {
+	        return self::getTableFormulaIncompatibleText();
+	    }
+
+	    $value = $kind === 'prod' ? 1.0 : (($kind === 'min' || $kind === 'max') ? $numbers[0]['value'] : 0.0);
+	    $inputDecimals = 0;
+	    $decimalsTotal = 0;
+	    $comma = null;
+	    foreach ($numbers as $n) {
+	        if ($kind === 'prod') {
+	            $value *= $n['value'];
+	        } elseif ($kind === 'min') {
+	            $value = min($value, $n['value']);
+	        } elseif ($kind === 'max') {
+	            $value = max($value, $n['value']);
+	        } else {
+	            $value += $n['value'];
+	        }
+	        $inputDecimals = max($inputDecimals, $n['decimals']);
+	        $decimalsTotal += $n['decimals'] + ($n['rate_decimals'] ?? 0);
+	        if ($comma === null && $n['decimals']) {
+	            $comma = $n['comma'];
+	        }
+	    }
+	    if ($kind === 'avg') {
+	        $value /= count($numbers);
+	    }
+	    $inputDecimals = min($inputDecimals, 10);
+
+	    $decimals = $inputDecimals;
+	    if ($kind === 'avg') {
+	        $decimals = max($inputDecimals, 2);
+	    } elseif ($kind === 'prod') {
+	        $decimals = min($decimalsTotal, 10);
+	    }
+	    $out = number_format(abs($value), $decimals, '.', '');
+	    // An average or a product only keeps the extra decimals it needs
+	    while ($decimals > $inputDecimals && substr($out, -1) === '0') {
+	        $out = substr($out, 0, -1);
+	        $decimals--;
+	    }
+	    if (substr($out, -1) === '.') {
+	        $out = substr($out, 0, -1);
+	    }
+
+	    $negative = $value < 0 && (float)$out != 0.0;
+	    if ($comma) {
+	        $out = str_replace('.', ',', $out);
+	    }
+
+	    return ($negative ? '-' : '')
+	        . self::getTableFormulaCommonAffix($numbers, 'prefix', $kind === 'prod')
+	        . $out
+	        . self::getTableFormulaCommonAffix($numbers, 'suffix', $kind === 'prod');
+	}
+
+	/**
+	 * Replaces the formula cells of a parsed table (rows of cells + is_header)
+	 * with their value and records them under 'formulas'. A formula skips the
+	 * header row and the other formulas of its own direction, so a total never
+	 * counts the average next to it, while a column total does add up the row
+	 * totals above it; hence the few passes.
+	 */
+	public static function resolveMarkdownTableFormulas(array $tableRows) {
+	    $entries = [];
+	    $text = [];
+	    $formula = [];
+	    foreach ($tableRows as $r => $row) {
+	        $isHeader = ($r === 0 && !empty($row['is_header']));
+	        foreach ($row['cells'] as $c => $cell) {
+	            $token = $isHeader ? null : self::parseMarkdownTableFormulaToken($cell);
+	            $text[$r][$c] = $token ? '' : $cell;
+	            $formula[$r][$c] = $token ? $token['formula'] : null;
+	            if ($token) {
+	                $entries[] = [$r, $c, $token];
+	            }
+	        }
+	    }
+	    if (!$entries) {
+	        return $tableRows;
+	    }
+
+	    for ($pass = 0; $pass < 4; $pass++) {
+	        $changed = false;
+	        foreach ($entries as [$r, $c, $token]) {
+	            $byRow = substr($token['formula'], -3) === 'row';
+	            $texts = [];
+	            if ($byRow) {
+	                foreach ($text[$r] as $oc => $otherText) {
+	                    $other = $formula[$r][$oc];
+	                    if ($oc === $c || ($other !== null && substr($other, -3) === 'row')) {
+	                        continue;
+	                    }
+	                    $texts[] = $otherText;
+	                }
+	            } else {
+	                foreach ($text as $or => $rowTexts) {
+	                    $isHeader = ($or === 0 && !empty($tableRows[0]['is_header']));
+	                    if ($or === $r || $isHeader || !array_key_exists($c, $rowTexts)) {
+	                        continue;
+	                    }
+	                    $other = $formula[$or][$c];
+	                    if ($other !== null && substr($other, -3) !== 'row') {
+	                        continue;
+	                    }
+	                    $texts[] = $rowTexts[$c];
+	                }
+	            }
+	            $value = self::computeTableFormula($token['formula'], $texts);
+	            if ($value !== $text[$r][$c]) {
+	                $text[$r][$c] = $value;
+	                $changed = true;
+	            }
+	        }
+	        if (!$changed) {
+	            break;
+	        }
+	    }
+
+	    foreach ($entries as [$r, $c, $token]) {
+	        $tableRows[$r]['cells'][$c] = $token['open'] . $text[$r][$c] . $token['close'];
+	        $tableRows[$r]['formulas'][$c] = $token['formula'];
+	    }
+	    return $tableRows;
+	}
+
+	public static function renderMarkdownMermaidBlock($source) {
+	    $mermaidSource = trim(html_entity_decode((string)$source, ENT_QUOTES, 'UTF-8'));
+	    $escapedSource = htmlspecialchars($mermaidSource, ENT_QUOTES, 'UTF-8');
+	    $escapedAttribute = str_replace(["\r\n", "\r", "\n"], '&#10;', $escapedSource);
+	    return '<div class="mermaid" data-mermaid-source="' . $escapedAttribute . '">' . $escapedSource . '</div>';
+	}
+
+	public static function isSafeMarkdownExcalidrawUrl($src) {
+	    $value = trim((string)$src);
+	    return self::pregMatch('#^(https?://|/|\./|\.\./)#i', $value) === 1
+	        || self::pregMatch('#^data:image/(png|jpeg|jpg|gif|webp);base64,#i', $value) === 1;
+	}
+
+	public static function isDangerousMarkdownExcalidrawAttributeValue($value) {
+	    return self::pregMatch('#javascript:|vbscript:|data:(?!image/)#i', (string)$value) === 1;
+	}
+
+	// The address of a link or an image: no spaces, and parentheses only in
+	// balanced pairs, so that "https://en.wikipedia.org/wiki/Foo_(bar)" keeps its
+	// ")" and the one closing the link is still found (issue #1700). Same pattern
+	// in js/markdown-source.js.
+	public const MARKDOWN_LINK_URL_PATTERN = '(?:[^\\s()]|\\([^\\s()]*\\))+';
+
+	// The text of a link or an image: square brackets only in balanced pairs, so
+	// that "[[v2] notes](url)" is one link (issue #1713), and a pair followed by
+	// "(" is a link of its own, which is the one that counts. Written so that the
+	// text between two pairs is one step: repeating a group for each character
+	// exhausts PCRE's stack on a long text with no closing bracket, and the whole
+	// note is lost. Same pattern in js/markdown-source.js.
+	public const MARKDOWN_LINK_TEXT_PATTERN = '[^\\[\\]]*+(?:\\[[^\\[\\]]*+\\](?!\\()[^\\[\\]]*+)*+';
+
+	/**
+	 * Bold, italic, strikethrough and highlight, on text already escaped.
+	 */
+	/**
+	 * B46: Unterstrich-Hervorhebung ohne quadratische Laufzeit. Ein Öffner hinter dem letzten möglichen Schließer
+	 * (\S + $n Unterstriche, danach kein Wortzeichen) findet nie ein Ende; Upstream suchte von jedem bis zum Textende.
+	 * Nur der Teil bis zum letzten Schließer wird ersetzt, der Rest bleibt; Ergebnis gleich Upstream.
+	 */
+	private const WORD_BYTES = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_';
+
+	private static function replaceBeforeLastCloser(string $pattern, string $replacement, string $text, int $n): string {
+	    $pos = strlen($text);
+	    if ($pos === 0) {
+	        return $text;
+	    }
+	    while (($pos = strrpos($text, str_repeat('_', $n), $pos - strlen($text) - 1)) !== false) {
+	        $next = $text[$pos + $n] ?? '';
+	        if ($pos > 0 && strpos(" \t\n\r\x0B\x0C", $text[$pos - 1]) === false && ($next === '' || strspn($next, self::WORD_BYTES) === 0)) {
+	            $cut = $pos + $n;
+	            return self::pregReplace($pattern, $replacement, substr($text, 0, $cut)) . substr($text, $cut);
+	        }
+	        if ($pos === 0) {
+	            break;
+	        }
+	    }
+	    return $text;
+	}
+
+	public static function applyMarkdownInlineEmphasis($text) {
+	    // Bold and italic (handling nesting better by avoiding [^*] which stops at the first asterisk)
+	    // Triple formatting (Bold + Italic)
+	    $text = self::pregReplace('/\*\*\*(.*?)\*\*\*/s', '<strong><em>$1</em></strong>', $text);
+	    $text = self::replaceBeforeLastCloser('/(^|[^A-Za-z0-9_])___(?=\S)(.*?\S)___(?![A-Za-z0-9_])/s', '$1<strong><em>$2</em></strong>', $text, 3); // B46
+
+	    // Bold
+	    $text = self::pregReplace('/\*\*(.*?)\*\*/s', '<strong>$1</strong>', $text);
+	    $text = self::replaceBeforeLastCloser('/(^|[^A-Za-z0-9_])__(?=\S)(.*?\S)__(?![A-Za-z0-9_])/s', '$1<strong>$2</strong>', $text, 2); // B46
+
+	    // Italic (use lookahead/lookbehind to ensure we don't match double asterisks)
+	    $text = self::pregReplace('/(?<!\*)\*(?!\*)(.*?)(?<!\*)\*(?!\*)/s', '<em>$1</em>', $text);
+	    $text = self::replaceBeforeLastCloser('/(^|[^A-Za-z0-9_])_(?=\S)(.*?\S)_(?![A-Za-z0-9_])/s', '$1<em>$2</em>', $text, 1); // B46
+
+	    // Strikethrough: ~~text~~
+	    $text = self::pregReplace('/~~(.*?)~~/s', '<del>$1</del>', $text);
+
+	    // Highlights: ==text==
+	    $text = self::pregReplace('/==(.*?)==/s', '<mark>$1</mark>', $text);
+
+	    return $text;
+	}
+
+	/**
+	 * The text of a [text](url) link as HTML: escaped, with its emphasis
+	 * (**bold**, ...). An address in it is set aside during the emphasis passes:
+	 * its "*" and "_" are not emphasis.
+	 */
+	public static function renderMarkdownLinkText($linkText) {
+	    $html = htmlspecialchars($linkText, ENT_QUOTES, 'UTF-8');
+
+	    $addresses = [];
+	    $html = self::pregReplaceCallback('/(^|[\s(])(https?:\/\/[^\s<]+)/m', function($matches) use (&$addresses) {
+	        [$url, $trailing] = self::splitMarkdownAutolinkTrailing($matches[2]);
+	        if ($url === '') {
+	            return $matches[0];
+	        }
+	        $addresses[] = $url;
+	        return $matches[1] . "\x00LNKTXT" . (count($addresses) - 1) . "\x00" . $trailing;
+	    }, $html);
+
+	    $html = self::applyMarkdownInlineEmphasis($html);
+
+	    return self::pregReplaceCallback('/\x00LNKTXT(\d+)\x00/', function($matches) use ($addresses) {
+	        return $addresses[(int)$matches[1]];
+	    }, $html);
+	}
+
+	/**
+	 * A bare address ends before the punctuation that follows it, but a ")"
+	 * stays when it closes a "(" of the address itself, as on GitHub:
+	 * "https://en.wikipedia.org/wiki/Foo_(bar)" keeps it, "(see https://x.y)"
+	 * does not. Returns [address, trailing punctuation].
+	 */
+	public static function splitMarkdownAutolinkTrailing($url) {
+	    $trailing = '';
+	    while ($url !== '' && self::pregMatch('/[),.;!?*_~]$/', $url)) {
+	        if (substr($url, -1) === ')' && substr_count($url, ')') <= substr_count($url, '(')) {
+	            break;
+	        }
+	        $trailing = substr($url, -1) . $trailing;
+	        $url = substr($url, 0, -1);
+	    }
+	    return [$url, $trailing];
+	}
+
+	public static function normalizeMarkdownUrlForAttribute($url, $context = 'link') {
+	    $value = trim((string)$url);
+	    if ($value === '') {
+	        return '';
+	    }
+
+	    $decodedValue = html_entity_decode($value, ENT_QUOTES, 'UTF-8');
+	    if (self::pregMatch('/[\x00-\x1F\x7F]/', $decodedValue)) {
+	        return '';
+	    }
+
+	    if (self::pregMatch('#^([a-z][a-z0-9+.-]*):#i', $decodedValue, $matches)) {
+	        $scheme = strtolower($matches[1]);
+	        if ($context === 'image' && $scheme === 'data') {
+	            return self::pregMatch('#^data:image/(png|jpeg|jpg|gif|webp);base64,#i', $decodedValue) === 1 ? $value : '';
+	        }
+
+	        $allowedSchemes = ($context === 'image') ? ['http', 'https'] : ['http', 'https', 'mailto', 'tel'];
+	        return in_array($scheme, $allowedSchemes, true) ? $value : '';
+	    }
+
+	    return $value;
+	}
+
+	public static function buildMarkdownExcalidrawAttributes(DOMElement $element, array $allowedAttrs) {
+	    $attrs = [];
+
+	    foreach ($allowedAttrs as $attrName) {
+	        if (!$element->hasAttribute($attrName)) {
+	            continue;
+	        }
+
+	        $attrValue = $element->getAttribute($attrName);
+	        if ($attrName === 'src' && !self::isSafeMarkdownExcalidrawUrl($attrValue)) {
+	            continue;
+	        }
+	        if ($attrName !== 'data-excalidraw' && self::isDangerousMarkdownExcalidrawAttributeValue($attrValue)) {
+	            continue;
+	        }
+
+	        $attrs[] = $attrName . '="' . htmlspecialchars($attrValue, ENT_QUOTES, 'UTF-8') . '"';
+	    }
+
+	    return empty($attrs) ? '' : ' ' . implode(' ', $attrs);
+	}
+
+	public static function sanitizeMarkdownExcalidrawContainer($html) {
+	    if (trim((string)$html) === '') {
+	        return '';
+	    }
+
+	    $previous = libxml_use_internal_errors(true);
+	    $dom = new DOMDocument();
+	    $dom->encoding = 'UTF-8';
+	    @$dom->loadHTML('<html><body>' . $html . '</body></html>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+	    libxml_clear_errors();
+	    libxml_use_internal_errors($previous);
+
+	    $xpath = new DOMXPath($dom);
+	    $container = $xpath->query('//div[contains(concat(" ", normalize-space(@class), " "), " excalidraw-container ")]')->item(0);
+	    if (!$container instanceof DOMElement) {
+	        return htmlspecialchars($html, ENT_QUOTES, 'UTF-8');
+	    }
+
+	    $divAttrs = self::buildMarkdownExcalidrawAttributes($container, ['id', 'class', 'style', 'data-diagram-id', 'data-excalidraw', 'contenteditable']);
+	    $childHtml = '';
+
+	    foreach ($container->childNodes as $child) {
+	        if ($child->nodeType === XML_TEXT_NODE) {
+	            $childHtml .= htmlspecialchars($child->textContent, ENT_QUOTES, 'UTF-8');
+	            continue;
+	        }
+	        if ($child->nodeType !== XML_ELEMENT_NODE) {
+	            continue;
+	        }
+
+	        $tagName = strtolower($child->nodeName);
+	        if ($tagName === 'img' && $child instanceof DOMElement) {
+	            $childHtml .= '<img' . self::buildMarkdownExcalidrawAttributes($child, ['src', 'alt', 'title', 'class', 'style', 'width', 'height', 'data-is-excalidraw', 'data-excalidraw-note-id', 'loading', 'decoding']) . '>';
+	        } elseif ($tagName === 'i' && $child instanceof DOMElement) {
+	            $childHtml .= '<i' . self::buildMarkdownExcalidrawAttributes($child, ['class', 'style']) . '></i>';
+	        } elseif ($tagName === 'p' && $child instanceof DOMElement) {
+	            $childHtml .= '<p' . self::buildMarkdownExcalidrawAttributes($child, ['class', 'style']) . '>' . htmlspecialchars($child->textContent, ENT_QUOTES, 'UTF-8') . '</p>';
+	        } elseif ($tagName === 'div' && $child instanceof DOMElement) {
+	            $class = $child->getAttribute('class');
+	            if (self::pregMatch('/(^|\s)excalidraw-data(\s|$)/', $class)) {
+	                $childHtml .= '<div' . self::buildMarkdownExcalidrawAttributes($child, ['class', 'style']) . '>' . htmlspecialchars($child->textContent, ENT_QUOTES, 'UTF-8') . '</div>';
+	            }
+	        }
+	    }
+
+	    return '<div' . $divAttrs . '>' . $childHtml . '</div>';
+	}
+
+	/**
+	 * Rebuild an embedded task-list marker from scratch (only the numeric id and
+	 * the fallback label are kept), so no attacker-controlled markup from the
+	 * markdown source survives.
+	 */
+	public static function sanitizeMarkdownTaskListEmbed($html) {
+	    if (!self::pregMatch('/\bdata-task-embed\s*=\s*(["\'])(\d+)\1/i', $html, $idMatch)) {
+	        return htmlspecialchars($html, ENT_QUOTES, 'UTF-8');
+	    }
+	    $noteId = $idMatch[2];
+
+	    $label = '';
+	    if (self::pregMatch('/<a\b[^>]*>(.*?)<\/a>/is', $html, $linkMatch)) {
+	        $label = trim(html_entity_decode(strip_tags($linkMatch[1]), ENT_QUOTES, 'UTF-8'));
+	    }
+
+	    return '<div class="tasklist-embed" data-task-embed="' . $noteId . '" contenteditable="false">'
+	        . '<a class="tasklist-embed-link" href="index.php?note=' . $noteId . '">'
+	        . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</a></div>';
+	}
+
+	public static function normalizeMarkdownImageBorderClass($borderClass) {
+	    return in_array($borderClass, ['img-with-border', 'img-with-border-no-padding'], true) ? $borderClass : '';
+	}
+
+	public static function getMarkdownImageBorderClassFromAttrBlock($attrs) {
+	    $attrText = is_string($attrs) ? $attrs : '';
+	    if (self::pregMatch('/(^|\s)\.img-with-border-no-padding(?=\s|$)/', $attrText)) {
+	        return 'img-with-border-no-padding';
+	    }
+	    if (self::pregMatch('/(^|\s)\.img-with-border(?=\s|$)/', $attrText)) {
+	        return 'img-with-border';
+	    }
+	    return '';
+	}
+
+	public static function getMarkdownImageWidthFromAttrBlock($attrs) {
+	    $attrText = is_string($attrs) ? $attrs : '';
+	    if (self::pregMatch('/(?:^|\s)width\s*=\s*(\d+)(?=\s|$)/i', $attrText, $matches)) {
+	        return max(1, (int)$matches[1]);
+	    }
+	    return null;
+	}
+
+	public static function buildMarkdownImageTag($alt, $url, $title = '', $attrBlock = '') {
+	    $safeUrl = self::normalizeMarkdownUrlForAttribute($url, 'image');
+	    if ($safeUrl === '') {
+	        return '';
+	    }
+
+	    $attributes = [
+	        'src="' . htmlspecialchars($safeUrl, ENT_QUOTES, 'UTF-8') . '"',
+	        'alt="' . htmlspecialchars($alt, ENT_QUOTES, 'UTF-8') . '"'
+	    ];
+
+	    if ($title !== '') {
+	        $attributes[] = 'title="' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '"';
+	    }
+
+	    $borderClass = self::normalizeMarkdownImageBorderClass(self::getMarkdownImageBorderClassFromAttrBlock($attrBlock));
+	    if ($borderClass !== '') {
+	        $attributes[] = 'class="' . $borderClass . '"';
+	    }
+
+	    $imageWidth = self::getMarkdownImageWidthFromAttrBlock($attrBlock);
+	    if (!empty($imageWidth)) {
+	        $attributes[] = 'width="' . $imageWidth . '"';
+	        $attributes[] = 'style="width: ' . $imageWidth . 'px;"';
+	    }
+
+	    $attributes[] = 'loading="lazy"';
+	    $attributes[] = 'decoding="async"';
+
+	    return '<img ' . implode(' ', $attributes) . '>';
+	}
+
+	public static function parseMarkdown($text) {
+	    if (!$text) return '';
+	    
+	    // STEP 1: Extract and protect code blocks from HTML escaping
+	    $protectedCodeBlocks = [];
+	    $codeBlockIndex = 0;
+	    
+	    $text = self::pregReplaceCallback('/(^|\n)([ \t]*```([^\n]*)\n(?:(.*?)\n)?[ \t]*```)(?=\n|$)/s', function($matches) use (&$protectedCodeBlocks, &$codeBlockIndex) {
+	        $lang = trim($matches[3]);
+	        $code = isset($matches[4]) ? $matches[4] : '';
+	        $placeholder = "\x00CODEBLOCK" . $codeBlockIndex . "\x00";
+	        
+	        if (strtolower($lang) === 'mermaid') {
+	            $protectedCodeBlocks[$codeBlockIndex] = self::renderMarkdownMermaidBlock($code);
+	        } else {
+	            if (self::markdownUsesPlainFormattingCodeBlockLanguage($lang)) {
+	                $escapedCode = self::renderMarkdownPlainCodeBlockContent($code);
+	                $escapedPlainLang = htmlspecialchars(self::markdownGetPlainCodeBlockDisplayLanguage($lang), ENT_QUOTES, 'UTF-8');
+	                $protectedCodeBlocks[$codeBlockIndex] = '<pre data-language="' . $escapedPlainLang . '"><code data-language="' . $escapedPlainLang . '">' . $escapedCode . '</code></pre>';
+	            } elseif ($lang !== '' && self::markdownUsesSyntaxHighlightLanguage($lang)) {
+	                // Escape HTML in code blocks so it displays as text
+	                $escapedCode = htmlspecialchars($code, ENT_QUOTES, 'UTF-8');
+	                $escapedLang = htmlspecialchars($lang, ENT_QUOTES, 'UTF-8');
+	                $protectedCodeBlocks[$codeBlockIndex] = '<pre data-language="' . $escapedLang . '"><code class="language-' . $escapedLang . '">' . $escapedCode . '</code></pre>';
+	            } else {
+	                // Escape HTML in code blocks so it displays as text
+	                $escapedCode = htmlspecialchars($code, ENT_QUOTES, 'UTF-8');
+	                $protectedCodeBlocks[$codeBlockIndex] = '<pre><code>' . $escapedCode . '</code></pre>';
+	            }
+	        }
+	        $codeBlockIndex++;
+	        return $matches[1] . $placeholder;
+	    }, $text);
+
+	    // Markdown source of each inline placeholder, so a task line can be handed
+	    // back as editable text (data-text) instead of leaking the NUL markers.
+	    $placeholderSources = [];
+
+	    $protectedInlineCode = [];
+	    $inlineCodeIndex = 0;
+	    // A span opens on a run of backticks and closes on the next run of the same
+	    // length, so a longer run can hold backticks: `` `code` ``. One space on each
+	    // side is dropped, which is what lets the content start or end with a backtick.
+	    $text = self::pregReplaceCallback('/(?<![\\\\`])(`+)(?!`)([^\n]*?[^`\n])\1(?!`)/', function($matches) use (&$protectedInlineCode, &$inlineCodeIndex, &$placeholderSources) {
+	        $placeholder = "\x00RAWCODE" . $inlineCodeIndex . "\x00";
+	        $placeholderSources[$placeholder] = $matches[0];
+	        $code = $matches[2];
+	        if (strlen($code) > 2 && $code[0] === ' ' && substr($code, -1) === ' ' && trim($code) !== '') {
+	            $code = substr($code, 1, -1);
+	        }
+	        $protectedInlineCode[$inlineCodeIndex] = $code;
+	        $inlineCodeIndex++;
+	        return $placeholder;
+	    }, $text);
+	    
+	    // STEP 2: Extract and protect math equations (display mode: $$...$$)
+	    $protectedMathBlocks = [];
+	    $mathBlockIndex = 0;
+	    
+	    $text = self::pregReplaceCallback('/(?<!\\\\)\$\$(.+?)(?<!\\\\)\$\$/s', function($matches) use (&$protectedMathBlocks, &$mathBlockIndex) {
+	        $math = trim($matches[1]);
+	        $placeholder = "\x00MATHBLOCK" . $mathBlockIndex . "\x00";
+	        $protectedMathBlocks[$mathBlockIndex] = $math;
+	        $mathBlockIndex++;
+	        return "\n" . $placeholder . "\n";
+	    }, $text);
+	    
+	    // STEP 3: Extract and protect inline math equations ($...$)
+	    $protectedMathInline = [];
+	    $mathInlineIndex = 0;
+	    
+	    // Only match $ if not preceded by \ or $ (to allow escaping and avoid matching $$)
+	    // and if not followed by a space (opening) and content doesn't end with a space (closing)
+	    // also ensures it's not followed by a digit to avoid matching currency like $10 and $20
+	    $text = self::pregReplaceCallback('/(?<![\\\\$])\$(?!\\$)([^\s$](?:[^$]*?[^\s$])?)\$(?!\\d)/', function($matches) use (&$protectedMathInline, &$mathInlineIndex, &$placeholderSources) {
+	        $math = trim($matches[1]);
+	        $placeholder = "\x00MATHINLINE" . $mathInlineIndex . "\x00";
+	        $placeholderSources[$placeholder] = $matches[0];
+	        $protectedMathInline[$mathInlineIndex] = $math;
+	        $mathInlineIndex++;
+	        return $placeholder;
+	    }, $text);
+
+	    $protectedEscapes = [];
+	    $escapeIndex = 0;
+	    $text = self::protectMarkdownBackslashEscapes($text, $protectedEscapes, $escapeIndex);
+	    
+	    // STEP 4: Extract and protect images, links, and HTML elements from escaping
+	    $protectedElements = [];
+	    $protectedIndex = 0;
+	    
+	    // Protect images first: ![alt](url "title") with optional {.img-with-border width=320} attributes
+	    $text = self::pregReplaceCallback('/!\[(' . self::MARKDOWN_LINK_TEXT_PATTERN . ')\]\((' . self::MARKDOWN_LINK_URL_PATTERN . ')(?:\s+"([^"]+)")?\)(?:\{((?=[^}]*(?:\.img-with-border(?:-no-padding)?(?=\s|})|\bwidth\s*=))[^}]*)\})?/', function($matches) use (&$protectedElements, &$protectedIndex, &$placeholderSources) {
+	        $alt = $matches[1];
+	        $url = $matches[2];
+	        $title = isset($matches[3]) ? $matches[3] : '';
+	        $attrBlock = isset($matches[4]) ? $matches[4] : '';
+	        $placeholder = "\x00PIMG" . $protectedIndex . "\x00";
+	        $imgTag = self::buildMarkdownImageTag($alt, $url, $title, $attrBlock);
+	        if ($imgTag === '') {
+	            return $matches[0];
+	        }
+	        $protectedElements[$protectedIndex] = $imgTag;
+	        $placeholderSources[$placeholder] = $matches[0];
+	        $protectedIndex++;
+	        return $placeholder;
+	    }, $text);
+	    
+	    // Protect links [text](url "title"), the address also written <url>
+	    $text = self::pregReplaceCallback('/\[((?!\])' . self::MARKDOWN_LINK_TEXT_PATTERN . ')\]\((?:<([^<>\n]*)>|(' . self::MARKDOWN_LINK_URL_PATTERN . '))(?:\s+"([^"]+)")?\)/', function($matches) use (&$protectedElements, &$protectedIndex, &$placeholderSources, $protectedEscapes) {
+	        $linkText = $matches[1];
+	        $url = (isset($matches[3]) && $matches[3] !== '') ? $matches[3] : $matches[2];
+	        $title = isset($matches[4]) ? $matches[4] : '';
+
+	        // "\(" and "\)" were set aside above; in an address they stand for
+	        // the character itself.
+	        $url = self::pregReplaceCallback('/\x00MDESC(\d+)\x00/', function($escape) use ($protectedEscapes) {
+	            $index = (int)$escape[1];
+	            return isset($protectedEscapes[$index])
+	                ? html_entity_decode($protectedEscapes[$index], ENT_QUOTES, 'UTF-8')
+	                : $escape[0];
+	        }, $url);
+	        $safeUrl = self::normalizeMarkdownUrlForAttribute($url, 'link');
+	        if ($safeUrl === '') {
+	            return $matches[0];
+	        }
+	        $placeholder = "\x00PLNK" . $protectedIndex . "\x00";
+	        if ($title) {
+	            $linkTag = '<a href="' . htmlspecialchars($safeUrl, ENT_QUOTES, 'UTF-8') . '" title="' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener">' . self::renderMarkdownLinkText($linkText) . '</a>';
+	        } else {
+	            $linkTag = '<a href="' . htmlspecialchars($safeUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener">' . self::renderMarkdownLinkText($linkText) . '</a>';
+	        }
+	        $protectedElements[$protectedIndex] = $linkTag;
+	        $placeholderSources[$placeholder] = $matches[0];
+	        $protectedIndex++;
+	        return $placeholder;
+	    }, $text);
+
+	    // Protect Poznote-generated Excalidraw containers as safe block HTML.
+	    $text = self::pregReplaceCallback('#<div\b(?=[^>]*\bclass\s*=\s*(["\'])[^"\']*\bexcalidraw-container\b[^"\']*\1)[^>]*>[\s\S]*?</div>#i', function($matches) use (&$protectedElements, &$protectedIndex) {
+	        $placeholder = "\x00PEXCALIDRAW" . $protectedIndex . "\x00";
+	        $protectedElements[$protectedIndex] = self::sanitizeMarkdownExcalidrawContainer($matches[0]);
+	        $protectedIndex++;
+	        return "\n" . $placeholder . "\n";
+	    }, $text);
+
+	    // Protect embedded task-list markers as safe block HTML (rendered as the
+	    // fallback link server-side; the app hydrates them into widgets)
+	    $text = self::pregReplaceCallback('#<div\b(?=[^>]*\bdata-task-embed\s*=\s*(["\'])\d+\1)[^>]*>[\s\S]*?</div>#i', function($matches) use (&$protectedElements, &$protectedIndex) {
+	        $placeholder = "\x00PTASKEMBED" . $protectedIndex . "\x00";
+	        $protectedElements[$protectedIndex] = self::sanitizeMarkdownTaskListEmbed($matches[0]);
+	        $protectedIndex++;
+	        return "\n" . $placeholder . "\n";
+	    }, $text);
+	    
+	    // Protect inline span tags with style attributes (for colors, backgrounds, etc.)
+	    // Match: <span style="...">content</span>
+	    // Only the opening/closing tags are protected: the inner content is left in the
+	    // stream so nested markdown (links, bold, ...) still gets parsed. Escaping the
+	    // content here would emit already-protected placeholders (PLNK0) as literal text.
+	    $text = self::pregReplaceCallback('/<span\s+style="([^"]+)">((?:(?!<\/?span\b).)*)<\/span>/is', function($matches) use (&$protectedElements, &$protectedIndex) {
+	        $openTag = '<span style="' . htmlspecialchars($matches[1], ENT_QUOTES, 'UTF-8') . '">';
+	        $content = $matches[2];
+
+	        $protect = function($html) use (&$protectedElements, &$protectedIndex) {
+	            $placeholder = "\x00PSPAN" . $protectedIndex . "\x00";
+	            $protectedElements[$protectedIndex] = $html;
+	            $protectedIndex++;
+	            return $placeholder;
+	        };
+
+	        // A span whose content spans several markdown blocks must be closed and
+	        // reopened around each blank line, otherwise the paragraph builder emits
+	        // the opening and closing tags in different <p> elements and the browser
+	        // auto-closes the span at the first block boundary.
+	        $blocks = self::pregSplit('/(\R[ \t]*\R)/', $content, -1, PREG_SPLIT_DELIM_CAPTURE);
+	        $result = '';
+	        foreach ($blocks as $i => $block) {
+	            if ($i % 2 === 1) {
+	                $result .= $block; // the blank-line separator itself
+	                continue;
+	            }
+	            if ($block === '') {
+	                continue;
+	            }
+	            $result .= $protect($openTag) . $block . $protect('</span>');
+	        }
+
+	        return $result;
+	    }, $text);
+
+	    // Protect details, summary, br, and underline tags
+	    $text = self::pregReplaceCallback('/<(details|summary|br|u)(?=[\s\/>])([^>]*)>/i', function($matches) use (&$protectedElements, &$protectedIndex, &$placeholderSources) {
+	        $tag = strtolower($matches[1]);
+	        $attrs = $matches[2];
+	        $placeholder = "\x00PTAG" . $protectedIndex . "\x00";
+	        $placeholderSources[$placeholder] = $matches[0];
+	        if ($tag === 'br') {
+	            $protectedElements[$protectedIndex] = '<br>';
+	        } else {
+	            // Attribute allow-list: raw HTML in Markdown must never carry
+	            // inline event handlers into the rendered preview.
+	            $protectedElements[$protectedIndex] = '<' . $tag . self::sanitizeMarkdownPassthroughTagAttrs($tag, $attrs) . '>';
+	        }
+	        $protectedIndex++;
+	        return $placeholder;
+	    }, $text);
+
+	    $text = self::pregReplaceCallback('/<\/(details|summary|u)>/i', function($matches) use (&$protectedElements, &$protectedIndex, &$placeholderSources) {
+	        $tag = $matches[1];
+	        $placeholder = "\x00PTAG" . $protectedIndex . "\x00";
+	        $placeholderSources[$placeholder] = $matches[0];
+	        $protectedElements[$protectedIndex] = '</' . $tag . '>';
+	        $protectedIndex++;
+	        return $placeholder;
+	    }, $text);
+
+	    $protectIframeTag = function($attrs, $original) use (&$protectedElements, &$protectedIndex) {
+	        $attrs = html_entity_decode($attrs, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+	        // Shared allow-list rebuild (functions.php): strict host match on src
+	        // against ALLOWED_IFRAME_DOMAINS or Poznote's local audio player, and
+	        // only safe attributes re-emitted with re-encoded values.
+	        $iframeTag = MediaTags::poznoteRebuildMediaTag('iframe', $attrs);
+	        if ($iframeTag === null) {
+	            // If not allowed, return the original (will be escaped)
+	            return $original;
+	        }
+
+	        $placeholder = "\x00PIFRAME" . $protectedIndex . "\x00";
+	        $protectedElements[$protectedIndex] = $iframeTag;
+	        $protectedIndex++;
+	        return $placeholder;
+	    };
+
+	    // Protect iframe tags (YouTube, Bilibili, and Poznote audio player embeds).
+	    $text = self::pregReplaceCallback('/<iframe\s+([^>]+)>\s*<\/iframe>/is', function($matches) use ($protectIframeTag) {
+	        return $protectIframeTag($matches[1], $matches[0]);
+	    }, $text);
+
+	    // Some saved/draft Markdown content can contain escaped media HTML.
+	    // Decode only validated iframe tags; everything else remains escaped below.
+	    $text = self::pregReplaceCallback('/&lt;iframe\s+([\s\S]*?)&gt;\s*&lt;\/iframe&gt;/i', function($matches) use ($protectIframeTag) {
+	        return $protectIframeTag($matches[1], $matches[0]);
+	    }, $text);
+
+	    // Protect video tags (for MP4 embeds and other video formats)
+	    $text = self::pregReplaceCallback('/<video\s+([^>]*)>\s*<\/video>/is', function($matches) use (&$protectedElements, &$protectedIndex) {
+	        $attrs = $matches[1];
+	        $placeholder = "\x00PVIDEO" . $protectedIndex . "\x00";
+	        
+	        $allowedAttrs = ['src', 'width', 'height', 'preload', 'poster', 'class', 'style', 'controls', 'muted', 'playsinline', 'loop', 'autoplay'];
+	        $booleanAttrs = ['controls', 'muted', 'playsinline', 'loop', 'autoplay'];
+	        $safeAttrsString = self::sanitizeAttributes($attrs, $allowedAttrs, $booleanAttrs);
+	        
+	        $videoTag = '<video ' . $safeAttrsString . '></video>';
+	        $protectedElements[$protectedIndex] = $videoTag;
+	        $protectedIndex++;
+	        return $placeholder;
+	    }, $text);
+
+	    // Protect audio tags (for MP3, WAV, and other audio formats)
+	    $text = self::pregReplaceCallback('/<audio\s+([^>]*)>\s*<\/audio>/is', function($matches) use (&$protectedElements, &$protectedIndex) {
+	        $attrs = $matches[1];
+	        $placeholder = "\x00PAUDIO" . $protectedIndex . "\x00";
+
+	        $allowedAttrs = ['src', 'preload', 'class', 'style', 'controls', 'muted', 'loop', 'autoplay'];
+	        $booleanAttrs = ['controls', 'muted', 'loop', 'autoplay'];
+	        $safeAttrsString = self::sanitizeAttributes($attrs, $allowedAttrs, $booleanAttrs);
+
+	        $audioTag = '<audio ' . $safeAttrsString . '></audio>';
+	        $protectedElements[$protectedIndex] = $audioTag;
+	        $protectedIndex++;
+	        return $placeholder;
+	    }, $text);
+	    
+	    // STEP 5: Escape HTML to prevent XSS attacks
+	    $html = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+	    
+	    // Unescape escaped dollar signs after HTML escaping
+	    $html = str_replace('\\$', '$', $html);
+	    
+	    // STEP 6: Process inline markdown styles (bold, italic, code, etc.)
+	    // This helper applies inline formatting after HTML escaping
+	    $applyInlineStyles = function($text) use (&$protectedElements, &$protectedMathInline, &$protectedInlineCode) {
+	        // Protect inline code from other formatting
+	        $protectedCode = [];
+	        $codeIndex = 0;
+	        $text = self::pregReplaceCallback('/`([^`]+)`/', function($matches) use (&$protectedCode, &$codeIndex) {
+	            $placeholder = "\x00CODE" . $codeIndex . "\x00";
+	            $protectedCode[$codeIndex] = '<code>' . $matches[1] . '</code>';
+	            $codeIndex++;
+	            return $placeholder;
+	        }, $text);
+	        
+	        // A bare address becomes a link, and is set aside until the end: the
+	        // "*" and "_" an address can hold (a Teams or SharePoint link) are
+	        // part of it, not emphasis, and the passes below would otherwise cut
+	        // the link in two with an <em>. Same in js/markdown-parser.js.
+	        $protectedUrls = [];
+
+	        // Auto-link URLs in angle brackets: <https://example.com>
+	        $text = self::pregReplaceCallback('/&lt;(https?:\/\/[^>]+)&gt;/', function($matches) use (&$protectedUrls) {
+	            $protectedUrls[] = '<a href="' . $matches[1] . '" target="_blank" rel="noopener">' . $matches[1] . '</a>';
+	            return "\x00URL" . (count($protectedUrls) - 1) . "\x00";
+	        }, $text);
+
+	        // Auto-link plain URLs like GitHub-style markdown behavior
+	        $text = self::pregReplaceCallback('/(^|[\s(])((?:https?:\/\/)[^\s<]+)/m', function($matches) use (&$protectedUrls) {
+	            $prefix = $matches[1];
+	            $url = $matches[2];
+	            // (the emphasis markers closing a format right behind the address
+	            // are not part of it: "**see https://x.y**")
+	            [$url, $trailing] = self::splitMarkdownAutolinkTrailing($url);
+
+	            if ($url === '') {
+	                return $matches[0];
+	            }
+
+	            $safeUrl = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
+	            $protectedUrls[] = '<a href="' . $safeUrl . '" target="_blank" rel="noopener">' . $safeUrl . '</a>';
+	            return $prefix . "\x00URL" . (count($protectedUrls) - 1) . "\x00" . $trailing;
+	        }, $text);
+	        
+	        $text = self::applyMarkdownInlineEmphasis($text);
+
+	        // The addresses set aside above, as links
+	        $text = self::pregReplaceCallback('/\x00URL(\d+)\x00/', function($matches) use ($protectedUrls) {
+	            $index = (int)$matches[1];
+	            return isset($protectedUrls[$index]) ? $protectedUrls[$index] : $matches[0];
+	        }, $text);
+
+	        // Support for <br> (already protected in STEP 4, this ensures literal <br> or <br/> works)
+	        $text = str_replace(['&lt;br&gt;', '&lt;br/&gt;', '&lt;br /&gt;'], '<br>', $text);
+	        
+	        // Restore protected code elements
+	        $text = self::pregReplaceCallback('/\x00CODE(\d+)\x00/', function($matches) use ($protectedCode) {
+	            $index = (int)$matches[1];
+	            return isset($protectedCode[$index]) ? $protectedCode[$index] : $matches[0];
+	        }, $text);
+
+	        $text = self::pregReplaceCallback('/\x00RAWCODE(\d+)\x00/', function($matches) use ($protectedInlineCode) {
+	            $index = (int)$matches[1];
+	            return isset($protectedInlineCode[$index]) ? '<code>' . htmlspecialchars($protectedInlineCode[$index], ENT_QUOTES, 'UTF-8') . '</code>' : $matches[0];
+	        }, $text);
+	        
+	        // Restore protected inline math elements
+	        $text = self::pregReplaceCallback('/\x00MATHINLINE(\d+)\x00/', function($matches) use ($protectedMathInline) {
+	            $index = (int)$matches[1];
+	            if (isset($protectedMathInline[$index])) {
+	                $mathContent = $protectedMathInline[$index];
+	                return '<span class="math-inline" data-math="' . htmlspecialchars($mathContent, ENT_QUOTES, 'UTF-8') . '"></span>';
+	            }
+	            return $matches[0];
+	        }, $text);
+	        
+	        // Restore protected elements (images, links, spans, tags, iframes, videos, audio, and Excalidraw)
+	        $text = self::pregReplaceCallback('/\x00P(IMG|LNK|SPAN|TAG|IFRAME|VIDEO|AUDIO|EXCALIDRAW)(\d+)\x00/', function($matches) use ($protectedElements) {
+	            $index = (int)$matches[2];
+	            return isset($protectedElements[$index]) ? $protectedElements[$index] : $matches[0];
+	        }, $text);
+
+	        $text = self::pregReplaceCallback('/\x00RAWCODE(\d+)\x00/', function($matches) use ($protectedInlineCode) {
+	            $index = (int)$matches[1];
+	            return isset($protectedInlineCode[$index]) ? '<code>' . htmlspecialchars($protectedInlineCode[$index], ENT_QUOTES, 'UTF-8') . '</code>' : $matches[0];
+	        }, $text);
+	        
+	        return $text;
+	    };
+
+	    // Render the collected lines of a blockquote/callout body: heading and
+	    // horizontal-rule lines become real <h1>-<h6>/<hr> elements, everything
+	    // else keeps the historical inline-styles-joined-by-<br> behavior. Blank
+	    // lines adjacent to those blocks are dropped since the block provides its
+	    // own spacing.
+	    $renderQuoteLines = function($quoteLines) use ($applyInlineStyles) {
+	        $htmlParts = [];
+	        $textRun = [];
+	        $skipBlankAfterBlock = false;
+	        $flushRun = function() use (&$textRun, &$htmlParts, $applyInlineStyles) {
+	            if (count($textRun) > 0) {
+	                $htmlParts[] = implode('<br>', array_map($applyInlineStyles, $textRun));
+	                $textRun = [];
+	            }
+	        };
+	        $trimTrailingBlanks = function() use (&$textRun) {
+	            while (count($textRun) > 0 && trim($textRun[count($textRun) - 1]) === '') {
+	                array_pop($textRun);
+	            }
+	        };
+	        foreach ($quoteLines as $ql) {
+	            if (self::pregMatch('/^(#{1,6})\s+(.+)$/', $ql, $hm)) {
+	                $trimTrailingBlanks();
+	                $flushRun();
+	                $level = strlen($hm[1]);
+	                $htmlParts[] = '<h' . $level . '>' . $applyInlineStyles($hm[2]) . '</h' . $level . '>';
+	                $skipBlankAfterBlock = true;
+	            } elseif (self::pregMatch('/^\s*(\*{3,}|-{3,}|_{3,})\s*$/', $ql)) {
+	                $trimTrailingBlanks();
+	                $flushRun();
+	                $htmlParts[] = '<hr>';
+	                $skipBlankAfterBlock = true;
+	            } elseif ($skipBlankAfterBlock && trim($ql) === '') {
+	                continue;
+	            } else {
+	                $skipBlankAfterBlock = false;
+	                $textRun[] = $ql;
+	            }
+	        }
+	        $flushRun();
+	        return implode('', $htmlParts);
+	    };
+
+	    // STEP 7: Process block-level elements (headers, lists, tables, etc.)
+	    $lines = explode("\n", $html);
+	    $result = [];
+	    $currentParagraph = [];
+	    $paragraphStartLine = -1;
+	    
+	    // Helper: Flush accumulated paragraph lines into a <p> tag
+	    $flushParagraph = function() use (&$currentParagraph, &$result, &$paragraphStartLine, $applyInlineStyles) {
+	        if (count($currentParagraph) > 0) {
+	            // GitHub Flavored Markdown: single line breaks become <br>
+	            $processedLines = [];
+	            for ($i = 0; $i < count($currentParagraph); $i++) {
+	                $line = $currentParagraph[$i];
+	                if ($i < count($currentParagraph) - 1) {
+	                    // Check if line ends with 2+ spaces (manual line break)
+	                    if (self::pregMatch('/\s{2,}$/', $line)) {
+	                        $processedLines[] = self::pregReplace('/\s{2,}$/', '', $line) . '<br>';
+	                    } else {
+	                        // Normal line: add <br> for GFM compatibility
+	                        $processedLines[] = $line . '<br>';
+	                    }
+	                } else {
+	                    // Last line in paragraph: no <br> needed
+	                    $processedLines[] = $line;
+	                }
+	            }
+	            $para = implode('', $processedLines);
+	            $para = $applyInlineStyles($para);
+	            $result[] = '<p data-line="' . $paragraphStartLine . '">' . $para . '</p>';
+	            $currentParagraph = [];
+	            $paragraphStartLine = -1;
+	        }
+	    };
+	    
+	    for ($i = 0; $i < count($lines); $i++) {
+	        $line = $lines[$i];
+
+	        if (self::pregMatch('/^\s*\x00PEXCALIDRAW(\d+)\x00\s*$/', $line, $matches)) {
+	            $flushParagraph();
+	            $index = (int)$matches[1];
+	            $result[] = isset($protectedElements[$index]) ? $protectedElements[$index] : $line;
+	            continue;
+	        }
+
+	        if (self::pregMatch('/^\s*\x00PTASKEMBED(\d+)\x00\s*$/', $line, $matches)) {
+	            $flushParagraph();
+	            $index = (int)$matches[1];
+	            $result[] = isset($protectedElements[$index]) ? $protectedElements[$index] : $line;
+	            continue;
+	        }
+
+	        // Check for protected HTML block tags (details, summary)
+	        // This ensures they are treated as block-level elements
+	        if (self::pregMatch('/^\x00PTAG\d+\x00/', $line)) {
+	            $flushParagraph();
+	            $result[] = $applyInlineStyles($line);
+	            continue;
+	        }
+	        
+	        // Check if this line contains a protected math block placeholder
+	        if (self::pregMatch('/\x00MATHBLOCK\d+\x00/', $line)) {
+	            $flushParagraph();
+	            // Restore the math block directly as HTML element
+	            $line = self::pregReplaceCallback('/\x00MATHBLOCK(\d+)\x00/', function($matches) use ($protectedMathBlocks) {
+	                $index = (int)$matches[1];
+	                if (isset($protectedMathBlocks[$index])) {
+	                    $mathContent = $protectedMathBlocks[$index];
+	                    return '<span class="math-block" data-math="' . htmlspecialchars($mathContent, ENT_QUOTES, 'UTF-8') . '"></span>';
+	                }
+	                return $matches[0];
+	            }, $line);
+	            $result[] = $line;
+	            continue;
+	        }
+	        
+	        // Check if this line contains a protected code block placeholder
+	        if (self::pregMatch('/\x00CODEBLOCK\d+\x00/', $line)) {
+	            $flushParagraph();
+	            // Restore the code block directly
+	            $line = self::pregReplaceCallback('/\x00CODEBLOCK(\d+)\x00/', function($matches) use ($protectedCodeBlocks) {
+	                $index = (int)$matches[1];
+	                return isset($protectedCodeBlocks[$index]) ? $protectedCodeBlocks[$index] : $matches[0];
+	            }, $line);
+	            $result[] = $line;
+	            continue;
+	        }
+	        
+	        // Empty line - paragraph separator
+	        if (trim($line) === '') {
+	            $flushParagraph();
+	            // Preserve blank lines by adding a non-breaking space paragraph
+	            // Count consecutive blank lines to preserve multiple blank lines
+	            $blankLineCount = 1;
+	            while ($i + 1 < count($lines) && trim($lines[$i + 1]) === '') {
+	                $blankLineCount++;
+	                $i++;
+	            }
+
+	            $previousResult = count($result) > 0 ? $result[count($result) - 1] : '';
+	            $isPreviousTaskEmbed = self::pregMatch('/^<div class="tasklist-embed"/', $previousResult) === 1;
+	            $isNextTaskEmbed = ($i + 1 < count($lines)) && self::pregMatch('/^\s*\x00PTASKEMBED\d+\x00\s*$/', $lines[$i + 1]) === 1;
+
+	            // The first blank line is the block separator itself: the paragraph,
+	            // heading, list, ... on either side already carries the margin that
+	            // renders it, so emitting a placeholder for it would double the gap.
+	            // Only the extra blank lines an author typed on purpose become
+	            // placeholders.
+	            $placeholdersToAdd = max($blankLineCount - 1, 0);
+	            // The task-embed protection adds a synthetic newline on each side
+	            // of the marker; swallow it plus the single authored blank line so
+	            // the widget sits flush against the surrounding text (no spacer
+	            // above or below the widget)
+	            if ($isNextTaskEmbed) {
+	                $placeholdersToAdd = max($blankLineCount - 2, 0);
+	            }
+	            if ($isPreviousTaskEmbed) {
+	                $placeholdersToAdd = max($placeholdersToAdd - 2, 0);
+	            }
+	            for ($bl = 0; $bl < $placeholdersToAdd; $bl++) {
+	                $result[] = '<p class="blank-line">&nbsp;</p>';
+	            }
+	            continue;
+	        }
+	        
+	        // A line aligned the GitHub README way, <p align="center">text</p>
+	        // (js/markdown-formatting.js applyMarkdownAlignment), the text inside
+	        // still Markdown. The tag is escaped here. Consecutive lines with the
+	        // same alignment are one paragraph, like consecutive plain lines.
+	        $alignedLineRegex = '/^ {0,3}&lt;p\s+align\s*=\s*(?:&quot;|&#0?39;|"|\')?(left|center|right|justify)(?:&quot;|&#0?39;|"|\')?\s*&gt;(.*?)&lt;\/p&gt;\s*$/i';
+	        if (self::pregMatch($alignedLineRegex, $line, $matches)) {
+	            $flushParagraph();
+	            $alignValue = strtolower($matches[1]);
+	            $alignedStartLine = $i;
+	            $alignedLines = [$applyInlineStyles($matches[2])];
+	            while ($i + 1 < count($lines) && self::pregMatch($alignedLineRegex, $lines[$i + 1], $next) && strtolower($next[1]) === $alignValue) {
+	                $alignedLines[] = $applyInlineStyles($next[2]);
+	                $i++;
+	            }
+	            $result[] = '<p data-line="' . $alignedStartLine . '" style="text-align: ' . $alignValue . ';">' . implode('<br>', $alignedLines) . '</p>';
+	            continue;
+	        }
+
+	        // Headers. CommonMark, GitHub and Obsidian all allow up to three
+	        // spaces of indentation before the hashes (four spaces makes the line
+	        // an indented code block instead), and notes written elsewhere do
+	        // arrive that way.
+	        if (self::pregMatch('/^ {0,3}(#{1,6})\s+(.+)$/', $line, $matches)) {
+	            $flushParagraph();
+	            $level = strlen($matches[1]);
+	            $content = $applyInlineStyles($matches[2]);
+	            $result[] = '<h' . $level . ' data-line="' . $i . '">' . $content . '</h' . $level . '>';
+	            continue;
+	        }
+	        
+	        // Horizontal rules
+	        if (self::pregMatch('/^(\*{3,}|-{3,}|_{3,})$/', $line)) {
+	            $flushParagraph();
+	            $result[] = '<hr>';
+	            continue;
+	        }
+	        
+	        // Blockquotes - collect multi-line blockquotes
+	        if (self::pregMatch('/^&gt;\s*(.*)$/', $line, $matches)) {
+	            $flushParagraph();
+	            $blockquoteLines = [];
+	            $blockquoteLines[] = $matches[1];
+
+	            // Continue collecting consecutive blockquote lines
+	            while ($i + 1 < count($lines) && self::pregMatch('/^&gt;\s*(.*)$/', $lines[$i + 1], $nextMatch)) {
+	                $i++;
+	                $blockquoteLines[] = $nextMatch[1];
+	            }
+
+	            // Detect GitHub-style callouts (e.g. Note, Tip, Important, Warning, Caution)
+	            $firstLine = isset($blockquoteLines[0]) ? self::trimMarkdownTableWhitespace($blockquoteLines[0]) : '';
+	            $calloutType = null;
+	            $calloutRemainder = '';
+	            $calloutCustomTitle = null;
+	            $calloutFold = null;
+
+	            // [!TYPE] syntax: any type name is accepted (unknown ones fall back to
+	            // the note look). An Obsidian fold marker may follow the bracket:
+	            // "+" = collapsible & open, "-" = collapsible & collapsed.
+	            // The text after that is the title (not the body), e.g. "> [!WARNING] Custom title".
+	            if (self::pregMatch('/^\s*\[!([A-Za-z][A-Za-z0-9_-]*)\]([+-])?\s*(.*)$/', $firstLine, $lm)) {
+	                $calloutType = strtolower($lm[1]);
+	                $calloutFold = (isset($lm[2]) && $lm[2] !== '') ? $lm[2] : null;
+	                $customTitle = isset($lm[3]) ? self::trimMarkdownTableWhitespace($lm[3]) : '';
+	                if ($customTitle !== '') {
+	                    $calloutCustomTitle = $customTitle;
+	                }
+	            }
+	            // Fall back to the bare keyword syntax (optionally bolded, with optional body after).
+	            // Here any trailing text is the body, matching the previous behaviour.
+	            elseif (self::pregMatch('/^\s*(?:\*\*|__)?(Note|Tip|Important|Warning|Caution)(?:\*\*|__)?(?:[:\s\-]+(.*))?$/i', $firstLine, $lm)) {
+	                $calloutType = strtolower($lm[1]);
+	                $calloutRemainder = isset($lm[2]) ? self::trimMarkdownTableWhitespace($lm[2]) : '';
+	            }
+
+	            if ($calloutType) {
+	                // Build callout aside element
+	                $bodyLines = [];
+	                if ($calloutRemainder !== '') {
+	                    $bodyLines[] = $calloutRemainder;
+	                }
+	                // append remaining blockquote lines (after the title line)
+	                for ($bi = 1; $bi < count($blockquoteLines); $bi++) {
+	                    $bodyLines[] = $blockquoteLines[$bi];
+	                }
+
+	                // Use the custom title if provided, otherwise the translated default.
+	                if ($calloutCustomTitle !== null) {
+	                    $titleHtml = $calloutCustomTitle;
+	                } else {
+	                    $defaultTitle = ucfirst($calloutType);
+	                    if (self::hasTr()) {
+	                        $titleHtml = self::tr('slash_menu.callout_' . $calloutType, [], $defaultTitle);
+	                    } else {
+	                        $titleHtml = $defaultTitle;
+	                    }
+	                }
+	                $bodyHtml = $renderQuoteLines($bodyLines);
+
+	                // GitHub-style callout icons (matching the screenshot)
+	                switch ($calloutType) {
+	                    case 'note':
+	                        // Info icon (circle with i)
+	                        $iconSvg = '<svg class="callout-icon-svg" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>';
+	                        break;
+	                    case 'tip':
+	                        // Light bulb icon
+	                        $iconSvg = '<svg class="callout-icon-svg" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 1.5c-2.363 0-4 1.69-4 3.75 0 .984.424 1.625.984 2.304l.214.253c.223.264.47.556.673.848.284.411.537.896.621 1.49a.75.75 0 0 1-1.484.211c-.04-.282-.163-.547-.37-.847a8.456 8.456 0 0 0-.542-.68c-.084-.1-.173-.205-.268-.32C3.201 7.75 2.5 6.766 2.5 5.25 2.5 2.31 4.863 0 8 0s5.5 2.31 5.5 5.25c0 1.516-.701 2.5-1.328 3.259-.095.115-.184.22-.268.319-.207.245-.383.453-.541.681-.208.3-.33.565-.37.847a.751.751 0 0 1-1.485-.212c.084-.593.337-1.078.621-1.489.203-.292.45-.584.673-.848.075-.088.147-.173.213-.253.561-.679.985-1.32.985-2.304 0-2.06-1.637-3.75-4-3.75ZM5.75 12h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1 0-1.5ZM6 15.25a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 0 1.5h-2.5a.75.75 0 0 1-.75-.75Z"></path></svg>';
+	                        break;
+	                    case 'important':
+	                        // Exclamation in circle icon
+	                        $iconSvg = '<svg class="callout-icon-svg" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM7.25 4.75v4.5a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-1.5 0ZM8 12a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"></path></svg>';
+	                        break;
+	                    case 'warning':
+	                        // Triangle with exclamation
+	                        $iconSvg = '<svg class="callout-icon-svg" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M6.457 1.047c.659-1.234 2.427-1.234 3.086 0l6.082 11.378A1.75 1.75 0 0 1 14.082 15H1.918a1.75 1.75 0 0 1-1.543-2.575Zm1.763.707a.25.25 0 0 0-.44 0L1.698 13.132a.25.25 0 0 0 .22.368h12.164a.25.25 0 0 0 .22-.368Zm.53 3.996v2.5a.75.75 0 0 1-1.5 0v-2.5a.75.75 0 0 1 1.5 0ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"></path></svg>';
+	                        break;
+	                    case 'caution':
+	                        // Octagon with exclamation
+	                        $iconSvg = '<svg class="callout-icon-svg" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M4.47.22A.75.75 0 0 1 5 0h6c.199 0 .389.079.53.22l4.25 4.25c.141.14.22.331.22.53v6a.75.75 0 0 1-.22.53l-4.25 4.25A.75.75 0 0 1 11 16H5a.75.75 0 0 1-.53-.22L.22 11.53A.75.75 0 0 1 0 11V5a.75.75 0 0 1 .22-.53Zm.84 1.28L1.5 5.31v5.38l3.81 3.81h5.38l3.81-3.81V5.31L10.69 1.5ZM8 4a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 8 4Zm0 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>';
+	                        break;
+	                    default:
+	                        $iconSvg = '<svg class="callout-icon-svg" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>';
+	                        break;
+	                }
+
+	                $titleInner = $iconSvg . '<span class="callout-title-text">' . $applyInlineStyles($titleHtml) . '</span>';
+	                if ($calloutFold !== null) {
+	                    $foldChevron = '<svg class="callout-fold-icon" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M12.78 5.22a.749.749 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.06 0L3.22 6.28a.749.749 0 1 1 1.06-1.06L8 8.939l3.72-3.72a.749.749 0 0 1 1.06 0Z"></path></svg>';
+	                    $result[] = '<details class="callout callout-' . $calloutType . '"' . ($calloutFold === '+' ? ' open' : '') . '>'
+	                             . '<summary class="callout-title">' . $titleInner . $foldChevron . '</summary>'
+	                             . '<div class="callout-body">' . $bodyHtml . '</div>'
+	                             . '</details>';
+	                } else {
+	                    $result[] = '<aside class="callout callout-' . $calloutType . '">'
+	                             . '<div class="callout-title">' . $titleInner . '</div>'
+	                             . '<div class="callout-body">' . $bodyHtml . '</div>'
+	                             . '</aside>';
+	                }
+	            } else {
+	                // Regular blockquote
+	                $result[] = '<blockquote>' . $renderQuoteLines($blockquoteLines) . '</blockquote>';
+	            }
+	            continue;
+	        }
+	        
+	        // The text after the checkbox is optional: "- [ ]" on its own is an empty
+	        // checkbox, not a bullet whose text is "[ ]" (issue #1386).
+	        $taskListLinePattern = '/^(\s*)[\*\-\+]\s+\[([ xX])\](?:\s+(.*))?$/';
+
+	        // Helper: the Markdown a task line was written with, for its data-text.
+	        // Placeholders go back to their source (a link source may itself hold a
+	        // code placeholder, hence the loop); whatever is left is dropped, since
+	        // a NUL byte in the markup truncates the page in DOMDocument.
+	        $taskSourceText = function($content) use (&$placeholderSources) {
+	            $source = htmlspecialchars_decode($content, ENT_QUOTES);
+	            for ($pass = 0; $pass < 5 && strpos($source, "\x00") !== false; $pass++) {
+	                $restored = strtr($source, $placeholderSources);
+	                if ($restored === $source) break;
+	                $source = $restored;
+	            }
+	            return self::pregReplace('/\x00(?!MDESC\d+\x00)[A-Z]+\d+\x00/', '', $source);
+	        };
+
+	        // Helper: Parse nested lists (supports task lists, ordered, and unordered)
+	        $parseNestedList = function($startIndex, $isTaskList = false) use (&$lines, $applyInlineStyles, &$parseNestedList, $taskListLinePattern, $taskSourceText) {
+	            $listItems = [];
+	            $currentIndex = $startIndex;
+	            $baseIndent = null;
+	            $baseMarkerType = null; // 'bullet' (-, *, +) or 'number' (1.)
+	            
+	            while ($currentIndex < count($lines)) {
+	                $currentLine = $lines[$currentIndex];
+	                
+	                // Handle blank lines within lists (don't break the list if continuation follows)
+	                if (trim($currentLine) === '' && $baseIndent !== null) {
+	                    // Look ahead to see if list continues after blank line(s)
+	                    $lookAheadIndex = $currentIndex + 1;
+	                    $foundContinuation = false;
+	                    
+	                    while ($lookAheadIndex < count($lines)) {
+	                        $lookAheadLine = $lines[$lookAheadIndex];
+	                        
+	                        // If we hit another blank line, keep looking
+	                        if (trim($lookAheadLine) === '') {
+	                            $lookAheadIndex++;
+	                            continue;
+	                        }
+	                        
+	                        // Check if this is a list item that continues our list
+	                        if ($isTaskList) {
+	                            $lookMatch = self::pregMatch($taskListLinePattern, $lookAheadLine, $lookMatches);
+	                            $lookMarkerType = null;
+	                        } else {
+	                            $lookTaskMatch = self::pregMatch($taskListLinePattern, $lookAheadLine, $lookTaskMatches);
+	                            if ($lookTaskMatch && $baseIndent !== null && strlen($lookTaskMatches[1]) === $baseIndent) {
+	                                break;
+	                            }
+
+	                            $lookMatch = self::pregMatch('/^(\s*)([\*\-\+]|\d+(?:\.\d+)*\.)\s+(.+)$/', $lookAheadLine, $lookMatches);
+	                            if ($lookMatch) {
+	                                $lookMarker = $lookMatches[2];
+	                                $lookMarkerType = self::pregMatch('/\d+(?:\.\d+)*\./', $lookMarker) ? 'number' : 'bullet';
+	                            } else {
+	                                $lookMarkerType = null;
+	                            }
+	                        }
+	                        
+	                        // Check if it's a list item with same type and indentation
+	                        if ($lookMatch && $baseIndent !== null && strlen($lookMatches[1]) === $baseIndent && 
+	                            ($isTaskList || $lookMarkerType === $baseMarkerType)) {
+	                            $foundContinuation = true;
+	                        }
+	                        
+	                        break; // Stop after finding non-blank content
+	                    }
+	                    
+	                    if ($foundContinuation) {
+	                        $currentIndex++; // Skip blank line and continue
+	                        continue;
+	                    } else {
+	                        break; // End of list
+	                    }
+	                }
+	                
+	                // Parse list item (task list or regular list)
+	                if ($isTaskList) {
+	                    $listMatch = self::pregMatch($taskListLinePattern, $currentLine, $matches);
+	                    $marker = null;
+	                    $markerType = null;
+	                } else {
+	                    $taskLineMatch = self::pregMatch($taskListLinePattern, $currentLine, $taskMatches);
+	                    if ($taskLineMatch && $baseIndent !== null && strlen($taskMatches[1]) <= $baseIndent) {
+	                        break;
+	                    }
+
+	                    $listMatch = self::pregMatch('/^(\s*)([\*\-\+]|\d+(?:\.\d+)*\.)\s+(.+)$/', $currentLine, $matches);
+	                    if (!$listMatch && self::pregMatch('/^(\s*)(\d+(?:\.\d+)+\.)[ \t]*$/', $currentLine, $bareMatches)) {
+	                        // A bare dotted marker like "2.1." with nothing after it is an
+	                        // empty hierarchical item, not continuation text.
+	                        $listMatch = 1;
+	                        $matches = [$bareMatches[0], $bareMatches[1], $bareMatches[2], ''];
+	                    }
+	                    $marker = isset($matches[2]) ? $matches[2] : null;
+	                    $markerType = ($marker && self::pregMatch('/\d+(?:\.\d+)*\./', $marker)) ? 'number' : 'bullet';
+	                }
+	                
+	                if (!$listMatch) {
+	                    // Wrapped continuation line (issue #1312): a non-blank line with no
+	                    // list marker, indented deeper than the list's base indent, joins the
+	                    // previous item instead of ending the list.
+	                    if ($baseIndent !== null && count($listItems) > 0 && trim($currentLine) !== '' &&
+	                        !self::pregMatch('/^(\s*)([\*\-\+]|\d+(?:\.\d+)*\.)\s+(.+)$/', $currentLine)) {
+	                        $contIndent = strlen($currentLine) - strlen(ltrim($currentLine, " \t"));
+	                        if ($contIndent > $baseIndent) {
+	                            $lastIdx = count($listItems) - 1;
+	                            $listItems[$lastIdx] = self::pregReplace('/<\/li>$/', '', $listItems[$lastIdx])
+	                                . ' ' . $applyInlineStyles(self::trimMarkdownTableWhitespace($currentLine)) . '</li>';
+	                            $currentIndex++;
+	                            continue;
+	                        }
+	                    }
+	                    break; // Not a list item
+	                }
+	                
+	                $indent = strlen($matches[1]);
+	                $content = $matches[3] ?? '';
+	                
+	                // First item: establish base indentation and marker type
+	                if ($baseIndent === null) {
+	                    $baseIndent = $indent;
+	                    $baseMarkerType = $markerType;
+	                }
+	                
+	                // Special behavior: Marker type change at root level (indent=0) creates nested list
+	                // Example: * item1 \n 1. nested1 \n 2. nested2 \n * item2
+	                if (!$isTaskList && $indent === 0 && $baseIndent === 0 && 
+	                    $markerType !== $baseMarkerType && count($listItems) > 0) {
+	                    $nestedItems = [];
+	                    $nestedListTag = ($markerType === 'number') ? 'ol' : 'ul';
+	                    $tempIndex = $currentIndex;
+	                    
+	                    while ($tempIndex < count($lines)) {
+	                        $tempLine = $lines[$tempIndex];
+	                        if (!self::pregMatch('/^(\s*)([\*\-\+]|\d+(?:\.\d+)*\.)\s+(.+)$/', $tempLine, $tempMatches)) {
+	                            break;
+	                        }
+	                        $tempIndent = strlen($tempMatches[1]);
+	                        $tempMarker = $tempMatches[2];
+	                        $tempMarkerType = self::pregMatch('/\d+(?:\.\d+)*\./', $tempMarker) ? 'number' : 'bullet';
+	                        
+	                        // Stop if we're back to the base marker type or different indentation
+	                        if ($tempIndent !== 0 || $tempMarkerType !== $markerType) {
+	                            break;
+	                        }
+	                        
+	                        $nestedItems[] = '<li>' . $applyInlineStyles($tempMatches[3]) . '</li>';
+	                        $tempIndex++;
+	                    }
+	                    
+	                    // Add nested list to last item
+	                    if (count($nestedItems) > 0) {
+	                        $lastIdx = count($listItems) - 1;
+	                        $listItems[$lastIdx] = self::pregReplace('/<\/li>$/', '', $listItems[$lastIdx]);
+	                        $listItems[$lastIdx] .= '<' . $nestedListTag . '>' . implode('', $nestedItems) . '</' . $nestedListTag . '></li>';
+	                        $currentIndex = $tempIndex;
+	                        continue;
+	                    }
+	                }
+	                
+	                // If marker type changed at SAME indentation level (non-root), this is a different list
+	                if (!$isTaskList && $indent === $baseIndent && $markerType !== $baseMarkerType) {
+	                    break; // Different list type at same level
+	                }
+	                
+	                if ($indent === $baseIndent) {
+	                    // Same level item
+	                    if ($isTaskList) {
+	                        $isChecked = strtolower($matches[2]) === 'x';
+	                        $checkbox = '<input type="checkbox" class="markdown-task-checkbox" data-line="' . $currentIndex . '" ' . ($isChecked ? 'checked ' : '') . '>';
+	                        $itemHtml = '<li class="task-list-item" data-line="' . $currentIndex . '">' . $checkbox . ' <span class="task-text" data-text="' . htmlspecialchars($taskSourceText($content), ENT_QUOTES, 'UTF-8') . '">' . $applyInlineStyles($content) . '</span>';
+	                    } else {
+	                        $itemHtml = '<li data-line="' . $currentIndex . '">' . $applyInlineStyles($content);
+	                    }
+	                    
+	                    // Check if next items are more indented (nested)
+	                    $nextIndex = $currentIndex + 1;
+	                    if ($nextIndex < count($lines)) {
+	                        $nextLine = $lines[$nextIndex];
+	                        $nextIsTaskList = false;
+	                        if ($isTaskList) {
+	                            $nextMatch = self::pregMatch($taskListLinePattern, $nextLine, $nextMatches);
+	                        } else {
+	                            $nextIsTaskList = self::pregMatch($taskListLinePattern, $nextLine, $nextMatches) === 1;
+	                            if ($nextIsTaskList) {
+	                                $nextMatch = 1;
+	                            } else {
+	                                $nextMatch = self::pregMatch('/^(\s*)([\*\-\+]|\d+(?:\.\d+)*\.)\s+(.+)$/', $nextLine, $nextMatches);
+	                            }
+	                        }
+	                        
+	                        if ($nextMatch && strlen($nextMatches[1]) > $indent) {
+	                            // Parse nested list recursively
+	                            $nestedResult = $parseNestedList($nextIndex, $isTaskList || $nextIsTaskList);
+	                            $isOrderedNested = !$isTaskList && !$nextIsTaskList && self::pregMatch('/\d+(?:\.\d+)*\./', $nextMatches[2]);
+	                            $listTag = $isOrderedNested ? 'ol' : 'ul';
+	                            $listClass = ($isTaskList || $nextIsTaskList) ? ' class="task-list"' : '';
+	                            $itemHtml .= '<' . $listTag . $listClass . '>' . implode('', $nestedResult['items']) . '</' . $listTag . '>';
+	                            $currentIndex = $nestedResult['endIndex'];
+	                        }
+	                    }
+	                    
+	                    $itemHtml .= '</li>';
+	                    $listItems[] = $itemHtml;
+	                } else if ($indent < $baseIndent) {
+	                    // Less indented, end of current list
+	                    break;
+	                } else {
+	                    // Deeper-indented item reached at loop top: continuation lines
+	                    // separated it from its parent, so the parent's nested-list
+	                    // lookahead never saw it. Attach it to the last item.
+	                    if (count($listItems) === 0) {
+	                        break;
+	                    }
+	                    $nestedIsTask = !$isTaskList && self::pregMatch($taskListLinePattern, $currentLine) === 1;
+	                    $nestedResult = $parseNestedList($currentIndex, $isTaskList || $nestedIsTask);
+	                    $isOrderedNested = !$isTaskList && !$nestedIsTask && $markerType === 'number';
+	                    $listTag = $isOrderedNested ? 'ol' : 'ul';
+	                    $listClass = ($isTaskList || $nestedIsTask) ? ' class="task-list"' : '';
+	                    $lastIdx = count($listItems) - 1;
+	                    $listItems[$lastIdx] = self::pregReplace('/<\/li>$/', '', $listItems[$lastIdx])
+	                        . '<' . $listTag . $listClass . '>' . implode('', $nestedResult['items']) . '</' . $listTag . '></li>';
+	                    $currentIndex = $nestedResult['endIndex'] + 1;
+	                    continue;
+	                }
+	                
+	                $currentIndex++;
+	            }
+	            
+	            return [
+	                'items' => $listItems,
+	                'endIndex' => $currentIndex - 1
+	            ];
+	        };
+	        
+	        // Task lists (checkboxes) - must be checked before unordered lists
+	        if (self::pregMatch($taskListLinePattern, $line)) {
+	            $flushParagraph();
+	            $listResult = $parseNestedList($i, true);
+	            $result[] = '<ul class="task-list">' . implode('', $listResult['items']) . '</ul>';
+	            $i = $listResult['endIndex'];
+	            continue;
+	        }
+	        
+	        // Unordered lists
+	        if (self::pregMatch('/^\s*[\*\-\+]\s+(.+)$/', $line)) {
+	            $flushParagraph();
+	            $listResult = $parseNestedList($i, false);
+	            $result[] = '<ul>' . implode('', $listResult['items']) . '</ul>';
+	            $i = $listResult['endIndex'];
+	            continue;
+	        }
+	        
+	        // Ordered lists
+	        if (self::pregMatch('/^\s*\d+(?:\.\d+)*\.\s+(.+)$/', $line)) {
+	            $flushParagraph();
+	            $listResult = $parseNestedList($i, false);
+	            $result[] = '<ol>' . implode('', $listResult['items']) . '</ol>';
+	            $i = $listResult['endIndex'];
+	            continue;
+	        }
+	        
+	        // Tables - require a header separator row so plain pipe-delimited text stays editable as text.
+	        if (self::isMarkdownTableStart($line, isset($lines[$i + 1]) ? $lines[$i + 1] : '')) {
+	            $flushParagraph();
+	            
+	            $tableRows = [];
+	            $tableAlignments = [];
+	            $isFirstRow = true;
+	            
+	            // Collect all consecutive table rows
+	            while ($i < count($lines) && self::isMarkdownTableRowLine($lines[$i])) {
+	                $currentLine = self::trimMarkdownTableWhitespace($lines[$i]);
+	                
+	                // Check if this is a header separator line (|---|---|)
+	                if (self::isMarkdownTableSeparatorLine($currentLine)) {
+	                    $tableAlignments = self::getMarkdownTableAlignments($currentLine);
+	                    $i++;
+	                    continue;
+	                }
+
+	                $logicalRow = $currentLine;
+	                while (!self::pregMatch('/\|\s*$/', $logicalRow) && $i + 1 < count($lines)) {
+	                    $nextLine = self::trimMarkdownTableWhitespace($lines[$i + 1]);
+
+	                    if ($nextLine === '' || self::isMarkdownTableRowLine($nextLine)) {
+	                        break;
+	                    }
+
+	                    $i++;
+	                    $logicalRow .= "\n" . $nextLine;
+	                }
+	                
+	                // Parse table cells
+	                $tableRows[] = [
+	                    'cells' => self::getMarkdownTableCells($logicalRow),
+	                    'is_header' => $isFirstRow
+	                ];
+	                $isFirstRow = false;
+	                $i++;
+	            }
+	            $i--; // Adjust because the for loop will increment
+	            
+	            // Generate HTML table
+	            if (count($tableRows) > 0) {
+	                // =SUM(col), =AVG(row)... cells show their value
+	                $tableRows = self::resolveMarkdownTableFormulas($tableRows);
+	                $tableHTML = '<table>';
+	                
+	                // Process rows
+	                for ($r = 0; $r < count($tableRows); $r++) {
+	                    $row = $tableRows[$r]['cells'];
+	                    $isHeaderRow = ($r === 0 && $tableRows[$r]['is_header']);
+	                    $cellTag = $isHeaderRow ? 'th' : 'td';
+	                    
+	                    $tableHTML .= '<tr>';
+	                    for ($c = 0; $c < count($row); $c++) {
+	                        $cellContent = $applyInlineStyles($row[$c]);
+	                        $alignment = isset($tableAlignments[$c]) ? $tableAlignments[$c] : '';
+	                        $alignAttr = $alignment !== '' ? ' style="text-align: ' . $alignment . ';"' : '';
+	                        // Kept by a rich-text note the Markdown is converted to
+	                        $formulaAttr = isset($tableRows[$r]['formulas'][$c]) ? ' data-formula="' . $tableRows[$r]['formulas'][$c] . '"' : '';
+	                        $tableHTML .= '<' . $cellTag . $alignAttr . $formulaAttr . '>' . $cellContent . '</' . $cellTag . '>';
+	                    }
+	                    $tableHTML .= '</tr>';
+	                }
+	                
+	                $tableHTML .= '</table>';
+	                $result[] = $tableHTML;
+	            }
+	            continue;
+	        }
+	        
+	        // Regular text - add to current paragraph
+	        if ($paragraphStartLine === -1) {
+	            $paragraphStartLine = $i;
+	        }
+	        $currentParagraph[] = $line;
+	    }
+	    
+	    // Flush any remaining paragraph
+	    $flushParagraph();
+	    
+	    return self::restoreMarkdownBackslashEscapes(implode("\n", $result), $protectedEscapes);
+	}
+
+	/**
+	 * Adapts parseMarkdown() output for a rich-text (HTML) note.
+	 *
+	 * In the Markdown preview a code block gets its breathing room from the CSS
+	 * margins of <pre>, but ".noteentry pre" forces "margin: 0 !important", so a
+	 * converted note glues the code block to the paragraph above it and welds two
+	 * consecutive code blocks together. Rich-text notes have no such margin to
+	 * lean on, so the empty lines have to be real: an empty paragraph, the same
+	 * one parseMarkdown() already emits for authored blank lines.
+	 *
+	 * Used by every path that turns Markdown into the content of an HTML note
+	 * (the "Convert to HTML" action, the "Insert Markdown" modal, the AI
+	 * assistant), so the three can never drift apart.
+	 */
+	public static function parseMarkdownForRichText($text) {
+	    return self::addRichTextCodeBlockSpacing(self::parseMarkdown($text));
+	}
+
+	/**
+	 * Inserts an empty paragraph above and below each top-level code block of an
+	 * HTML fragment, unless one is already there (or the block sits at an edge of
+	 * the fragment, where there is nothing to separate it from).
+	 */
+	public static function addRichTextCodeBlockSpacing($html) {
+	    $spacer = '<p class="blank-line">&nbsp;</p>';
+
+	    // Odd indexes hold the code blocks, even indexes the content between them
+	    $parts = self::pregSplit('/(<pre\b[^>]*>.*?<\/pre>)/s', $html, -1, PREG_SPLIT_DELIM_CAPTURE);
+	    if ($parts === false || count($parts) < 2) {
+	        return $html;
+	    }
+
+	    $out = '';
+	    for ($i = 0, $n = count($parts); $i < $n; $i++) {
+	        $part = $parts[$i];
+
+	        if ($i % 2 === 1) {
+	            // A code block: make sure an empty line precedes it
+	            $needsSpacer = trim($out) !== ''
+	                && !self::pregMatch('/<p class="blank-line">(?:&nbsp;|\s)*<\/p>\s*$/', $out);
+	            if ($needsSpacer) {
+	                $out = rtrim($out, "\n") . "\n" . $spacer . "\n";
+	            }
+	            $out .= $part;
+	            continue;
+	        }
+
+	        // Content following a code block: make sure an empty line separates it.
+	        // Two consecutive code blocks leave only a newline here, and the next
+	        // block adds the spacer itself through the branch above.
+	        $needsSpacer = $i > 0
+	            && trim($part) !== ''
+	            && !self::pregMatch('/^\s*<p class="blank-line">/', $part);
+	        if ($needsSpacer) {
+	            $out .= "\n" . $spacer . "\n" . ltrim($part, "\n");
+	        } else {
+	            $out .= $part;
+	        }
+	    }
+
+	    return $out;
+	}
+}

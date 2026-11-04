@@ -6,7 +6,7 @@
 // abgeleitet von src/modals.php @ 7e2e0b6aa501ba95ac1e9789fd2bb477c281a001
 // (dazu src/task_list_picker_modal.php, src/task_due_modal.php, src/modals/{folder_icon_modal,icon_color_options,tag_folder_notes_modal}.php)
 // Nur Dialoge der Hauptansicht und des Editors. Weggelassen: Update/What's new, eigenes CSS/Schriften, Admin-Limits,
-// Konten/Passwort, Workspace-Einstellungen und Workspace anlegen (M4), Export (M4), Umwandeln (501 bis M4),
+// Konten/Passwort, Workspace-Einstellungen und Workspace anlegen (M4), Export (M4c),
 // Anhang-Auswahl (M3b2), Offline, Spracheingabe (Audio-Aufnahme bleibt, ohne Transkription), Tagebuch (M4), Hintergrundbild,
 // Farbpalette/Markdown-Farben/Revisionen/Datumsformat (Einstellungen M4), NC-Glocke statt Benachrichtigungsdialog,
 // E-Mail-Erinnerung (nur NC-Benachrichtigung).
@@ -438,6 +438,22 @@ $createTitle = static function (string $title): void {
         <div class="modal-buttons">
             <button type="button" class="btn-cancel" data-action="close-modal" data-modal="insertMarkdownModal"><?php p($tr->t('common.cancel')); ?></button>
             <button type="button" class="btn-primary" id="insertMarkdownInsertBtn" disabled><?php p($tr->t('modals.insert_markdown.insert', [], 'Insert')); ?></button>
+        </div>
+    </div>
+</div>
+
+<!-- Convert Note Modal (Upstream modals.php:878, M4b) -->
+<div id="convertNoteModal" class="modal">
+    <div class="modal-content">
+        <h3 id="convertNoteTitle"><?php p($tr->t('modals.convert.title', [], 'Convert Note')); ?></h3>
+        <div class="modal-body">
+            <p id="convertNoteMessage"><?php p($tr->t('modals.convert.message', [], 'Are you sure you want to convert this note?')); ?></p>
+            <p id="convertNoteWarning" class="convert-warning"></p>
+        </div>
+        <div class="modal-buttons">
+            <button type="button" class="btn-cancel" data-action="close-modal" data-modal="convertNoteModal"><?php p($tr->t('common.cancel')); ?></button>
+            <button type="button" class="btn-success" id="duplicateBeforeConvertBtn"><?php p($tr->t('modals.convert.duplicate_button', [], 'Duplicate')); ?></button>
+            <button type="button" class="btn-primary" id="confirmConvertBtn"><?php p($tr->t('common.convert', [], 'Convert')); ?></button>
         </div>
     </div>
 </div>

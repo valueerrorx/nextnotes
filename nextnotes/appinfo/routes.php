@@ -35,6 +35,7 @@ return [
 		['name' => 'compat#attachments', 'url' => '/api_attachments.php', 'verb' => 'GET'],
 		['name' => 'compat#saveExcalidraw', 'url' => '/api_save_excalidraw.php', 'verb' => 'POST'],
 		['name' => 'compat#workspaces', 'url' => '/workspaces.php', 'verb' => 'POST'],
+		['name' => 'compat#importDroppedNotes', 'url' => '/api_import_dropped_notes.php', 'verb' => 'POST'],
 		// API v1, Reihenfolge wie src/public/api/v1/index.php
 		['name' => 'notes_api#resolve', 'url' => '/api/v1/notes/resolve', 'verb' => 'GET'],
 		['name' => 'notes_api#reorder', 'url' => '/api/v1/notes/reorder', 'verb' => 'POST'],

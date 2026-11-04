@@ -102,7 +102,6 @@ class IndexViewService {
 	// Bis zur Portierung erzwungen ausgeblendet (ui-customization.js, __POZNOTE_GLOBAL_HIDDEN_UI_ELEMENTS__)
 	public const FORCED_HIDDEN = [
 		'wsmenu:edit-workspaces', // settings.php: M4
-		'slash:paste-markdown', // convert-html/convert-markdown 501 bis M4b
 	];
 	private const SPEED_DIAL_TAG = 'speed-dial';
 
@@ -258,6 +257,8 @@ class IndexViewService {
 		$hasLinked = $type !== 'linked' && $this->notes->findList([(int)$note->getWorkspaceId()], ['linked_note_id' => $id]) !== [];
 		$display = '';
 		if ($type === 'markdown') {
+			// Anhang-Bilder im Markdown (z. B. nach Umwandlung) brauchen die App-Basis wie in der API (M4b)
+			$content = $this->urls->toClient($content);
 			$display = $content;
 		} elseif ($type === 'tasklist') {
 			// gültiges JSON rendert der Client; sonst (Altbestand) nie roh ausgeben
