@@ -9,11 +9,18 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Tests\Page;
 
+use OCA\NextNotes\BackgroundJob\UserDataDeletionJob;
+use OCA\NextNotes\Service\UserDataService;
 use OCA\NextNotes\Service\WorkspaceService;
 use OCA\NextNotes\Tests\Support\ApiClient;
 use OCA\NextNotes\Tests\Support\ApiTestCase;
 use OCA\NextNotes\Tests\Support\Response;
+use OCP\BackgroundJob\IJobList;
+use OCP\DB\QueryBuilder\IQueryBuilder;
+use OCA\NextNotes\Notification\Notifier;
 use OCP\IUserManager;
+use OCP\Notification\IManager as INotificationManager;
+use OCP\Notification\INotification;
 use OCP\Server;
 
 // Plan M4 §M4g Done 1–4: Dashboard, Graph, Speed Dial, Mentions (Seiten, Isolation), Erwähnungs-Benachrichtigung, Hintergrundbild (B43)
@@ -47,6 +54,21 @@ final class ViewsM4gTest extends ApiTestCase {
 			$qb->andWhere($qb->expr()->eq('user', $qb->createNamedParameter($uid)));
 		}
 		return (int)$qb->executeQuery()->fetchOne();
+	}
+
+	/**
+	 * Lösch-Job zur Kennung des entkoppelten Workspace $wsId ausführen und austragen (wie UserDataDeletionJob, alle Workspaces der Kennung);
+	 * kein Job bleibt für spätere Tests liegen (IJobList baut Jobs als geteilte Instanz)
+	 */
+	private static function runDeletionJob(int $wsId): int {
+		$qb = self::db()->getQueryBuilder();
+		$token = (string)$qb->select('owner_id')->from('nextnotes_workspaces')
+			->where($qb->expr()->eq('id', $qb->createNamedParameter($wsId, IQueryBuilder::PARAM_INT)))
+			->andWhere($qb->expr()->eq('owner_type', $qb->createNamedParameter(UserDataService::DELETED)))
+			->executeQuery()->fetchOne();
+		self::assertStringStartsWith('#', $token, "Workspace $wsId entkoppelt");
+		Server::get(IJobList::class)->remove(UserDataDeletionJob::class, ['token' => $token]);
+		return Server::get(UserDataService::class)->purgeWorkspaces($token);
 	}
 
 	/** Dateien unter appdata …/nextnotes/backgrounds/<wsId>/[<uid>/] (Dateicache) */
@@ -150,6 +172,88 @@ final class ViewsM4gTest extends ApiTestCase {
 		self::assertStringContainsString("Hinweis $mark", self::get($b, 'mentions.php?handled=1')->body, 'handled=1: sichtbar');
 	}
 
+	/** @return int[] eigene Workspace-IDs */
+	private static function ownedIds(string $uid): array {
+		$qb = self::db()->getQueryBuilder();
+		$qb->select('id')->from('nextnotes_workspaces')
+			->where($qb->expr()->eq('owner_type', $qb->createNamedParameter('user')))
+			->andWhere($qb->expr()->eq('owner_id', $qb->createNamedParameter($uid)));
+		return array_map('intval', $qb->executeQuery()->fetchFirstColumn());
+	}
+
+	/** Zähler der Icon-Leiste in einer Seite (null = Badge versteckt) */
+	private static function railBadge(string $html): ?string {
+		self::assertMatchesRegularExpression('/id="iconSidebarMentionsBtn"/', $html, 'Erwähnungen in der Icon-Leiste');
+		preg_match('/id="iconSidebarMentionsBtn".*?<span class="mention-badge"( hidden)?>([^<]*)<\/span>/s', $html, $m);
+		return ($m[1] ?? '') === ' hidden' ? null : ($m[2] ?? null);
+	}
+
+	// M4g-r1 Hinweis 1: Zähler zwischengespeichert, Speichern mit geänderter Erwähnung und die Erwähnungsseite aktualisieren sofort
+	public function testMentionRailCountCache(): void {
+		$a = $this->createUser('ra');
+		$b = $this->createUser('rb');
+		[$ws, $wsId] = self::newWorkspace($a, 'Zähler');
+		Server::get(WorkspaceService::class)->share($a->uid, $wsId, $b->uid, 'write');
+		$n = self::newNote($a, $ws, 'Zähler', "<p>Hallo @{$b->uid}</p>");
+		$n2 = self::newNote($a, $ws, 'Zweite', "<p>Auch @{$b->uid}</p>");
+		self::assertSame('2', self::railBadge(self::get($b, 'index.php')->body), 'zwei offen');
+		self::ok($a->call('PATCH', "/notes/$n", ['content' => '<p>ohne</p>', 'workspace' => $ws]), 'Erwähnung entfernt');
+		self::assertSame('1', self::railBadge(self::get($b, 'index.php')->body), 'Speichern leert den Zähler von B');
+		self::ok($b->call('POST', "/mentions/{$a->uid}/$n2/handled"), 'erledigt');
+		self::assertNull(self::railBadge(self::get($b, 'dashboard.php')->body), 'erledigt: Zähler 0');
+		self::ok($a->call('PATCH', "/notes/$n", ['content' => "<p>wieder @{$b->uid}</p>", 'workspace' => $ws]), 'Erwähnung neu');
+		self::assertSame('1', self::railBadge(self::get($b, 'mentions.php')->body), 'Erwähnungsseite zählt genau');
+	}
+
+	// M4g-r1 Hinweis 2: erwähnende Person gelöscht → neutraler Text; Kontolöschung entfernt eigene Benachrichtigungen
+	public function testMentionNotificationAfterAccountDeletion(): void {
+		$a = $this->createUser('da');
+		$b = $this->createUser('db');
+		$c = $this->createUser('dc');
+		[$ws, $wsId] = self::newWorkspace($c, 'Dritte');
+		Server::get(WorkspaceService::class)->share($c->uid, $wsId, $a->uid, 'write');
+		Server::get(WorkspaceService::class)->share($c->uid, $wsId, $b->uid, 'read');
+		$n = self::newNote($c, $ws, 'Gemeinsam', '<p>leer</p>');
+		self::ok($a->call('PATCH', "/notes/$n", ['content' => "<p>Hallo @{$b->uid}</p>"]), 'A erwähnt B');
+		self::assertSame(1, self::mentionNotifications($n, $b->uid));
+		$prepare = static function (string $by) use ($b, $n): INotification {
+			$x = Server::get(INotificationManager::class)->createNotification();
+			$x->setApp('nextnotes')->setUser($b->uid)->setDateTime(new \DateTime())->setObject('note', (string)$n)->setSubject('mention', ['by' => $by]);
+			return Server::get(Notifier::class)->prepare($x, 'de');
+		};
+		self::assertStringContainsString($a->uid, $prepare($a->uid)->getParsedSubject(), 'vorher: Name/UID von A');
+		$ownA = self::ownedIds($a->uid);
+		Server::get(IUserManager::class)->get($a->uid)?->delete();
+		if ($ownA !== []) {
+			self::runDeletionJob($ownA[0]);
+		}
+		$after = $prepare($a->uid);
+		self::assertSame('Jemand hat dich in Gemeinsam erwähnt', $after->getParsedSubject());
+		self::assertStringNotContainsString($a->uid, json_encode($after->getRichSubjectParameters()) ?: '', 'keine UID in den Parametern');
+		$ownB = self::ownedIds($b->uid);
+		Server::get(IUserManager::class)->get($b->uid)?->delete();
+		if ($ownB !== []) {
+			self::runDeletionJob($ownB[0]);
+		}
+		self::assertSame(0, self::mentionNotifications($n, $b->uid), 'Kontolöschung: Benachrichtigungen des Empfängers weg');
+	}
+
+	// M4g-r1 Hinweis 6 (P27): Ordner-Tags liefern je geänderter Notiz die Version davor und danach
+	public function testFolderTagVersions(): void {
+		$a = $this->createUser('ta');
+		[$ws] = self::newWorkspace($a, 'Tags');
+		$fid = (int)self::ok($a->call('POST', '/folders', ['folder_name' => 'Ordner', 'workspace' => $ws]), 'Ordner')['folder_id'];
+		$n = self::newNote($a, $ws, 'Eins', '<p>eins ü</p>', $fid);
+		$before = self::ok($a->call('GET', "/notes/$n?workspace=" . self::enc($ws)), 'vorher')['note']['version'];
+		sleep(1);
+		$r = self::ok($a->call('POST', "/folders/$fid/tags", ['tags' => ['neu'], 'workspace' => $ws, 'include_subfolders' => true]), 'Ordner-Tag');
+		$after = self::ok($a->call('GET', "/notes/$n?workspace=" . self::enc($ws)), 'nachher')['note']['version'];
+		self::assertNotSame($before, $after);
+		self::assertSame(['from' => $before, 'to' => $after], $r['versions'][(string)$n] ?? null, 'from/to wie GET');
+		$again = self::ok($a->call('POST', "/folders/$fid/tags", ['tags' => ['neu'], 'workspace' => $ws, 'include_subfolders' => true]), 'erneut');
+		self::assertSame([], (array)$again['versions'], 'unverändert: keine Version');
+	}
+
 	public function testMentionNotificationCap(): void {
 		$a = $this->createUser('mx');
 		[$ws, $wsId] = self::newWorkspace($a, 'Viele');
@@ -251,7 +355,10 @@ final class ViewsM4gTest extends ApiTestCase {
 		Server::get(IUserManager::class)->get($a->uid)?->delete();
 		self::assertSame(0, self::backgroundFiles($idB, $a->uid), 'Kontolöschung: A-Bild im geteilten Workspace weg');
 		self::assertSame(1, self::backgroundFiles($idB, $b->uid), 'Kontolöschung: B-Bild bleibt');
-		self::assertGreaterThanOrEqual(0, self::backgroundFiles($idA), 'eigener Workspace folgt mit dem Lösch-Job');
+		self::assertSame(1, self::backgroundFiles($idA, $a->uid), 'eigener Workspace: Bild bis zum Lösch-Job');
+		self::assertGreaterThanOrEqual(1, self::runDeletionJob($idA), 'Lösch-Job');
+		self::assertSame(0, self::backgroundFiles($idA), 'Lösch-Job: eigene Bilder weg');
+		self::assertSame(1, self::backgroundFiles($idB, $b->uid), 'Lösch-Job: B-Bild bleibt');
 	}
 
 	/** InitialState „config“ der Seite (Base64) */

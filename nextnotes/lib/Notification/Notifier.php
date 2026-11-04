@@ -70,6 +70,14 @@ class Notifier implements INotifier {
 		$icon = $this->urls->getAbsoluteURL($this->urls->imagePath(Application::APP_ID, 'app-dark.svg'));
 		if ($notification->getSubject() === 'mention') {
 			$by = (string)($notification->getSubjectParameters()['by'] ?? '');
+			// Konto gelöscht: neutraler Text statt der gespeicherten UID (SPEC §2 UID-Regel)
+			if ($by === '' || !$this->users->userExists($by)) {
+				$subject = $l->t('Someone mentioned you in {note}');
+				return $notification->setParsedSubject(str_replace('{note}', $heading, $subject))
+					->setRichSubject($subject, ['note' => $noteParam])
+					->setLink($link)
+					->setIcon($icon);
+			}
 			$name = $this->users->getDisplayName($by) ?? $by;
 			$subject = $l->t('{user} mentioned you in {note}');
 			return $notification->setParsedSubject(str_replace(['{user}', '{note}'], [$name, $heading], $subject))

@@ -9,9 +9,11 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Listener;
 
+use OCA\NextNotes\AppInfo\Application;
 use OCA\NextNotes\Service\UserDataService;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
+use OCP\Notification\IManager as INotificationManager;
 use OCP\User\Events\UserDeletedEvent;
 use Psr\Log\LoggerInterface;
 
@@ -20,6 +22,7 @@ class UserDeletedListener implements IEventListener {
 	public function __construct(
 		private UserDataService $userData,
 		private LoggerInterface $logger,
+		private INotificationManager $notifications,
 	) {
 	}
 
@@ -32,6 +35,14 @@ class UserDeletedListener implements IEventListener {
 		} catch (\Throwable $e) {
 			$this->logger->error('nextnotes: neutralizing data of deleted user failed', ['uid' => $event->getUid(), 'exception' => $e]);
 			throw $e;
+		}
+		// Eigene Benachrichtigungen der App (Empfänger = gelöschtes Konto) entfernen; Fehler stoppen die Löschung nicht
+		try {
+			$n = $this->notifications->createNotification();
+			$n->setApp(Application::APP_ID)->setUser($event->getUid());
+			$this->notifications->markProcessed($n);
+		} catch (\Throwable $e) {
+			$this->logger->error('nextnotes: removing notifications of deleted user failed', ['uid' => $event->getUid(), 'exception' => $e]);
 		}
 	}
 }

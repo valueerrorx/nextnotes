@@ -819,7 +819,7 @@ class FolderService {
 		$notes = $this->notes->findList([$wsId], ['folder_ids' => $ids]);
 		$noteIds = array_map(static fn (Note $n) => (int)$n->getId(), $notes);
 		$lower = array_map('mb_strtolower', $tags);
-		$updated = $this->tx->run(function () use ($noteIds, $tags, $lower, $add, $uid) {
+		[$updated, $versions] = $this->tx->run(function () use ($noteIds, $tags, $lower, $add, $uid) {
 			$current = $this->tags->tagsFor($noteIds);
 			$changed = [];
 			foreach ($noteIds as $nid) {
@@ -839,10 +839,27 @@ class FolderService {
 					$changed[] = $nid;
 				}
 			}
+			$versions = [];
 			if ($changed !== []) {
-				$this->notes->touch($changed, $uid, $this->time->getTime());
+				// Version vor/nach je Notiz: eine offene Notiz übernimmt „to“ nur, wenn ihre Basis „from“ ist (P27)
+				$now = $this->time->getTime();
+				foreach (array_chunk($changed, 100) as $chunk) {
+					$meta = [];
+					foreach ($this->notes->findListByIds($chunk) as $n) {
+						$meta[(int)$n->getId()] = [$n->getUpdatedAt(), (string)($n->getHeading() ?? '')];
+					}
+					foreach ($this->notes->contentByIds($chunk) as $nid => $content) {
+						[$updated, $heading] = $meta[$nid];
+						$hash = md5($content);
+						$versions[(string)$nid] = [
+							'from' => NoteSerializer::versionOf($updated, $heading, $hash),
+							'to' => NoteSerializer::versionOf($now, $heading, $hash),
+						];
+					}
+				}
+				$this->notes->touch($changed, $uid, $now);
 			}
-			return count($changed);
+			return [count($changed), $versions];
 		});
 		return [
 			'message' => ($add ? 'Tagged ' : 'Untagged ') . $updated . ' notes',
@@ -850,6 +867,7 @@ class FolderService {
 			'notes_count' => count($noteIds),
 			'note_ids' => $noteIds,
 			'updated_count' => $updated,
+			'versions' => (object)$versions,
 			'include_subfolders' => $include,
 		];
 	}

@@ -38,7 +38,12 @@ class NoteSerializer {
 
 	// Upstream poznoteNoteVersion: md5(updated|heading|md5(content))
 	public static function version(Note $note): string {
-		return md5((string)self::date($note->getUpdatedAt()) . '|' . (string)($note->getHeading() ?? '') . '|' . md5((string)($note->getContent() ?? '')));
+		return self::versionOf($note->getUpdatedAt(), (string)($note->getHeading() ?? ''), md5((string)($note->getContent() ?? '')));
+	}
+
+	// Gleiche Version aus Bausteinen (Ordner-Tags: Version vor/nach dem Touch, P27)
+	public static function versionOf(?int $updatedAt, string $heading, string $contentHash): string {
+		return md5((string)self::date($updatedAt) . '|' . $heading . '|' . $contentHash);
 	}
 
 	// ETag = Inhaltsversion + Prüfsumme der ganzen Antwort (reminder_at, Tags, Favorit …); If-Match nutzt nur den Teil vor '-'

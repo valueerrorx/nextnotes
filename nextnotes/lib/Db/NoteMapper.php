@@ -220,6 +220,30 @@ class NoteMapper extends QBMapper {
 	}
 
 	/**
+	 * Treffer der search_text-Suche ohne Inhalt (Erwähnungszähler, neueste zuerst)
+	 * @param int[] $workspaceIds
+	 * @return list<array{id: int, type: string, bytes: int}>
+	 */
+	public function searchSizes(array $workspaceIds, string $search): array {
+		$out = [];
+		foreach (array_chunk(array_values(array_unique($workspaceIds)), 1000) as $chunk) {
+			$qb = $this->db->getQueryBuilder();
+			$qb->select('id', 'type', 'updated_at')->selectAlias($qb->func()->octetLength('content'), 'bytes')->from(self::TABLE)
+				->where($qb->expr()->in('workspace_id', $qb->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY)))
+				->andWhere($qb->expr()->eq('role', $qb->createNamedParameter('note')))
+				->andWhere($qb->expr()->isNull('trashed_at'))
+				->andWhere($qb->expr()->like('search_text', $qb->createNamedParameter('%' . $this->db->escapeLikeParameter($search) . '%')));
+			$res = $qb->executeQuery();
+			while ($row = $res->fetch()) {
+				$out[] = ['id' => (int)$row['id'], 'type' => (string)($row['type'] ?: 'note'), 'bytes' => (int)$row['bytes'], 'updated' => (int)$row['updated_at']];
+			}
+			$res->closeCursor();
+		}
+		usort($out, static fn (array $a, array $b) => [$b['updated'], $b['id']] <=> [$a['updated'], $a['id']]);
+		return array_map(static fn (array $r) => ['id' => $r['id'], 'type' => $r['type'], 'bytes' => $r['bytes']], $out);
+	}
+
+	/**
 	 * Inhalt je Notiz (Export lädt stückweise)
 	 * @param int[] $ids
 	 * @return array<int, string>

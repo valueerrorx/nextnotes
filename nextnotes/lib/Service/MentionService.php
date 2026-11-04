@@ -17,7 +17,10 @@ use OCA\NextNotes\Db\WsShareMapper;
 use OCA\NextNotes\Service\Exception\BadRequestException;
 use OCA\NextNotes\Service\Exception\NotFoundException;
 use OCA\NextNotes\AppInfo\Application;
+use OCA\NextNotes\Service\View\TrashViewService;
 use OCP\AppFramework\Utility\ITimeFactory;
+use OCP\ICache;
+use OCP\ICacheFactory;
 use OCP\IDateTimeFormatter;
 use OCP\IUserManager;
 use OCP\Notification\IManager as INotificationManager;
@@ -27,6 +30,10 @@ use Psr\Log\LoggerInterface;
 class MentionService {
 	// Höchstens so viele Benachrichtigungen je Speichervorgang (Plan M4g, SPEC §4.5)
 	public const MAX_NOTIFY = 20;
+	// Zähler der Icon-Leiste je Benutzer (Sekunden); Speichern mit geänderter Erwähnung und die Erwähnungsseite leeren ihn
+	public const RAIL_TTL = 60;
+
+	private ICache $cache;
 
 	public function __construct(
 		private NoteMapper $notes,
@@ -40,7 +47,9 @@ class MentionService {
 		private IUserManager $users,
 		private IDateTimeFormatter $dates,
 		private LoggerInterface $logger,
+		ICacheFactory $cacheFactory,
 	) {
+		$this->cache = $cacheFactory->createDistributed(Application::APP_ID . '-mentions');
 	}
 
 	/** @return array{open: int, mentions: list<array<string, mixed>>} GET /mentions */
@@ -80,7 +89,8 @@ class MentionService {
 		} else {
 			$this->handled->remove($noteId, $uid);
 		}
-		return ['handled' => $handled, 'open' => count($this->collect($uid, false))];
+		$this->forget($uid);
+		return ['handled' => $handled, 'open' => (int)$this->railCount($uid)];
 	}
 
 	/**
@@ -145,12 +155,53 @@ class MentionService {
 		return $out;
 	}
 
-	/** Offene Erwähnungen für die Icon-Leiste; null = kein geteilter Workspace (Eintrag fehlt wie Upstream) */
+	/** Offene Erwähnungen für die Icon-Leiste; null = kein geteilter Workspace (Eintrag fehlt wie Upstream); kurz zwischengespeichert */
 	public function railCount(string $uid): ?int {
-		if ($this->shares->sharedWorkspaceIds($this->access->visibleWorkspaceIds($uid)) === []) {
+		$key = self::cacheKey($uid);
+		$cached = $this->cache->get($key);
+		if (is_int($cached)) {
+			return $cached < 0 ? null : $cached;
+		}
+		$count = $this->countOpen($uid);
+		$this->cache->set($key, $count ?? -1, self::RAIL_TTL);
+		return $count;
+	}
+
+	public function forget(string $uid): void {
+		$this->cache->remove(self::cacheKey($uid));
+	}
+
+	private static function cacheKey(string $uid): string {
+		return 'rail-' . md5($uid);
+	}
+
+	// Wie collect(…, false), aber ohne Inhalt über dem Render-Budget: solche Treffer zählen ohne Erledigt-Eintrag als offen
+	private function countOpen(string $uid): ?int {
+		$wsIds = $this->shares->sharedWorkspaceIds($this->access->visibleWorkspaceIds($uid));
+		if ($wsIds === []) {
 			return null;
 		}
-		return count($this->collect($uid, false, null, false));
+		$handled = $this->handled->countsFor($uid);
+		$budget = TrashViewService::RENDER_BUDGET;
+		$types = [];
+		$open = 0;
+		foreach ($this->notes->searchSizes($wsIds, '@' . $this->normalizer->fold($uid)) as $row) {
+			if ($row['bytes'] <= $budget) {
+				$budget -= $row['bytes'];
+				$types[$row['id']] = $row['type'];
+			} elseif (!isset($handled[$row['id']])) {
+				$open++;
+			}
+		}
+		foreach (array_chunk(array_keys($types), 100) as $chunk) {
+			foreach ($this->notes->contentByIds($chunk) as $id => $content) {
+				$count = self::count(self::plainText($content, $types[$id]), $uid);
+				if ($count > 0 && (!isset($handled[$id]) || $count > $handled[$id])) {
+					$open++;
+				}
+			}
+		}
+		return $open;
 	}
 
 	/**
@@ -159,8 +210,11 @@ class MentionService {
 	 */
 	public function page(string $uid, bool $showHandled): array {
 		$hasShared = $this->shares->sharedWorkspaceIds($this->access->visibleWorkspaceIds($uid)) !== [];
+		$all = $hasShared ? $this->collect($uid, $showHandled, null, false) : [];
+		// Seite zählt genau: Zähler der Icon-Leiste neu setzen
+		$this->cache->set(self::cacheKey($uid), $hasShared ? count(array_filter($all, static fn (array $m) => !$m['handled'])) : -1, self::RAIL_TTL);
 		$groups = [];
-		foreach ($hasShared ? $this->collect($uid, $showHandled, null, false) : [] as $m) {
+		foreach ($all as $m) {
 			$key = $m['owner_user_id'] . "\n" . $m['workspace'];
 			$owner = $m['owner_user_id'];
 			$groups[$key] ??= [
@@ -180,11 +234,13 @@ class MentionService {
 	/**
 	 * Nach dem Speichern: neu erwähnte Mitglieder (Besitzer, Freigabeempfänger) eines geteilten Workspace benachrichtigen
 	 * Diff alt/neu, höchstens MAX_NOTIFY in Reihenfolge im Text, nie an sich selbst; Fehler brechen das Speichern nicht ab
+	 * Mitglieder mit geänderter Anzahl verlieren ihren Zähler der Icon-Leiste
 	 */
 	public function notifyNew(string $uid, Note $note, string $oldContent): void {
 		try {
 			$new = (string)($note->getContent() ?? '');
-			if (!str_contains($new, '@') || $note->getRole() !== 'note' || $note->getWorkspaceId() === null) {
+			$hadAt = str_contains($oldContent, '@');
+			if ((!str_contains($new, '@') && !$hadAt) || $note->getRole() !== 'note' || $note->getWorkspaceId() === null) {
 				return;
 			}
 			$ws = $this->access->requireWorkspace($uid, (int)$note->getWorkspaceId(), 'read');
@@ -193,11 +249,15 @@ class MentionService {
 				return;
 			}
 			$type = (string)($note->getType() ?: 'note');
-			$newText = self::plainText($new, $type);
-			$oldText = str_contains($oldContent, '@') ? self::plainText($oldContent, $type) : '';
+			$newText = str_contains($new, '@') ? self::plainText($new, $type) : '';
+			$oldText = $hadAt ? self::plainText($oldContent, $type) : '';
 			$found = [];
 			foreach (array_unique(array_merge([(string)$ws->getOwnerId()], $recipients)) as $member) {
-				if ($member === $uid || self::count($oldText, $member) > 0 || !Pcre::match(self::pattern($member), $newText, $m, PREG_OFFSET_CAPTURE)) {
+				$before = self::count($oldText, $member);
+				if ($before !== self::count($newText, $member)) {
+					$this->forget($member);
+				}
+				if ($member === $uid || $before > 0 || !Pcre::match(self::pattern($member), $newText, $m, PREG_OFFSET_CAPTURE)) {
 					continue;
 				}
 				$found[$member] = (int)$m[0][1];

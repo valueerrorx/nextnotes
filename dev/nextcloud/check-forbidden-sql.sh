@@ -9,6 +9,8 @@ scan() {
 	local dir="$1" rc=0
 	grep -rnE 'datetime\(|COLLATE|INSERT OR|REPLACE INTO|PRAGMA|ON CONFLICT|\$_SESSION|X-User-ID' "$dir" && rc=1
 	grep -rnE -- '->(prepare|executeQuery|executeStatement)\(\s*['"'"'"]' "$dir" && rc=1
+	# IFunctionBuilder::md5 ist seit NC 35.0.0 deprecated
+	grep -rnE -- '->md5\(' "$dir" && rc=1
 	return $rc
 }
 
@@ -18,6 +20,8 @@ if [[ "${SELFTEST:-0}" == 1 ]]; then
 	scan "$tmp" >/dev/null && die "Selbsttest: Roh-SQL nicht erkannt"
 	echo '<?php $x = $_SESSION["a"];' > "$tmp/probe.php"
 	scan "$tmp" >/dev/null && die "Selbsttest: \$_SESSION nicht erkannt"
+	echo '<?php $qb->func()->md5("content");' > "$tmp/probe.php"
+	scan "$tmp" >/dev/null && die "Selbsttest: md5 im QueryBuilder nicht erkannt"
 	echo '<?php $qb->executeQuery();' > "$tmp/probe.php"
 	scan "$tmp" >/dev/null || die "Selbsttest: Fehlalarm bei QueryBuilder"
 	echo "check-forbidden-sql: Selbsttest OK"
