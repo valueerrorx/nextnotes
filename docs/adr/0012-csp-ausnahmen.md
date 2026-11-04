@@ -39,3 +39,6 @@ Probe „Bild einfügen“ auf `excalidraw_editor.php` (PNG 200 KB und 3 MB/2000
 
 ## Nachtrag M3-fix4 (2026-11-03)
 NC sendet `Feature-Policy: … microphone 'none'`. Die Hauptansicht (`index`) erhält `microphone 'self'` (`FeaturePolicy::addAllowedMicrophoneDomain("'self'")`, @since 17, über `CspFactory::featurePolicyForView`, von NC mit den Standardwerten zusammengeführt) für „Audio aufnehmen“ (ADR 0010 Nachtrag). Alle anderen Ansichten behalten `'none'`; keine fremden Domains, keine Kamera.
+
+## Nachtrag M4c (2026-11-04)
+Druckansicht `export_print` (`api_export_note.php?format=html&disposition=inline`) erhält dieselbe Policy wie die Notizansicht: `frame-src 'self'` und je Embed-Domain `https://<host>` (`CspFactory::NOTE_VIEWS`), damit eingebettete Videos auch im Druck erscheinen. Keine weitere Lockerung; KaTeX/Mermaid kommen aus dem App-Pfad, Skript über NC-Nonce.

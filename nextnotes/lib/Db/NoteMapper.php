@@ -156,6 +156,41 @@ class NoteMapper extends QBMapper {
 	}
 
 	/**
+	 * Ziele von [[…]] in einem Workspace (B47): per ID oder Kandidaten per Titel (search_text beginnt mit dem gefalteten Titel), ohne Papierkorb
+	 * @param int[] $ids
+	 * @param string[] $foldedTitles
+	 * @return Note[]
+	 */
+	public function findReferenced(int $workspaceId, array $ids, array $foldedTitles): array {
+		// je Abfrage ≤ 1000 IDs und ≤ 400 Titel (Parametergrenzen SQLite/PostgreSQL); übliche Notizen: eine Abfrage
+		$idChunks = array_chunk(array_values(array_unique($ids)), 1000);
+		$titleChunks = array_chunk(array_values(array_unique($foldedTitles)), 400);
+		$result = [];
+		for ($k = 0, $n = max(count($idChunks), count($titleChunks)); $k < $n; $k++) {
+			$qb = $this->db->getQueryBuilder();
+			$expr = $qb->expr();
+			$or = [];
+			if (isset($idChunks[$k])) {
+				$or[] = $expr->in('id', $qb->createNamedParameter($idChunks[$k], IQueryBuilder::PARAM_INT_ARRAY));
+			}
+			foreach ($titleChunks[$k] ?? [] as $t) {
+				$or[] = $expr->eq('search_text', $qb->createNamedParameter($t));
+				$or[] = $expr->like('search_text', $qb->createNamedParameter($this->db->escapeLikeParameter($t) . ' %'));
+			}
+			$qb->select(...self::LIST_COLUMNS)->from(self::TABLE)
+				->where($expr->eq('workspace_id', $qb->createNamedParameter($workspaceId, IQueryBuilder::PARAM_INT)))
+				->andWhere($expr->eq('role', $qb->createNamedParameter('note')))
+				->andWhere($expr->isNull('trashed_at'))
+				->andWhere($expr->orX(...$or));
+			foreach ($this->findEntities($qb) as $note) {
+				$result[(int)$note->getId()] = $note;
+			}
+		}
+		ksort($result);
+		return array_values($result);
+	}
+
+	/**
 	 * Notizen in Ordnern auf anderen Workspace umhängen
 	 * @param int[] $folderIds
 	 */

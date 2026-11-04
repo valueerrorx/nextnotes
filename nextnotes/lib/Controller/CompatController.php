@@ -9,9 +9,11 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Controller;
 
+use OCA\NextNotes\AppInfo\Application;
 use OCA\NextNotes\Db\Note;
 use OCA\NextNotes\Db\NoteTagMapper;
 use OCA\NextNotes\Http\AttachmentResponse;
+use OCA\NextNotes\Http\CspFactory;
 use OCA\NextNotes\Service\AccessService;
 use OCA\NextNotes\Service\AttachmentService;
 use OCA\NextNotes\Service\Exception\BadRequestException;
@@ -20,9 +22,11 @@ use OCA\NextNotes\Service\Exception\NotImplementedException;
 use OCA\NextNotes\Service\Exception\NotFoundException;
 use OCA\NextNotes\Service\Exception\TooLargeException;
 use OCA\NextNotes\Service\ExcalidrawService;
+use OCA\NextNotes\Service\ExportService;
 use OCA\NextNotes\Service\FolderService;
 use OCA\NextNotes\Service\ImportService;
 use OCA\NextNotes\Service\SettingsService;
+use OCA\NextNotes\Service\View\PageAssets;
 use OCA\NextNotes\Service\View\PageTranslator;
 use OCA\NextNotes\Service\WorkspaceService;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
@@ -30,7 +34,11 @@ use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\Attribute\UserRateLimit;
 use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\FileDisplayResponse;
+use OCP\App\IAppManager;
 use OCP\AppFramework\Http\JSONResponse;
+use OCP\AppFramework\Http\Response;
+use OCP\AppFramework\Http\StreamResponse;
+use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IDateTimeFormatter;
 use OCP\IRequest;
 use OCP\IUserManager;
@@ -52,6 +60,10 @@ class CompatController extends ApiController {
 		private IUserManager $users,
 		private ExcalidrawService $excalidraw,
 		private ImportService $import,
+		private ExportService $export,
+		private CspFactory $cspFactory,
+		private PageAssets $assets,
+		private IAppManager $appManager,
 	) {
 		parent::__construct($request, $userSession, $workspaces);
 	}
@@ -109,30 +121,50 @@ class CompatController extends ApiController {
 		]]);
 	}
 
-	// Upstream api_download_note.php: gespeicherte Form als Datei (Export mit Formatierung: M4, Plan-O2)
+	// Upstream api_download_note.php: formatiertes HTML bzw. Markdown roh (B56); verknüpfte Notiz → Ziel (B42)
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
-	public function downloadNote(): DataDownloadResponse {
-		$note = $this->note('id');
-		$type = (string)($note->getType() ?: 'note');
-		[$ext, $mime] = match ($type) {
-			'markdown' => ['md', 'text/markdown'],
-			'tasklist', 'excalidraw' => ['json', 'application/json'],
-			default => ['html', 'text/html'],
-		};
-		$base = preg_replace('/[^a-zA-Z0-9_\-]/', '_', (string)($note->getHeading() ?? '')) ?: 'note_' . (int)$note->getId();
-		$response = new DataDownloadResponse((string)($note->getContent() ?? ''), $base . '.' . $ext, $mime . '; charset=utf-8');
+	#[UserRateLimit(limit: 30, period: 60)]
+	public function downloadNote(): Response {
+		return self::fileResponse($this->export->download($this->uid(), $this->param('id'), $this->param('workspace')));
+	}
+
+	// Upstream api_export_note.php: html (ZIP mit Anhängen), html_embedded, markdown (ZIP mit Anhängen), json; Druckansicht nur format=html&disposition=inline (B48)
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	#[UserRateLimit(limit: 30, period: 60)]
+	public function exportNote(): Response {
+		$uid = $this->uid();
+		$r = $this->export->export($uid, $this->param('id'), $this->param('workspace'), $this->param('format'), $this->param('disposition'));
+		if ($r['kind'] !== 'print') {
+			return self::fileResponse($r);
+		}
+		$this->assets->print();
+		$response = new TemplateResponse(Application::APP_ID, 'export_print', [
+			'title' => $r['title'], 'tags' => $r['tags'], 'noteId' => $r['noteId'], 'type' => $r['type'], 'body' => $r['body'],
+			'bodyClasses' => $r['bodyClasses'], 'fontSize' => $r['fontSize'],
+			'assetBase' => $this->appManager->getAppWebPath(Application::APP_ID), 'version' => $this->appManager->getAppVersion(Application::APP_ID),
+		], TemplateResponse::RENDER_AS_BASE);
+		// iframes wie in der Notizansicht (frame-src self + Embed-Domains)
+		$response->setContentSecurityPolicy($this->cspFactory->forView('export_print'));
 		$response->addHeader('X-Content-Type-Options', 'nosniff');
-		$response->addHeader('Cache-Control', 'no-cache, must-revalidate');
 		return $response;
 	}
 
-	// Upstream api_export_note.php: Rechteprüfung, Export folgt mit ExportService (M4, Plan-O2)
-	#[NoAdminRequired]
-	#[NoCSRFRequired]
-	public function exportNote(): JSONResponse {
-		$this->note('id');
-		throw new NotImplementedException('not_implemented');
+	/** @param array<string, mixed> $r ExportService-Ergebnis file|zip: immer Download, nosniff (B48) */
+	private static function fileResponse(array $r): Response {
+		if ($r['kind'] === 'zip') {
+			$response = new StreamResponse($r['stream']);
+			$response->addHeader('Content-Type', $r['mime']);
+			$response->addHeader('Content-Length', (string)$r['size']);
+			// Name aus ExportFormatter::fileName: nur [A-Za-z0-9 _-]
+			$response->addHeader('Content-Disposition', 'attachment; filename="' . $r['name'] . '"');
+		} else {
+			$response = new DataDownloadResponse($r['body'], $r['name'], $r['mime']);
+		}
+		$response->addHeader('X-Content-Type-Options', 'nosniff');
+		$response->addHeader('Cache-Control', 'no-cache, must-revalidate');
+		return $response;
 	}
 
 	// Upstream api_export_folder.php: Rechteprüfung, Export folgt mit ExportService (M4, Plan-O2)

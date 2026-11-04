@@ -417,21 +417,20 @@ class NoteService {
 		$tagList = array_key_exists('tags', $in) ? $this->validator->noteTags($in['tags']) : null;
 		$stateHash = (isset($in['state_hash']) && is_string($in['state_hash']) && preg_match('/^[0-9a-f-]{1,80}$/', $in['state_hash'])) ? $in['state_hash'] : null;
 		// Base64-Bilder einer HTML-Notiz → Anhänge (Upstream #1471, M4b); Grenzen vor der Transaktion, nichts geändert bei 413
-		$images = is_scalar($content) && $writable->getType() === 'note' ? $this->images->prepare((string)$content, (int)$writable->getWorkspaceId()) : null;
-		$created = [];
-		try {
-			return $this->tx->run(function () use ($uid, $id, $in, $expected, $newHeading, $content, $tagList, $stateHash, $images, &$created) {
-				$this->attachments->enforceQuota($images['quota'] ?? null);
-				return $this->updateLocked($uid, $id, $in, $expected, $newHeading, $content, $tagList, $stateHash, $images, $created);
-			});
-		} catch (\Throwable $e) {
-			$this->images->discard($created);
-			throw $e;
+		// Quote gegen den Ziel-Workspace, falls die Notiz mit dem Speichern umzieht (M4b-r1 MINOR 2)
+		$images = null;
+		if (is_scalar($content) && $writable->getType() === 'note') {
+			$target = is_string($in['workspace'] ?? null) && trim($in['workspace']) !== '' ? $this->workspaces->requireByKey($uid, trim($in['workspace']), 'write') : null;
+			$images = $this->images->prepare((string)$content, $target !== null ? (int)$target->getId() : (int)$writable->getWorkspaceId());
 		}
+		return $this->tx->run(function () use ($uid, $id, $in, $expected, $newHeading, $content, $tagList, $stateHash, $images) {
+			$this->attachments->enforceQuota($images['quota'] ?? null);
+			return $this->updateLocked($uid, $id, $in, $expected, $newHeading, $content, $tagList, $stateHash, $images);
+		});
 	}
 
 	/** @return array<string, mixed> */
-	private function updateLocked(string $uid, int $id, array $in, string $expected, ?string $newHeading, mixed $content, ?array $tagList, ?string $stateHash, ?array $images, array &$created): array {
+	private function updateLocked(string $uid, int $id, array $in, string $expected, ?string $newHeading, mixed $content, ?array $tagList, ?string $stateHash, ?array $images): array {
 		// Versionsprüfung und Schreiben unter Zeilensperre (wie Aufgaben): keine verlorene Änderung
 		$this->notes->lockRow($id);
 		$note = $this->notes->find($id);
@@ -505,7 +504,7 @@ class NoteService {
 		if ($content !== null) {
 			$content = is_scalar($content) ? (string)$content : '';
 			if ($images !== null && $note->getType() === 'note') {
-				['content' => $content, 'adopted' => $adopted] = $this->images->store($images, $id, $content, $uid, $created);
+				['content' => $content, 'adopted' => $adopted] = $this->images->store($images, $id, $content, $uid);
 			}
 			$this->applyContent($note, $content);
 		} else {

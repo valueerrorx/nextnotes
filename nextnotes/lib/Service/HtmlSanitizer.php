@@ -40,7 +40,7 @@ class HtmlSanitizer {
 		'th' => ['colspan', 'rowspan', 'scope'],
 		'ol' => ['type', 'start'],
 		'div' => ['class', 'data-tasklist-json', 'data-markdown-content', 'data-excalidraw', 'data-diagram-id', 'data-task-embed', 'contenteditable'],
-		'span' => ['class'],
+		'span' => ['class', 'data-math'],
 		'input' => ['type', 'checked', 'disabled'],
 		'time' => ['datetime'],
 		'blockquote' => ['cite'],
@@ -164,17 +164,24 @@ class HtmlSanitizer {
 		}
 	}
 
+	/** Einzige loadHTML-Stelle der App (check-upstream h): Meldungen aus, nichts gesammelt (B39); letzter Fehler bleibt abfragbar */
+	public static function loadHtmlQuiet(DOMDocument $dom, string $html, int $flags): bool {
+		$previous = libxml_use_internal_errors(false);
+		set_error_handler(static fn (): bool => true);
+		try {
+			return $dom->loadHTML($html, $flags | LIBXML_NOERROR | LIBXML_NOWARNING);
+		} finally {
+			restore_error_handler();
+			libxml_use_internal_errors($previous);
+		}
+	}
+
 	private function sanitizeDom(string $html): string {
 		$dom = new DOMDocument();
 		$dom->encoding = 'UTF-8';
 		// ohne schließendes </body>: sonst je offenem Tag ein Fehler; PARSEHUGE: sonst fällt ein Attribut > 10 MB weg (B37)
 		$wrapped = '<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"></head><body>' . $html;
-		set_error_handler(static fn (): bool => true);
-		try {
-			$dom->loadHTML($wrapped, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD | LIBXML_PARSEHUGE | LIBXML_NOERROR | LIBXML_NOWARNING);
-		} finally {
-			restore_error_handler();
-		}
+		self::loadHtmlQuiet($dom, $wrapped, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD | LIBXML_PARSEHUGE);
 		// Fataler Fehler hält den Parser an und ist dann der letzte; Rest wäre abgeschnitten → ablehnen (B37)
 		$error = libxml_get_last_error();
 		if ($error !== false && $error->level === LIBXML_ERR_FATAL) {

@@ -168,6 +168,8 @@ class IndexViewService {
 			}
 		}
 		$noteFolderId = $note?->getFolderId();
+		// verknüpfte Notiz zeigt das Ziel (B42, Upstream note_loader.php), Auswahl im Baum bleibt die Verknüpfung
+		$shown = $note !== null ? $this->access->resolveLinked($uid, $note) : null;
 
 		$tree = $this->tree($uid, $baseUrl, $key, $byId, $notes, $tagMap, $sort, $favSort, $note, $folderFilter, $openFolder, $search);
 		$titleColor = self::colorHex($ws->getColor());
@@ -177,7 +179,7 @@ class IndexViewService {
 			'workspaceColor' => $titleColor,
 			'canWrite' => $canWrite,
 			'replaceWorkspace' => $requested !== $key ? $key : null,
-			'noteId' => $note !== null ? (int)$note->getId() : null,
+			'noteId' => $shown !== null ? (int)$shown->getId() : null,
 			'sort' => $sort,
 			'sortIcons' => self::SORT_ICONS,
 			'sortModes' => self::SORT_MODES,
@@ -196,7 +198,7 @@ class IndexViewService {
 			'globals' => $this->globals($uid, $key),
 			'hiddenUiElements' => $this->hiddenUi($uid),
 			'prefetchedSettings' => ['tasklist_insert_order' => $this->value($uid, 'tasklist_insert_order') === 'top' ? 'top' : 'bottom'],
-			'note' => $note !== null ? $this->noteView($uid, $note, $key, $canWrite, $byId) : null,
+			'note' => $shown !== null ? $this->shownView($uid, $shown, $wsId, $key, $canWrite, $byId) : null,
 			'iconPalette' => self::iconPalette(),
 		];
 	}
@@ -215,7 +217,19 @@ class IndexViewService {
 		if (!ctype_digit($rawNote)) {
 			throw new NotFoundException('Note not found');
 		}
-		$note = $this->access->requireNote($uid, (int)$rawNote, 'read');
+		$note = $this->access->resolveLinked($uid, $this->access->requireNote($uid, (int)$rawNote, 'read'));
+		return ['note' => $this->shownView($uid, $note, null, '', false, [])];
+	}
+
+	/**
+	 * Angezeigte Notiz; liegt sie nicht im Seiten-Workspace (Ziel einer Verknüpfung), Schlüssel/Rechte/Ordner aus ihrem Workspace
+	 * @param array<int, Folder> $byId Ordner des Seiten-Workspace
+	 * @throws NotFoundException Workspace für uid nicht erreichbar
+	 */
+	private function shownView(string $uid, Note $note, ?int $pageWsId, string $pageKey, bool $pageCanWrite, array $byId): array {
+		if ($pageWsId !== null && (int)$note->getWorkspaceId() === $pageWsId) {
+			return $this->noteView($uid, $note, $pageKey, $pageCanWrite, $byId);
+		}
 		// kein Schlüssel = Workspace für uid nicht erreichbar, kein Rückfall auf den Standard-Workspace
 		$key = $this->workspaces->keyFor($uid, (int)$note->getWorkspaceId());
 		if ($key === null) {
@@ -223,7 +237,7 @@ class IndexViewService {
 		}
 		$ws = $this->workspaces->resolveKey($uid, $key);
 		$canWrite = $this->access->workspaceLevel($uid, $ws) >= AccessService::WRITE;
-		return ['note' => $this->noteView($uid, $note, $key, $canWrite, $this->folders->byId((int)$ws->getId()))];
+		return $this->noteView($uid, $note, $key, $canWrite, $this->folders->byId((int)$ws->getId()));
 	}
 
 	/**
@@ -643,6 +657,26 @@ class IndexViewService {
 	}
 
 	/** @return array<string, mixed> Klassen/Attribute für <body> (Upstream index.php:480-635), setzt der Adapter */
+	/**
+	 * Lese-Einstellungen für die Druckansicht (Upstream generatePrintHtml): body-Klassen und Schriftgröße
+	 * @return array{classes: list<string>, fontSize: string}
+	 */
+	public function readingSettings(string $uid): array {
+		$this->values = [];
+		$classes = ['note-print-body'];
+		if (!$this->bool($uid, 'code_block_word_wrap')) {
+			$classes[] = 'code-block-no-wrap';
+		}
+		if ($this->bool($uid, 'code_block_line_numbers')) {
+			$classes[] = 'code-block-line-numbers';
+		}
+		if (!$this->bool($uid, 'markdown_heading_underline')) {
+			$classes[] = 'markdown-no-heading-underline';
+		}
+		$size = $this->value($uid, 'note_font_size');
+		return ['classes' => $classes, 'fontSize' => (ctype_digit($size) && (int)$size >= 8 && (int)$size <= 40 ? (int)$size : 15) . 'px'];
+	}
+
 	private function body(string $uid, string $key, bool $noNote): array {
 		$classes = [];
 		$flag = function (string $setting, string $class, bool $when = true) use ($uid, &$classes): void {

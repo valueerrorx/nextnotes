@@ -9,13 +9,12 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Service;
 
-use OCA\NextNotes\Db\Attachment;
 use OCA\NextNotes\Service\Exception\TooLargeException;
 
 /**
  * Base64-Bilder einer HTML-Notiz als Anhänge (Upstream NotesController::convertBase64ImagesToAttachments, M4b).
  * Ablauf: prepare() vor der Transaktion (dekodieren, Grenzen, Quote vorprüfen) → in der Transaktion zuerst
- * AttachmentService::enforceQuota, dann store() → bei Fehler discard() (Dateien weg, Zeilen über Rollback).
+ * AttachmentService::enforceQuota, dann store(); rollt eine (auch äußere) Transaktion zurück, löscht Transaction::onRollback die Dateien.
  */
 class EmbeddedImageService {
 	private const IMG_TAG = '/<img\b[^<>]*+>/i';
@@ -24,6 +23,7 @@ class EmbeddedImageService {
 
 	public function __construct(
 		private AttachmentService $attachments,
+		private Transaction $tx,
 	) {
 	}
 
@@ -68,16 +68,16 @@ class EmbeddedImageService {
 	/**
 	 * In der Transaktion nach enforceQuota: Anhänge anlegen, src ersetzen
 	 * @param array{images: array<string, array{data: string, mime: string, ext: string, alt: string}>, quota: ?array} $prepared
-	 * @param list<Attachment> $created angelegte Anhänge (für discard)
 	 * @return array{content: string, adopted: list<array{url: string, id: string}>}
 	 */
-	public function store(array $prepared, int $noteId, string $html, string $uid, array &$created): array {
+	public function store(array $prepared, int $noteId, string $html, string $uid): array {
 		$ids = [];
 		$adopted = [];
 		foreach ($prepared['images'] as $url => $img) {
 			$name = AttachmentService::generatedName($img['alt'], $img['ext'], 'image');
 			$a = $this->attachments->createFromString($noteId, $name, $img['mime'], $img['data'], $uid);
-			$created[] = $a;
+			// Zeile verschwindet mit dem Rollback, die Datei nicht (M4b-r1 MINOR 1)
+			$this->tx->onRollback(fn () => $this->attachments->deleteFileNow($noteId, (int)$a->getId()));
 			$ids[$url] = (string)$a->getId();
 			$adopted[] = ['url' => $url, 'id' => (string)$a->getId()];
 		}
@@ -101,10 +101,4 @@ class EmbeddedImageService {
 		return ['content' => $content, 'adopted' => $adopted];
 	}
 
-	/** @param list<Attachment> $created Dateien eines fehlgeschlagenen Speicherns sofort löschen */
-	public function discard(array $created): void {
-		foreach ($created as $a) {
-			$this->attachments->discardNew((int)$a->getNoteId(), (int)$a->getId());
-		}
-	}
 }

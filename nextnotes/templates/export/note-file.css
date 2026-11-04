@@ -1,0 +1,382 @@
+/* SPDX-FileCopyrightText: 2026 Thomas Weissel
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ * abgeleitet von src/public/api_export_note.php (generateStyledHtml) @ 7e2e0b6aa501ba95ac1e9789fd2bb477c281a001; Stil exportierter HTML-Dateien (ExportFormatter) */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.2;
+    color: #333;
+    background: white;
+    padding: 40px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.note-metadata {
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.note-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin-bottom: 15px;
+}
+
+.note-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.note-tag {
+    display: inline-block;
+    padding: 4px 12px;
+    background: #f0f0f0;
+    border: 1px solid #d0d0d0;
+    border-radius: 12px;
+    font-size: 13px;
+    color: #555;
+}
+
+.note-attachments {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-top: 15px;
+    font-size: 14px;
+}
+
+.note-attachments a {
+    color: #0645ad;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(6, 69, 173, 0.35);
+}
+
+.note-attachments a:hover {
+    border-bottom-color: #0645ad;
+}
+
+.note-content {
+    font-size: 16px;
+    line-height: 1.2;
+}
+
+/* Code blocks */
+pre {
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 16px;
+    overflow-x: auto;
+    margin: 16px 0;
+    font-family: "Consolas", "Monaco", "Courier New", monospace;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+code {
+    background: #f0f0f0;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: "Consolas", "Monaco", "Courier New", monospace;
+    font-size: 14px;
+}
+
+pre code {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+    margin-top: 24px;
+    margin-bottom: 16px;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+h1 { font-size: 28px; }
+h2 { font-size: 24px; }
+h3 { font-size: 20px; }
+h4 { font-size: 18px; }
+h5 { font-size: 16px; }
+h6 { font-size: 14px; }
+
+/* Lists */
+ul, ol {
+    margin: 16px 0;
+    padding-left: 32px;
+}
+
+li {
+    margin: 8px 0;
+}
+
+ul.dash-list {
+    list-style-type: "-\00a0\00a0";
+}
+
+/* Tables */
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 16px 0;
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 12px;
+    text-align: left;
+}
+
+th {
+    background: #f5f5f5;
+    font-weight: 600;
+}
+
+/* Links */
+a {
+    color: #0066cc;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* A [[Note Title]] that matches no note, as the app shows it */
+.note-link-broken {
+    color: #dc3545;
+    text-decoration: line-through;
+}
+
+/* Blockquotes */
+blockquote {
+    border-left: 4px solid #ddd;
+    padding-left: 16px;
+    margin: 16px 0;
+    color: #666;
+}
+
+/* Images */
+img {
+    max-width: 100%;
+    height: auto;
+    margin: 16px 0;
+    /* This page is light whatever the system prefers, and an
+       Excalidraw preview reads the scheme to decide how to draw its
+       photos. */
+    color-scheme: light;
+}
+
+/* Task lists */
+.task-list-item {
+    list-style: none;
+}
+
+.task-list-item input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+/* Tasklist notes (JSON-based tasklists) */
+.task-list-container {
+    padding: 10px 0;
+}
+
+.tasks-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 15px;
+}
+
+.task-item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 8px 12px;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    background: #fafafa;
+}
+
+/* Subtasks: a full-width block under the line of their task */
+.task-subtasks {
+    flex: 0 0 100%;
+    margin-top: 6px;
+    padding-left: 24px;
+    box-sizing: border-box;
+}
+
+.task-subitem {
+    display: flex;
+    align-items: baseline;
+    padding: 2px 0;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.task-subitem-text {
+    flex: 1;
+    overflow-wrap: anywhere;
+}
+
+.task-subitem.completed .task-subitem-text {
+    text-decoration: line-through;
+    color: #666;
+}
+
+.task-item input[type="checkbox"] {
+    margin-right: 10px;
+    cursor: default;
+    vertical-align: middle;
+}
+
+.task-item .task-text {
+    flex: 1;
+    font-size: 14px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.task-item.completed {
+    background: #f0f8f0;
+    border-color: #c8e6c9;
+    opacity: 0.8;
+}
+
+.task-item.completed .task-text {
+    text-decoration: line-through;
+    color: #666;
+}
+
+.task-item.important {
+    border-color: #ffcccc;
+    background: #fff6f6;
+}
+
+.task-item.important .task-text {
+    color: #c62828;
+    font-weight: 600;
+}
+
+/* Callouts (Note, Tip, Important, Warning, Caution). This page is
+   standalone, so the rules of tasks.css are repeated here with the
+   light theme colours. Unknown types keep the note blue. */
+.callout {
+    display: block;
+    border-left: 3px solid #007db8;
+    padding: 8px 0 8px 12px;
+    margin: 12px 0;
+}
+
+.callout .callout-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 15px;
+    font-weight: 600;
+    color: #007db8;
+}
+
+.callout .callout-body {
+    line-height: 1.45;
+}
+
+.callout .callout-body hr {
+    border: 0;
+    border-top: 1px solid currentColor;
+    opacity: 0.25;
+    margin: 0.85em 0;
+}
+
+.callout .callout-icon-svg {
+    flex: 0 0 16px;
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    fill: currentColor;
+    opacity: 0.75;
+}
+
+details.callout > summary.callout-title {
+    list-style: none;
+}
+
+details.callout > summary.callout-title::-webkit-details-marker {
+    display: none;
+}
+
+.callout .callout-fold-icon {
+    flex: 0 0 12px;
+    width: 12px;
+    height: 12px;
+    fill: currentColor;
+    opacity: 0.6;
+}
+
+details.callout:not([open]) > summary.callout-title {
+    margin-bottom: 0;
+}
+
+details.callout:not([open]) .callout-fold-icon {
+    transform: rotate(-90deg);
+}
+
+.callout-tip { border-left-color: #218838; }
+.callout-tip .callout-title { color: #218838; }
+.callout-important { border-left-color: #9333ea; }
+.callout-important .callout-title { color: #9333ea; }
+.callout-warning { border-left-color: #856404; }
+.callout-warning .callout-title { color: #856404; }
+.callout-caution { border-left-color: #c82333; }
+.callout-caution .callout-title { color: #c82333; }
+
+/* Blank lines to preserve spacing in markdown */
+p.blank-line {
+    margin: 0;
+    min-height: 1.6em;
+    line-height: 1.6;
+}
+
+@media print {
+    body {
+        padding: 20px;
+    }
+    
+    .note-metadata {
+        page-break-after: avoid;
+    }
+    
+    /* Hide elements that should not be printed */
+    @page {
+        margin: 2cm;
+    }
+    
+    /* Avoid breaking inside elements */
+    pre, blockquote, table, .callout {
+        page-break-inside: avoid;
+    }
+    
+    /* Keep headings with following content */
+    h1, h2, h3, h4, h5, h6 {
+        page-break-after: avoid;
+    }
+    
+    /* Optimize images for print */
+    img {
+        max-width: 100% !important;
+        page-break-inside: avoid;
+    }
+}

@@ -198,7 +198,9 @@
 	},
 	"jsSingle": [
 		"js/lazy-libs.js",
-		"js/syntax-highlight.js"
+		"js/syntax-highlight.js",
+		"js/math-renderer.js",
+		"js/mermaid-theme.js"
 	],
 	"css": {
 		"core": [

@@ -6,7 +6,7 @@
 // abgeleitet von src/modals.php @ 7e2e0b6aa501ba95ac1e9789fd2bb477c281a001
 // (dazu src/task_list_picker_modal.php, src/task_due_modal.php, src/modals/{folder_icon_modal,icon_color_options,tag_folder_notes_modal}.php)
 // Nur Dialoge der Hauptansicht und des Editors. Weggelassen: Update/What's new, eigenes CSS/Schriften, Admin-Limits,
-// Konten/Passwort, Workspace-Einstellungen und Workspace anlegen (M4), Export (M4c),
+// Konten/Passwort, Workspace-Einstellungen und Workspace anlegen (M4),
 // Anhang-Auswahl (M3b2), Offline, Spracheingabe (Audio-Aufnahme bleibt, ohne Transkription), Tagebuch (M4), Hintergrundbild,
 // Farbpalette/Markdown-Farben/Revisionen/Datumsformat (Einstellungen M4), NC-Glocke statt Benachrichtigungsdialog,
 // E-Mail-Erinnerung (nur NC-Benachrichtigung).
@@ -454,6 +454,48 @@ $createTitle = static function (string $title): void {
             <button type="button" class="btn-cancel" data-action="close-modal" data-modal="convertNoteModal"><?php p($tr->t('common.cancel')); ?></button>
             <button type="button" class="btn-success" id="duplicateBeforeConvertBtn"><?php p($tr->t('modals.convert.duplicate_button', [], 'Duplicate')); ?></button>
             <button type="button" class="btn-primary" id="confirmConvertBtn"><?php p($tr->t('common.convert', [], 'Convert')); ?></button>
+        </div>
+    </div>
+</div>
+
+<!-- Export Modal (Upstream modals.php:829, M4c); Optionen je Notiztyp blendet showExportModal ein -->
+<div id="exportModal" class="modal">
+    <div class="modal-content">
+        <h3><?php p($tr->t('modals.export.title', [], 'Export Note')); ?></h3>
+        <div class="modal-body">
+            <div class="export-options">
+            <div class="export-option export-option-markdown initially-hidden" data-action="select-export-type" data-type="markdown">
+                <i class="lucide lucide-file-alt"></i>
+                <div>
+                    <span><?php p($tr->t('modals.export.markdown.title', [], 'Export as Markdown')); ?></span>
+                    <p><?php p($tr->t('modals.export.markdown.description', [], 'Download as MD file with metadata (title, tags, folder) in YAML frontmatter')); ?></p>
+                </div>
+            </div>
+            <div class="export-option export-option-html" data-action="select-export-type" data-type="html">
+                <i class="lucide lucide-file-code"></i>
+                <div>
+                    <span><?php p($tr->t('modals.export.html.title', [], 'Export as HTML')); ?></span>
+                    <p><?php p($tr->t('modals.export.html.description', [], 'Download as HTML file with all formatting preserved')); ?></p>
+                </div>
+            </div>
+            <div class="export-option export-option-html-embedded" data-action="select-export-type" data-type="html_embedded">
+                <i class="lucide lucide-file-image"></i>
+                <div>
+                    <span><?php p($tr->t('modals.export.html_embedded.title', [], 'HTML with embedded images')); ?></span>
+                    <p><?php p($tr->t('modals.export.html_embedded.description', [], 'Download as a single HTML file with all images embedded (Base64)')); ?></p>
+                </div>
+            </div>
+            <div class="export-option export-option-json initially-hidden" data-action="select-export-type" data-type="json">
+                <i class="lucide lucide-file-code"></i>
+                <div>
+                    <span><?php p($tr->t('modals.export.json.title', [], 'Download as JSON')); ?></span>
+                    <p><?php p($tr->t('modals.export.json.description', [], 'Download the raw tasklist data as a JSON file')); ?></p>
+                </div>
+            </div>
+            </div>
+        </div>
+        <div class="modal-buttons">
+            <button type="button" class="btn-cancel" data-action="close-modal" data-modal="exportModal"><?php p($tr->t('common.cancel')); ?></button>
         </div>
     </div>
 </div>

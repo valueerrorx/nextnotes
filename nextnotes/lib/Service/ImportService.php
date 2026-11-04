@@ -374,10 +374,8 @@ class ImportService {
 	/** @return list<array<string, mixed>>|null Upstream extractTaskListFromHTML */
 	private static function tasksFromHtml(string $html): ?array {
 		$dom = new \DOMDocument();
-		$prev = libxml_use_internal_errors(true);
-		$ok = $dom->loadHTML('<?xml encoding="UTF-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD | LIBXML_NONET);
-		libxml_clear_errors();
-		libxml_use_internal_errors($prev);
+		// Fehler nicht sammeln (B39)
+		$ok = HtmlSanitizer::loadHtmlQuiet($dom, '<?xml encoding="UTF-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD | LIBXML_NONET);
 		if (!$ok) {
 			return null;
 		}

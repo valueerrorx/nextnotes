@@ -133,7 +133,25 @@ class AccessService {
 	 * @return Note[]
 	 */
 	public function filterReadable(string $uid, array $notes): array {
-		$visible = array_flip($this->visibleWorkspaceIds($uid));
+		return self::inWorkspaces($notes, $this->visibleWorkspaceIds($uid));
+	}
+
+	/**
+	 * Lesbar neben einer schon lesbar geladenen Notiz (requireNote/resolveLinked): Rechte sind workspaceweit (SPEC §3), daher ohne Abfrage
+	 * @param Note[] $notes
+	 * @return Note[]
+	 */
+	public function filterReadableBeside(Note $readable, array $notes): array {
+		return $readable->getWorkspaceId() === null ? [] : self::inWorkspaces($notes, [(int)$readable->getWorkspaceId()]);
+	}
+
+	/**
+	 * @param Note[] $notes
+	 * @param int[] $workspaceIds
+	 * @return Note[]
+	 */
+	private static function inWorkspaces(array $notes, array $workspaceIds): array {
+		$visible = array_flip($workspaceIds);
 		return array_values(array_filter($notes, static fn (Note $n) => $n->getRole() === 'note'
 			&& $n->getWorkspaceId() !== null && isset($visible[(int)$n->getWorkspaceId()])));
 	}
@@ -156,6 +174,21 @@ class AccessService {
 			throw new BadRequestException('Note is not in trash');
 		}
 		return $note;
+	}
+
+	/** Verknüpfte Notiz → Ziel mit Leserecht (B42), eine Stufe; fehlt/fremd/selbst verknüpft → 404; sonst die Notiz selbst */
+	public function resolveLinked(string $uid, Note $note): Note {
+		if ($note->getType() !== 'linked') {
+			return $note;
+		}
+		if ($note->getLinkedNoteId() === null) {
+			throw new NotFoundException('Note not found');
+		}
+		$target = $this->requireNote($uid, (int)$note->getLinkedNoteId(), 'read');
+		if ($target->getType() === 'linked') {
+			throw new NotFoundException('Note not found');
+		}
+		return $target;
 	}
 
 	public function canRead(string $uid, int $noteId): bool {

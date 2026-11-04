@@ -122,6 +122,13 @@ class ConversionService {
 		return ['html' => $this->markdownToHtml($uid, $markdown)];
 	}
 
+	/** Export einer Markdown-Notiz (Upstream parseMarkdown): sanitisiertes HTML in Server-Form; > MAX_RENDER_INPUT → 413 */
+	public function markdownForExport(string $uid, string $markdown): string {
+		self::checkSize($markdown);
+		$this->setup($uid);
+		return $this->sanitizer->sanitizeHtml(MarkdownRenderer::parseMarkdown($this->urls->toServer($markdown)));
+	}
+
 	/** Snapshot-Vorschau ?render=1 (Revisionen-Seite) */
 	public function renderSnapshot(string $uid, string $markdown): string {
 		return $this->markdownToHtml($uid, $markdown, false);
@@ -147,30 +154,24 @@ class ConversionService {
 		} else {
 			self::checkSize($content);
 		}
-		$created = [];
-		try {
-			$newType = $this->tx->run(function () use ($uid, $id, $target, $images, &$created): string {
-				$this->attachments->enforceQuota($images['quota'] ?? null);
-				$this->notes->lockRow($id);
-				$note = $this->notes->find($id);
-				self::checkType((string)($note->getType() ?: 'note'), $target);
-				$content = (string)$note->getContent();
-				if ($target === 'markdown') {
-					if ($images !== null) {
-						$content = $this->images->store($images, $id, $content, $uid, $created)['content'];
-					}
-					self::checkSize($content);
-					$this->noteService->storeConverted($note, 'markdown', self::noteToMarkdown($content), $uid);
-					return 'markdown';
+		$newType = $this->tx->run(function () use ($uid, $id, $target, $images): string {
+			$this->attachments->enforceQuota($images['quota'] ?? null);
+			$this->notes->lockRow($id);
+			$note = $this->notes->find($id);
+			self::checkType((string)($note->getType() ?: 'note'), $target);
+			$content = (string)$note->getContent();
+			if ($target === 'markdown') {
+				if ($images !== null) {
+					$content = $this->images->store($images, $id, $content, $uid)['content'];
 				}
 				self::checkSize($content);
-				$this->noteService->storeConverted($note, 'note', MarkdownRenderer::parseMarkdownForRichText($content), $uid);
-				return 'note';
-			});
-		} catch (\Throwable $e) {
-			$this->images->discard($created);
-			throw $e;
-		}
+				$this->noteService->storeConverted($note, 'markdown', self::noteToMarkdown($content), $uid);
+				return 'markdown';
+			}
+			self::checkSize($content);
+			$this->noteService->storeConverted($note, 'note', MarkdownRenderer::parseMarkdownForRichText($content), $uid);
+			return 'note';
+		});
 		return ['id' => $id, 'type' => $newType, 'message' => 'Note converted successfully'];
 	}
 

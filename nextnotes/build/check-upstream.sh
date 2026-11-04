@@ -2,7 +2,8 @@
 # SPDX-FileCopyrightText: 2026 Thomas Weissel
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # check-upstream (ADR 0007, M3-Teil): (a) src/-Diff = upstream-patches.txt, (b) Bundles = Upstream-Listen,
-# (c) Kopfkommentar der Templates, (d) Adapter-Namen in src/, (e) gebaute CSS ohne 'Inter', (e2) Spezifitäts-Zusatz mit Chromium geprüft (ADR 0017).
+# (c) Kopfkommentar der Templates, (d) Adapter-Namen in src/, (e) gebaute CSS ohne 'Inter', (e2) Spezifitäts-Zusatz mit Chromium geprüft (ADR 0017),
+# (f) Port-Hashes, (g) Pcre in Ports, (h) loadHTML nur über HtmlSanitizer (B39).
 # Voraussetzung: git, Host-php, node, Chromium (CHROMIUM=). SRC= prüft (b)/(d)/(e2) in einer Kopie, OUT_DIR= anderes Build-Ziel.
 set -euo pipefail
 app="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -70,10 +71,16 @@ while read -r up sum port; do
 done < "$app/build/upstream-ported.txt"
 if [[ $fail -eq 0 ]]; then echo "check-upstream (f): $n nachgebaute Upstream-Dateien unverändert"; fi
 # (g) Regex in Parser-/Import-/Export-Ports nur über Pcre (Plan M4 §1.2, B46)
-if hits="$(grep -rnE '\bpreg_[a-z_]+\(' "$app/lib/Service/Convert" "$app/lib/Service/ImportService.php" $(ls "$app"/lib/Service/ExportFormatter.php 2>/dev/null))"; then
+if hits="$(grep -rnE '\bpreg_[a-z_]+\(' "$app/lib/Service/Convert" "$app/lib/Service/ImportService.php" $(ls "$app"/lib/Service/Export*.php 2>/dev/null))"; then
 	err "direktes preg_* statt Pcre: ${hits//$'\n'/ }"
 else
 	echo "check-upstream (g): kein direktes preg_* in Convert/Import/Export"
+fi
+# (h) DOM-Parser nur über HtmlSanitizer::loadHtmlQuiet (B39: libxml-Fehler nicht sammeln)
+if hits="$(grep -rniE '(->|::)load(HTML|XML|HTMLFile)\(|libxml_use_internal_errors\(true|simplexml_load_|XMLReader|xml_parser_create|HTMLDocument::createFrom' "$app/lib" | grep -v '^'"$app"'/lib/Service/HtmlSanitizer.php:')"; then
+	err "loadHTML/loadXML außerhalb HtmlSanitizer::loadHtmlQuiet: ${hits//$'\n'/ }"
+else
+	echo "check-upstream (h): DOM-Parser nur über HtmlSanitizer::loadHtmlQuiet"
 fi
 
 if [[ $fail -ne 0 ]]; then

@@ -1,0 +1,105 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Thomas Weissel
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+/* Druckansicht (templates/export_print.php), abgeleitet von src/public/api_export_note.php generatePrintHtml.
+   Hell wie Upstream; NC-Grundlayout (RENDER_AS_BASE) ohne Rahmen; Selektoren über #nextnotes-root (ADR 0017). */
+html,
+body#body-public,
+body#body-public #content.app-public {
+	height: auto;
+	min-height: 0;
+	overflow: visible;
+	background: #fff;
+	color: #1a1a1a;
+	color-scheme: light;
+}
+
+body#body-public #content.app-public {
+	display: block;
+	position: static;
+	width: auto;
+	margin: 0;
+	padding: 0;
+}
+
+#nextnotes-root.note-print-page {
+	display: block;
+	max-width: 1200px;
+	margin: 0 auto;
+	padding: 40px;
+	background: #fff;
+}
+
+#nextnotes-root.note-print-page :is(#right_pane, #right_col, .notecard, .innernote, .noteentry) {
+	position: static;
+	display: block;
+	width: auto;
+	max-width: none;
+	height: auto;
+	min-height: 0;
+	max-height: none;
+	margin: 0;
+	padding: 0;
+	overflow: visible;
+	border: 0;
+	box-shadow: none;
+	background: transparent;
+}
+
+#nextnotes-root.note-print-page .note-print-header {
+	margin-bottom: 24px;
+	padding-bottom: 16px;
+	border-bottom: 2px solid #e0e0e0;
+}
+
+#nextnotes-root.note-print-page .note-print-title {
+	font-size: 28px;
+	font-weight: 700;
+	line-height: 1.25;
+	color: #1a1a1a;
+}
+
+#nextnotes-root.note-print-page .note-print-tags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 12px;
+}
+
+#nextnotes-root.note-print-page .note-print-tag {
+	padding: 3px 10px;
+	border: 1px solid #d0d0d0;
+	border-radius: 12px;
+	background: #f0f0f0;
+	font-size: 12px;
+	color: #555;
+}
+
+/* Nichts ist auf Papier anklickbar */
+#nextnotes-root.note-print-page :is(.code-block-copy-btn, .mermaid-zoom-btn) {
+	display: none !important;
+}
+
+@page {
+	margin: 2cm;
+}
+
+@media print {
+	#nextnotes-root.note-print-page {
+		max-width: none;
+		padding: 0;
+	}
+
+	#nextnotes-root.note-print-page .note-print-header {
+		break-after: avoid;
+	}
+
+	#nextnotes-root.note-print-page :is(pre, blockquote, table, img, .callout, .mermaid, .math-block) {
+		break-inside: avoid;
+	}
+
+	#nextnotes-root.note-print-page :is(h1, h2, h3, h4, h5, h6) {
+		break-after: avoid;
+	}
+}

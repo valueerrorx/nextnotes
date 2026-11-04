@@ -108,7 +108,10 @@ final class PageIsolationTest extends ApiTestCase {
 		self::assertStringContainsString("Text $mark", $r->body);
 		self::assertStringContainsString('attachment', (string)$r->header('Content-Disposition'));
 
-		self::assertSame(501, self::get($a, "api_export_note.php?id=$n")->status, 'Export Notiz: Prüfung bestanden, 501');
+		// M4c: Export portiert
+		$r = self::get($a, "api_export_note.php?id=$n&format=html_embedded");
+		self::assertSame(200, $r->status, 'Export Notiz: ' . $r->describe());
+		self::assertStringContainsString("Text $mark", $r->body);
 		self::assertSame(501, self::get($a, "api_export_folder.php?folder_id=$f")->status, 'Export Ordner: Prüfung bestanden, 501');
 
 		$r = self::get($a, "api_attachments.php?action=download&note_id=$n&attachment_id=$at");
@@ -209,7 +212,7 @@ final class PageIsolationTest extends ApiTestCase {
 		$r = self::get($b, "api_download_note.php?id=$n");
 		self::assertSame(200, $r->status);
 		self::assertStringContainsString("Text $mark", $r->body);
-		self::assertSame(501, self::get($b, "api_export_note.php?id=$n")->status);
+		self::assertSame(200, self::get($b, "api_export_note.php?id=$n")->status, 'B Export lesend (Q2 vorläufig)');
 		self::assertSame(501, self::get($b, "api_export_folder.php?folder_id=$f")->status);
 		$r = self::get($b, "api_attachments.php?action=download&note_id=$n&attachment_id=$at");
 		self::assertSame(200, $r->status);

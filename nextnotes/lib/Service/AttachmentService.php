@@ -100,12 +100,15 @@ class AttachmentService {
 	}
 
 	private function queueFileDeletion(int $noteId, int $attachmentId): void {
-		$this->cleanup->add(function () use ($noteId, $attachmentId) {
-			try {
-				$this->root()->getFolder((string)$noteId)->getFile((string)$attachmentId)->delete();
-			} catch (FilesNotFoundException) {
-			}
-		});
+		$this->cleanup->add(fn () => $this->deleteFileNow($noteId, $attachmentId));
+	}
+
+	// Datei sofort löschen (Rollback-Aufräumen, Transaction::onRollback); fehlt sie, nichts
+	public function deleteFileNow(int $noteId, int $attachmentId): void {
+		try {
+			$this->root()->getFolder((string)$noteId)->getFile((string)$attachmentId)->delete();
+		} catch (FilesNotFoundException) {
+		}
 	}
 
 	// ---------- Hilfen ----------
@@ -471,6 +474,11 @@ class AttachmentService {
 	}
 
 	// ---------- für andere Services ----------
+
+	/** Datei eines Anhangs (Export); Rechte prüft der Aufrufer, fehlt → NotFoundException */
+	public function fileFor(Attachment $a): ISimpleFile {
+		return $this->fileOf($a);
+	}
 
 	/** @return array<int, Attachment[]> */
 	public function forNotes(array $noteIds): array {

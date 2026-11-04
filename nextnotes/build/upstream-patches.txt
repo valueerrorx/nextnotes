@@ -26,3 +26,6 @@ src/public/js/utils-folders.js
 src/public/js/utils-move-folder.js
 src/public/js/clickable-tags.js
 src/public/js/sidebar-file-import.js
+src/public/js/revisions-page.js
+src/public/js/katex/katex.min.js
+src/public/js/katex/katex.min.css

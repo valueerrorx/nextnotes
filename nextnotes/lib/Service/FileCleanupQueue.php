@@ -26,8 +26,9 @@ class FileCleanupQueue {
 		$this->jobs[] = $job;
 	}
 
-	public function discard(): void {
-		$this->jobs = [];
+	// Aufträge ab Position $n verwerfen (Rollback einer inneren Ebene)
+	public function truncate(int $n): void {
+		$this->jobs = array_slice($this->jobs, 0, $n);
 	}
 
 	public function flush(): void {

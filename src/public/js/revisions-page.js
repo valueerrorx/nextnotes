@@ -139,7 +139,11 @@
 
     function fetchRevision(key) {
         if (state.contents[key]) return Promise.resolve(state.contents[key]);
-        return api('/snapshot?render=1&snapshot_key=' + encodeURIComponent(key)).then(function (data) {
+        var query = '/snapshot?snapshot_key=' + encodeURIComponent(key);
+        return api(query + '&render=1').then(function (data) {
+            // Next Notes (P21): too large to render (413) -> raw content, shown as source
+            return data.success ? data : api(query);
+        }).then(function (data) {
             if (!data.success || !data.snapshot) throw new Error(data.error || 'load failed');
             state.contents[key] = data.snapshot;
             return data.snapshot;

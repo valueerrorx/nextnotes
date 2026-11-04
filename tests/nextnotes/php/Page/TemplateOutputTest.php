@@ -23,6 +23,8 @@ final class TemplateOutputTest extends TestCase {
 		'attachments.php' => ['json_encode($islandData, $jsonFlags)'],
 		// M3c2: Excalidraw-Editor (Konfiguration inkl. Diagramm-JSON als Insel)
 		'excalidraw_editor.php' => ['json_encode($islandData, $jsonFlags)'],
+		// M4c: Druckansicht; $body = ExportService::htmlBody (cleanContent → HtmlSanitizer::sanitizeHtml)
+		'export_print.php' => ['json_encode($islandData, $jsonFlags)', '$body'],
 		// Notizinhalt, beim Speichern durch HtmlSanitizer::sanitizeForType geprüft (Lead M3b1); Tasklist-JSON wird nicht ausgegeben
 		// (Gegenprobe: EditorPageTest::testTasklistContentNeverRenderedUnsanitized)
 		'partials/note_display.php' => ['$note[\'display\']'],
@@ -64,7 +66,7 @@ final class TemplateOutputTest extends TestCase {
 
 	/** @return array<string, array{string}> Templates mit JSON-Inseln */
 	public static function islandTemplates(): array {
-		return ['index.php' => ['index.php'], 'revisions.php' => ['revisions.php'], 'attachments.php' => ['attachments.php'], 'excalidraw_editor.php' => ['excalidraw_editor.php']];
+		return ['index.php' => ['index.php'], 'revisions.php' => ['revisions.php'], 'attachments.php' => ['attachments.php'], 'excalidraw_editor.php' => ['excalidraw_editor.php'], 'export_print.php' => ['export_print.php']];
 	}
 
 	#[\PHPUnit\Framework\Attributes\DataProvider('islandTemplates')]
@@ -90,7 +92,9 @@ final class TemplateOutputTest extends TestCase {
 	public function testNoRawOutputOrInlineCode(): void {
 		foreach (self::templates() as $file => $src) {
 			self::assertStringNotContainsString('<?=', $src, "$file: Kurz-Echo ohne Escaping");
-			self::assertDoesNotMatchRegularExpression('/<\?php[^?]*\b(echo|print)\b(?!_unescaped)/', $src, "$file: echo/print ohne Escaping");
+			// Zeichenketten in PHP-Blöcken ausblenden (M4c: Schlüssel 'common.print', Aktion 'print-note')
+			$code = preg_replace_callback('/<\?php.*?(\?>|$)/s', static fn (array $m): string => (string)preg_replace('/\'(?:[^\'\\\\]|\\\\.)*\'|"(?:[^"\\\\]|\\\\.)*"/s', "''", $m[0]), $src);
+			self::assertDoesNotMatchRegularExpression('/<\?php[^?]*\b(echo|print)\b(?!_unescaped)/', (string)$code, "$file: echo/print ohne Escaping");
 			self::assertDoesNotMatchRegularExpression('/\son[a-z]+\s*=\s*["\']/i', $src, "$file: Inline-Handler on…=");
 			self::assertStringNotContainsStringIgnoringCase('javascript:', $src, "$file: javascript:-URL");
 			preg_match_all('/<script\b([^>]*)>/i', $src, $s);

@@ -703,12 +703,10 @@ final class MarkdownRenderer {
 	        return '';
 	    }
 
-	    $previous = libxml_use_internal_errors(true);
 	    $dom = new DOMDocument();
 	    $dom->encoding = 'UTF-8';
-	    @$dom->loadHTML('<html><body>' . $html . '</body></html>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-	    libxml_clear_errors();
-	    libxml_use_internal_errors($previous);
+	    // B39: libxml-Fehler nicht sammeln
+	    \OCA\NextNotes\Service\HtmlSanitizer::loadHtmlQuiet($dom, '<html><body>' . $html . '</body></html>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
 
 	    $xpath = new DOMXPath($dom);
 	    $container = $xpath->query('//div[contains(concat(" ", normalize-space(@class), " "), " excalidraw-container ")]')->item(0);

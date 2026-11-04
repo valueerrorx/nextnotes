@@ -37,6 +37,16 @@ class PageAssets {
 		}
 	}
 
+	/** Druckansicht (templates/export_print.php): Lesedarstellung hell, Code-Farben, KaTeX/Mermaid über nextnotes-print */
+	public function print(): void {
+		foreach (['vendor/highlight/highlight.min', 'vendor/highlight/powershell.min', 'syntax-highlight', 'math-renderer', 'mermaid-theme', 'nextnotes-print'] as $script) {
+			Util::addScript(Application::APP_ID, $script);
+		}
+		foreach (['nextnotes-core', 'nextnotes-modals', 'vendor/katex.min', 'syntax-highlight', 'nextnotes-printview'] as $style) {
+			Util::addStyle(Application::APP_ID, $style);
+		}
+	}
+
 	/**
 	 * Eigene Seite aus bundles.json pages (revisions, attachments, excalidraw_editor): Adapter, Vendor, Seitenbündel, Late-Adapter
 	 * @param string[] $vendor unveränderte Vendor-Skripte (js/vendor/…), vor dem Seitenbündel
