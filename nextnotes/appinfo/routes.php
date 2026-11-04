@@ -15,6 +15,9 @@ return [
 		['name' => 'page#search', 'url' => '/index.php', 'verb' => 'POST'],
 		// Spike ADR 0004: .php-URL im App-Pfad
 		['name' => 'page#dashboard', 'url' => '/dashboard.php', 'verb' => 'GET'],
+		['name' => 'page#graph', 'url' => '/graph.php', 'verb' => 'GET'],
+		['name' => 'page#speedDial', 'url' => '/speed_dial.php', 'verb' => 'GET'],
+		['name' => 'page#mentions', 'url' => '/mentions.php', 'verb' => 'GET'],
 		// SPEC §4.2: Upstream-Login/-Logout als Weiterleitung
 		['name' => 'page#login', 'url' => '/login.php', 'verb' => 'GET'],
 		['name' => 'page#logout', 'url' => '/logout.php', 'verb' => 'GET'],
@@ -50,6 +53,9 @@ return [
 		['name' => 'compat#saveExcalidraw', 'url' => '/api_save_excalidraw.php', 'verb' => 'POST'],
 		['name' => 'compat#workspaces', 'url' => '/workspaces.php', 'verb' => 'POST'],
 		['name' => 'compat#importDroppedNotes', 'url' => '/api_import_dropped_notes.php', 'verb' => 'POST'],
+		['name' => 'compat#background', 'url' => '/api_upload_background.php', 'verb' => 'GET'],
+		['name' => 'compat#backgroundUpload', 'url' => '/api_upload_background.php', 'verb' => 'POST'],
+		['name' => 'compat#backgroundDelete', 'url' => '/api_upload_background.php', 'verb' => 'DELETE'],
 		// Kalender/Tagebuch: Upstream-Einzeldateien unter api/v1 (Inventur A #186–190, SPEC §4.2)
 		['name' => 'diary_api#diaryEntry', 'url' => '/api/v1/calendar/diary-entry.php', 'verb' => 'GET'],
 		['name' => 'diary_api#notesByDate', 'url' => '/api/v1/calendar/notes-by-date.php', 'verb' => 'GET'],

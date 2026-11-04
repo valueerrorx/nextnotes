@@ -41,6 +41,7 @@ class UserDataService {
 		private WorkspaceMapper $workspaces,
 		private ITimeFactory $time,
 		private LoggerInterface $logger,
+		private BackgroundFiles $backgrounds,
 	) {
 	}
 
@@ -60,6 +61,8 @@ class UserDataService {
 				->where($qb->expr()->eq('owner_type', $qb->createNamedParameter('user')))
 				->andWhere($qb->expr()->eq('owner_id', $qb->createNamedParameter($uid)))
 				->executeStatement();
+			// Hintergrundbilder in fremden Workspaces (eigene gehen mit dem Workspace im Job)
+			$this->backgrounds->queueUser($this->shares->workspaceIdsSharedWith($uid), $uid);
 			$qb = $this->db->getQueryBuilder();
 			$qb->delete(WsShareMapper::TABLE)
 				->where($qb->expr()->eq('share_type', $qb->createNamedParameter('user')))
@@ -118,6 +121,7 @@ class UserDataService {
 				$this->folders->deleteByIds(array_map(static fn ($f) => (int)$f->getId(), $this->folders->findInWorkspace($id)));
 				$this->shares->deleteForWorkspace($id);
 				$this->workspaces->deleteById($id);
+				$this->backgrounds->queueWorkspace($id);
 			});
 			$done++;
 		}

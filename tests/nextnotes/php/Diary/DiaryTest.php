@@ -12,6 +12,7 @@ namespace OCA\NextNotes\Tests\Diary;
 use OCA\NextNotes\Service\ConversionService;
 use OCA\NextNotes\Service\DiaryService;
 use OCA\NextNotes\Service\View\TrashViewService;
+use OCA\NextNotes\Service\WorkspaceService;
 use OCA\NextNotes\Tests\Support\ApiClient;
 use OCA\NextNotes\Tests\Support\ApiTestCase;
 use OCP\Server;
@@ -105,6 +106,37 @@ final class DiaryTest extends ApiTestCase {
 		self::assertSame([$id], array_map('intval', array_keys($e['entries'])));
 		self::assertStringContainsString("Vorlage $mark", $e['entries'][(string)$id]);
 		self::assertSame([], $e['truncated']);
+	}
+
+	// M4f-r1 Hinweis 4: Leser einer Freigabe legt nichts an; Vorlage aus fremdem Workspace wird ignoriert
+	public function testReadOnlyShareAndForeignTemplate(): void {
+		$a = $this->createUser('dr');
+		$b = $this->createUser('ds');
+		$mark = 'RO' . bin2hex(random_bytes(4));
+		[$ws, $wsId] = self::newWorkspace($a, 'Lesen');
+		[$id] = self::createEntry($a, $ws, '2026-08-03');
+		Server::get(WorkspaceService::class)->share($a->uid, $wsId, $b->uid, 'read');
+		$key = null;
+		foreach (self::ok($b->call('GET', '/workspaces'), 'B workspaces')['workspaces'] as $w) {
+			if ($w['name'] === $ws || str_starts_with($w['name'], $ws . ' (')) {
+				$key = $w['name'];
+			}
+		}
+		self::assertNotNull($key, 'B sieht den Workspace');
+		$folders = count(self::dump($a->uid)['folders']);
+		$r = $b->call('POST', '/diary/diaries.php', ['name' => "Neu $mark", 'workspace' => $key]);
+		self::assertSame(403, $r->status, 'POST diaries.php als Leser: ' . $r->describe());
+		$title = self::ok($b->call('GET', '/calendar/diary-entry.php?' . http_build_query(['date' => '2026-09-09', 'workspace' => $key])), 'Titel als Leser')['title'];
+		$r = $b->call('PATCH', "/notes/$id", ['heading' => $title, 'workspace' => $key]);
+		self::assertSame(403, $r->status, 'PATCH Datumstitel als Leser: ' . $r->describe());
+		self::assertCount($folders, self::dump($a->uid)['folders'], 'Leser legt keinen Ordner an');
+
+		// B: Vorlage zeigt auf eine Notiz von A → ignoriert
+		$secret = self::newNote($a, $ws, "Geheim $mark", "<p>Geheim $mark</p>");
+		[$bws, $bwsId] = self::newWorkspace($b, 'Eigen');
+		self::ok($b->call('PUT', '/settings/diary_templates', ['value' => json_encode([(string)$bwsId => $secret, (string)$wsId => $secret])]), 'Vorlage setzen');
+		[$own] = self::createEntry($b, $bws, '2026-08-04');
+		self::assertStringNotContainsString($mark, (string)self::note(self::dump($b->uid), $own)['content'], 'fremde Vorlage ignoriert');
 	}
 
 	public function testInvalidDateAndIdsAre400(): void {

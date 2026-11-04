@@ -238,7 +238,8 @@ class DiaryService {
 		foreach ($this->notes->calendarStamps($this->scope($uid, $wsKey)) as [$c, $u]) {
 			$day = (new \DateTimeImmutable('@' . $c))->setTimezone($tz)->format('Y-m-d');
 			$created[$day] = ($created[$day] ?? 0) + 1;
-			$day = (new \DateTimeImmutable('@' . ($u ?: $c)))->setTimezone($tz)->format('Y-m-d');
+			// gleiche Bedingung wie notes-on-date?mode=modified (updated_at)
+			$day = (new \DateTimeImmutable('@' . $u))->setTimezone($tz)->format('Y-m-d');
 			$modified[$day] = ($modified[$day] ?? 0) + 1;
 		}
 		return match ($mode) {
@@ -358,7 +359,7 @@ class DiaryService {
 			}
 			$size = $bytes[(int)$s->getId()] ?? 0;
 			if ($size > ConversionService::MAX_RENDER_INPUT) {
-				$entries[(string)$id] = $this->tooLarge($id, $ws);
+				$entries[(string)$id] = $this->tooLarge($uid, $id, $ws);
 				continue;
 			}
 			if ($size > $budget) {
@@ -373,7 +374,7 @@ class DiaryService {
 			try {
 				$entries[(string)$id] = $this->renderEntry($uid, (string)$s->getType(), $contents[(int)$s->getId()] ?? '');
 			} catch (TooLargeException|BadRequestException) {
-				$entries[(string)$id] = $this->tooLarge($id, $ws);
+				$entries[(string)$id] = $this->tooLarge($uid, $id, $ws);
 			}
 		}
 		// Reihenfolge der Anfrage
@@ -416,8 +417,9 @@ class DiaryService {
 		return $this->urls->toClient($content);
 	}
 
-	private function tooLarge(int $id, Workspace $ws): string {
-		$url = 'index.php?' . http_build_query(['note' => $id, 'newtab' => 1, 'workspace' => (string)$ws->getName()]);
+	// Link über den Workspace-Schlüssel: Namen können in geteilten Workspaces doppelt sein (§4.4)
+	private function tooLarge(string $uid, int $id, Workspace $ws): string {
+		$url = 'index.php?' . http_build_query(['note' => $id, 'newtab' => 1, 'workspace' => (string)$this->workspaces->keyFor($uid, (int)$ws->getId())]);
 		return '<p class="diary-journal-too-large">' . htmlspecialchars($this->l->t('This entry is too large for the journal view.'), ENT_QUOTES, 'UTF-8')
 			. ' <a href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($this->l->t('Open note'), ENT_QUOTES, 'UTF-8') . '</a></p>';
 	}
@@ -473,10 +475,11 @@ class DiaryService {
 		if (!in_array($tplType, ['note', 'markdown'], true) || trim($content) === '') {
 			return null;
 		}
+		// Wie der Umwandlungszweig im Client-Format: create() speichert über applyContent (toServer)
+		$content = $this->urls->toClient($content);
 		if ($tplType === $type) {
 			return $content;
 		}
-		$content = $this->urls->toClient($content);
 		return $type === 'markdown' ? $this->conversion->htmlToMarkdown($uid, $content) : $this->conversion->markdownToHtml($uid, $content);
 	}
 

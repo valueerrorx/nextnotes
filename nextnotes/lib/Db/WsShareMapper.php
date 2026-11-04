@@ -88,4 +88,13 @@ class WsShareMapper extends QBMapper {
 		}
 		return $out;
 	}
+
+	/** @return int[] Workspaces, die an $uid freigegeben sind */
+	public function workspaceIdsSharedWith(string $uid): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('workspace_id')->from(self::TABLE)
+			->where($qb->expr()->eq('share_type', $qb->createNamedParameter('user')))
+			->andWhere($qb->expr()->eq('share_with', $qb->createNamedParameter($uid)));
+		return array_map('intval', $qb->executeQuery()->fetchFirstColumn());
+	}
 }

@@ -102,9 +102,12 @@ final class ControllerAttributeTest extends TestCase {
 		'PageController::notesManager', 'PageController::create',
 		// M4f: Tagebuch und Aufgaben, GET ohne Seiteneffekt (B61: Tagebuch wird erst beim Schreiben markiert)
 		'PageController::diary', 'PageController::tasks',
+		// M4g: Graph, Speed Dial, Erwähnungen (GET schreibt keinen Erledigt-Zähler), Hintergrundbild-Status/-Bild (B43)
+		'PageController::graph', 'PageController::speedDial', 'PageController::mentions', 'CompatController::background',
 	];
 	// M3c2: schreibende Kompatibilitätsrouten (POST) prüfen CSRF
-	private const PAGE_COMPAT_CSRF = ['PageController::search', 'PageController::trashSearch', 'CompatController::noteInfo', 'CompatController::saveExcalidraw', 'CompatController::workspaces', 'CompatController::importDroppedNotes'];
+	private const PAGE_COMPAT_CSRF = ['PageController::search', 'PageController::trashSearch', 'CompatController::noteInfo', 'CompatController::saveExcalidraw', 'CompatController::workspaces', 'CompatController::importDroppedNotes',
+		'CompatController::backgroundUpload', 'CompatController::backgroundDelete'];
 
 	public function testPageAndCompatControllerAttributes(): void {
 		$errors = [];

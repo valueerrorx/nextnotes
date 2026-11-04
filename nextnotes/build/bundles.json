@@ -18,8 +18,7 @@
 		"css/fonts.css": "Schrift Inter gestrichen, var(--font-face) (ADR 0016)",
 		"css/custom-css.css": "Custom-CSS gestrichen (ADR 0016)",
 		"css/ai-chat.css": "AI gestrichen (ADR 0010)",
-		"css/offline-banner.css": "PWA/Offline gestrichen (Inventur B 1.5)",
-		"js/background-settings.js": "bis M4: api_upload_background.php fehlt (sonst 404 beim Laden), mit CompatController wieder aufnehmen"
+		"css/offline-banner.css": "PWA/Offline gestrichen (Inventur B 1.5)"
 	},
 	"excludePages": {
 		"admin/*": "Admin-Seiten gestrichen (Inventur B 1.4)",
@@ -156,6 +155,7 @@
 			"js/note-width-toggle.js",
 			"js/note-sort-cycle.js",
 			"js/index-icon-scale-settings.js",
+			"js/background-settings.js",
 			"js/tasklist-core.js",
 			"js/tasklist-render.js",
 			"js/tasklist-crud.js",
@@ -886,6 +886,64 @@
 				"js/task-due-modal.js",
 				"js/reminder-notifications.js",
 				"js/tasks-page.js"
+			]
+		},
+		"dashboard": {
+			"js": [
+				"js/theme-manager.js",
+				"js/reminder-notifications.js",
+				"js/navigation.js",
+				"js/request-errors.js",
+				"js/modal-alerts.js",
+				"js/dashboard-note-modal.js",
+				"js/board-view-menu.js",
+				"js/dashboard-page.js",
+				"js/panel-back.js",
+				"js/globals.js",
+				"js/markdown-source.js",
+				"js/table-formulas.js",
+				"js/markdown-parser.js",
+				"js/icon-sidebar-toggle.js",
+				"js/ui-customization.js"
+			],
+			"omit": {
+				"js/ui-customization-panel.js": "kein Kontext-Anpassungspanel auf den Seiten (Elementsichtbarkeit über ui-customization.js und Einstellungen)"
+			}
+		},
+		"graph": {
+			"js": [
+				"js/theme-manager.js",
+				"js/globals.js",
+				"js/navigation.js",
+				"js/color-palette.js",
+				"js/graph.js",
+				"js/icon-sidebar-toggle.js"
+			]
+		},
+		"speed_dial": {
+			"js": [
+				"js/theme-manager.js",
+				"js/speed-dial.js",
+				"js/globals.js",
+				"js/navigation.js",
+				"js/color-palette.js",
+				"js/request-errors.js",
+				"js/modal-alerts.js",
+				"js/icon-sidebar-toggle.js",
+				"js/workspace-background.js",
+				"js/ui-customization.js"
+			],
+			"omit": {
+				"js/ui-customization-panel.js": "kein Kontext-Anpassungspanel auf den Seiten (Elementsichtbarkeit über ui-customization.js und Einstellungen)"
+			}
+		},
+		"mentions": {
+			"js": [
+				"js/theme-manager.js",
+				"js/navigation.js",
+				"js/icon-sidebar-toggle.js",
+				"js/request-errors.js",
+				"js/mentions-page.js"
 			]
 		}
 	}

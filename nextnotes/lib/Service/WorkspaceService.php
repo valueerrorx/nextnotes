@@ -47,6 +47,7 @@ class WorkspaceService {
 		private IFactory $l10nFactory,
 		private ReminderMapper $reminders,
 		private MentionHandledMapper $mentions,
+		private BackgroundFiles $backgrounds,
 	) {
 	}
 
@@ -304,6 +305,7 @@ class WorkspaceService {
 			$this->moveContents($ws, $target);
 			$this->shares->deleteForWorkspace((int)$ws->getId());
 			$this->workspaces->deleteById((int)$ws->getId());
+			$this->backgrounds->queueWorkspace((int)$ws->getId());
 		});
 		$this->reset();
 	}
@@ -377,7 +379,7 @@ class WorkspaceService {
 		$this->reset();
 	}
 
-	// Entzug löscht Erinnerungen und Mention-Status des Empfängers zu Notizen dieses Workspace (SPEC §6)
+	// Entzug löscht Erinnerungen, Mention-Status und Hintergrundbilder des Empfängers in diesem Workspace (SPEC §6, §8)
 	public function unshare(string $ownerUid, int $workspaceId, string $targetUid): void {
 		$ws = $this->access->requireWorkspace($ownerUid, $workspaceId, 'manage');
 		$this->tx->run(function () use ($ws, $targetUid) {
@@ -385,6 +387,7 @@ class WorkspaceService {
 			$noteIds = $this->notes->idsInWorkspace((int)$ws->getId());
 			$this->reminders->deleteForNotes($noteIds, $targetUid);
 			$this->mentions->deleteForNotes($noteIds, $targetUid);
+			$this->backgrounds->queueUser([(int)$ws->getId()], $targetUid);
 		});
 		$this->reset();
 	}

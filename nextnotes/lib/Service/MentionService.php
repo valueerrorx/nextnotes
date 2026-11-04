@@ -16,10 +16,18 @@ use OCA\NextNotes\Db\Workspace;
 use OCA\NextNotes\Db\WsShareMapper;
 use OCA\NextNotes\Service\Exception\BadRequestException;
 use OCA\NextNotes\Service\Exception\NotFoundException;
+use OCA\NextNotes\AppInfo\Application;
 use OCP\AppFramework\Utility\ITimeFactory;
+use OCP\IDateTimeFormatter;
+use OCP\IUserManager;
+use OCP\Notification\IManager as INotificationManager;
+use Psr\Log\LoggerInterface;
 
 // „@uid“ in Notizen geteilter Workspaces (Upstream lib/mentions.php); gespeichert wird nur „erledigt“
 class MentionService {
+	// Höchstens so viele Benachrichtigungen je Speichervorgang (Plan M4g, SPEC §4.5)
+	public const MAX_NOTIFY = 20;
+
 	public function __construct(
 		private NoteMapper $notes,
 		private WsShareMapper $shares,
@@ -28,6 +36,10 @@ class MentionService {
 		private WorkspaceService $workspaces,
 		private SearchTextNormalizer $normalizer,
 		private ITimeFactory $time,
+		private INotificationManager $notifications,
+		private IUserManager $users,
+		private IDateTimeFormatter $dates,
+		private LoggerInterface $logger,
 	) {
 	}
 
@@ -76,7 +88,7 @@ class MentionService {
 	 * @param int[]|null $onlyWs
 	 * @return list<array<string, mixed>>
 	 */
-	private function collect(string $uid, bool $includeHandled, ?array $onlyWs = null): array {
+	private function collect(string $uid, bool $includeHandled, ?array $onlyWs = null, bool $persist = true): array {
 		$visible = $this->access->visibleWorkspaceIds($uid);
 		if ($onlyWs !== null) {
 			$visible = array_values(array_intersect($visible, $onlyWs));
@@ -104,7 +116,10 @@ class MentionService {
 			$handledCount = $counts[$id] ?? null;
 			// Erledigte Nennungen entfernt: die nächste neue zählt wieder als offen
 			if ($handledCount !== null && $count < $handledCount) {
-				$this->handled->store($id, $uid, $count, $this->time->getTime());
+				// Seiten-GET ohne Schreiben: Ergebnis wie nach dem Speichern
+				if ($persist) {
+					$this->handled->store($id, $uid, $count, $this->time->getTime());
+				}
 				$handledCount = $count;
 			}
 			$open = $handledCount === null || $count > $handledCount;
@@ -128,6 +143,86 @@ class MentionService {
 			];
 		}
 		return $out;
+	}
+
+	/** Offene Erwähnungen für die Icon-Leiste; null = kein geteilter Workspace (Eintrag fehlt wie Upstream) */
+	public function railCount(string $uid): ?int {
+		if ($this->shares->sharedWorkspaceIds($this->access->visibleWorkspaceIds($uid)) === []) {
+			return null;
+		}
+		return count($this->collect($uid, false, null, false));
+	}
+
+	/**
+	 * mentions.php: eine Gruppe je Workspace in der Reihenfolge der Erwähnungen (Upstream mentions.php)
+	 * @return array{groups: list<array<string, mixed>>, hasShared: bool}
+	 */
+	public function page(string $uid, bool $showHandled): array {
+		$hasShared = $this->shares->sharedWorkspaceIds($this->access->visibleWorkspaceIds($uid)) !== [];
+		$groups = [];
+		foreach ($hasShared ? $this->collect($uid, $showHandled, null, false) : [] as $m) {
+			$key = $m['owner_user_id'] . "\n" . $m['workspace'];
+			$owner = $m['owner_user_id'];
+			$groups[$key] ??= [
+				'workspace' => $m['workspace'],
+				'ownerName' => $owner !== '' && $owner !== $uid ? ($this->users->getDisplayName($owner) ?? $owner) : '',
+				'mentions' => [],
+			];
+			$by = $m['updated_by'] !== '' ? ($this->users->getDisplayName($m['updated_by']) ?? $m['updated_by']) : '';
+			$groups[$key]['mentions'][] = $m + [
+				'updatedByName' => $by,
+				'updatedDisplay' => is_string($m['updated']) ? $this->dates->formatDateTime((int)strtotime($m['updated'] . ' UTC'), 'short', 'short') : '',
+			];
+		}
+		return ['groups' => array_values($groups), 'hasShared' => $hasShared];
+	}
+
+	/**
+	 * Nach dem Speichern: neu erwähnte Mitglieder (Besitzer, Freigabeempfänger) eines geteilten Workspace benachrichtigen
+	 * Diff alt/neu, höchstens MAX_NOTIFY in Reihenfolge im Text, nie an sich selbst; Fehler brechen das Speichern nicht ab
+	 */
+	public function notifyNew(string $uid, Note $note, string $oldContent): void {
+		try {
+			$new = (string)($note->getContent() ?? '');
+			if (!str_contains($new, '@') || $note->getRole() !== 'note' || $note->getWorkspaceId() === null) {
+				return;
+			}
+			$ws = $this->access->requireWorkspace($uid, (int)$note->getWorkspaceId(), 'read');
+			$recipients = $this->shares->recipients((int)$ws->getId());
+			if ($recipients === [] || $ws->getOwnerType() !== 'user') {
+				return;
+			}
+			$type = (string)($note->getType() ?: 'note');
+			$newText = self::plainText($new, $type);
+			$oldText = str_contains($oldContent, '@') ? self::plainText($oldContent, $type) : '';
+			$found = [];
+			foreach (array_unique(array_merge([(string)$ws->getOwnerId()], $recipients)) as $member) {
+				if ($member === $uid || self::count($oldText, $member) > 0 || !Pcre::match(self::pattern($member), $newText, $m, PREG_OFFSET_CAPTURE)) {
+					continue;
+				}
+				$found[$member] = (int)$m[0][1];
+			}
+			asort($found);
+			$sent = 0;
+			foreach (array_keys($found) as $member) {
+				if ($sent >= self::MAX_NOTIFY) {
+					break;
+				}
+				if ($this->access->workspaceLevel($member, $ws) < AccessService::READ) {
+					continue;
+				}
+				$n = $this->notifications->createNotification();
+				$n->setApp(Application::APP_ID)
+					->setUser($member)
+					->setDateTime((new \DateTime())->setTimestamp($this->time->getTime()))
+					->setObject('note', (string)$note->getId())
+					->setSubject('mention', ['by' => $uid]);
+				$this->notifications->notify($n);
+				$sent++;
+			}
+		} catch (\Throwable $e) {
+			$this->logger->error('nextnotes: mention notification failed', ['exception' => $e, 'app' => Application::APP_ID]);
+		}
 	}
 
 	// Upstream poznoteMentionPattern: kein Treffer in E-Mail-Adressen oder längeren Namen

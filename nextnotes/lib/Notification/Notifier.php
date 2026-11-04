@@ -15,13 +15,14 @@ use OCA\NextNotes\Service\AccessService;
 use OCA\NextNotes\Service\WorkspaceService;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IURLGenerator;
+use OCP\IUserManager;
 use OCP\L10N\IFactory;
 use OCP\Notification\AlreadyProcessedException;
 use OCP\Notification\INotification;
 use OCP\Notification\INotifier;
 use OCP\Notification\UnknownNotificationException;
 
-// Erinnerungen in der NC-Glocke (SPEC §6); ohne Leserecht oder Notiz verschwindet die Benachrichtigung
+// Erinnerungen und Erwähnungen in der NC-Glocke (SPEC §6); ohne Leserecht oder Notiz verschwindet die Benachrichtigung
 class Notifier implements INotifier {
 	public function __construct(
 		private IFactory $l10nFactory,
@@ -29,6 +30,7 @@ class Notifier implements INotifier {
 		private AccessService $access,
 		private NoteMapper $notes,
 		private WorkspaceService $workspaces,
+		private IUserManager $users,
 	) {
 	}
 
@@ -42,7 +44,7 @@ class Notifier implements INotifier {
 
 	public function prepare(INotification $notification, string $languageCode): INotification {
 		if ($notification->getApp() !== Application::APP_ID || $notification->getObjectType() !== 'note'
-			|| !in_array($notification->getSubject(), ['reminder', 'task_reminder'], true)) {
+			|| !in_array($notification->getSubject(), ['reminder', 'task_reminder', 'mention'], true)) {
 			throw new UnknownNotificationException();
 		}
 		$uid = $notification->getUser();
@@ -64,12 +66,23 @@ class Notifier implements INotifier {
 			$params['workspace'] = $key;
 		}
 		$link = $this->urls->linkToRouteAbsolute('nextnotes.page.indexphp') . '?' . http_build_query($params);
+		$noteParam = ['type' => 'highlight', 'id' => (string)$noteId, 'name' => $heading, 'link' => $link];
+		$icon = $this->urls->getAbsoluteURL($this->urls->imagePath(Application::APP_ID, 'app-dark.svg'));
+		if ($notification->getSubject() === 'mention') {
+			$by = (string)($notification->getSubjectParameters()['by'] ?? '');
+			$name = $this->users->getDisplayName($by) ?? $by;
+			$subject = $l->t('{user} mentioned you in {note}');
+			return $notification->setParsedSubject(str_replace(['{user}', '{note}'], [$name, $heading], $subject))
+				->setRichSubject($subject, ['user' => ['type' => 'user', 'id' => $by, 'name' => $name], 'note' => $noteParam])
+				->setLink($link)
+				->setIcon($icon);
+		}
 		$task = $notification->getSubject() === 'task_reminder';
 		$subject = $task ? $l->t('Task reminder in {note}') : $l->t('Reminder: {note}');
 		$notification->setParsedSubject(str_replace('{note}', $heading, $subject))
-			->setRichSubject($subject, ['note' => ['type' => 'highlight', 'id' => (string)$noteId, 'name' => $heading, 'link' => $link]])
+			->setRichSubject($subject, ['note' => $noteParam])
 			->setLink($link)
-			->setIcon($this->urls->getAbsoluteURL($this->urls->imagePath(Application::APP_ID, 'app-dark.svg')));
+			->setIcon($icon);
 		$message = trim((string)($notification->getSubjectParameters()['message'] ?? ''));
 		if ($message !== '' && $message !== $heading) {
 			$notification->setParsedMessage($message);

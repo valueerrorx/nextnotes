@@ -12,6 +12,7 @@ namespace OCA\NextNotes\Controller;
 use OCA\NextNotes\Service\Exception\BadRequestException;
 use OCA\NextNotes\Service\NoteService;
 use OCA\NextNotes\Service\SettingsService;
+use OCA\NextNotes\Service\BackgroundService;
 use OCA\NextNotes\Service\WorkspaceService;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\JSONResponse;
@@ -20,12 +21,13 @@ use OCP\IUserSession;
 
 // Upstream SettingsController (nur Benutzereinstellungen); „zuletzt geöffnet“ gefiltert über NoteService (Plan H3)
 class SettingsApiController extends ApiController {
-	public function __construct(IRequest $request, IUserSession $userSession, WorkspaceService $workspaces, private SettingsService $settings, private NoteService $notes) {
+	public function __construct(IRequest $request, IUserSession $userSession, WorkspaceService $workspaces, private SettingsService $settings, private NoteService $notes, private BackgroundService $backgrounds) {
 		parent::__construct($request, $userSession, $workspaces);
 	}
 
+	// Deckkraft der Hintergrundbilder je Workspace-Name → intern je Workspace-ID (BackgroundService)
 	private function value(string $uid, string $key): string {
-		return $key === SettingsService::OPENED_KEY ? $this->notes->openedSetting($uid) : $this->settings->read($uid, $key);
+		return $key === SettingsService::OPENED_KEY ? $this->notes->openedSetting($uid) : ($this->backgrounds->readOpacity($uid, $key) ?? $this->settings->read($uid, $key));
 	}
 
 	#[NoAdminRequired]
@@ -61,7 +63,7 @@ class SettingsApiController extends ApiController {
 
 	#[NoAdminRequired]
 	public function update(string $key): JSONResponse {
-		$value = $this->settings->write($this->uid(), $key, $this->param('value') ?? '');
+		$value = $this->backgrounds->writeOpacity($this->uid(), $key, $this->param('value') ?? '') ?? $this->settings->write($this->uid(), $key, $this->param('value') ?? '');
 		return $this->ok(['key' => $key, 'value' => $value]);
 	}
 }

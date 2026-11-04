@@ -50,7 +50,9 @@
 	}
 
 	// Globals der Upstream-Inline-Skripte (index.php, icon_sidebar.php); nur bekannte Namen
-	var GLOBALS = ['DEFAULT_NOTE_TITLES', 'PoznoteMentionMembers', 'TAG_COLORS', 'NOTE_COLOR_PALETTE', 'PoznoteActiveAccountIsOwn', 'calendarTranslations', 'NOTIFICATIONS_TXT', 'DIARY_DATA'];
+	var GLOBALS = ['DEFAULT_NOTE_TITLES', 'PoznoteMentionMembers', 'TAG_COLORS', 'NOTE_COLOR_PALETTE', 'PoznoteActiveAccountIsOwn', 'calendarTranslations', 'NOTIFICATIONS_TXT', 'DIARY_DATA',
+		'NOTE_COLOR_TXT', 'DASHBOARD_DATA', 'DASHBOARD_PIN_TXT', 'DASHBOARD_REORDER_TXT', 'DASHBOARD_SHOW_MORE_TXT', 'DASHBOARD_SCOPE_TXT',
+		'DASHBOARD_MODIFIED_TXT', 'DASHBOARD_TAG_FILTER_TXT', 'DASHBOARD_NOTE_MODAL_TXT', 'NEXTNOTES_TXT'];
 	var pageGlobals = readIsland('nextnotes-globals') || {};
 	GLOBALS.forEach(function (name) {
 		if (Object.prototype.hasOwnProperty.call(pageGlobals, name)) window[name] = pageGlobals[name];
@@ -132,11 +134,27 @@
 		try {
 			var path = new URL(url, window.location.href).pathname;
 			var prefix = apiBase + '/settings/';
-			var key = path.indexOf(prefix) === 0 ? path.slice(prefix.length) : '';
+			var key = path.indexOf(prefix) === 0 ? decodeURIComponent(path.slice(prefix.length)) : '';
 			return key !== '' && Object.prototype.hasOwnProperty.call(prefetched, key) ? key : null;
 		} catch (e) {
 			return null;
 		}
+	}
+
+	// Hintergrund der Hauptansicht kam mit der Seite (background-settings.js): erste Statusabfrage dieses Workspace ohne Request
+	var prefetchedBackground = config.background && typeof config.background === 'object' ? config.background : null;
+	function backgroundAnswer(url, method) {
+		if (!prefetchedBackground || method !== 'GET') return null;
+		try {
+			var target = new URL(url, window.location.href);
+			if (!/\/api_upload_background\.php$/.test(target.pathname) || target.searchParams.has('image')) return null;
+			if ((target.searchParams.get('scope') || 'background') !== 'background' || target.searchParams.get('workspace') !== prefetchedBackground.workspace) return null;
+		} catch (e) {
+			return null;
+		}
+		var answer = Object.assign({ success: true }, prefetchedBackground);
+		prefetchedBackground = null;
+		return answer;
 	}
 
 	function token() {
@@ -199,6 +217,10 @@
 		if (settingKey && method === 'GET') {
 			var answer = JSON.stringify({ success: true, key: settingKey, value: prefetched[settingKey] });
 			return Promise.resolve(new Response(answer, { status: 200, headers: { 'Content-Type': 'application/json' } }));
+		}
+		var background = backgroundAnswer(target, method);
+		if (background) {
+			return Promise.resolve(new Response(JSON.stringify(background), { status: 200, headers: { 'Content-Type': 'application/json' } }));
 		}
 		if (!isAppCall(target)) {
 			return nativeFetch.call(this, target === url ? input : target, init);

@@ -16,6 +16,7 @@ use OCA\NextNotes\Http\AttachmentResponse;
 use OCA\NextNotes\Http\CspFactory;
 use OCA\NextNotes\Service\AccessService;
 use OCA\NextNotes\Service\AttachmentService;
+use OCA\NextNotes\Service\BackgroundService;
 use OCA\NextNotes\Service\Exception\BadRequestException;
 use OCA\NextNotes\Service\Exception\LockedException;
 use OCA\NextNotes\Service\Exception\NotImplementedException;
@@ -31,6 +32,7 @@ use OCA\NextNotes\Service\View\PageAssets;
 use OCA\NextNotes\Service\View\PageTranslator;
 use OCA\NextNotes\Service\WorkspaceService;
 use OCA\NextNotes\Service\ZipExportService;
+use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\Attribute\UserRateLimit;
@@ -67,6 +69,7 @@ class CompatController extends ApiController {
 		private CspFactory $cspFactory,
 		private PageAssets $assets,
 		private IAppManager $appManager,
+		private BackgroundService $backgrounds,
 	) {
 		parent::__construct($request, $userSession, $workspaces);
 	}
@@ -314,5 +317,34 @@ class CompatController extends ApiController {
 	public function importDroppedNotes(): JSONResponse {
 		$r = $this->import->importDropped($this->uid(), $this->request->getUploadedFile('files'), $this->param('workspace'), $this->param('folder_id'), $this->param('file_count'));
 		return $this->ok(['message' => $r['message'], 'error' => $r['error']]);
+	}
+
+	// Upstream api_upload_background.php (B43): Status bzw. ?image=1 das Bild selbst (Leserecht, nur eigenes Bild)
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function background(): Response {
+		$uid = $this->uid();
+		if ($this->param('image') !== '1') {
+			return $this->ok($this->backgrounds->status($uid, $this->param('workspace'), $this->param('scope')));
+		}
+		$file = $this->backgrounds->image($uid, $this->param('workspace'), $this->param('scope'));
+		$response = new FileDisplayResponse($file, Http::STATUS_OK, ['Content-Type' => BackgroundService::mimeOf($file)]);
+		$response->addHeader('Content-Disposition', 'inline');
+		$response->addHeader('X-Content-Type-Options', 'nosniff');
+		$response->addHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+		$response->cacheFor(86400);
+		return $response;
+	}
+
+	// Hochladen nur mit Schreibrecht (Leser: 403), Typ nach Inhalt, ≤ 5 MiB
+	#[NoAdminRequired]
+	#[UserRateLimit(limit: 20, period: 60)]
+	public function backgroundUpload(): JSONResponse {
+		return $this->ok($this->backgrounds->upload($this->uid(), $this->param('workspace'), $this->param('scope'), $this->request->getUploadedFile('background')));
+	}
+
+	#[NoAdminRequired]
+	public function backgroundDelete(): JSONResponse {
+		return $this->ok($this->backgrounds->delete($this->uid(), $this->param('workspace'), $this->param('scope')));
 	}
 }

@@ -27,7 +27,7 @@ class SettingsService {
 		'theme_list', 'allow_executable_attachments', 'login_disabled', 'two_factor_required', 'outbound_allowed_hosts',
 		'whats_new_seen_version', 'schema_version', 'user_profile_username', 'language_source', 'snapshots_expiry_sweep_at'];
 	private const BLOCKED_PREFIXES = ['git_', 'github_', 'ai_', 'stt_', 'smtp_', 'mcp_', 'admin_', 'offline_', 'tenant_',
-		'user_max_', 'import_max_', 'login_', 'two_factor', 'webhook', 'push_', 'backup'];
+		'user_max_', 'import_max_', 'login_', 'two_factor', 'webhook', 'push_', 'backup', ...BackgroundFiles::OPACITY_PREFIXES];
 	// Werte aus Nextcloud bzw. vom Server geführt, über die API nur lesbar
 	private const READ_ONLY = ['language', 'timezone', self::OPENED_KEY];
 	private const BOOLS = ['whats_new_popup', 'attachment_previews_in_note', 'emoji_icons_enabled', 'show_note_icons',

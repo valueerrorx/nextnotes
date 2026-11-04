@@ -100,9 +100,9 @@ final class ReminderJobTest extends ApiTestCase {
 		return $n;
 	}
 
-	private static function assertAlreadyProcessed(string $uid, int $noteId, string $what): void {
+	private static function assertAlreadyProcessed(string $uid, int $noteId, string $what, string $subject = 'reminder'): void {
 		try {
-			Server::get(Notifier::class)->prepare(self::notification($uid, $noteId), 'en');
+			Server::get(Notifier::class)->prepare(self::notification($uid, $noteId, $subject), 'en');
 			self::fail("$what: prepare ohne Leserecht liefert Anzeige statt AlreadyProcessedException");
 		} catch (AlreadyProcessedException) {
 			self::assertTrue(true);
@@ -248,7 +248,9 @@ final class ReminderJobTest extends ApiTestCase {
 		self::assertAlreadyProcessed($b->uid, $n1, 'nach unshare');
 
 		$this->runJob($this->t0 + 3600 + 60);
-		self::assertSame(0, self::notifications($b->uid, $n2), 'nach Entzug gesendet');
+		// M4g: die Erwähnungs-Benachrichtigung (beim Anlegen) bleibt als Zeile, prepare verwirft sie ohne Leserecht
+		self::assertSame(0, self::notifications($b->uid, $n2, 'reminder'), 'nach Entzug gesendet');
+		self::assertAlreadyProcessed($b->uid, $n2, 'Erwähnung nach unshare', 'mention');
 		self::assertSame(1, self::notifications($a->uid, $n2), 'Besitzer erhält keine Benachrichtigung');
 		self::assertSame(404, $b->call('GET', "/notes/$n1/reminder")->status);
 	}

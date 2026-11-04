@@ -40,6 +40,11 @@ final class TemplateOutputTest extends TestCase {
 		// M4f: Tagebuch und Aufgaben (Karten/Journal per JS aus JSON-Insel bzw. entries.php)
 		'diary.php' => ['json_encode($islandData, $jsonFlags)'],
 		'tasks.php' => ['json_encode($islandData, $jsonFlags)'],
+		// M4g: Dashboard, Graph, Speed Dial, Erwähnungen (nur JSON-Inseln)
+		'dashboard.php' => ['json_encode($islandData, $jsonFlags)'],
+		'graph.php' => ['json_encode($island, $jsonFlags)'],
+		'speed_dial.php' => ['json_encode($island, $jsonFlags)'],
+		'mentions.php' => ['json_encode($island, $jsonFlags)'],
 	];
 
 	/** @return array<string, string> relativer Pfad => Inhalt */

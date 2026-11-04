@@ -495,3 +495,63 @@ body.diary-journal-active #nextnotes-root .nn-diary-main .diary-outline {
 	color: var(--color-text-maxcontrast);
 	font-style: italic;
 }
+
+/* Hintergrundbild der Hauptansicht (M4g, background-settings.js setzt Inline-Stile für das ganze Fenster): nur über dem App-Bereich unter der NC-Kopfleiste;
+   z-index 1: dezente Lasur (≤ 25 %) über den App-Flächen, die im NC-Rahmen deckend sind; Klicks gehen durch (pointer-events: none) */
+#poznote-background-layer {
+	z-index: 1 !important;
+	top: var(--header-height) !important;
+	left: var(--body-container-margin) !important;
+	right: var(--body-container-margin) !important;
+	bottom: var(--body-container-margin) !important;
+	width: auto !important;
+	height: auto !important;
+	border-radius: var(--body-container-radius);
+	background-attachment: scroll !important;
+}
+
+/* Dashboard, Graph, Speed Dial (M4g): Upstream setzt Höhe/Abstände auf body (dashboard.css, graph.css, speed-dial.css); hier im Hauptbereich */
+#nextnotes-root.graph-page {
+	--graph-page-bg: var(--pz-surface);
+}
+
+html[data-theme='dark'] #nextnotes-root.graph-page {
+	--graph-page-bg: var(--pz-chrome-bg, var(--pz-bg));
+}
+
+#nextnotes-root .nn-graph-main {
+	background: var(--graph-page-bg);
+	display: flex;
+	flex-direction: column;
+	padding-top: 0;
+	overflow: hidden;
+}
+
+#nextnotes-root .nn-graph-main .graph-container {
+	flex: 1 1 auto;
+	height: auto;
+	min-height: 0;
+}
+
+#nextnotes-root .nn-dashboard-main,
+#nextnotes-root.mentions-page .nn-page-main {
+	background: var(--pz-surface);
+}
+
+/* Speed Dial: eigenes Bild hinter den Kacheln, nur im Hauptbereich (Upstream fixed über das Fenster) */
+#nextnotes-root .nn-speed-dial-main {
+	isolation: isolate;
+}
+
+#nextnotes-root .nn-speed-dial-main .speed-dial-background {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+}
+
+/* Hintergrund-Knopf rechts vom Filter (Upstream-Raster: Größe | Filter | frei) */
+#nextnotes-root .speed-dial-toolbar #edgeMenuSpeedDialBackground {
+	grid-column: 3;
+	grid-row: 1;
+	justify-self: start;
+}

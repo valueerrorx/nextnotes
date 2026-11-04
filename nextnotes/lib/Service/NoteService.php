@@ -64,6 +64,7 @@ class NoteService {
 		private MentionHandledMapper $mentions,
 		private INotificationManager $notifications,
 		private EmbeddedImageService $images,
+		private MentionService $mentionService,
 	) {
 	}
 
@@ -334,8 +335,11 @@ class NoteService {
 		$folderPath = is_string($folderPath) ? trim($folderPath) : '';
 		$folderIdIn = isset($in['folder_id']) ? (int)$in['folder_id'] : 0;
 		$hasWs = is_string($in['workspace'] ?? null) && trim($in['workspace']) !== '';
+		// speed-dial setzen nur die Speed-Dial-Aktionen (PUT notes/{id}/tags, Ordner-Tags), nicht die Tag-Eingabe
+		$tagList = array_values(array_filter($tagList, static fn (string $t) => !TagService::isInternal($t)));
+		$this->pendingMention = null;
 
-		return $this->tx->run(function () use ($uid, $in, $type, $headingIn, $tagList, $content, $folderPath, $folderIdIn, $hasWs, $diary) {
+		$out = $this->tx->run(function () use ($uid, $in, $type, $headingIn, $tagList, $content, $folderPath, $folderIdIn, $hasWs, $diary) {
 			$folder = $folderIdIn > 0 ? $this->access->requireFolder($uid, $folderIdIn, 'write') : null;
 			if ($hasWs) {
 				$ws = $this->workspaces->requireByKey($uid, trim($in['workspace']), 'write');
@@ -391,6 +395,7 @@ class NoteService {
 			$this->applyContent($note, $content);
 			$note = $this->notes->insert($note);
 			$this->tags->replace((int)$note->getId(), $tagList);
+			$this->pendingMention = [$note, ''];
 			return [
 				'note' => [
 					'id' => (int)$note->getId(),
@@ -403,6 +408,20 @@ class NoteService {
 				'share_delta' => 0,
 			];
 		});
+		$this->notifyMentions($uid);
+		return $out;
+	}
+
+	/** @var ?array{0: Note, 1: string} gespeicherte Notiz und Inhalt davor, bis nach dem Commit */
+	private ?array $pendingMention = null;
+
+	// Neu erwähnte Mitglieder benachrichtigen (§6); erst nach dem Commit, Fehler brechen das Speichern nicht ab
+	private function notifyMentions(string $uid): void {
+		$pending = $this->pendingMention;
+		$this->pendingMention = null;
+		if ($pending !== null) {
+			$this->mentionService->notifyNew($uid, $pending[0], $pending[1]);
+		}
 	}
 
 	/** @return array<string, mixed> PATCH /notes/{id}; $diary: Datumstitel verschiebt in den Datumsordner (M4f) */
@@ -426,10 +445,13 @@ class NoteService {
 			$target = is_string($in['workspace'] ?? null) && trim($in['workspace']) !== '' ? $this->workspaces->requireByKey($uid, trim($in['workspace']), 'write') : null;
 			$images = $this->images->prepare((string)$content, $target !== null ? (int)$target->getId() : (int)$writable->getWorkspaceId());
 		}
-		return $this->tx->run(function () use ($uid, $id, $in, $expected, $newHeading, $content, $tagList, $stateHash, $images, $diary) {
+		$this->pendingMention = null;
+		$out = $this->tx->run(function () use ($uid, $id, $in, $expected, $newHeading, $content, $tagList, $stateHash, $images, $diary) {
 			$this->attachments->enforceQuota($images['quota'] ?? null);
 			return $this->updateLocked($uid, $id, $in, $expected, $newHeading, $content, $tagList, $stateHash, $images, $diary);
 		});
+		$this->notifyMentions($uid);
+		return $out;
 	}
 
 	/** @return array<string, mixed> */
@@ -508,6 +530,7 @@ class NoteService {
 		$note->setUpdatedAt($now);
 		$note->setUpdatedBy($uid);
 		$adopted = [];
+		$oldContent = (string)($note->getContent() ?? '');
 		if ($content !== null) {
 			$content = is_scalar($content) ? (string)$content : '';
 			if ($images !== null && $note->getType() === 'note') {
@@ -521,7 +544,15 @@ class NoteService {
 		$note->setClientStateHash($stateHash);
 		$note->setClientStateVersion($stateHash !== null ? $version : null);
 		$this->notes->update($note);
+		if ($content !== null) {
+			$this->pendingMention = [$note, $oldContent];
+		}
 		if ($tagList !== null) {
+			// speed-dial bleibt, wenn vorhanden; neu setzen nur die Speed-Dial-Aktionen
+			$internal = array_filter($tagList, static fn (string $t) => TagService::isInternal($t));
+			if ($internal !== [] && array_filter($this->tags->tagsOf((int)$note->getId()), static fn (string $t) => TagService::isInternal($t)) === []) {
+				$tagList = array_values(array_filter($tagList, static fn (string $t) => !TagService::isInternal($t)));
+			}
 			$this->tags->replace((int)$note->getId(), $tagList);
 		}
 		$linked = [];

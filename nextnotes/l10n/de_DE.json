@@ -35,7 +35,11 @@
   "Not found or no access.": "Nicht gefunden oder kein Zugriff.",
   "Back to Next Notes": "Zurück zu Next Notes",
   "This entry is too large for the journal view.": "Dieser Eintrag ist für die Journal-Ansicht zu groß.",
-  "Open note": "Notiz öffnen"
+  "Open note": "Notiz öffnen",
+  "{user} mentioned you in {note}": "{user} hat Sie in {note} erwähnt",
+  "The tag \"%1$s\" is reserved. Use \"%2$s\" in the menu of the note.": "Der Tag „%1$s“ ist reserviert. Nutzen Sie „%2$s“ im Menü der Notiz.",
+  "Your speed dial is empty.": "Ihre Schnellwahl ist leer.",
+  "To add a tile, use \"%s\" in the menu of a note or folder. A tile opens the first link of the note, or the note itself; its icon is the first image of the note or the first letter of the title. A note with several links becomes a group of tiles, a horizontal line starts a new row.": "Um eine Kachel hinzuzufügen, nutzen Sie „%s“ im Menü einer Notiz oder eines Ordners. Eine Kachel öffnet den ersten Link der Notiz oder die Notiz selbst; ihr Symbol ist das erste Bild der Notiz oder der Anfangsbuchstabe des Titels. Eine Notiz mit mehreren Links wird zu einer Gruppe von Kacheln, eine horizontale Linie beginnt eine neue Zeile."
  },
  "pluralForm": "nplurals=2; plural=(n != 1);"
 }

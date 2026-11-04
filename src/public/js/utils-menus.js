@@ -343,6 +343,12 @@ function showTagFolderNotesDialog(folderId, folderName, noteCount, presetTag) {
     if (suggestions) suggestions.style.display = 'none';
     input.value = presetTag || '';
 
+    // Next Notes P27: "Add to speed dial" of a folder acts at once, like its removal
+    if (presetTag === 'speed-dial') {
+        executeTagFolderNotes(true);
+        return;
+    }
+
     if (typeof openModal === 'function') {
         openModal('tagFolderNotesModal');
     } else {
@@ -353,7 +359,7 @@ function showTagFolderNotesDialog(folderId, folderName, noteCount, presetTag) {
 
 // An open note saves the tags of its field: it has to learn the ones just given
 // to it, or its next save takes them away.
-function refreshOpenNotesTags() {
+function refreshOpenNotesTags(changedNoteIds) {
     if (typeof convertTagsToEditable !== 'function') return;
     document.querySelectorAll('input[id^="tags"]').forEach(function(input) {
         var noteId = input.id.slice(4);
@@ -362,6 +368,11 @@ function refreshOpenNotesTags() {
             .then(function(response) { return response.json(); })
             .then(function(data) {
                 if (!data.success || !data.note) return;
+                // Next Notes P27 (B52): an open note the server just tagged saves against its new version (no 409)
+                var changed = (changedNoteIds || []).some(function(id) { return String(id) === noteId; });
+                if (changed && data.note.version && typeof window.setLiveNoteContentVersion === 'function') {
+                    window.setLiveNoteContentVersion(noteId, data.note.version);
+                }
                 input.value = String(data.note.tags || '').split(/[,\s]+/).filter(Boolean).join(' ');
                 convertTagsToEditable(noteId);
             })
@@ -414,7 +425,7 @@ function removeFolderFromSpeedDial(folderId) {
                 ? label('speed_dial.folder_removed_one', '1 note removed from the speed dial')
                 : label('speed_dial.folder_removed_other', '{{count}} notes removed from the speed dial');
             window.poznoteShowToast(message.replace('{{count}}', String(data.updated_count)));
-            refreshOpenNotesTags();
+            refreshOpenNotesTags(data.note_ids);
             syncSpeedDialAfterFolderChange(data.note_ids, false);
         })
         .catch(function(error) {
@@ -424,13 +435,20 @@ function removeFolderFromSpeedDial(folderId) {
 }
 window.removeFolderFromSpeedDial = removeFolderFromSpeedDial;
 
-function executeTagFolderNotes() {
+function executeTagFolderNotes(speedDial) {
     var modal = document.getElementById('tagFolderNotesModal');
     var input = document.getElementById('tagFolderNotesInput');
     if (!modal || !input) return;
 
     var tags = input.value.split(',').map(function(tag) { return tag.trim(); }).filter(Boolean);
     var errorMessage = document.getElementById('tagFolderNotesErrorMessage');
+    // Next Notes P27: typed, speed-dial is refused (reserved for the speed dial actions)
+    var reserved = speedDial !== true && tags.some(function(tag) { return tag.toLowerCase() === 'speed-dial'; });
+    if (reserved) {
+        if (errorMessage) errorMessage.textContent = (window.NEXTNOTES_TXT || {}).speedDialReserved || 'The tag "speed-dial" is reserved.';
+        input.focus();
+        return;
+    }
     if (!tags.length) {
         if (errorMessage) errorMessage.textContent = modal.dataset.msgNoTags || 'Enter at least one tag';
         input.focus();
@@ -464,13 +482,15 @@ function executeTagFolderNotes() {
         .then(function(data) {
             var message = data.updated_count === 1 ? modal.dataset.msgSuccessOne : modal.dataset.msgSuccessOther;
             if (data.updated_count === 0) message = modal.dataset.msgSuccessNone;
+            if (speedDial === true) message = window.t ? window.t('speed_dial.added', null, 'Added to the speed dial') : 'Added to the speed dial';
             window.poznoteShowToast((message || '').replace('{{count}}', String(data.updated_count || 0)));
             if (typeof closeModal === 'function') closeModal('tagFolderNotesModal');
-            if (data.updated_count > 0) refreshOpenNotesTags();
+            if (data.updated_count > 0) refreshOpenNotesTags(data.note_ids);
             if (tags.indexOf('speed-dial') !== -1) syncSpeedDialAfterFolderChange(data.note_ids, true);
         })
         .catch(function(error) {
             if (errorMessage) errorMessage.textContent = error.message;
+            if (speedDial === true) showNotificationPopup(error.message, 'error');
         })
         .finally(function() {
             if (applyButton) {

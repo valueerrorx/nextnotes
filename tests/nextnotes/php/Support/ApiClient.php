@@ -79,6 +79,21 @@ final class ApiClient {
 		return self::toResponse($ch, (string)curl_exec($ch));
 	}
 
+	/** Eine Datei unter beliebigem Feldnamen an eine Kompatibilitätsroute (ohne API-Präfix), z. B. background */
+	public function uploadField(string $path, string $field, string $filename, string $bytes, array $fields = [], string $mime = 'application/octet-stream'): Response {
+		$ch = curl_init(self::baseUrl() . $path);
+		curl_setopt_array($ch, [
+			CURLOPT_CUSTOMREQUEST => 'POST',
+			CURLOPT_RETURNTRANSFER => true,
+			CURLOPT_HEADER => true,
+			CURLOPT_TIMEOUT => 60,
+			CURLOPT_USERPWD => $this->uid . ':' . $this->secret,
+			CURLOPT_HTTPHEADER => array_merge($this->extraHeaders, ['Accept: application/json']),
+			CURLOPT_POSTFIELDS => [$field => new \CURLStringFile($bytes, $filename, $mime)] + array_map('strval', $fields),
+		]);
+		return self::toResponse($ch, (string)curl_exec($ch));
+	}
+
 	/**
 	 * Mehrere Dateien als files[] (wie FormData im Browser) an eine Kompatibilitätsroute (ohne API-Präfix)
 	 * @param list<array{0: string, 1: string}> $files [Dateiname, Bytes]

@@ -2132,12 +2132,24 @@
     function applyScopeSelection(names, allNames) {
         if (!names.length) return;
         if (names.length === 1) {
-            window.location.href = buildDashboardUrl({ scope: 'single', workspace: names[0] });
+            goToScope({ scope: 'single', workspace: names[0] });
         } else if (names.length === allNames.length) {
-            window.location.href = buildDashboardUrl({ scope: 'all' });
+            goToScope({ scope: 'all' });
         } else {
-            window.location.href = buildDashboardUrl({ scope: 'list', 'ws[]': names });
+            goToScope({ scope: 'list', ws: names });
         }
+    }
+
+    // Next Notes P28: the choice is saved through the settings API, the page GET writes nothing
+    function goToScope(query) {
+        var params = query.ws ? { scope: query.scope, 'ws[]': query.ws } : query;
+        var go = function () { window.location.href = buildDashboardUrl(params); };
+        fetch('api/v1/settings/dashboard_scope', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ value: JSON.stringify(query) })
+        }).then(go, go);
     }
 
     function loadWorkspaces() {
@@ -2244,7 +2256,7 @@
                     btn.addEventListener('click', function (e) {
                         e.preventDefault();
                         var ws = btn.getAttribute('data-workspace');
-                        if (ws) window.location.href = buildDashboardUrl({ scope: 'single', workspace: ws });
+                        if (ws) goToScope({ scope: 'single', workspace: ws });
                     });
                 });
 

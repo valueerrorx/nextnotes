@@ -27,8 +27,10 @@ use OCA\NextNotes\Service\NoteSerializer;
 use OCA\NextNotes\Service\NoteService;
 use OCA\NextNotes\Service\SearchService;
 use OCA\NextNotes\Service\SettingsService;
+use OCA\NextNotes\Service\TagService;
 use OCA\NextNotes\Service\WorkspaceService;
 use OCP\IDateTimeFormatter;
+use OCP\IL10N;
 
 /**
  * Daten der Hauptansicht (Upstream index.php, notes_list.php, folders_display.php) ohne Markup.
@@ -123,6 +125,7 @@ class IndexViewService {
 		private IDateTimeFormatter $dates,
 		private SearchService $search,
 		private PageFrameService $frame,
+		private IL10N $l,
 	) {
 	}
 
@@ -796,6 +799,8 @@ class IndexViewService {
 			'TAG_COLORS' => is_array($tagColors) ? (object)$tagColors : new \stdClass(),
 			'NOTE_COLOR_PALETTE' => $palette,
 			'PoznoteActiveAccountIsOwn' => true,
+			// Texte des Ports (NC-l10n), z. B. reservierter Tag speed-dial (P27)
+			'NEXTNOTES_TXT' => ['speedDialReserved' => $this->l->t('The tag "%1$s" is reserved. Use "%2$s" in the menu of the note.', [TagService::SPEED_DIAL, $this->tr->t('speed_dial.add', [], 'Add to speed dial')])],
 			'calendarTranslations' => [
 				'months' => array_map(static fn ($m) => $t('calendar.months.' . $m), $months),
 				'weekdays' => array_map(static fn ($d) => $t('calendar.weekdays.' . $d), $days),

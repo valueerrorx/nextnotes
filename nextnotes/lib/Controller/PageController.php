@@ -12,11 +12,14 @@ namespace OCA\NextNotes\Controller;
 use OCA\NextNotes\AppInfo\Application;
 use OCA\NextNotes\Http\CspFactory;
 use OCA\NextNotes\Service\AttachmentService;
+use OCA\NextNotes\Service\BackgroundService;
 use OCA\NextNotes\Service\EmbedDomainService;
 use OCA\NextNotes\Service\ExcalidrawService;
+use OCA\NextNotes\Service\MentionService;
 use OCA\NextNotes\Service\Exception\NotFoundException;
 use OCA\NextNotes\Service\SettingsService;
 use OCA\NextNotes\Service\SnapshotService;
+use OCA\NextNotes\Service\View\DashboardViewService;
 use OCA\NextNotes\Service\View\DiaryViewService;
 use OCA\NextNotes\Service\View\IndexViewService;
 use OCA\NextNotes\Service\View\KanbanViewService;
@@ -25,6 +28,7 @@ use OCA\NextNotes\Service\View\NotePageViewService;
 use OCA\NextNotes\Service\View\PageAssets;
 use OCA\NextNotes\Service\View\PageFrameService;
 use OCA\NextNotes\Service\View\PageTranslator;
+use OCA\NextNotes\Service\View\SpeedDialViewService;
 use OCA\NextNotes\Service\View\TagListViewService;
 use OCA\NextNotes\Service\View\TrashViewService;
 use OCP\App\IAppManager;
@@ -62,6 +66,10 @@ class PageController extends Controller {
 		private TagListViewService $tagListView,
 		private FolderListViewService $folderListView,
 		private DiaryViewService $diaryView,
+		private BackgroundService $backgrounds,
+		private DashboardViewService $dashboardView,
+		private SpeedDialViewService $speedDialView,
+		private MentionService $mentions,
 	) {
 		parent::__construct(Application::APP_ID, $request);
 	}
@@ -108,15 +116,19 @@ class PageController extends Controller {
 			return $response;
 		}
 		$this->assets->index($lang);
+		// Hintergrundbild und Deckkraft mit der Seite (background-settings.js, kein zusätzlicher Request beim Laden)
+		$opacityKey = 'background_opacity_' . $view['workspaceKey'];
 		$this->provideConfig($uid, $baseUrl, $lang, [
 			'hiddenUiElements' => $view['hiddenUiElements']['user'],
 			'globalHiddenUiElements' => $view['hiddenUiElements']['forced'],
-			'prefetchedSettings' => $view['prefetchedSettings'],
+			'prefetchedSettings' => $view['prefetchedSettings'] + [$opacityKey => (string)$this->backgrounds->readOpacity($uid, $opacityKey)],
+			'background' => $this->backgrounds->status($uid, $view['workspaceKey'], 'background'),
 		]);
 		return $this->page('index', 'index', [
 			'tr' => $this->translator,
 			'view' => $view,
 			'baseUrl' => $baseUrl,
+			'railMentions' => $this->mentions->railCount($uid),
 		]);
 	}
 
@@ -442,15 +454,47 @@ class PageController extends Controller {
 			'baseUrl' => $baseUrl,
 			'frame' => $frame,
 			'currentPage' => $page . '.php',
+			'railMentions' => $this->mentions->railCount($uid),
 			'view' => ['workspaceKey' => $frame['workspaceKey'], 'iconPalette' => IndexViewService::iconPalette()],
 		] + $extra);
 	}
 
-	// Spike ADR 0004, leere Seite bis M4
+	// Upstream dashboard.php: Karten der Notizen nach Ordnern; Bereich (ein/mehrere/alle Workspaces, Tag) aus der URL, sonst gespeichert (P28)
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
 	public function dashboard(): TemplateResponse {
-		return $this->page('main', 'dashboard');
+		return $this->listPage('dashboard', function (string $uid, array $frame): array {
+			$board = $this->dashboardView->build($uid, $frame, $this->request->getParams());
+			return ['board' => $board, 'globals' => $board['globals']];
+		});
+	}
+
+	// Upstream graph.php: Graph der Verweise (graph.js über api/v1/graph)
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function graph(): TemplateResponse {
+		return $this->listPage('graph');
+	}
+
+	// Upstream speed_dial.php: Notizen mit dem internen Tag speed-dial als Kacheln, eigenes Hintergrundbild
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function speedDial(): TemplateResponse {
+		return $this->listPage('speed_dial', fn (string $uid, array $frame) => [
+			'speedDial' => $this->speedDialView->build($uid, $frame),
+		]);
+	}
+
+	// Upstream mentions.php: Notizen geteilter Workspaces, die den Benutzer mit @uid nennen; ?handled=1 zeigt erledigte
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function mentions(): TemplateResponse {
+		$showHandled = $this->request->getParam('handled') === '1';
+		return $this->listPage('mentions', fn (string $uid) => [
+			'uid' => $uid,
+			'showHandled' => $showHandled,
+			'mentions' => $this->mentions->page($uid, $showHandled),
+		]);
 	}
 
 	// Upstream-Login (SPEC §4.2): angemeldet zur App; abgemeldet leitet NC selbst auf den Login mit Rücksprung

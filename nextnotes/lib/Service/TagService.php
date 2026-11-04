@@ -76,6 +76,13 @@ class TagService {
 			throw new BadRequestException('new_name is required');
 		}
 		$newName = $this->validator->tagName((string)$newName);
+		// interner Tag ist kein Benutzer-Tag: weder umbenennen noch als Ziel (Nacharbeit B52)
+		if (self::isInternal($newName)) {
+			throw new BadRequestException('This tag name is reserved');
+		}
+		if (self::isInternal($tag)) {
+			throw new NotFoundException('Tag not found: ' . $tag);
+		}
 		$ids = $this->scope($uid, $workspaceKey);
 		$noteIds = $ids === [] ? [] : $this->tags->findInWorkspaces($ids, $tag);
 		if ($noteIds === []) {
@@ -96,6 +103,9 @@ class TagService {
 	}
 
 	public function delete(string $uid, string $tag, mixed $workspaceKey): int {
+		if (self::isInternal($tag)) {
+			throw new NotFoundException('Tag not found: ' . $tag);
+		}
 		$ids = $this->scope($uid, $workspaceKey);
 		$noteIds = $ids === [] ? [] : $this->tags->findInWorkspaces($ids, $tag);
 		if ($noteIds === []) {

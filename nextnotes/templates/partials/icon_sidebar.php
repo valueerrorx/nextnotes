@@ -5,8 +5,9 @@
  */
 // abgeleitet von src/icon_sidebar.php @ 7e2e0b6aa501ba95ac1e9789fd2bb477c281a001
 // Icon-Leiste: App-Symbol „Next Notes“ als Startseiten-Link, Einträge der portierten Seiten (M4e: Erstellen, Notizen, Ordner,
-// Tags, Anhänge, Papierkorb; M4f: Aufgaben, Tagebuch). Weggelassen bis zur Portierung: Dashboard, Graph, Speed Dial (M4g),
-// Einstellungen/Über (M4h); gestrichen: Teilen-Seite, Offline, Theme-Umschalter, Abmelden, Konten, Git, Profil-/Farb-/Reihenfolge-Modals.
+// Tags, Anhänge, Papierkorb; M4f: Aufgaben, Tagebuch; M4g: Dashboard, Graph, Speed Dial, Erwähnungen nur mit geteiltem Workspace und Zähler).
+// Weggelassen bis zur Portierung: Einstellungen/Über (M4h); gestrichen: Teilen-Seite, Offline, Theme-Umschalter, Abmelden, Konten, Git,
+// Profil-/Farb-/Reihenfolge-Modals.
 /** @var array $_ */
 /** @var \OCA\NextNotes\Service\View\PageTranslator $tr */
 $homeLabel = $tr->t('common.home', [], 'Home');
@@ -17,8 +18,12 @@ $railQuery = '?' . http_build_query(['workspace' => $view['workspaceKey']]);
 // Gruppen wie Upstream (Trennlinie beim Gruppenwechsel); „Erstellen“ als eigene Gruppe oben (Plan M4e)
 $railItems = [
 	['id' => 'iconSidebarCreateBtn', 'group' => 'create', 'page' => 'create.php', 'icon' => 'lucide-plus-circle', 'label' => $tr->t('sidebar.create', [], 'Create')],
+	['id' => 'iconSidebarDashboardBtn', 'group' => 'home', 'page' => 'dashboard.php', 'icon' => 'lucide-layout-dashboard', 'label' => $tr->t('common.back_to_home', [], 'Dashboard')],
+	['id' => 'iconSidebarGraphBtn', 'group' => 'home', 'page' => 'graph.php', 'icon' => 'lucide-network', 'label' => $tr->t('home.graph', [], 'Graph')],
+	['id' => 'iconSidebarSpeedDialBtn', 'group' => 'home', 'page' => 'speed_dial.php', 'icon' => 'lucide-zap', 'label' => $tr->t('speed_dial.title', [], 'Speed dial')],
 	['id' => 'iconSidebarNotesBtn', 'group' => 'content', 'page' => 'notes_manager.php', 'icon' => 'lucide-sticky-note', 'label' => $tr->t('common.notes', [], 'Notes')],
 	['id' => 'iconSidebarTasksBtn', 'group' => 'content', 'page' => 'tasks.php', 'icon' => 'lucide-list-todo', 'label' => $tr->t('tasks_page.title', [], 'Tasks')],
+	...(($_['railMentions'] ?? null) !== null ? [['id' => 'iconSidebarMentionsBtn', 'group' => 'content', 'page' => 'mentions.php', 'icon' => 'lucide-at-sign', 'label' => $tr->t('mentions.title', [], 'Mentions'), 'badge' => (int)$_['railMentions']]] : []),
 	['id' => 'iconSidebarFoldersBtn', 'group' => 'content', 'page' => 'list_folders.php', 'icon' => 'lucide-folder-open', 'label' => $tr->t('home.folders', [], 'Folders')],
 	['id' => 'iconSidebarDiaryBtn', 'group' => 'content', 'page' => 'diary.php', 'icon' => 'lucide-book-open', 'label' => $tr->t('diary.title', [], 'Diary')],
 	['id' => 'iconSidebarTagsBtn', 'group' => 'collections', 'page' => 'list_tags.php', 'icon' => 'lucide-tags', 'label' => $tr->t('notes_list.system_folders.tags', [], 'Tags')],
@@ -39,6 +44,9 @@ $railGroup = null;
 		<?php $railGroup = $railItem['group']; $railActive = $railItem['page'] === $railPage; ?>
 		<a href="<?php p($_['baseUrl'] . $railItem['page'] . $railQuery); ?>" id="<?php p($railItem['id']); ?>" class="icon-sidebar-btn<?php if ($railActive): ?> icon-sidebar-btn-active<?php endif; ?>" title="<?php p($railItem['label']); ?>" aria-label="<?php p($railItem['label']); ?>"<?php if ($railActive): ?> aria-current="page"<?php endif; ?>>
 			<i class="lucide <?php p($railItem['icon']); ?>"></i>
+			<?php if (isset($railItem['badge'])): // offene Erwähnungen, mentions-page.js hält den Zähler aktuell ?>
+			<span class="mention-badge"<?php if ($railItem['badge'] <= 0): ?> hidden<?php endif; ?>><?php p($railItem['badge'] > 99 ? '99+' : (string)$railItem['badge']); ?></span>
+			<?php endif; ?>
 		</a>
 	<?php endforeach; ?>
 	</div>

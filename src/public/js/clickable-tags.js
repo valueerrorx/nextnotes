@@ -73,6 +73,14 @@ function isSpeedDialTag(tag) {
     return tag.toLowerCase() === 'speed-dial';
 }
 
+// Next Notes P27: speed-dial is reserved for the speed dial actions; typed, it is refused with a hint
+function rejectReservedTag(tag) {
+    if (!isSpeedDialTag(tag)) return false;
+    const txt = window.NEXTNOTES_TXT || {};
+    showNotificationPopup(txt.speedDialReserved || 'The tag "speed-dial" is reserved. Use "Add to speed dial" in the menu of the note.', 'error');
+    return true;
+}
+
 /**
  * Whether a note is in the speed dial (public/speed_dial.php), that is, has its
  * tag. The field of an open note knows best: its tag row can change it at any time.
@@ -1047,6 +1055,7 @@ function handleTagInput(e, noteId, container) {
 
             tags.forEach(singleTag => {
                 const trimmedTag = singleTag.trim();
+                if (rejectReservedTag(trimmedTag)) return;
                 if (trimmedTag && !tagExistsInContainer(container, trimmedTag)) {
                     addTagElement(container, trimmedTag, noteId);
                 }
@@ -1094,6 +1103,7 @@ function handleTagInputBlur(e, noteId, container) {
 
         tags.forEach(singleTag => {
             const trimmedTag = singleTag.trim();
+            if (rejectReservedTag(trimmedTag)) return;
             if (trimmedTag && !tagExistsInContainer(container, trimmedTag)) {
                 addTagElement(container, trimmedTag, noteId);
             }
