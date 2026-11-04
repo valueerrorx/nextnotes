@@ -32,3 +32,5 @@ src/public/js/katex/katex.min.css
 src/public/js/attachments-list.js
 src/public/js/list_folders.js
 src/public/js/utils-menus.js
+src/public/js/calendar.js
+src/public/js/diary-page.js

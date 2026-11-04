@@ -33,7 +33,9 @@
   "Another export is still running – please wait a moment and try again.": "Es läuft noch ein Export – bitte kurz warten und erneut versuchen.",
   "Export too large (max. 1 GiB).": "Export zu groß (max. 1 GiB).",
   "Not found or no access.": "Nicht gefunden oder kein Zugriff.",
-  "Back to Next Notes": "Zurück zu Next Notes"
+  "Back to Next Notes": "Zurück zu Next Notes",
+  "This entry is too large for the journal view.": "Dieser Eintrag ist für die Journal-Ansicht zu groß.",
+  "Open note": "Notiz öffnen"
  },
  "pluralForm": "nplurals=2; plural=(n != 1);"
 }

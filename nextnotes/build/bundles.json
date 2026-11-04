@@ -19,7 +19,6 @@
 		"css/custom-css.css": "Custom-CSS gestrichen (ADR 0016)",
 		"css/ai-chat.css": "AI gestrichen (ADR 0010)",
 		"css/offline-banner.css": "PWA/Offline gestrichen (Inventur B 1.5)",
-		"js/calendar.js": "bis M4: Diary-Kalender-Route fehlt (sonst 404 beim Laden), mit DiaryApiController wieder aufnehmen",
 		"js/background-settings.js": "bis M4: api_upload_background.php fehlt (sonst 404 beim Laden), mit CompatController wieder aufnehmen"
 	},
 	"excludePages": {
@@ -182,6 +181,7 @@
 			"js/folder-tree-highlight.js",
 			"js/kanban.js",
 			"js/tabs.js",
+			"js/calendar.js",
 			"js/backlinks.js",
 			"js/snapshots.js",
 			"js/ui-customization.js",
@@ -859,6 +859,33 @@
 				"js/folder-hierarchy.js",
 				"js/ui-customization.js",
 				"js/icon-sidebar-toggle.js"
+			]
+		},
+		"diary": {
+			"js": [
+				"js/theme-manager.js",
+				"js/navigation.js",
+				"js/icon-sidebar-toggle.js",
+				"js/request-errors.js",
+				"js/modal-alerts.js",
+				"js/shortcut-key.js",
+				"js/date-picker-popup.js",
+				"js/diary-page.js",
+				"js/board-view-menu.js"
+			]
+		},
+		"tasks": {
+			"js": [
+				"js/theme-manager.js",
+				"js/navigation.js",
+				"js/icon-sidebar-toggle.js",
+				"js/request-errors.js",
+				"js/note-reference.js",
+				"js/date-time-format.js",
+				"js/date-picker-popup.js",
+				"js/task-due-modal.js",
+				"js/reminder-notifications.js",
+				"js/tasks-page.js"
 			]
 		}
 	}

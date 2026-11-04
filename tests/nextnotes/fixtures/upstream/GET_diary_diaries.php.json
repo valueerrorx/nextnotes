@@ -1,0 +1,12 @@
+{
+    "route": "GET /diary/diaries.php",
+    "status": 200,
+    "body": {
+        "diaries": [
+            {
+                "id": "int",
+                "name": "string"
+            }
+        ]
+    }
+}

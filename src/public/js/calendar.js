@@ -118,12 +118,18 @@ class MiniCalendar {
      */
     async fetchNotesData() {
         const generation = ++this.fetchGeneration;
+        // Next Notes P25: hidden calendar loads nothing; both counts in one request (mode=both)
+        if (!this.isVisible) {
+            this.countsStale = true;
+            return;
+        }
+        this.countsStale = false;
         try {
-            const [created, modified] = await Promise.all(['created', 'modified'].map(async mode => {
-                const response = await fetch(this.buildCalendarApiUrl('api/v1/calendar/notes-by-date.php', { mode }));
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                return response.json();
-            }));
+            const response = await fetch(this.buildCalendarApiUrl('api/v1/calendar/notes-by-date.php', { mode: 'both' }));
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const counts = await response.json();
+            const created = counts && counts.created;
+            const modified = counts && counts.modified;
             // A refresh started while this one was in flight wins
             if (generation !== this.fetchGeneration) return;
             this.countsByMode = { created: created || {}, modified: modified || {} };
@@ -249,6 +255,8 @@ class MiniCalendar {
         this.isVisible = !this.isVisible;
         localStorage.setItem('calendarVisible', this.isVisible);
         this.render();
+        // Next Notes P25: counts load when the calendar is first shown
+        if (this.isVisible && this.countsStale) this.fetchNotesData();
     }
 
     /**

@@ -50,7 +50,7 @@
 	}
 
 	// Globals der Upstream-Inline-Skripte (index.php, icon_sidebar.php); nur bekannte Namen
-	var GLOBALS = ['DEFAULT_NOTE_TITLES', 'PoznoteMentionMembers', 'TAG_COLORS', 'NOTE_COLOR_PALETTE', 'PoznoteActiveAccountIsOwn', 'calendarTranslations', 'NOTIFICATIONS_TXT'];
+	var GLOBALS = ['DEFAULT_NOTE_TITLES', 'PoznoteMentionMembers', 'TAG_COLORS', 'NOTE_COLOR_PALETTE', 'PoznoteActiveAccountIsOwn', 'calendarTranslations', 'NOTIFICATIONS_TXT', 'DIARY_DATA'];
 	var pageGlobals = readIsland('nextnotes-globals') || {};
 	GLOBALS.forEach(function (name) {
 		if (Object.prototype.hasOwnProperty.call(pageGlobals, name)) window[name] = pageGlobals[name];
@@ -67,8 +67,17 @@
 		Object.keys(state.style || {}).forEach(function (k) { body.style.setProperty(k, String(state.style[k])); });
 		Object.keys(state.rootStyle || {}).forEach(function (k) { root.style.setProperty(k, String(state.rootStyle[k])); });
 		try {
-			var stored = localStorage.getItem('outlineCollapsed');
-			if (window.innerWidth > 800 && (stored === null || stored === 'true')) root.classList.add('outline-collapsed');
+			if (state.outline === 'diary') {
+				// Upstream diary.php Inline-Skript: Journal und Datumsleiste vor dem ersten Zeichnen (diary-page.js übernimmt)
+				var store = window.__poznoteUserStorage || localStorage;
+				if (store.getItem('diaryViewMode') === 'journal') body.classList.add('diary-journal-active');
+				if (window.innerWidth > 800 && store.getItem('diaryOutlineCollapsed') === 'true') body.classList.add('outline-collapsed');
+				var outlineWidth = parseInt(localStorage.getItem('outlineWidth'), 10);
+				if (outlineWidth >= 200 && outlineWidth <= 500) root.style.setProperty('--outline-width', outlineWidth + 'px');
+			} else {
+				var stored = localStorage.getItem('outlineCollapsed');
+				if (window.innerWidth > 800 && (stored === null || stored === 'true')) root.classList.add('outline-collapsed');
+			}
 			if (localStorage.getItem('iconSidebarCollapsed') === 'true') body.classList.add('icon-sidebar-collapsed');
 			var focusParam = new URLSearchParams(window.location.search).get('focus');
 			var focus = focusParam === '1' || focusParam === '0' ? focusParam : localStorage.getItem('focusMode');

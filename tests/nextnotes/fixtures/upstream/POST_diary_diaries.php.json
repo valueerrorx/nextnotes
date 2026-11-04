@@ -1,0 +1,13 @@
+{
+    "route": "POST /diary/diaries.php",
+    "status": 200,
+    "body": {
+        "success": "bool",
+        "converted": "bool",
+        "diary": {
+            "id": "int",
+            "name": "string"
+        },
+        "workspace": "string"
+    }
+}

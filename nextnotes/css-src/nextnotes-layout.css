@@ -471,3 +471,27 @@ body#body-user.excalidraw-editor-page {
 	min-width: 0;
 	min-height: 0;
 }
+
+/* Tagebuch (M4f): Inhalt und Datumsleiste nebeneinander; die Leiste klebt oben im scrollenden Hauptbereich (Upstream: Flex-Zeile des body) */
+#nextnotes-root .nn-diary-main {
+	display: flex;
+	align-items: flex-start;
+	padding-top: 0;
+}
+
+#nextnotes-root .nn-diary-main > .dashboard-container {
+	flex: 1 1 auto;
+	min-width: 0;
+	padding-top: 12px;
+}
+
+body.diary-journal-active #nextnotes-root .nn-diary-main .diary-outline {
+	flex: 0 0 auto;
+	max-height: 100%;
+	overflow-y: auto;
+}
+
+#nextnotes-root .diary-journal-too-large {
+	color: var(--color-text-maxcontrast);
+	font-style: italic;
+}

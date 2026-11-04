@@ -70,7 +70,7 @@
 		window.targetFolderName = null;
 		window.isCreatingInFolder = false;
 		window.selectedWorkspace = document.body.dataset.workspace || '';
-		if (['html', 'markdown', 'list'].indexOf(type) !== -1 && typeof window.showNoteCreationLoading === 'function') {
+		if (['html', 'markdown', 'list', 'diary'].indexOf(type) !== -1 && typeof window.showNoteCreationLoading === 'function') {
 			window.showNoteCreationLoading(card);
 			window.setTimeout(window.executeCreateAction, 80);
 			return;

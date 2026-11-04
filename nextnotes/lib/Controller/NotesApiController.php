@@ -12,6 +12,7 @@ namespace OCA\NextNotes\Controller;
 use OCA\NextNotes\Service\AttachmentService;
 use OCA\NextNotes\Service\ChangesService;
 use OCA\NextNotes\Service\ConversionService;
+use OCA\NextNotes\Service\DiaryService;
 use OCA\NextNotes\Service\DuplicateService;
 use OCA\NextNotes\Service\Exception\BadRequestException;
 use OCA\NextNotes\Service\InputValidator;
@@ -40,6 +41,7 @@ class NotesApiController extends ApiController {
 		private DuplicateService $duplicates,
 		private AttachmentService $attachments,
 		private ConversionService $conversion,
+		private DiaryService $diary,
 	) {
 		parent::__construct($request, $userSession, $workspaces);
 	}
@@ -137,14 +139,14 @@ class NotesApiController extends ApiController {
 
 	#[NoAdminRequired]
 	public function create(): JSONResponse {
-		return $this->ok($this->notes->create($this->uid(), $this->input()), 201);
+		return $this->ok($this->notes->create($this->uid(), $this->input(), $this->diary), 201);
 	}
 
 	#[NoAdminRequired]
 	public function update(int $id): JSONResponse {
 		$in = $this->input();
 		unset($in['id']);
-		$data = $this->notes->update($this->uid(), $id, $in, (string)$this->request->getHeader('If-Match'), $this->editorSession());
+		$data = $this->notes->update($this->uid(), $id, $in, (string)$this->request->getHeader('If-Match'), $this->editorSession(), $this->diary);
 		$response = $this->ok($data);
 		$response->setETag(NoteSerializer::etag($data['note']['version'], $data['note']));
 		return $response;

@@ -14,15 +14,15 @@ const RUN = `${process.argv[3]}${Date.now().toString(36)}`;
 // M3c1: leer (Kanban-Seite kanban_content.php portiert); jeder Eintrag braucht Slice der Behebung
 const KNOWN_MISSING = {};
 
-// Seiten, die in M3a2 nicht verlinkt sein dürfen (gestrichen oder erst M4/M3c portiert); M4e: notes_manager, list_folders, list_tags, attachments_list, trash portiert
-const FORBIDDEN_PAGES = /(^|\/)(dashboard|graph|speed_dial|tasks|diary|shared|offline_notes|mentions|settings|login|logout|profile|backup[a-z_]*|users|about|whats_new|public_note|git[a-z_]*|ai[a-z_]*|export[a-z_]*|api_export[a-z_]*|api_download[a-z_]*)\.php/i;
-// Sichtbare Texte (de/en) gestrichener Funktionen; „Neuer Workspace“ seit M4a sichtbar
+// Seiten, die in M3a2 nicht verlinkt sein dürfen (gestrichen oder erst M4/M3c portiert); M4e: notes_manager, list_folders, list_tags, attachments_list, trash portiert; M4f: tasks, diary
+const FORBIDDEN_PAGES = /(^|\/)(dashboard|graph|speed_dial|shared|offline_notes|mentions|settings|login|logout|profile|backup[a-z_]*|users|about|whats_new|public_note|git[a-z_]*|ai[a-z_]*|export[a-z_]*|api_export[a-z_]*|api_download[a-z_]*)\.php/i;
+// Sichtbare Texte (de/en) gestrichener Funktionen; „Neuer Workspace“ seit M4a, Tagebuch seit M4f sichtbar
 const FORBIDDEN_TEXT = [
 	/\b(ab|an)melden\b|log ?out|log ?in\b|sign (in|out)/i, /\bkonten\b|\bkonto\b|accounts?\b|benutzerverwaltung|users? management/i,
 	/\bKI\b|\bAI\b|künstliche intelligenz|assistent/i, /teilen|share|öffentlich(er)? link|public link/i, /offline/i, /\bPWA\b|installieren|install app/i,
 	/backup|sicherung|wiederherstell|restore/i, /\btheme\b|design wählen|farbschema|schriftart|\bfont\b|dunkel(er)? modus|dark mode|light mode|hell(er)? modus/i,
 	/\bgit\b|github|gitea|sync/i, /export|herunterladen|download/i, /dokumentation|documentation|\bdocs?\b|spende|donat|sponsor|poznote/i,
-	/tagebuch|\bdiary\b|\bgraph\b|einstellungen|settings|arbeitsbereiche bearbeiten|edit workspaces|über poznote|about/i,
+	/\bgraph\b|einstellungen|settings|arbeitsbereiche bearbeiten|edit workspaces|über poznote|about/i,
 ];
 
 const NOTE_EXPORT_ACTIONS = new Set(['show-export-modal', 'select-export-type', 'print-note', 'download-folder']);

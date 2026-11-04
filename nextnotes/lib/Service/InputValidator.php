@@ -305,4 +305,13 @@ class InputValidator {
 		}
 		return (int)($m[4] ?? 0) <= 23 && (int)($m[5] ?? 0) <= 59 && (int)($m[6] ?? 0) <= 59;
 	}
+
+	// Tag YYYY-MM-DD (Kalender/Tagebuch); Format oder Kalenderdatum ungültig → 400
+	public function date(mixed $raw, string $field): string {
+		$raw = is_string($raw) ? trim($raw) : '';
+		if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw) || !self::validDateTime($raw)) {
+			throw new BadRequestException('Invalid ' . $field . '. Use YYYY-MM-DD');
+		}
+		return $raw;
+	}
 }

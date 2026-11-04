@@ -195,6 +195,13 @@ final class IsolationTest extends ApiTestCase {
 			'GET /mentions/members' => ['scoped', 'path' => '/mentions/members', 'sees' => null],
 			'POST /mentions/{}/{}/handled' => ['owned', 'cases' => [['path' => '/mentions/x/{mn}/handled', 'body' => []]]],
 			'DELETE /mentions/{}/{}/handled' => ['owned', 'cases' => [['path' => '/mentions/x/{mn}/handled', 'body' => []]]],
+			// M4f: Kalender/Tagebuch (A #186–190); Datum = heute (Fixture-Notizen), fremde Notiz-IDs in entries.php werden ignoriert
+			'GET /calendar/diary-entry.php' => ['scoped', 'path' => '/calendar/diary-entry.php', 'query' => ['date' => date('Y-m-d')], 'sees' => 'ws'],
+			'GET /calendar/notes-by-date.php' => ['scoped', 'path' => '/calendar/notes-by-date.php', 'query' => ['mode' => 'both'], 'sees' => null],
+			'GET /calendar/notes-on-date.php' => ['scoped', 'path' => '/calendar/notes-on-date.php', 'query' => ['date' => date('Y-m-d')], 'sees' => 'n1'],
+			'GET /diary/diaries.php' => ['scoped', 'path' => '/diary/diaries.php', 'sees' => null],
+			'POST /diary/diaries.php' => ['owned', 'cases' => [['path' => '/diary/diaries.php', 'body' => ['name' => 'Iso-Tagebuch', 'workspace' => '{ws}']]]],
+			'GET /diary/entries.php' => ['owned', 'cases' => [['path' => '/diary/entries.php', 'query' => ['ids' => '{n1}', 'workspace' => '{ws}'], 'hints' => ['query.ids']]]],
 			// Tasks
 			'GET /tasks' => ['scoped', 'path' => '/tasks', 'sees' => 'tl'],
 			'GET /notes/{}/tasks' => ['owned', 'cases' => [['path' => '/notes/{tl}/tasks']]],
@@ -433,7 +440,7 @@ final class IsolationTest extends ApiTestCase {
 			}
 		}
 		self::assertSame([], $errors);
-		self::assertCount(112, $table);
+		self::assertCount(118, $table);
 	}
 
 	public function testDetectorsObject(): void {

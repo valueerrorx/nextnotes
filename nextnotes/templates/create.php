@@ -6,7 +6,7 @@
 // abgeleitet von src/public/create.php @ 7e2e0b6aa501ba95ac1e9789fd2bb477c281a001
 // Erstellen-Hub (utils-note-create.js executeCreateAction). Daten: PageController::create.
 // Abweichungen: Icon-Leiste im NC-Rahmen, Inline-Skript (Karten-Klick) → Delegation in nextnotes-late.js, DEFAULT_NOTE_TITLES als
-// JSON-Insel; Karte „Tagebuch-Eintrag“ erst mit M4f; ohne Schreibrecht im Workspace keine Karten.
+// JSON-Insel; ohne Schreibrecht im Workspace keine Karten.
 /** @var array $_ */
 /** @var \OCA\NextNotes\Service\View\PageTranslator $tr */
 $tr = $_['tr'];
@@ -22,6 +22,8 @@ $cards = [
 	['id' => 'create-note-card', 'type' => 'html', 'icon' => 'lucide-file-alt', 'label' => $t('modals.create.note.title', 'Note')],
 	['id' => 'create-markdown-note-card', 'type' => 'markdown', 'icon' => 'lucide-file-code', 'label' => $t('modals.create.markdown.title', 'Markdown Note')],
 	['id' => 'create-task-list-card', 'type' => 'list', 'icon' => 'lucide-list-ul', 'label' => $t('modals.create.task_list.title', 'Task List')],
+	['id' => 'create-diary-entry-card', 'type' => 'diary', 'icon' => 'lucide-book-open', 'label' => $t('diary.create_card_title', 'Diary entry'),
+		'description' => $_['diaryMarkdown'] ? $t('modals.create.markdown.title', 'Markdown note') : $t('modals.create.note.title', 'Rich text note')],
 	['id' => 'create-folder-card', 'type' => 'folder', 'icon' => 'lucide-folder', 'label' => $t('modals.create.folder.title', 'Folder')],
 ];
 $titleIcon = 'lucide-plus-circle';
@@ -42,7 +44,7 @@ $titleText = $t('sidebar.create', 'Create');
 			<?php foreach ($cards as $card): ?>
 			<a href="#" class="home-card" id="<?php p($card['id']); ?>" data-create-type="<?php p($card['type']); ?>" title="<?php p($card['label']); ?>">
 				<div class="home-card-icon"><i class="lucide <?php p($card['icon']); ?>"></i></div>
-				<div class="home-card-content"><span class="home-card-title"><?php p($card['label']); ?></span></div>
+				<div class="home-card-content"><span class="home-card-title"><?php p($card['label']); ?></span><?php if (isset($card['description'])): ?><span class="home-card-description"><?php p($card['description']); ?></span><?php endif; ?></div>
 			</a>
 			<?php endforeach; ?>
 			<?php else: ?>

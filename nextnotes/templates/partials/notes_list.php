@@ -6,7 +6,7 @@
 // abgeleitet von src/notes_list.php @ 7e2e0b6aa501ba95ac1e9789fd2bb477c281a001
 // Suchleiste, Ordnerbaum mit Notizen, gemeinsame Menüs. Daten: $view['tree'] (IndexViewService).
 // Weggelassen: Konten-Zeilen (gestrichen), Offline-Punkte (gestrichen), „Seitenleiste anpassen“ und Favoritenfarbe
-// (UI-Anpassung/Farb-Modal, M4), Mini-Kalender (calendar.js, M4), Mention-Markierung (M4).
+// (UI-Anpassung/Farb-Modal, M4), Mention-Markierung (M4).
 /** @var array $_ */
 /** @var \OCA\NextNotes\Service\View\PageTranslator $tr */
 include __DIR__ . '/folders_display.php';
@@ -162,3 +162,7 @@ if (!$tree['rootFirst']) {
 	</div>
 </div>
 <?php $renderNoteActionsMenu($workspace); ?>
+
+<div class="mini-calendar-container">
+	<div id="mini-calendar"></div>
+</div>

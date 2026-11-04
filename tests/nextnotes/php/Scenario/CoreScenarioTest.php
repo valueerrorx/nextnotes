@@ -170,6 +170,16 @@ final class CoreScenarioTest extends ApiTestCase {
 
 		$m1 = $this->m2bSteps($a, $ws2, (int)$f1);
 		$this->m2cSteps($a, $b, $ws2, $m1);
+		// M4f: Kalender/Tagebuch (A #186–190); Fixtures aus dem Upstream-Quelltext abgeleitet (api/v1/calendar|diary/*.php)
+		$this->rec('POST /diary/diaries.php', $a->call('POST', '/diary/diaries.php', ['name' => 'Fixture-Tagebuch', 'workspace' => $ws2]));
+		$this->rec('GET /diary/diaries.php', $a->call('GET', '/diary/diaries.php' . $q));
+		$de = $this->rec('GET /calendar/diary-entry.php', $a->call('GET', '/calendar/diary-entry.php' . self::q(['date' => '2026-02-03', 'workspace' => $ws2])));
+		$entry = (int)self::ok($a->call('POST', '/notes', ['heading' => $de['title'], 'folder_name' => $de['folder'], 'workspace' => $ws2, 'created_date' => '2026-02-03']), 'Tagebuch-Eintrag')['note']['id'];
+		$this->rec('GET /calendar/notes-on-date.php', $a->call('GET', '/calendar/notes-on-date.php' . self::q(['date' => '2026-02-03', 'workspace' => $ws2])));
+		$this->rec('GET /diary/entries.php', $a->call('GET', '/diary/entries.php' . self::q(['ids' => $entry, 'workspace' => $ws2])));
+		$empty = $ws . ' leer';
+		self::ok($a->call('POST', '/workspaces', ['name' => $empty]), 'leerer Workspace');
+		$this->rec('GET /calendar/notes-by-date.php', $a->call('GET', '/calendar/notes-by-date.php' . self::q(['workspace' => $empty])));
 
 		$n4 = self::ok($a->call('POST', '/notes', ['heading' => 'Archiv', 'content' => '<p>a</p>', 'workspace' => $ws2, 'folder_id' => $f1]), 'n4')['note']['id'];
 		$this->rec('POST /notes/{id}/archive', $a->call('POST', "/notes/$n4/archive"));

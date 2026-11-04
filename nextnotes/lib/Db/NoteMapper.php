@@ -59,7 +59,7 @@ class NoteMapper extends QBMapper {
 
 	/**
 	 * Notizen (role=note) in den Workspaces, ohne Inhalt.
-	 * Filter: folder_id (int|null für Wurzel), favorite, trashed (bool), search (normalisiert), created_from/created_to (Unix), linked_note_id, folder_ids (int[]), types (string[]), content_any (Teilzeichenketten, ODER)
+	 * Filter: folder_id (int|null für Wurzel), favorite, trashed (bool), search (normalisiert), created_from/created_to, updated_from/updated_to (Unix), linked_note_id, folder_ids (int[]), types (string[]), content_any (Teilzeichenketten, ODER)
 	 * @param int[] $workspaceIds
 	 * @param array<string, mixed> $filter
 	 * @return Note[]
@@ -115,6 +115,12 @@ class NoteMapper extends QBMapper {
 		if (isset($filter['created_to'])) {
 			$qb->andWhere($expr->lte('created_at', $qb->createNamedParameter((int)$filter['created_to'], IQueryBuilder::PARAM_INT)));
 		}
+		if (isset($filter['updated_from'])) {
+			$qb->andWhere($expr->gte('updated_at', $qb->createNamedParameter((int)$filter['updated_from'], IQueryBuilder::PARAM_INT)));
+		}
+		if (isset($filter['updated_to'])) {
+			$qb->andWhere($expr->lte('updated_at', $qb->createNamedParameter((int)$filter['updated_to'], IQueryBuilder::PARAM_INT)));
+		}
 		if (isset($filter['types'])) {
 			$qb->andWhere($expr->in('type', $qb->createNamedParameter(array_values($filter['types']), IQueryBuilder::PARAM_STR_ARRAY)));
 		}
@@ -128,6 +134,28 @@ class NoteMapper extends QBMapper {
 		if (isset($filter['exclude_id'])) {
 			$qb->andWhere($expr->neq('id', $qb->createNamedParameter((int)$filter['exclude_id'], IQueryBuilder::PARAM_INT)));
 		}
+	}
+
+	/**
+	 * Erstellt/geändert je Notiz ohne Papierkorb (Mini-Kalender, Tage gruppiert in PHP nach Zeitzone des Benutzers)
+	 * @param int[] $workspaceIds
+	 * @return list<array{0: int, 1: int}>
+	 */
+	public function calendarStamps(array $workspaceIds): array {
+		$out = [];
+		foreach (array_chunk(array_values(array_unique($workspaceIds)), 1000) as $chunk) {
+			$qb = $this->db->getQueryBuilder();
+			$qb->select('created_at', 'updated_at')->from(self::TABLE)
+				->where($qb->expr()->in('workspace_id', $qb->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY)))
+				->andWhere($qb->expr()->eq('role', $qb->createNamedParameter('note')))
+				->andWhere($qb->expr()->isNull('trashed_at'));
+			$res = $qb->executeQuery();
+			while ($row = $res->fetch()) {
+				$out[] = [(int)$row['created_at'], (int)$row['updated_at']];
+			}
+			$res->closeCursor();
+		}
+		return $out;
 	}
 
 	// Gleicher Titel im selben Ordner (nicht im Papierkorb)

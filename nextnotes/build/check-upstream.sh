@@ -70,11 +70,11 @@ while read -r up sum port; do
 	fi
 done < "$app/build/upstream-ported.txt"
 if [[ $fail -eq 0 ]]; then echo "check-upstream (f): $n nachgebaute Upstream-Dateien unverändert"; fi
-# (g) Regex in Parser-/Import-/Export-Ports nur über Pcre (Plan M4 §1.2, B46)
-if hits="$(grep -rnE '\bpreg_[a-z_]+\(' "$app/lib/Service/Convert" "$app/lib/Service/ImportService.php" $(ls "$app"/lib/Service/Export*.php "$app"/lib/Service/ZipExportService.php 2>/dev/null))"; then
+# (g) Regex in Parser-/Import-/Export-/Tagebuch-Ports nur über Pcre (Plan M4 §1.2, B46); preg_quote führt keinen Regex aus
+if hits="$(grep -rnE '\bpreg_[a-pr-z_][a-z_]*\(' "$app/lib/Service/Convert" "$app/lib/Service/ImportService.php" $(ls "$app"/lib/Service/Export*.php "$app"/lib/Service/ZipExportService.php "$app"/lib/Service/Diary*.php "$app"/lib/Service/View/DiaryViewService.php 2>/dev/null))"; then
 	err "direktes preg_* statt Pcre: ${hits//$'\n'/ }"
 else
-	echo "check-upstream (g): kein direktes preg_* in Convert/Import/Export"
+	echo "check-upstream (g): kein direktes preg_* in Convert/Import/Export/Tagebuch"
 fi
 # (h) DOM-Parser nur über HtmlSanitizer::loadHtmlQuiet (B39: libxml-Fehler nicht sammeln)
 if hits="$(grep -rniE '(->|::)load(HTML|XML|HTMLFile)\(|libxml_use_internal_errors\(true|simplexml_load_|XMLReader|xml_parser_create|HTMLDocument::createFrom' "$app/lib" | grep -v '^'"$app"'/lib/Service/HtmlSanitizer.php:')"; then

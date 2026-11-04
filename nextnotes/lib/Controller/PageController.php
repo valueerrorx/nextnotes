@@ -17,6 +17,7 @@ use OCA\NextNotes\Service\ExcalidrawService;
 use OCA\NextNotes\Service\Exception\NotFoundException;
 use OCA\NextNotes\Service\SettingsService;
 use OCA\NextNotes\Service\SnapshotService;
+use OCA\NextNotes\Service\View\DiaryViewService;
 use OCA\NextNotes\Service\View\IndexViewService;
 use OCA\NextNotes\Service\View\KanbanViewService;
 use OCA\NextNotes\Service\View\FolderListViewService;
@@ -60,6 +61,7 @@ class PageController extends Controller {
 		private TrashViewService $trashView,
 		private TagListViewService $tagListView,
 		private FolderListViewService $folderListView,
+		private DiaryViewService $diaryView,
 	) {
 		parent::__construct(Application::APP_ID, $request);
 	}
@@ -365,22 +367,70 @@ class PageController extends Controller {
 		return $this->listPage('notes_manager');
 	}
 
-	// Upstream create.php: Erstellen-Hub (Notiz, Markdown, Aufgabenliste, Ordner; Tagebuch ab M4f)
+	// Upstream create.php: Erstellen-Hub (Notiz, Markdown, Aufgabenliste, Ordner, Tagebuch-Eintrag)
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
 	public function create(): TemplateResponse {
-		return $this->listPage('create', fn () => ['globals' => ['DEFAULT_NOTE_TITLES' => $this->translator->defaultNoteTitles()]]);
+		return $this->listPage('create', fn (string $uid) => [
+			'globals' => ['DEFAULT_NOTE_TITLES' => $this->translator->defaultNoteTitles()],
+			'diaryMarkdown' => $this->settings->get($uid, 'diary_default_note_type', '') === 'markdown',
+		]);
+	}
+
+	// Upstream diary.php: Tagebuch-Karten/Journal; ?date= mit vorhandenem Eintrag → Notiz, sonst legt diary-page.js ihn an
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function diary(): Response {
+		$uid = $this->userSession->getUser()?->getUID() ?? '';
+		$this->language($uid);
+		$frame = $this->pageFrame->frame($uid, $this->request->getParam('workspace'));
+		$diary = $this->diaryView->build($uid, $frame, $this->request->getParam('diary'), $this->request->getParam('date'));
+		if ($diary['redirectNote'] !== null) {
+			return new RedirectResponse($this->urls->linkToRoute('nextnotes.page.index') . 'index.php?'
+				. http_build_query(['note' => $diary['redirectNote'], 'newtab' => 1, 'workspace' => $frame['workspaceKey']]));
+		}
+		return $this->listPage('diary', fn () => [
+			'diary' => $diary,
+			'globals' => ['calendarTranslations' => $this->calendarTranslations(), 'NOTE_COLOR_PALETTE' => $diary['palette'] ?? [], 'DIARY_DATA' => $diary['data']],
+		], $frame);
+	}
+
+	// Upstream tasks.php: Aufgaben aller Aufgabenlisten/Checklisten des Workspace (tasks-page.js über api/v1/tasks)
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function tasks(): TemplateResponse {
+		return $this->listPage('tasks', function (string $uid) {
+			$hidden = json_decode($this->settings->get($uid, 'tasks_page_hidden_notes', '[]'), true);
+			$format = $this->settings->get($uid, 'date_time_format', 'default');
+			return [
+				'hiddenNotes' => is_array($hidden) ? array_values(array_filter($hidden, static fn ($v) => is_int($v) || is_string($v))) : [],
+				'dateTimeFormat' => preg_match('/^[A-Za-z0-9_:.-]{1,40}$/', $format) ? $format : 'default',
+				'globals' => ['calendarTranslations' => $this->calendarTranslations() + ['apply' => $this->translator->t('common.apply', [], 'Apply')]],
+			];
+		});
+	}
+
+	/** @return array<string, mixed> Monats-/Tagesnamen der Datumsauswahl (Upstream diary.php/tasks.php) */
+	private function calendarTranslations(): array {
+		$t = fn (string $k) => $this->translator->t($k);
+		return [
+			'months' => array_map(static fn ($m) => $t('calendar.months.' . $m), ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december']),
+			'weekdays' => array_map(static fn ($d) => $t('calendar.weekdays.' . $d), ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']),
+			'previousMonth' => $t('calendar.buttons.previous_month'),
+			'nextMonth' => $t('calendar.buttons.next_month'),
+			'today' => $t('calendar.buttons.today'),
+		];
 	}
 
 	/**
 	 * Rahmen der Listen-Seiten (M4e): Icon-Leiste, Workspace wie die Hauptansicht (unbekannt → Standard, §4.4), eigenes Bündel
 	 * @param ?callable(string, array): array<string, mixed> $data
 	 */
-	private function listPage(string $page, ?callable $data = null): TemplateResponse {
+	private function listPage(string $page, ?callable $data = null, ?array $frame = null): TemplateResponse {
 		$uid = $this->userSession->getUser()?->getUID() ?? '';
 		$lang = $this->language($uid);
 		$baseUrl = $this->urls->linkToRoute('nextnotes.page.index');
-		$frame = $this->pageFrame->frame($uid, $this->request->getParam('workspace'));
+		$frame ??= $this->pageFrame->frame($uid, $this->request->getParam('workspace'));
 		$extra = $data !== null ? $data($uid, $frame) : [];
 		$this->assets->page($page, $lang);
 		$this->provideConfig($uid, $baseUrl, $lang, [

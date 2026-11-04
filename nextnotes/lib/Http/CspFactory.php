@@ -15,8 +15,8 @@ use OCP\AppFramework\Http\FeaturePolicy;
 
 /** Einzige Quelle für CSP- und Feature-Policy-Abweichungen (ADR 0012); ohne ADR keine Ausnahme. */
 class CspFactory {
-	// Ansichten mit Notizanzeige: iframes (self) und Admin-Embed-Domains (EmbedDomainService); export_print = Druckansicht (M4c), trash = Vorschau (M4e)
-	private const NOTE_VIEWS = ['index', 'revisions', 'kanban_content', 'export_print', 'trash'];
+	// Ansichten mit Notizanzeige: iframes (self) und Admin-Embed-Domains (EmbedDomainService); export_print = Druckansicht (M4c), trash = Vorschau (M4e), diary = Journal (M4f)
+	private const NOTE_VIEWS = ['index', 'revisions', 'kanban_content', 'export_print', 'trash', 'diary'];
 	// Nur iframes (self): PDF-Vorschau der Anhang-Seite (P13, ADR 0012 Nachtrag M3c1)
 	private const SELF_FRAME_VIEWS = ['attachments'];
 	// Mikrofon (self) nur für die Audio-Aufnahme im Editor (ADR 0012 Nachtrag M3-fix4)

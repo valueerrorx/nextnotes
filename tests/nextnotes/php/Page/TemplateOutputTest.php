@@ -37,6 +37,9 @@ final class TemplateOutputTest extends TestCase {
 		'attachments_list.php' => ['json_encode($islandData, $jsonFlags)'],
 		'notes_manager.php' => ['json_encode($islandData, $jsonFlags)'],
 		'create.php' => ['json_encode($islandData, $jsonFlags)'],
+		// M4f: Tagebuch und Aufgaben (Karten/Journal per JS aus JSON-Insel bzw. entries.php)
+		'diary.php' => ['json_encode($islandData, $jsonFlags)'],
+		'tasks.php' => ['json_encode($islandData, $jsonFlags)'],
 	];
 
 	/** @return array<string, string> relativer Pfad => Inhalt */

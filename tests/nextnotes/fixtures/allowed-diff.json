@@ -6,6 +6,12 @@
 			"kind": "extra",
 			"path": "note.version",
 			"reason": "B52 (SPEC Bekannte Upstream-Bugs, P19, M3-fix3): Antwort liefert note.version, damit der Editor nach Speed-Dial-Umschalten nicht mit 409 speichert"
+		},
+		{
+			"route": "GET /diary/entries.php",
+			"kind": "extra",
+			"path": "truncated",
+			"reason": "M4f (SPEC §4.5, P26): Einträge über dem Render-Budget von 1 MiB je Request werden als IDs geliefert und vom Frontend nachgefragt"
 		}
 	]
 }

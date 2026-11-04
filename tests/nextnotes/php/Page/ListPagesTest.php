@@ -23,7 +23,7 @@ use OCP\Server;
 // Papierkorb-Suche/-Sortierung, Seed 1 000 Notizen: Abfragezähler je Seite ≤ 15 (ViewServices direkt), Antwortzeit ≤ 500 ms.
 final class ListPagesTest extends ApiTestCase {
 	private const APP = '/index.php/apps/nextnotes/';
-	private const PAGES = ['trash.php', 'list_tags.php', 'list_folders.php', 'attachments_list.php', 'notes_manager.php', 'create.php'];
+	private const PAGES = ['trash.php', 'list_tags.php', 'list_folders.php', 'attachments_list.php', 'notes_manager.php', 'create.php', 'diary.php', 'tasks.php'];
 
 	private static function get(ApiClient $c, string $path): Response {
 		return $c->absolute('GET', self::APP . $path);
@@ -48,7 +48,7 @@ final class ListPagesTest extends ApiTestCase {
 			self::assertSame(200, $r->status, "$p: " . $r->describe());
 			self::assertStringContainsString('id="icon_sidebar"', $r->body, "$p: Icon-Leiste");
 			self::assertStringContainsString(htmlspecialchars($ws), $r->body, "$p: Workspace im Titel");
-			foreach (['share-folder', 'offline-folder', 'iconSidebarLogoutBtn', 'data-create-type="diary"'] as $struck) {
+			foreach (['share-folder', 'offline-folder', 'iconSidebarLogoutBtn'] as $struck) {
 				self::assertStringNotContainsString($struck, $r->body, "$p: gestrichen $struck");
 			}
 		}

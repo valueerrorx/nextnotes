@@ -5,7 +5,7 @@
  */
 // abgeleitet von src/icon_sidebar.php @ 7e2e0b6aa501ba95ac1e9789fd2bb477c281a001
 // Icon-Leiste: App-Symbol „Next Notes“ als Startseiten-Link, Einträge der portierten Seiten (M4e: Erstellen, Notizen, Ordner,
-// Tags, Anhänge, Papierkorb). Weggelassen bis zur Portierung: Dashboard, Graph, Speed Dial, Aufgaben, Tagebuch (M4f/M4g),
+// Tags, Anhänge, Papierkorb; M4f: Aufgaben, Tagebuch). Weggelassen bis zur Portierung: Dashboard, Graph, Speed Dial (M4g),
 // Einstellungen/Über (M4h); gestrichen: Teilen-Seite, Offline, Theme-Umschalter, Abmelden, Konten, Git, Profil-/Farb-/Reihenfolge-Modals.
 /** @var array $_ */
 /** @var \OCA\NextNotes\Service\View\PageTranslator $tr */
@@ -18,7 +18,9 @@ $railQuery = '?' . http_build_query(['workspace' => $view['workspaceKey']]);
 $railItems = [
 	['id' => 'iconSidebarCreateBtn', 'group' => 'create', 'page' => 'create.php', 'icon' => 'lucide-plus-circle', 'label' => $tr->t('sidebar.create', [], 'Create')],
 	['id' => 'iconSidebarNotesBtn', 'group' => 'content', 'page' => 'notes_manager.php', 'icon' => 'lucide-sticky-note', 'label' => $tr->t('common.notes', [], 'Notes')],
+	['id' => 'iconSidebarTasksBtn', 'group' => 'content', 'page' => 'tasks.php', 'icon' => 'lucide-list-todo', 'label' => $tr->t('tasks_page.title', [], 'Tasks')],
 	['id' => 'iconSidebarFoldersBtn', 'group' => 'content', 'page' => 'list_folders.php', 'icon' => 'lucide-folder-open', 'label' => $tr->t('home.folders', [], 'Folders')],
+	['id' => 'iconSidebarDiaryBtn', 'group' => 'content', 'page' => 'diary.php', 'icon' => 'lucide-book-open', 'label' => $tr->t('diary.title', [], 'Diary')],
 	['id' => 'iconSidebarTagsBtn', 'group' => 'collections', 'page' => 'list_tags.php', 'icon' => 'lucide-tags', 'label' => $tr->t('notes_list.system_folders.tags', [], 'Tags')],
 	['id' => 'iconSidebarAttachmentsBtn', 'group' => 'collections', 'page' => 'attachments_list.php', 'icon' => 'lucide-paperclip', 'label' => $tr->t('notes_list.system_folders.attachments', [], 'Attachments')],
 	['id' => 'iconSidebarTrashBtn', 'group' => 'utility', 'page' => 'trash.php', 'icon' => 'lucide-trash-2', 'label' => $tr->t('notes_list.system_folders.trash', [], 'Trash')],

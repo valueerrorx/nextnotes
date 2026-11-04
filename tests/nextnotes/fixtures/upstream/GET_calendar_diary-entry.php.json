@@ -1,0 +1,24 @@
+{
+    "route": "GET /calendar/diary-entry.php",
+    "status": 200,
+    "body": {
+        "exists": "bool",
+        "id": "null",
+        "folder": "string",
+        "workspace": "string",
+        "noteType": "string",
+        "title": "string",
+        "diaries": [
+            {
+                "id": "null",
+                "name": "string",
+                "exists": "bool",
+                "noteId": "null",
+                "folder": "string",
+                "workspace": "string",
+                "noteType": "string",
+                "title": "string"
+            }
+        ]
+    }
+}

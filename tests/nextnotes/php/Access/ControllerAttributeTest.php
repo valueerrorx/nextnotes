@@ -100,6 +100,8 @@ final class ControllerAttributeTest extends TestCase {
 		// M4e: Listen-Seiten, GET ohne Seiteneffekt (Papierkorb-?sort= wird nicht gespeichert, B58)
 		'PageController::trash', 'PageController::listTags', 'PageController::listFolders', 'PageController::attachmentsList',
 		'PageController::notesManager', 'PageController::create',
+		// M4f: Tagebuch und Aufgaben, GET ohne Seiteneffekt (B61: Tagebuch wird erst beim Schreiben markiert)
+		'PageController::diary', 'PageController::tasks',
 	];
 	// M3c2: schreibende Kompatibilitätsrouten (POST) prüfen CSRF
 	private const PAGE_COMPAT_CSRF = ['PageController::search', 'PageController::trashSearch', 'CompatController::noteInfo', 'CompatController::saveExcalidraw', 'CompatController::workspaces', 'CompatController::importDroppedNotes'];

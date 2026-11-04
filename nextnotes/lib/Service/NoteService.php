@@ -323,8 +323,8 @@ class NoteService {
 		return [$this->serializer->full($uid, $note, $version), $version];
 	}
 
-	/** @return array<string, mixed> POST /notes (201) */
-	public function create(string $uid, array $in): array {
+	/** @return array<string, mixed> POST /notes (201); $diary: Tagebuch-Vorlage für leere Einträge (M4f) */
+	public function create(string $uid, array $in, ?DiaryService $diary = null): array {
 		$type = $this->validator->noteType($in['type'] ?? null);
 		$headingIn = $this->validator->heading(is_scalar($in['heading'] ?? null) ? (string)$in['heading'] : '');
 		$tagList = isset($in['tags']) ? $this->validator->noteTags($in['tags']) : [];
@@ -335,7 +335,7 @@ class NoteService {
 		$folderIdIn = isset($in['folder_id']) ? (int)$in['folder_id'] : 0;
 		$hasWs = is_string($in['workspace'] ?? null) && trim($in['workspace']) !== '';
 
-		return $this->tx->run(function () use ($uid, $in, $type, $headingIn, $tagList, $content, $folderPath, $folderIdIn, $hasWs) {
+		return $this->tx->run(function () use ($uid, $in, $type, $headingIn, $tagList, $content, $folderPath, $folderIdIn, $hasWs, $diary) {
 			$folder = $folderIdIn > 0 ? $this->access->requireFolder($uid, $folderIdIn, 'write') : null;
 			if ($hasWs) {
 				$ws = $this->workspaces->requireByKey($uid, trim($in['workspace']), 'write');
@@ -365,6 +365,9 @@ class NoteService {
 				$linked = (int)$target->getId();
 			}
 			$heading = $type === 'linked' && $headingIn !== '' ? $headingIn : $this->uniqueHeading($wsId, $folderId, $headingIn);
+			if ($diary !== null && trim($content) === '') {
+				$content = $diary->initialContent($uid, $ws, $folderId, $headingIn, $type) ?? $content;
+			}
 			$now = $this->now();
 			$created = $now;
 			if (isset($in['created_date']) && is_string($in['created_date'])
@@ -402,8 +405,8 @@ class NoteService {
 		});
 	}
 
-	/** @return array<string, mixed> PATCH /notes/{id} */
-	public function update(string $uid, int $id, array $in, string $ifMatch, string $session): array {
+	/** @return array<string, mixed> PATCH /notes/{id}; $diary: Datumstitel verschiebt in den Datumsordner (M4f) */
+	public function update(string $uid, int $id, array $in, string $ifMatch, string $session, ?DiaryService $diary = null): array {
 		$writable = $this->access->requireNote($uid, $id, 'write');
 		// ADR 0005: gültige Sperre einer anderen Sitzung → 423, danach Versionsprüfung → 409
 		$this->locks->assertCanSave($uid, $id, $session);
@@ -423,14 +426,14 @@ class NoteService {
 			$target = is_string($in['workspace'] ?? null) && trim($in['workspace']) !== '' ? $this->workspaces->requireByKey($uid, trim($in['workspace']), 'write') : null;
 			$images = $this->images->prepare((string)$content, $target !== null ? (int)$target->getId() : (int)$writable->getWorkspaceId());
 		}
-		return $this->tx->run(function () use ($uid, $id, $in, $expected, $newHeading, $content, $tagList, $stateHash, $images) {
+		return $this->tx->run(function () use ($uid, $id, $in, $expected, $newHeading, $content, $tagList, $stateHash, $images, $diary) {
 			$this->attachments->enforceQuota($images['quota'] ?? null);
-			return $this->updateLocked($uid, $id, $in, $expected, $newHeading, $content, $tagList, $stateHash, $images);
+			return $this->updateLocked($uid, $id, $in, $expected, $newHeading, $content, $tagList, $stateHash, $images, $diary);
 		});
 	}
 
 	/** @return array<string, mixed> */
-	private function updateLocked(string $uid, int $id, array $in, string $expected, ?string $newHeading, mixed $content, ?array $tagList, ?string $stateHash, ?array $images): array {
+	private function updateLocked(string $uid, int $id, array $in, string $expected, ?string $newHeading, mixed $content, ?array $tagList, ?string $stateHash, ?array $images, ?DiaryService $diary = null): array {
 		// Versionsprüfung und Schreiben unter Zeilensperre (wie Aufgaben): keine verlorene Änderung
 		$this->notes->lockRow($id);
 		$note = $this->notes->find($id);
@@ -488,6 +491,10 @@ class NoteService {
 		}
 		if ($wsId !== $sourceWs && !$folderGiven && !$pathApplied) {
 			$folderId = null;
+		}
+		// Tagebuch: neuer Datumstitel → Tagebuch/JJJJ/MM, nur ohne Ordnerwechsel in dieser Anfrage und im selben Workspace
+		if ($diary !== null && $heading !== $oldHeading && !$pathApplied && $wsId === $sourceWs && $folderId === $note->getFolderId()) {
+			$folderId = $diary->dateFolder($uid, $ws ?? $this->access->requireWorkspace($uid, $wsId, 'write'), $folderId, $heading) ?? $folderId;
 		}
 		if ($heading !== $oldHeading || $folderId !== $note->getFolderId() || $wsId !== $sourceWs) {
 			$heading = $this->notes->headingExists($wsId, $folderId, $heading, (int)$note->getId())

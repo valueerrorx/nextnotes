@@ -33,6 +33,9 @@ return [
 		['name' => 'page#attachmentsList', 'url' => '/attachments_list.php', 'verb' => 'GET'],
 		['name' => 'page#notesManager', 'url' => '/notes_manager.php', 'verb' => 'GET'],
 		['name' => 'page#create', 'url' => '/create.php', 'verb' => 'GET'],
+		// Tagebuch und Aufgaben (M4f)
+		['name' => 'page#diary', 'url' => '/diary.php', 'verb' => 'GET'],
+		['name' => 'page#tasks', 'url' => '/tasks.php', 'verb' => 'GET'],
 		// Admin-Formular (Settings\AdminSettings), nur Admins
 		['name' => 'admin_settings#save', 'url' => '/admin/settings', 'verb' => 'POST'],
 		// Kompatibilitätsrouten (SPEC §4.2): Upstream-Einzeldateien unter gleichem Namen
@@ -47,6 +50,13 @@ return [
 		['name' => 'compat#saveExcalidraw', 'url' => '/api_save_excalidraw.php', 'verb' => 'POST'],
 		['name' => 'compat#workspaces', 'url' => '/workspaces.php', 'verb' => 'POST'],
 		['name' => 'compat#importDroppedNotes', 'url' => '/api_import_dropped_notes.php', 'verb' => 'POST'],
+		// Kalender/Tagebuch: Upstream-Einzeldateien unter api/v1 (Inventur A #186–190, SPEC §4.2)
+		['name' => 'diary_api#diaryEntry', 'url' => '/api/v1/calendar/diary-entry.php', 'verb' => 'GET'],
+		['name' => 'diary_api#notesByDate', 'url' => '/api/v1/calendar/notes-by-date.php', 'verb' => 'GET'],
+		['name' => 'diary_api#notesOnDate', 'url' => '/api/v1/calendar/notes-on-date.php', 'verb' => 'GET'],
+		['name' => 'diary_api#diaries', 'url' => '/api/v1/diary/diaries.php', 'verb' => 'GET'],
+		['name' => 'diary_api#createDiary', 'url' => '/api/v1/diary/diaries.php', 'verb' => 'POST'],
+		['name' => 'diary_api#entries', 'url' => '/api/v1/diary/entries.php', 'verb' => 'GET'],
 		// API v1, Reihenfolge wie src/public/api/v1/index.php
 		['name' => 'notes_api#resolve', 'url' => '/api/v1/notes/resolve', 'verb' => 'GET'],
 		['name' => 'notes_api#reorder', 'url' => '/api/v1/notes/reorder', 'verb' => 'POST'],

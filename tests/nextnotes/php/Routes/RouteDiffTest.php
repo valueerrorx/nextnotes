@@ -78,7 +78,7 @@ final class RouteDiffTest extends TestCase {
 		$routes = (static fn () => require $file)();
 		$out = [];
 		foreach ($routes['routes'] as $r) {
-			if (str_starts_with($r['url'], '/api/v1/')) {
+			if (str_starts_with($r['url'], '/api/v1/') && !str_ends_with($r['url'], '.php')) {
 				$out[] = self::norm($r['verb'] ?? 'GET', substr($r['url'], strlen('/api/v1')));
 			}
 		}
@@ -116,5 +116,26 @@ final class RouteDiffTest extends TestCase {
 		self::assertSame(count($actual), count(array_unique($actual)), 'doppelte Routen in routes.php');
 		self::assertCount(112, $actual);
 		self::assertSame([], self::numbers(self::PENDING), 'Liste „ausstehend“ muss leer sein');
+	}
+
+	// M4f: Upstream-Einzeldateien unter api/v1 (Inventur A #186–190, nicht im Router) als eigene Routen
+	public function testStandaloneApiFiles(): void {
+		$file = Server::get(IAppManager::class)->getAppPath('nextnotes') . '/appinfo/routes.php';
+		$routes = (static fn () => require $file)();
+		$actual = [];
+		foreach ($routes['routes'] as $r) {
+			if (str_starts_with($r['url'], '/api/v1/') && str_ends_with($r['url'], '.php')) {
+				$actual[] = ($r['verb'] ?? 'GET') . ' ' . $r['url'];
+			}
+		}
+		sort($actual);
+		self::assertSame([
+			'GET /api/v1/calendar/diary-entry.php', 'GET /api/v1/calendar/notes-by-date.php', 'GET /api/v1/calendar/notes-on-date.php',
+			'GET /api/v1/diary/diaries.php', 'GET /api/v1/diary/entries.php', 'POST /api/v1/diary/diaries.php',
+		], $actual);
+		$inv = (string)file_get_contents(self::refDir() . '/A-backend.md');
+		foreach ($actual as $route) {
+			self::assertStringContainsString('| ' . explode(' ', $route)[1] . ' |', $inv, "$route: Inventur A");
+		}
 	}
 }

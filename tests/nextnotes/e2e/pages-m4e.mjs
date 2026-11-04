@@ -8,7 +8,7 @@ import { apiClient } from './lib/api.mjs';
 const RUN = `${process.argv[3]}${Date.now().toString(36)}`;
 const TAG = `m4etag${RUN}`;
 const STRIPPED = ['[data-action="share-folder"]', '[data-action="offline-folder"]', 'option[value="keep-offline"]', '#iconSidebarSharesBtn',
-	'#iconSidebarOfflineBtn', '#iconSidebarLogoutBtn', '#iconSidebarThemeToggleBtn', '.share-state-shared', '[data-create-type="diary"]'];
+	'#iconSidebarOfflineBtn', '#iconSidebarLogoutBtn', '#iconSidebarThemeToggleBtn', '.share-state-shared'];
 
 await runSpec(import.meta.url, async (ctx, page) => {
 	const api = apiClient(ctx, page.request);
@@ -247,7 +247,7 @@ await runSpec(import.meta.url, async (ctx, page) => {
 
 	// 6. Erstellen: Notiz anlegen öffnet den Editor
 	m = await open('create.php', 'Erstellen');
-	ctx.ok(await page.locator('.home-card[data-create-type]').count() === 4, 'Erstellen: vier Karten (ohne Tagebuch bis M4f)');
+	ctx.ok(await page.locator('.home-card[data-create-type]').count() === 5 && await page.locator('#create-diary-entry-card').count() === 1, 'Erstellen: fünf Karten inkl. Tagebuch (M4f)');
 	await ctx.screenshot(page, 'create');
 	await Promise.all([page.waitForURL(/index\.php\?.*note=\d+/, { timeout: 15000 }), page.locator('#create-note-card').click()]);
 	await page.waitForLoadState('networkidle');

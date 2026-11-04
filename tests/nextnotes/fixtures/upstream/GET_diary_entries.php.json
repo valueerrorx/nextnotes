@@ -1,0 +1,7 @@
+{
+    "route": "GET /diary/entries.php",
+    "status": 200,
+    "body": {
+        "entries": {}
+    }
+}

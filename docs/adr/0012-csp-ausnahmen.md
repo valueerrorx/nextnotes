@@ -45,3 +45,6 @@ Druckansicht `export_print` (`api_export_note.php?format=html&disposition=inline
 
 ## Nachtrag M4e (2026-11-04)
 Papierkorb: `trash` gehört zu `NOTE_VIEWS` und bekommt dieselbe Policy wie `index` (`frame-src 'self'` + Embed-Domains aus `EmbedDomainService`), weil die Papierkorb-Vorschau bereinigten Notizinhalt mit erlaubten Einbettungen zeigt. Nicht lockerer als `index`; keine weitere Ausnahme. Review `M4e-r1` (Blocker: fehlender Nachtrag) damit erledigt.
+
+## Nachtrag M4f (2026-11-04)
+Tagebuch: `diary` gehört zu `NOTE_VIEWS` (`frame-src 'self'` + Embed-Domains aus `EmbedDomainService`), weil die Journal-Ansicht ganze Einträge mit erlaubten Einbettungen und Audio-Player (`audio_player.php`) zeigt. Gleiche Policy wie `index`, keine weitere Ausnahme. `tasks` bleibt bei der NC-Standard-CSP.

@@ -322,9 +322,16 @@
             })
             .then(function (result) {
                 var entries = (result && result.entries) || {};
+                // Next Notes P26: entries over the server's render budget come back in a follow-up request
+                var truncated = (result && Array.isArray(result.truncated)) ? result.truncated.map(Number) : [];
+                var again = [];
                 missing.forEach(function (id) {
                     if (!isCurrent(id)) return;
                     delete journalPending[id];
+                    if (truncated.indexOf(Number(id)) !== -1 && truncated.length < missing.length) {
+                        again.push(id);
+                        return;
+                    }
                     if (Object.prototype.hasOwnProperty.call(entries, id)) {
                         journalBodies[id] = String(entries[id] || '');
                     } else {
@@ -332,6 +339,9 @@
                     }
                     fillJournalBody(id);
                 });
+                if (again.length) {
+                    loadJournalBodies(chunk.filter(function (note) { return again.indexOf(note.id) !== -1; }));
+                }
             })
             .catch(function () {
                 missing.forEach(function (id) {
