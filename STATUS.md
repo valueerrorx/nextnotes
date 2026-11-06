@@ -142,7 +142,7 @@ Vorläufig (M2d):
 - M5: `AccessService::filterReadable` und `noteLevel`/`visibleWorkspaceIds` gemeinsam um Teams erweitern (FilterReadableTest sichert ab)
 - Hinweis: CSS-Nesting (`&`) zählt `check-css` nicht mit – bei Upstream-Updates beachten
 
-## M4 (laufend)
+## M4 (abgeschlossen 2026-11-06)
 - M4-Plan `docs/slices/M4-plan.md`: Slices M4a–M4i. Review `M4-plan-r1` (BLOCKER: Export-Rechte, ZIP-Speicher/Platte, Parser-DoS) → `M4-plan-r2` (FREIGABE, Hinweise als Lead-Auflagen übernommen).
   Lead: Embed-Domains exakte Hosts ohne Public Suffix List; Export nur Anhänge der exportierten Notizen, Verweise über `filterReadable`; Export ≤ 1 GiB, ein ZIP-Export je Benutzer; Render/Umwandlung ≤ 1 MiB.
 - M4a erledigt: Admin-Formular (NC-Verwaltung, nur Admin, CSRF), `EmbedDomainService` = eine Liste exakter Hosts für Sanitizer/CSP/JS (B41, P17 in `markdown-parser.js` + `events-rte-paste.js`), Normalisierung mit Fehlerliste, ab Werk leer (Q1), Grenzwerte, „Neuer Workspace“, Excalidraw-Bild unter CSP ohne Lockerung (pica `wasm-eval`-Meldung geduldet, JS-Rückfall; ADR 0012 Nachtrag). Review `M4a-diff-r1` FREIGABE. Lead: `'` in Workspace-/Ordnernamen bleibt verboten (B20), nur in Tags. Flaky AdminSettingsTest = NC-AppConfig-Cache (3 s) nach CLI-Löschen im Test, kein App-Fehler.
