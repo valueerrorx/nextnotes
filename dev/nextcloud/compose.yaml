@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Thomas Weissel
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Nur Tests. App wird per install-app.sh kopiert, nie gemountet (app:remove löscht das Verzeichnis).
+# Nur Tests; Projektname/Ports über env.sh (NN_PROJECT, NN_PORT_BASE). App wird per install-app.sh kopiert, nie gemountet (app:remove löscht das Verzeichnis).
 name: nextnotes-dev
 
 x-nc-env: &nc-env
@@ -13,7 +13,7 @@ services:
     profiles: [sqlite]
     image: nextcloud:35.0.2-apache
     pull_policy: missing
-    ports: ["127.0.0.1:8081:80"]
+    ports: ["127.0.0.1:${NN_PORT_SQLITE:-8081}:80"]
     environment:
       <<: *nc-env
       SQLITE_DATABASE: nextcloud
@@ -44,7 +44,7 @@ services:
     pull_policy: missing
     depends_on:
       db-mariadb: {condition: service_healthy}
-    ports: ["127.0.0.1:8082:80"]
+    ports: ["127.0.0.1:${NN_PORT_MARIADB:-8082}:80"]
     environment:
       <<: *nc-env
       MYSQL_HOST: db-mariadb
@@ -76,7 +76,7 @@ services:
     pull_policy: missing
     depends_on:
       db-pgsql: {condition: service_healthy}
-    ports: ["127.0.0.1:8083:80"]
+    ports: ["127.0.0.1:${NN_PORT_PGSQL:-8083}:80"]
     environment:
       <<: *nc-env
       POSTGRES_HOST: db-pgsql
@@ -103,7 +103,7 @@ services:
     image: nginx:1.30.6-alpine
     pull_policy: missing
     depends_on: [nc-fpm]
-    ports: ["127.0.0.1:8084:80"]
+    ports: ["127.0.0.1:${NN_PORT_NGINX:-8084}:80"]
     volumes:
       - nc-nginx:/var/www/html:ro
       - ./nginx/nextcloud.conf:/etc/nginx/conf.d/default.conf:ro

@@ -176,6 +176,30 @@ final class ApiClient {
 		return $out;
 	}
 
+	/**
+	 * Anfrage im Hintergrund starten: pump() treibt sie voran (true = läuft noch), wait() liefert die Antwort
+	 * @return object{pump: \Closure(): bool, wait: \Closure(): Response}
+	 */
+	public function start(string $method, string $path, ?array $json = null): object {
+		$mh = curl_multi_init();
+		$ch = self::handle($method, self::baseUrl() . self::PREFIX . $path, $json, $this->extraHeaders, $this->uid . ':' . $this->secret);
+		curl_multi_add_handle($mh, $ch);
+		$pump = static function () use ($mh): bool {
+			curl_multi_exec($mh, $running);
+			return $running > 0;
+		};
+		$wait = static function () use ($mh, $ch, $pump): Response {
+			while ($pump()) {
+				curl_multi_select($mh, 1.0);
+			}
+			$r = self::toResponse($ch, (string)curl_multi_getcontent($ch));
+			curl_multi_remove_handle($mh, $ch);
+			curl_multi_close($mh);
+			return $r;
+		};
+		return (object)['pump' => $pump, 'wait' => $wait];
+	}
+
 	public static function raw(string $method, string $url, ?array $json, array $headers, ?string $userpwd, ?string $cookieJar = null, ?string $form = null): Response {
 		$ch = self::handle($method, $url, $json, $headers, $userpwd, $cookieJar, $form);
 		return self::toResponse($ch, (string)curl_exec($ch));

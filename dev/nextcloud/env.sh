@@ -15,6 +15,34 @@ NN_TEST_PASS='NextNotes-Alice-2026!'
 NN_TEST_USER2=bob
 NN_TEST_PASS2='NextNotes-Bob-2026!'
 NN_NC_VERSION=35.0.2
+# Compose-Projekt und Ports überschreibbar (parallele Instanzen): NN_PROJECT=nextnotes-x NN_PORT_BASE=8190 → Ports 8191–8194
+NN_PROJECT="${NN_PROJECT:-nextnotes-dev}"
+NN_PORT_BASE="${NN_PORT_BASE:-8080}"
+# Nur eigene Testprojekte (nie die Demo); Ports nicht von fremden Containern oder Prozessen belegt
+if [[ ! "$NN_PROJECT" =~ ^nextnotes-[a-z0-9-]+$ || "$NN_PROJECT" == nextnotes-demo ]]; then
+	echo "FEHLER: NN_PROJECT '$NN_PROJECT' unzulässig (nur nextnotes-<a-z0-9->, nie nextnotes-demo)" >&2; exit 1
+fi
+[[ "$NN_PORT_BASE" =~ ^[0-9]+$ ]] || { echo "FEHLER: NN_PORT_BASE '$NN_PORT_BASE' keine Zahl" >&2; exit 1; }
+export NN_PORT_SQLITE=$((NN_PORT_BASE + 1)) NN_PORT_MARIADB=$((NN_PORT_BASE + 2)) NN_PORT_PGSQL=$((NN_PORT_BASE + 3)) NN_PORT_NGINX=$((NN_PORT_BASE + 4))
+nn_check_ports() {
+	local own=() foreign=(8090) c proj ports p
+	if command -v docker >/dev/null 2>&1; then
+		# alle Container, auch gestoppte (z. B. nc35-gftest): Projekt und gebundene Host-Ports
+		while read -r c proj ports; do
+			[[ -n "$c" ]] || continue
+			if [[ "$proj" == "$NN_PROJECT" ]]; then own+=($ports); else foreign+=($ports); fi
+		done < <(docker ps -aq | xargs -r docker inspect -f '{{.Name}} {{index .Config.Labels "com.docker.compose.project"}} {{range $k, $v := .HostConfig.PortBindings}}{{range $v}}{{.HostPort}} {{end}}{{end}}' 2>/dev/null \
+			| awk '{ if (NF == 1 || $2 ~ /^[0-9]+$/) { n = $1; $1 = ""; print n, "-", $0 } else print }')
+	fi
+	for p in "$NN_PORT_SQLITE" "$NN_PORT_MARIADB" "$NN_PORT_PGSQL" "$NN_PORT_NGINX"; do
+		[[ " ${foreign[*]} " == *" $p "* ]] && { echo "FEHLER: Port $p gehört einem fremden Container oder der Demo (NN_PORT_BASE ändern)" >&2; exit 1; }
+		if [[ " ${own[*]} " != *" $p "* ]] && command -v ss >/dev/null 2>&1 && [[ -n "$(ss -Hltn "sport = :$p" 2>/dev/null)" ]]; then
+			echo "FEHLER: Port $p ist schon belegt (NN_PORT_BASE ändern)" >&2; exit 1
+		fi
+	done
+	return 0
+}
+nn_check_ports
 
 # Alle Aufrufe mit Zeitlimit, damit ein hängender Webserver nicht blockiert
 NN_CURL=(curl --max-time 30)
@@ -49,10 +77,10 @@ vols_for() {
 
 port_for() {
 	case "$1" in
-		sqlite) echo 8081 ;;
-		mariadb) echo 8082 ;;
-		pgsql) echo 8083 ;;
-		nginx) echo 8084 ;;
+		sqlite) echo "$NN_PORT_SQLITE" ;;
+		mariadb) echo "$NN_PORT_MARIADB" ;;
+		pgsql) echo "$NN_PORT_PGSQL" ;;
+		nginx) echo "$NN_PORT_NGINX" ;;
 		*) die "kein Port für '$1'" ;;
 	esac
 }
@@ -61,7 +89,7 @@ base_url() { echo "http://localhost:$(port_for "$1")"; }
 
 dc() {
 	local profile="$1"; shift
-	docker compose -f "$NN_DEV_DIR/compose.yaml" --profile "$profile" "$@"
+	docker compose -p "$NN_PROJECT" -f "$NN_DEV_DIR/compose.yaml" --profile "$profile" "$@"
 }
 
 # occ <env> <args…>

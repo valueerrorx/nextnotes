@@ -17,15 +17,14 @@ Die App wird in den Container **kopiert**, nie gemountet: `occ app:remove` lösc
 | `check-page.sh <env>` | leere Seite angemeldet (200) und Login-Redirect abgemeldet (303) |
 | `spike-urls.sh <env>` | `.php`-Routen über `/index.php/apps/…` und `/apps/…` (200), ADR 0004 |
 | `check-csp.sh <env>` | Browser-Login, App-Seiten ohne CSP-Verletzung (mit Detektor-Selbsttest) |
-| `run-m1.sh [env…]` | alle Done-Kriterien M1 je Umgebung frisch, danach `down.sh all`; Exit 0 nur wenn alles grün (`KEEP=1` lässt bei Fehlschlag die Umgebung stehen) |
 | `check-forbidden-sql.sh [dir]` | verbotene SQL-/Sitzungsmuster in `nextnotes/lib` (SPEC §13 M2.5); `SELFTEST=1` prüft den Detektor |
 | `run-phpunit.sh <env> [args…]` | PHPUnit aus `tests/nextnotes` im Container (www-data) gegen die Instanz-DB; vorher `composer install -d tests/nextnotes` |
-| `run-e2e.sh <env> [spec…]` | Playwright-Specs aus `tests/nextnotes/e2e/` je Theme (hell, dunkel); legt `alice`/`bob` (Sprache de) an, deaktiviert `firstrunwizard`; Spec-Aufruf `node <spec>.mjs <base-url> <theme>`, Zugang über `NN_USER`/`NN_PASS`/`NN_USER2`/`NN_PASS2`, `PW_CORE`, `CHROMIUM`; `E2E_DIR=`, `THEMES=` |
-| `run-m3.sh [env…]` | Done M3: Build zweimal (zweiter mit `unshare -rn` ohne Netz) mit Prüfsummenvergleich, `check-upstream`, info.xml, SQL-Prüfung; je Umgebung frisch PHPUnit (Apache) und Playwright (sqlite, nginx); `KEEP=1` wie M2 |
-| `run-m4.sh [env…]` | Done M4: wie `run-m3.sh`, zusätzlich `scripts/probe-grenzen.sh` (200 MiB-Anhang „alle Anhänge“-ZIP byte-gleich, Temp nach Export und Abbruch leer) auf mariadb/pgsql; Regression `run-m3.sh`, `run-m2.sh`, `run-m1.sh` getrennt |
-| `run-m2.sh [env…]` | Done M2 je Umgebung frisch (sqlite, mariadb, pgsql): info.xml, SQL-Prüfung, App, `mysql.utf8mb4`, PHPUnit; läuft alle Umgebungen durch, Exit 1 wenn eine rot ist; `KEEP=1` lässt rote Umgebungen stehen |
+| `run-m4.sh [env…]` | **Einzige volle Matrix** (Done M1–M4, Meilenstein-Ende): Build zweimal (zweiter mit `unshare -rn` ohne Netz) mit Prüfsummenvergleich, `check-upstream`, info.xml, SQL-Prüfung; Phase 1 je Umgebung parallel (`PARALLEL=0` nacheinander): Lebenszyklus wie `run-m1.sh` (Seite, Spike/CSP je Webserver, Schema), danach frisch App, `mysql.utf8mb4`, PHPUnit (Apache), `scripts/probe-grenzen.sh` (mariadb/pgsql); Phase 2 nacheinander Playwright Hell+Dunkel (sqlite, nginx), ohne Parallel-Last wegen Zeitmessungen. Logs je Umgebung in `NN_LOG_DIR` (Standard `.cache/run-m4-<Zeit>/`); `KEEP=1` lässt rote Umgebungen stehen |
+| `run-m1.sh [env…]` | nur Lebenszyklus M1 (Teilmenge von `run-m4.sh`, für Slices mit Migrationen); nicht zusätzlich zur vollen Matrix |
+| `run-e2e.sh <env> [spec…]` | Playwright-Specs aus `tests/nextnotes/e2e/` je Theme (hell, dunkel); legt `alice`/`bob` (Sprache de) an, deaktiviert `firstrunwizard` und `recommendations` (Vorschau-404 auf der Dateien-Startseite); Dauer je Spec im Log; Spec-Aufruf `node <spec>.mjs <base-url> <theme>`, Zugang über `NN_USER`/`NN_PASS`/`NN_USER2`/`NN_PASS2`, `PW_CORE`, `CHROMIUM`; `E2E_DIR=`, `THEMES=` |
 
 Upstream-Fixtures: `../upstream/up.sh` (Build einmalig mit Netz, Port 8090), `php ../upstream/capture.php upstream tests/nextnotes/fixtures/upstream`, `../upstream/down.sh`.
 
-Umgebungen: `sqlite` (Apache, 8081), `mariadb` (Apache, 8082), `pgsql` (Apache, 8083), `nginx` (nginx + fpm, SQLite, 8084). Zugang: `admin`/`admin`, `alice` (Passwort in `env.sh`).
-Beispiel: `./run-m1.sh` oder `./run-m1.sh pgsql`
+Umgebungen: `sqlite` (Apache, 8081), `mariadb` (Apache, 8082), `pgsql` (Apache, 8083), `nginx` (nginx + fpm, SQLite, 8084). Eigene Instanz neben anderen: `NN_PROJECT=nextnotes-<name> NN_PORT_BASE=8190` (Ports Basis+1 … +4) vor jedem Skript setzen; `nextnotes-demo` und `nc35-gftest` sind gesperrt.
+`run-m2.sh`/`run-m3.sh` entfallen (M4i-fix): vollständig in `run-m4.sh` enthalten. Laufzeit vorher seriell 2 h 43 min (run-m4) plus run-m3/m2/m1 als Regression. Zugang: `admin`/`admin`, `alice` (Passwort in `env.sh`).
+Beispiel: `./run-m4.sh`, `./run-m4.sh pgsql` oder `./run-m1.sh pgsql`

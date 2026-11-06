@@ -1,0 +1,23 @@
+# M4i-fix – Diff-Review Runde 1 (speccritic)
+
+VERDICT: FREIGABE
+
+Basis 583cc14e + untracked; statisch geprüft, ohne Docker. Stichprobe im vorhandenen Build `nextnotes/css/` (14:48, neuer als `css-bump.mjs`) und `bumpSpecificity` per node auf Beispiel-CSS.
+
+## Blocker
+keine
+
+## Geprüft, in Ordnung
+- Sperrreihenfolge: Alle Pfade, die Notizen sperren (`NoteService::updateLocked`, Conversion, Excalidraw, Task), legen nach der Notiz-Sperre keinen Ordner mehr an. Die einzige Ausnahme ist `updateLocked`. Dort sperrt jetzt `update` vorher den Workspace (NoteService.php:453–456). `create`, `moveToFolder` (:920), `FolderService::create` (:278) und Diary `dateFolder` sperren keine Notiz vor dem Workspace. Workspace löschen/`moveNotes` sperren Workspace vor Notiz. Import legt keine Ordner an (`folder_id`, ImportService.php:133).
+- `mayCreateFolder` (NoteService.php:464) bildet die Bedingungen aus `updateLocked` (:515/:533) ab. Wo es abweicht, sperrt es eher zu viel (Workspace-Wechsel, Nicht-Datumstitel), nie zu wenig. Ausnahme: siehe Hinweis 1.
+- `Transaction::active()`: Der Zähler `depth` wird auch im Fehlerpfad korrekt zurückgesetzt. Der Guard in `resolvePath` (FolderService.php:151) ruft sich rekursiv in `tx->run` auf, die Cleanup-Queue ist davon nicht betroffen. Eine erneute Sperre derselben Zeile in derselben Transaktion ist unschädlich.
+- CSS-Wächter: `:not(:is(N) *):not(N)` ist mengengleich mit `:not(N, N *)`. Die Spezifität bleibt 0, weil alles in `:where` steht. `::selection` bekommt weiterhin Wächter und Scoped-Kopie (nextnotes-core.css). `::highlight(pz-syntax-*)` bleibt unverändert, auch die Dunkel-Variante `:where(html[data-theme=dark]) ::highlight(…)`. Hell und Dunkel haben gleiche Spezifität, die Reihenfolge bleibt wie im Quelltext. In `.ref/nextcloud-server` gibt es kein `::highlight`/`CSS.highlights`, Namen haben das Präfix `pz-`. `div::highlight(a)` (mit Element) wird weiterhin geschützt. `frame.mjs`-Regexe sind angepasst.
+- Skripte: Alle Docker-Aufrufe laufen über `dc`/`down.sh` mit `-p "$NN_PROJECT"`. `nextnotes-demo`/`nc35-gftest` werden in env.sh:21 abgewiesen. Compose lehnt nicht normalisierte Namen ab, deshalb gibt es keine Umgehung über Groß-/Kleinschreibung. Volumes nur `${NN_PROJECT}_<vol>`. `dev/demo/` nutzt env.sh nicht. run-m4 Phase 1 deckt run-m1 (lifecycle + Schema), run-m2 (utf8mb4, PHPUnit) und run-m3 (PHPUnit, E2E sqlite/nginx) ab. Keine Lücke.
+- Tests: `testDateRenameLocksWorkspaceBeforeNote` unterscheidet die beiden Reihenfolgen: Bei alter Reihenfolge hält der PATCH die Notiz, `noteFree` wird false. `testM4ReadShareImportExport` deckt M4i-r1 Hinweis 6 vollständig ab (zwei 403-Fälle mit unveränderten Daten, Export 200 mit Inhalt).
+
+## Hinweise
+1. NoteService.php:464–469: `mayCreateFolder` liest Titel und Ordner aus `$writable` vor der Sperre. Szenario: B ändert parallel den Titel. Dann gilt für A `newHeading === alter Titel (vorab)`, also keine Workspace-Sperre. Unter der Notiz-Sperre ist `oldHeading` aber anders, `dateFolder` → `resolvePath` sperrt den Workspace nach der Notiz. Bei gleichzeitigem Workspace-Löschen droht ein Deadlock und damit 503. SPEC B64 nennt als Restfall nur den Workspace-Wechsel. Ergänzen oder im Restfall allgemeiner formulieren („Notiz zwischen Vorab-Lesen und Sperre geändert“).
+2. Folge davon: `NotesApiController` übergibt `$diary` immer (NotesApiController.php:149). Damit sperrt jede Titeländerung einer Notiz in einem Ordner die Workspace-Zeile, nicht nur Tagebuch-Datumstitel. In geteilten Workspaces werden gleichzeitige Titeländerungen dadurch kurz serialisiert. Die Korrektheit ist nicht betroffen. Ein Vorab-Filter mit `dates->parseTitle` würde das eingrenzen.
+3. DiaryTest.php `testConcurrentDateRenamesShareOneFolder` lässt auch auf mariadb/pgsql 503 zu. Ein Deadlock-Rückfall bliebe dort unbemerkt, solange eine Umbenennung durchkommt. Vorschlag: 503 nur auf SQLite zulassen.
+4. env.sh:21: Sperrliste statt Positivliste. `NN_PROJECT=<fremdes Projekt> ./down.sh all` entfernt per `--remove-orphans` alle Container dieses Projekts und per `-v` die gleichnamigen Volumes (`<projekt>_nc-…`). Demo und gftest sind geschützt. Vorschlag: nur `^nextnotes-[a-z0-9-]+$` zulassen und Ports ≠ 8090 prüfen. Heute verhindert nur der fehlschlagende Bind, dass Tests über `NN_PORT_BASE=8086…8089` die Demo ansprechen (docker.mjs sucht den Container über `publish=<port>`).
+5. Außerhalb dieses Diffs, nicht neu: `FolderService::mirrorPath` (:955) und die Ordner-Wiederherstellung (:499) prüfen erst und legen dann ohne Workspace-Sperre an. Das ist dieselbe Klasse wie B64, ohne Deadlock-Risiko, möglich sind doppelte Ordner.

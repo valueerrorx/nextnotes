@@ -110,6 +110,13 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	// 6. Tastatur: Tab erreicht die Knöpfe, Fokus macht sie sichtbar, Enter/Leertaste lösen aus (nicht die Baumnavigation)
 	{
 		const m = ctx.mark();
+		// Die neue Notiz aus 5. setzt den Fokus asynchron (Titel, Info-Knopf); erst abwarten, bis er ruht, sonst stiehlt er ihn hier
+		const active = () => page.evaluate(() => { const a = document.activeElement; return a ? `${a.tagName}#${a.id}.${a.className}` : ''; });
+		for (let last = await active(), since = Date.now(), end = Date.now() + 5000; Date.now() - since < 800 && Date.now() < end;) {
+			await page.waitForTimeout(100);
+			const now = await active();
+			if (now !== last) { last = now; since = Date.now(); }
+		}
 		await parkMouse();
 		await quick(page, C, 'open-kanban-view').focus();
 		ctx.ok(await width(quick(page, C, 'open-kanban-view')) >= 16, 'Tastatur: fokussierter Kanban-Knopf sichtbar');
@@ -118,12 +125,15 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 		ctx.ok(await width(quick(page, C, 'create-note-in-folder')) >= 16, 'Tastatur: fokussierter „+“-Knopf sichtbar');
 		await page.keyboard.press(' ');
 		ctx.ok(await waitFor(async () => (await page.locator('#create-menu.show').count()) === 1), 'Tastatur: Leertaste auf „+“ öffnet Erstellen-Menü');
+		// openCreateMenu hängt den Außenklick-Schließer per setTimeout(0) an; Eingaben überholen Timer → erst danach klicken
+		await page.evaluate(() => new Promise((r) => setTimeout(r, 0)));
 		await page.keyboard.press('Escape');
 		await page.mouse.click(1390, 890);
-		await waitFor(async () => (await page.locator('#create-menu.show').count()) === 0);
+		ctx.ok(await waitFor(async () => (await page.locator('#create-menu.show').count()) === 0), 'Tastatur: Erstellen-Menü nach Escape/Klick geschlossen');
 		await quick(page, B, 'open-kanban-view').focus();
 		await page.keyboard.press('Enter');
 		ctx.ok(await waitFor(() => kanbanOpen(B)), 'Tastatur: Enter auf Kanban öffnet Ansicht von B');
+		ctx.ok((await page.locator('#create-menu.show').count()) === 0, 'Tastatur: Enter auf Kanban öffnet kein Erstellen-Menü');
 		ctx.ok(!(await page.locator('#left_col .tree-inline-input').count()), 'Tastatur: Enter startet kein Umbenennen');
 		ctx.assertClean('Tastatur', m);
 	}
@@ -146,6 +156,8 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 		await row(page, fid).hover();
 		await quick(page, fid, 'open-kanban-view').click();
 		ctx.ok(await waitFor(() => kanbanOpen(fid)), 'Neuaufbau: Kanban-Knopf des neuen Ordners öffnet Ansicht');
+		// Vorbedingung getrennt prüfen: ein schon offenes Menü würde der Klick schließen (Befund M4i-fix)
+		ctx.ok((await page.locator('#create-menu.show').count()) === 0, 'Neuaufbau: Erstellen-Menü vor dem Klick geschlossen');
 		await row(page, A).hover();
 		await quick(page, A, 'create-note-in-folder').click();
 		ctx.ok(await waitFor(async () => (await page.locator('#create-menu.show').count()) === 1), 'Neuaufbau: „+“ eines alten Ordners öffnet Menü');

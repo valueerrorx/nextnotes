@@ -15,6 +15,7 @@ use OCA\NextNotes\Service\View\TrashViewService;
 use OCA\NextNotes\Service\WorkspaceService;
 use OCA\NextNotes\Tests\Support\ApiClient;
 use OCA\NextNotes\Tests\Support\ApiTestCase;
+use OCP\IDBConnection;
 use OCP\Server;
 
 // Plan M4 §M4f Done 1–3, 5: Tagebuch-Automatik (Vorlage, Datumsordner), Isolation der fünf Endpunkte, Datumsprüfung, Render-Budget
@@ -139,6 +140,92 @@ final class DiaryTest extends ApiTestCase {
 		$codes = array_map(static fn ($r) => $r->status, $a->parallel($reqs));
 		self::assertSame([], array_diff($codes, [201, 409, 503]), 'Ordner parallel: ' . implode(',', $codes));
 		self::assertCount(1, $byName(self::dump($a->uid), "Gleich $mark", null), 'ein Ordner trotz paralleler Anfragen: ' . implode(',', $codes));
+	}
+
+	// B64 (M4i-r1 Hinweis 3): gleichzeitige Umbenennungen auf Daten desselben neuen Monats (PATCH heading) → je ein Ordner
+	public function testConcurrentDateRenamesShareOneFolder(): void {
+		$a = $this->createUser('dr');
+		[$ws] = self::newWorkspace($a, 'Umbenennen');
+		$ids = [];
+		for ($i = 1; $i <= 6; $i++) {
+			[$ids[]] = self::createEntry($a, $ws, sprintf('2026-03-%02d', $i));
+		}
+		[, $d] = self::createEntry($a, $ws, '2026-03-20');
+		$root = explode('/', $d['folder'])[0];
+		$reqs = [];
+		foreach ($ids as $i => $id) {
+			$title = self::ok($a->call('GET', '/calendar/diary-entry.php?' . http_build_query(['date' => sprintf('2029-11-%02d', $i + 1), 'workspace' => $ws])), 'Titel')['title'];
+			$reqs[] = ['PATCH', "/notes/$id", ['heading' => $title, 'workspace' => $ws]];
+		}
+		$moved = 0;
+		// 503 nur unter SQLite (DB-weite Schreibsperre, Timeout); mariadb/pgsql: ein 503 wäre ein Deadlock
+		$allowed = self::db()->getDatabaseProvider() === IDBConnection::PLATFORM_SQLITE ? [200, 503] : [200];
+		foreach ($a->parallel($reqs) as $i => $r) {
+			self::assertContains($r->status, $allowed, "Umbenennung $i: " . $r->describe());
+			$moved += $r->status === 200 ? 1 : 0;
+		}
+		self::assertGreaterThan(0, $moved, 'mindestens eine Umbenennung');
+		$dump = self::dump($a->uid);
+		$byName = static fn (string $name, string $parent) => array_values(array_filter($dump['folders'], static fn ($f) => $f['name'] === $name && (string)$f['parent_id'] === $parent));
+		$rootRow = array_values(array_filter($dump['folders'], static fn ($f) => $f['name'] === $root && $f['parent_id'] === null));
+		$year = $byName('2029', (string)$rootRow[0]['id']);
+		self::assertCount(1, $year, 'ein Jahresordner');
+		$month = $byName('11', (string)$year[0]['id']);
+		self::assertCount(1, $month, 'ein Monatsordner');
+		$inMonth = array_filter($dump['notes'], static fn ($n) => (string)$n['folder_id'] === (string)$month[0]['id']);
+		self::assertCount($moved, $inMonth, 'jede erfolgreiche Umbenennung liegt im Monatsordner');
+	}
+
+	// B64 (M4i-r1 Hinweis 1): PATCH auf ein neues Datum sperrt den Workspace vor der Notiz (Reihenfolge wie Löschen/Verschieben)
+	public function testDateRenameLocksWorkspaceBeforeNote(): void {
+		$db = self::db();
+		$provider = $db->getDatabaseProvider();
+		if ($provider === IDBConnection::PLATFORM_SQLITE) {
+			self::markTestSkipped('SQLite: DB-weite Schreibsperre statt Zeilensperren');
+		}
+		$pg = $provider === IDBConnection::PLATFORM_POSTGRES;
+		$a = $this->createUser('dl');
+		[$ws, $wsId] = self::newWorkspace($a, 'Sperre');
+		[$id] = self::createEntry($a, $ws, '2026-03-14');
+		$title = self::ok($a->call('GET', '/calendar/diary-entry.php?' . http_build_query(['date' => '2028-09-03', 'workspace' => $ws])), 'Titel')['title'];
+		$lock = static function (string $table, int $rowId) use ($db): void {
+			$qb = $db->getQueryBuilder();
+			$qb->update($table)->set('id', 'id')->where($qb->expr()->eq('id', $qb->createNamedParameter($rowId)))->executeStatement();
+		};
+		$waiting = false;
+		$noteFree = false;
+		$error = '';
+		$db->beginTransaction();
+		try {
+			$lock('nextnotes_workspaces', $wsId);
+			$req = $a->start('PATCH', "/notes/$id", ['heading' => $title, 'workspace' => $ws]);
+			// warten, bis die Anfrage an einer Zeilensperre hängt (Ende der Wartezeit 10 s)
+			$sql = $pg ? 'SELECT COUNT(*) FROM pg_locks WHERE NOT granted'
+				: "SELECT COUNT(*) FROM information_schema.PROCESSLIST WHERE ID <> CONNECTION_ID() AND INFO LIKE 'UPDATE%nextnotes_workspaces%'";
+			for ($t = microtime(true); !$waiting && microtime(true) - $t < 10; usleep(50000)) {
+				($req->pump)();
+				$waiting = (int)$db->executeQuery($sql)->fetchOne() > 0;
+			}
+			// hielte die Anfrage schon die Notiz, liefe dies in Sperr-Timeout oder Deadlock
+			$db->executeStatement($pg ? "SET LOCAL lock_timeout = '500ms'" : 'SET SESSION innodb_lock_wait_timeout = 2');
+			try {
+				$lock('nextnotes_notes', $id);
+				$noteFree = true;
+			} catch (\Throwable $e) {
+				$error = $e->getMessage();
+			}
+		} finally {
+			$db->rollBack();
+			if (!$pg) {
+				$db->executeStatement('SET SESSION innodb_lock_wait_timeout = 50');
+			}
+		}
+		$r = ($req->wait)();
+		self::assertTrue($waiting, 'PATCH wartet auf die Workspace-Sperre');
+		self::assertTrue($noteFree, 'Notiz bleibt frei, solange PATCH auf den Workspace wartet: ' . $error);
+		self::assertSame(200, $r->status, 'PATCH nach Freigabe: ' . $r->describe());
+		$dump = self::dump($a->uid);
+		self::assertStringEndsWith('/2028/09', self::folderPath($dump, (int)self::note($dump, $id)['folder_id']), 'Datumsordner angelegt');
 	}
 
 	// M4f-r1 Hinweis 4: Leser einer Freigabe legt nichts an; Vorlage aus fremdem Workspace wird ignoriert

@@ -206,13 +206,13 @@ Reihenfolge = Tabelle. M4c/M4d hängen an M4b (Konvertierung), M4h an M4d (Expor
 **Testart:** PHPUnit Page/Storage sqlite; E2E `settings` Hell+Dunkel, nginx.
 
 ### M4i – Abschluss M4
-- Krit. 1: `tests/nextnotes/e2e/smoke-m4.mjs` öffnet alle Ansichten aus B §1.1 (übernehmen) und führt die Hauptaktion aus (Liste §13 M4.1; Favoriten über die Seitenleiste, B11).
+- Krit. 1: `tests/nextnotes/e2e/smoke-m4.mjs` öffnet alle Ansichten aus B §1.1 (übernehmen) und führt die Hauptaktion aus (Liste §13 M4.1; Favoriten über die Seitenleiste, B11). Erwähnungen „Liste lädt mit Eintrag“ belegt `views-m4g.mjs` Abschnitt 6 (Empfänger NN_USER2); smoke-m4 prüft dort nur die Seite (M4i-fix).
 - Krit. 3: Routenliste aller „streichen“-Dateien aus Inventur B §1.2–1.5 und A (Status streichen) → 404 (`/shared*` → `[]`); UI-Prüfung `stripped.mjs` auf allen M4-Seiten.
-- Krit. 4: `PageIsolationTest` vollständig über alle Seiten-/Kompatibilitätsrouten (M3 + M4) inkl. Detektor-Selbsttest, Lesefreigabe-Fälle.
+- Krit. 4: `PageIsolationTest` vollständig über alle Seiten-/Kompatibilitätsrouten (M3 + M4) inkl. Detektor-Selbsttest, Lesefreigabe-Fälle (Import in lesend geteilten Workspace/Ordner → 403, `api_export_structured.php?workspace=<geteilt>` → 200, M4i-fix).
 - Krit. 5: `IndirectReadTest` um Kalender, Tagebuch-Einträge, Dashboard, Speed Dial, Mentions-Seite, Kanban (linked), Exporte erweitert; Exporte je Fall: (a) eingebettete Fremd-Anhang-URL (`html_embedded`, Markdown-ZIP, Ordner-/„alle“-/strukturierter/Anhang-ZIP) → keine C-Bytes, (b) `[[<C-ID>]]` → kein C-Titel, (c) `type=linked` auf C → leere Hülle bzw. 404 (Einzelnotiz); Fälle mit Lesefreigabe **bedingt Q2**.
 - Grenzen-Gesamtlauf: Parser-Grenzfall-Korpus (M4b.2), Großanhang-Export + leeres Temp-Verzeichnis (M4d.6), Render-Budget Kanban/Tagebuch (M4b.3, M4f.5) einmal auf mariadb/pgsql.
 - `check-upstream`: Rest O8 (direkte Asset-Tags der M4-Seiten gegen `pages`, `upstream-ported.txt`), `KNOWN_MISSING` leer, `FORCED_HIDDEN` leer.
-- Budget §3.4 (M3-plan) auf Hauptansicht und Dashboard; volle Matrix: `run-m4.sh` (sqlite, mariadb, pgsql, nginx; PHPUnit + E2E Hell/Dunkel), Regression `run-m3.sh`, `run-m2.sh`, `run-m1.sh`.
+- Budget §3.4 (M3-plan) auf Hauptansicht und Dashboard; volle Matrix: `run-m4.sh` (sqlite, mariadb, pgsql, nginx; PHPUnit + E2E Hell/Dunkel), Regression `run-m3.sh`, `run-m2.sh`, `run-m1.sh`. Ab M4i-fix enthält `run-m4.sh` M1–M3 (Lebenszyklus, utf8mb4, PHPUnit, E2E); `run-m2.sh`/`run-m3.sh` entfallen, keine getrennte Regression mehr.
 
 ## 3. Testsetup
 - `dev/nextcloud/run-m4.sh [env…]` wie `run-m3.sh`, ergänzt um Host-PHP-Schritt für Parser-/Import-Fixtures (Upstream-Code nur lesend, außerhalb des Containers, `php -n`, Skript liegt unter `tests/`) und Seed 1 000 Notizen.

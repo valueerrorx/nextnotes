@@ -71,7 +71,7 @@ async function droppedRules(page) {
 			for (const sel of sels) {
 				out.checked++;
 				if (parses(`${sel}{}`) === 1) continue;
-				const unbumped = sel.replaceAll(':not(#nn-0)', '').replaceAll(':is(#nextnotes-root,#nextnotes-root *)', '').replace(/:where\(:not\(#header[^)]*\)\)/g, '');
+				const unbumped = sel.replaceAll(':not(#nn-0)', '').replaceAll(':is(#nextnotes-root,#nextnotes-root *)', '').replace(/:where\(:not\(:is\(#header[^)]*\) \*\):not\(#header[^)]*\)\)/g, '');
 				if (parses(`${unbumped}{}`) !== 1) { out.droppedAlsoUnbumped++; continue; }
 				out.dropped.push(`${file}: ${sel.slice(0, 200)}`);
 			}
@@ -238,7 +238,7 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 			kanbanHover: has(/\.kanban-board(:not\(#nn-0\))?::-webkit-scrollbar-thumb:hover/),
 			kanbanTrack: has(/\.kanban-board(:not\(#nn-0\))?::-webkit-scrollbar-track/),
 			darkCodeHover: has(/html\[data-theme="?dark"?\] [^,]*\.code-block[^,]*::-webkit-scrollbar-thumb:hover/),
-			afterPseudo: sb.filter((x) => /::-webkit-scrollbar[a-z-]*(:[a-z-]+)*:(not\(#nn-0\)|is\(#nextnotes-root|where\(:not\(#header)/.test(x)).length,
+			afterPseudo: sb.filter((x) => /::-webkit-scrollbar[a-z-]*(:[a-z-]+)*:(not\(#nn-0\)|is\(#nextnotes-root|where\(:not\(:is\(#header)/.test(x)).length,
 			sample: sb.filter((x) => /code-block|right_col|kanban/.test(x)).slice(0, 4),
 		};
 	});

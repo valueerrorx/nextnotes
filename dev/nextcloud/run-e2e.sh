@@ -23,7 +23,7 @@ fi
 [[ ${#specs[@]} -gt 0 ]] || die "keine Specs in $dir"
 for s in "${specs[@]}"; do [[ -f "$s" ]] || die "Spec fehlt: $s"; done
 
-# Benutzer (Sprache de), kein Einführungsdialog (Overlay, Netzlast)
+# Benutzer (Sprache de), kein Einführungsdialog (Overlay, Netzlast), keine Datei-Empfehlungen
 svc="$(svc_for "$env")"
 for pair in "$NN_TEST_USER:$NN_TEST_PASS" "$NN_TEST_USER2:$NN_TEST_PASS2"; do
 	u="${pair%%:*}"; p="${pair#*:}"
@@ -32,7 +32,8 @@ for pair in "$NN_TEST_USER:$NN_TEST_PASS" "$NN_TEST_USER2:$NN_TEST_PASS2"; do
 	fi
 	occ "$env" user:setting "$u" core lang de
 done
-occ "$env" app:disable firstrunwizard >/dev/null 2>&1 || true
+# recommendations fragt auf der Dateien-Startseite Vorschauen an, die ohne Office-Provider 404 liefern (Rauschen, nicht App)
+for a in firstrunwizard recommendations; do occ "$env" app:disable "$a" >/dev/null 2>&1 || true; done
 
 export NN_USER="$NN_TEST_USER" NN_PASS="$NN_TEST_PASS" NN_USER2="$NN_TEST_USER2" NN_PASS2="$NN_TEST_PASS2"
 export PW_CORE="$NN_DEV_DIR/node_modules/playwright-core" CHROMIUM="${CHROMIUM:-/usr/bin/chromium}"
@@ -43,9 +44,11 @@ for theme in ${THEMES:-light dark}; do
 	done
 	for s in "${specs[@]}"; do
 		echo "--- $env $theme $(basename "$s")"
+		t0=$SECONDS
 		if ! timeout 600 node "$s" "$(base_url "$env")" "$theme"; then
 			failed+=("$theme:$(basename "$s")")
 		fi
+		echo "--- $env $theme $(basename "$s"): $((SECONDS - t0)) s"
 	done
 done
 if [[ ${#failed[@]} -gt 0 ]]; then

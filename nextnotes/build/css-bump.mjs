@@ -5,14 +5,15 @@
 // gelten ohne Zusatz-Spezifität außerhalb der NC-Oberfläche und als gehobene Kopie in #nextnotes-root.
 export const BUMP_GLOBAL = ':not(#nn-0)';
 export const BUMP_SCOPED = ':is(#nextnotes-root,#nextnotes-root *)';
-// NC-Oberfläche außerhalb der App (Kopf, Popover, Dialoge, Toasts): reine Element-Selektoren wirken dort nicht
-export const NOT_NC_CHROME = ':where(:not(#header,#header *,.v-popper__popper,.v-popper__popper *,.modal-mask,.modal-mask *,.toastify,.toastify *))';
+// NC-Oberfläche außerhalb der App (Kopf, Popover, Dialoge, Toasts): reine Element-Selektoren wirken dort nicht.
+// Ein Vorfahren-Durchlauf (:is(…) *) statt vier: `*`-Regeln kosteten sonst je Stilberechnung ~100 ms (M4i-fix)
+export const NOT_NC_CHROME = ':where(:not(:is(#header,.v-popper__popper,.modal-mask,.toastify) *):not(#header,.v-popper__popper,.modal-mask,.toastify))';
 // Pseudo-Element am Ende samt nachfolgenden Pseudo-Klassen (z. B. ::-webkit-scrollbar-thumb:hover); Zusatz muss davor
 const PSEUDO_ARG = '(?:\\([^()]*(?:\\([^()]*\\)[^()]*)*\\))?';
 const PSEUDO_EL = `(?:::[a-z-]+${PSEUDO_ARG}|:(?:before|after|first-line|first-letter)(?![a-z-]))`;
 const PSEUDO_TAIL = new RegExp(`(${PSEUDO_EL}(?::{1,2}[a-z-]+${PSEUDO_ARG})*)$`, 'i');
 // Zusatz hinter einem Pseudo-Element (ungültiger Selektor, Browser verwirft die ganze Regel)
-const BUMP_AFTER_PSEUDO = new RegExp(`${PSEUDO_EL}(?::{1,2}[a-z-]+${PSEUDO_ARG})*?:(?:not\\(#nn-0\\)|is\\(#nextnotes-root|where\\(:not\\(#header)`, 'gi');
+const BUMP_AFTER_PSEUDO = new RegExp(`${PSEUDO_EL}(?::{1,2}[a-z-]+${PSEUDO_ARG})*?:(?:not\\(#nn-0\\)|is\\(#nextnotes-root|where\\(:not\\(:is\\(#header)`, 'gi');
 
 // Text bis zu einem Zeichen aus stops auf Ebene 0 (Klammern, Strings, Kommentare beachtet)
 function scanTo(css, i, stops) {
@@ -67,6 +68,8 @@ function bumpSelector(sel) {
 	// Klasse/ID außerhalb führender html/body/:root-Teile?
 	const rest = t.replace(/^:(?:where|is)\(((?:html|body|:root)[^()]*)\)/i, '$1').replace(/^(?:\s*(?:html|body|:root)(?:[.#[:][^\s>+~]*)?\s*[>+~]?\s*)+/i, '');
 	if (rest === '') return [t];
+	// ::highlight(name): Namen setzt nur App-Code, NC-Kern stylt sie nicht; ohne Zusatz keine Prüfung je Element (M4i-fix)
+	if (/^::highlight\([^()]*\)$/i.test(rest.trim())) return [t];
 	const specific = /[.#]|\[(?:class|id|data-)/i.test(rest.replace(/\[(?!class|id|data-)[^\]]*\]|"[^"]*"|'[^']*'/gi, ''));
 	return specific ? [withBump(t, BUMP_GLOBAL)] : [withBump(t, NOT_NC_CHROME), withBump(t, BUMP_SCOPED)];
 }

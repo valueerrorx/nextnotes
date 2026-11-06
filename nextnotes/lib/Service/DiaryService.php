@@ -486,6 +486,11 @@ class DiaryService {
 	/**
 	 * Titeländerung auf ein Datum → Ordner Tagebuch/JJJJ/MM desselben Tagebuchs (bei Bedarf angelegt); null = bleibt
 	 */
+	// Vorprüfung ohne Datenbank: nur ein Datumstitel kann einen Datumsordner anlegen
+	public function isDateTitle(string $uid, string $heading): bool {
+		return $this->dates->parseTitle($uid, $heading) !== null;
+	}
+
 	public function dateFolder(string $uid, Workspace $ws, ?int $currentFolderId, string $newHeading): ?int {
 		$date = $this->dates->parseTitle($uid, $newHeading);
 		if ($date === null || $currentFolderId === null) {

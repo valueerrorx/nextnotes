@@ -167,7 +167,8 @@ await runSpec(import.meta.url, async (ctx, page) => {
 		['notes_manager.php', 'Notizverwaltung', '#nmNotesContainer a'],
 		['attachments_list.php', 'Anhänge (Workspace)', '[data-attachment-id]'],
 		[`attachments.php?note_id=${note}`, 'Anhänge (Notiz)', '#uploadBtn'],
-		['mentions.php', 'Erwähnungen', '#nextnotes-root'],
+		// Einträge aus geteiltem Workspace (NN_USER2): views-m4g.mjs Abschnitt 6
+		['mentions.php', 'Erwähnungen', '.mentions-toolbar'],
 		['create.php', 'Erstellen', '#create-diary-entry-card'],
 		['settings.php', 'Einstellungen / Workspaces', '#nextnotes-root'],
 	];

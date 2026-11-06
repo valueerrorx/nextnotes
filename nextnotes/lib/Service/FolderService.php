@@ -147,6 +147,10 @@ class FolderService {
 
 	// Pfad → Ordner-ID wie resolveFolderPathToId inkl. refuseAmbiguousFolderName (409)
 	public function resolvePath(Workspace $ws, string $path, bool $create): ?int {
+		// B64: Sperre wirkt nur in einer Transaktion; ohne offene selbst eine öffnen
+		if ($create && !$this->tx->active()) {
+			return $this->tx->run(fn () => $this->resolvePath($ws, $path, true));
+		}
 		$path = trim($path);
 		if ($path === '' || strtolower($path) === 'default') {
 			return null;
@@ -181,7 +185,8 @@ class FolderService {
 			$found = $this->folders->findSibling($wsId, $parentId, $seg);
 			if ($found === null && $create && !$locked) {
 				// B64: gleichzeitiges Anlegen desselben Pfads serialisieren, danach erneut suchen
-				$locked = $this->lockForCreate($wsId);
+				$this->lockWorkspace($wsId);
+				$locked = true;
 				$found = $this->folders->findSibling($wsId, $parentId, $seg);
 			}
 			if ($found !== null) {
@@ -195,13 +200,12 @@ class FolderService {
 		return $parentId;
 	}
 
-	// B64: Zeilensperre des Workspace bis Transaktionsende; Aufrufer läuft in Transaction::run (READ COMMITTED sieht danach fremde Ordner)
-	private function lockForCreate(int $wsId): bool {
+	// B64: Zeilensperre des Workspace bis Transaktionsende; immer vor Notiz-Sperren nehmen (Reihenfolge Workspace → Notiz)
+	public function lockWorkspace(int $wsId): void {
 		// Workspace parallel gelöscht: keinen verwaisten Ordner anlegen
 		if ($this->wsRows->lockRows([$wsId]) < 1) {
 			throw new NotFoundException('Workspace not found');
 		}
-		return true;
 	}
 
 	// ---------- Routen ----------
@@ -271,7 +275,7 @@ class FolderService {
 			throw new BadRequestException('folder_name or folder_path is required');
 		}
 		return $this->tx->run(function () use ($uid, $data, $ws, $wsId, $wsKey, $folderPath, $createParents, $folderName, $isDiary) {
-			$this->lockForCreate($wsId);
+			$this->lockWorkspace($wsId);
 			if ($folderPath !== '') {
 				$segments = array_values(array_filter(array_map('trim', explode('/', trim($folderPath, "/ \t\n\r\0\x0B"))), static fn ($s) => $s !== ''));
 				if ($segments === []) {
@@ -473,6 +477,8 @@ class FolderService {
 		}
 		$notes = is_array($data['notes'] ?? null) ? $data['notes'] : [];
 		[$idMap, $restored] = $this->tx->run(function () use ($ordered, $wsId, $notes) {
+			// B64: Workspace vor Prüfen/Anlegen sperren (Reihenfolge Workspace → Notiz)
+			$this->lockWorkspace($wsId);
 			$idMap = [];
 			foreach ($ordered as $row) {
 				$parent = null;
@@ -952,8 +958,15 @@ class FolderService {
 	 */
 	public function mirrorPath(Workspace $archive, array $path, array &$created): ?int {
 		$parentId = null;
+		$locked = false;
 		foreach ($path as $seg) {
 			$found = $this->folders->findSibling((int)$archive->getId(), $parentId, $seg->getName());
+			if ($found === null && !$locked) {
+				// B64: wie resolvePath vor dem ersten Anlegen sperren und erneut suchen (Aufrufer in Transaction::run)
+				$this->lockWorkspace((int)$archive->getId());
+				$locked = true;
+				$found = $this->folders->findSibling((int)$archive->getId(), $parentId, $seg->getName());
+			}
 			if ($found !== null) {
 				$parentId = (int)$found->getId();
 				continue;

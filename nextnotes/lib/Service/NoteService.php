@@ -440,18 +440,34 @@ class NoteService {
 		$stateHash = (isset($in['state_hash']) && is_string($in['state_hash']) && preg_match('/^[0-9a-f-]{1,80}$/', $in['state_hash'])) ? $in['state_hash'] : null;
 		// Base64-Bilder einer HTML-Notiz → Anhänge (Upstream #1471, M4b); Grenzen vor der Transaktion, nichts geändert bei 413
 		// Quote gegen den Ziel-Workspace, falls die Notiz mit dem Speichern umzieht (M4b-r1 MINOR 2)
+		$target = is_string($in['workspace'] ?? null) && trim($in['workspace']) !== '' ? $this->workspaces->requireByKey($uid, trim($in['workspace']), 'write') : null;
+		$targetWsId = $target !== null ? (int)$target->getId() : (int)$writable->getWorkspaceId();
 		$images = null;
 		if (is_scalar($content) && $writable->getType() === 'note') {
-			$target = is_string($in['workspace'] ?? null) && trim($in['workspace']) !== '' ? $this->workspaces->requireByKey($uid, trim($in['workspace']), 'write') : null;
-			$images = $this->images->prepare((string)$content, $target !== null ? (int)$target->getId() : (int)$writable->getWorkspaceId());
+			$images = $this->images->prepare((string)$content, $targetWsId);
 		}
+		$lockWs = self::mayCreateFolder($uid, $in, $newHeading, $writable, $diary) ? $targetWsId : null;
 		$this->pendingMention = null;
-		$out = $this->tx->run(function () use ($uid, $id, $in, $expected, $newHeading, $content, $tagList, $stateHash, $images, $diary) {
+		$out = $this->tx->run(function () use ($uid, $id, $in, $expected, $newHeading, $content, $tagList, $stateHash, $images, $diary, $lockWs) {
 			$this->attachments->enforceQuota($images['quota'] ?? null);
+			// B64: Workspace vor der Notiz sperren (Reihenfolge wie Löschen/Verschieben), falls ein Ordner entstehen kann
+			if ($lockWs !== null) {
+				$this->folderService->lockWorkspace($lockWs);
+			}
 			return $this->updateLocked($uid, $id, $in, $expected, $newHeading, $content, $tagList, $stateHash, $images, $diary);
 		});
 		$this->notifyMentions($uid);
 		return $out;
+	}
+
+	// Kann PATCH einen Ordner anlegen (Pfad oder Tagebuch-Datumsordner)? Gleiche Bedingungen wie updateLocked
+	private static function mayCreateFolder(string $uid, array $in, ?string $newHeading, Note $note, ?DiaryService $diary): bool {
+		$path = $in['folder'] ?? $in['folder_name'] ?? null;
+		if (!(array_key_exists('folder_id', $in) && $in['folder_id'] !== null) && is_string($path)) {
+			return trim($path) !== '';
+		}
+		return $diary !== null && $newHeading !== null && $newHeading !== (string)$note->getHeading() && $note->getFolderId() !== null
+			&& $diary->isDateTitle($uid, $newHeading);
 	}
 
 	/** @return array<string, mixed> */

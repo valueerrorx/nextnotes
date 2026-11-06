@@ -663,6 +663,27 @@ final class PageIsolationTest extends ApiTestCase {
 		self::assertSame(200, self::get($a, "api_upload_background.php?$wq&image=1")->status, 'A: Hintergrund unverändert');
 	}
 
+	// M4i-r1 Hinweis 6: Import in nur lesend geteilten Workspace/Ordner → 403; Export (Q2) für jeden mit Leserecht → 200
+	public function testM4ReadShareImportExport(): void {
+		$x = $this->fixture();
+		['a' => $a, 'b' => $b, 'mark' => $mark, 'wsId' => $wsId, 'f' => $f] = $x;
+		Server::get(WorkspaceService::class)->share($a->uid, $wsId, $b->uid, 'read');
+		$key = (string)Server::get(WorkspaceService::class)->keyFor($b->uid, $wsId);
+		self::assertNotSame('', $key, 'B kennt den geteilten Workspace');
+		[$bws] = self::newWorkspace($b, 'Eigen');
+		$before = self::dump($a->uid);
+		foreach ([
+			'Import in geteilten Workspace' => $b->uploadFiles(self::APP . 'api_import_dropped_notes.php', [["imp-$mark.md", "# x\n"]], ['workspace' => $key, 'file_count' => 1]),
+			'Import in geteilten Ordner' => $b->uploadFiles(self::APP . 'api_import_dropped_notes.php', [["imp-$mark.md", "# x\n"]], ['workspace' => $bws, 'folder_id' => $f, 'file_count' => 1]),
+		] as $label => $r) {
+			self::assertSame(403, $r->status, "B lesend $label: " . $r->describe());
+		}
+		self::assertSame($before, self::dump($a->uid), 'Lesefreigabe: Import hat Daten von A verändert');
+		$r = self::get($b, 'api_export_structured.php?workspace=' . self::enc($key));
+		self::assertSame(200, $r->status, 'B lesend Export: ' . $r->describe());
+		self::assertStringContainsString($mark, self::zipText($r), 'B lesend Export: Inhalt des geteilten Workspace');
+	}
+
 	private static function zipText(Response $r): string {
 		self::assertStringStartsWith('application/zip', (string)$r->header('Content-Type'), $r->describe());
 		$path = tempnam(sys_get_temp_dir(), 'nnpiso');

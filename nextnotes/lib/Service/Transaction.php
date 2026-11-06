@@ -65,6 +65,11 @@ class Transaction {
 		return $result;
 	}
 
+	// true innerhalb von run(): Zeilensperren gelten bis zum äußersten Commit
+	public function active(): bool {
+		return $this->depth > 0;
+	}
+
 	/**
 	 * Aufräumen, falls die aktuelle oder eine äußere Transaktion zurückrollt (z. B. neu geschriebene IAppData-Dateien)
 	 * @param callable():void $job
