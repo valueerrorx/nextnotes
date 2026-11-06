@@ -207,7 +207,7 @@ final class ViewsM4gTest extends ApiTestCase {
 
 	// M4g-r1 Hinweis 2: erwähnende Person gelöscht → neutraler Text; Kontolöschung entfernt eigene Benachrichtigungen
 	public function testMentionNotificationAfterAccountDeletion(): void {
-		$a = $this->createUser('da');
+		$a = $this->createUser('da', 'Anna Autorin');
 		$b = $this->createUser('db');
 		$c = $this->createUser('dc');
 		[$ws, $wsId] = self::newWorkspace($c, 'Dritte');
@@ -216,20 +216,29 @@ final class ViewsM4gTest extends ApiTestCase {
 		$n = self::newNote($c, $ws, 'Gemeinsam', '<p>leer</p>');
 		self::ok($a->call('PATCH', "/notes/$n", ['content' => "<p>Hallo @{$b->uid}</p>"]), 'A erwähnt B');
 		self::assertSame(1, self::mentionNotifications($n, $b->uid));
-		$prepare = static function (string $by) use ($b, $n): INotification {
+		// gespeicherte Parameter: UID und Anzeigename beim Senden (Thomas, M4i)
+		$qb = self::db()->getQueryBuilder();
+		$stored = json_decode((string)$qb->select('subject_parameters')->from('notifications')
+			->where($qb->expr()->eq('app', $qb->createNamedParameter('nextnotes')))->andWhere($qb->expr()->eq('user', $qb->createNamedParameter($b->uid)))
+			->andWhere($qb->expr()->eq('object_id', $qb->createNamedParameter((string)$n)))->executeQuery()->fetchOne(), true);
+		self::assertSame(['by' => $a->uid, 'byName' => 'Anna Autorin'], $stored, 'Parameter der Benachrichtigung');
+		$prepare = static function (array $params) use ($b, $n): INotification {
 			$x = Server::get(INotificationManager::class)->createNotification();
-			$x->setApp('nextnotes')->setUser($b->uid)->setDateTime(new \DateTime())->setObject('note', (string)$n)->setSubject('mention', ['by' => $by]);
+			$x->setApp('nextnotes')->setUser($b->uid)->setDateTime(new \DateTime())->setObject('note', (string)$n)->setSubject('mention', $params);
 			return Server::get(Notifier::class)->prepare($x, 'de');
 		};
-		self::assertStringContainsString($a->uid, $prepare($a->uid)->getParsedSubject(), 'vorher: Name/UID von A');
+		self::assertSame('Anna Autorin hat dich in Gemeinsam erwähnt', $prepare(['by' => $a->uid, 'byName' => 'Alter Name'])->getParsedSubject(), 'vorher: aktueller Anzeigename');
 		$ownA = self::ownedIds($a->uid);
 		Server::get(IUserManager::class)->get($a->uid)?->delete();
 		if ($ownA !== []) {
 			self::runDeletionJob($ownA[0]);
 		}
-		$after = $prepare($a->uid);
-		self::assertSame('Jemand hat dich in Gemeinsam erwähnt', $after->getParsedSubject());
+		$after = $prepare($stored);
+		self::assertSame('Anna Autorin hat dich in Gemeinsam erwähnt', $after->getParsedSubject(), 'nach Kontolöschung: gespeicherter Name');
 		self::assertStringNotContainsString($a->uid, json_encode($after->getRichSubjectParameters()) ?: '', 'keine UID in den Parametern');
+		$legacy = $prepare(['by' => $a->uid]);
+		self::assertSame('Jemand hat dich in Gemeinsam erwähnt', $legacy->getParsedSubject(), 'Altbestand ohne byName');
+		self::assertStringNotContainsString($a->uid, json_encode($legacy->getRichSubjectParameters()) ?: '', 'Altbestand: keine UID');
 		$ownB = self::ownedIds($b->uid);
 		Server::get(IUserManager::class)->get($b->uid)?->delete();
 		if ($ownB !== []) {

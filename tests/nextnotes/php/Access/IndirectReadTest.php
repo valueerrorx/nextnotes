@@ -12,12 +12,15 @@ namespace OCA\NextNotes\Tests\Access;
 use OCA\NextNotes\Service\WorkspaceService;
 use OCA\NextNotes\Tests\Support\ApiClient;
 use OCA\NextNotes\Tests\Support\ApiTestCase;
+use OCA\NextNotes\Tests\Support\Response;
 use OCP\Server;
 
 /**
  * SPEC §3 (indirekte Lesepfade), Plan Done M2b 1: /notes/resolve (Titel, ID), Backlinks, Graph, /changes,
  * Suche, Anhänge, Snapshots – B sieht nichts von A, weder ohne Freigabe noch nach deren Entzug.
  * Querverweise in beide Richtungen (A-Notiz verweist auf B-Notiz und umgekehrt).
+ * M4i (SPEC §13 M4.5, Plan M4i Krit. 5): M4-Ansichten und Exporte über B's eigene Objekte, die auf A zeigen
+ * (Verknüpfung, [[ID]]/[[Titel]], index.php?note=, Anhang-URL, Erwähnung, Tagebuch-/Kalender-IDs).
  */
 final class IndirectReadTest extends ApiTestCase {
 	/** @return string[] Lecks */
@@ -138,5 +141,135 @@ final class IndirectReadTest extends ApiTestCase {
 
 		$svc->unshare($a->uid, $wsAId, $b->uid);
 		self::assertSame([], self::leaks($b, $fx), 'nach Entzug der Freigabe');
+	}
+
+	private const APP = '/index.php/apps/nextnotes/';
+
+	private static function page(ApiClient $c, string $path): Response {
+		return $c->absolute('GET', self::APP . $path);
+	}
+
+	/** Antworttext inkl. entpackter ZIP-Einträge (Namen + Inhalte) */
+	private static function text(Response $r): string {
+		if (!str_starts_with((string)$r->header('Content-Type'), 'application/zip')) {
+			return $r->body;
+		}
+		$path = tempnam(sys_get_temp_dir(), 'nnind');
+		file_put_contents($path, $r->body);
+		$zip = new \ZipArchive();
+		self::assertTrue($zip->open($path) === true, 'ZIP lesbar');
+		$out = '';
+		for ($i = 0; $i < $zip->numFiles; $i++) {
+			$out .= $zip->getNameIndex($i) . "\n" . $zip->getFromIndex($i) . "\n";
+		}
+		$zip->close();
+		unlink($path);
+		return $out;
+	}
+
+	/**
+	 * M4-Lesepfade von B; $secrets dürfen nirgends erscheinen
+	 * @return array<string, string> Pfad → Antworttext (für die Positivkontrolle)
+	 */
+	private static function m4Views(ApiClient $b, array $fx): array {
+		$wq = 'workspace=' . self::enc($fx['wsB']);
+		$out = [];
+		foreach ([
+			"dashboard.php?$wq", 'dashboard.php?scope=all', "speed_dial.php?$wq", "mentions.php?$wq", 'mentions.php?handled=1',
+			"graph.php?$wq", "kanban_content.php?ajax=1&folder_id={$fx['bF']}&$wq", "diary.php?$wq", "tasks.php?$wq",
+			"notes_manager.php?$wq", "index.php?$wq&note={$fx['bRef']}",
+		] as $p) {
+			$out[$p] = self::page($b, $p)->body;
+		}
+		foreach ([
+			'/graph?' . $wq, '/mentions', "/calendar/notes-by-date.php?mode=both&$wq", '/calendar/notes-by-date.php?mode=both&workspace=' . self::enc($fx['wsA']),
+			"/calendar/notes-on-date.php?date={$fx['day']}&$wq", "/calendar/notes-on-date.php?date={$fx['day']}&mode=modified&$wq",
+			"/calendar/diary-entry.php?date={$fx['day']}&diary={$fx['aDiary']}&$wq", "/diary/diaries.php?$wq",
+			"/diary/entries.php?ids={$fx['gA']},{$fx['aEntry']},{$fx['bRef']}&$wq", "/diary/entries.php?ids={$fx['gA']},{$fx['aEntry']}&workspace=" . self::enc($fx['wsA']),
+			"/notes/{$fx['bLink']}?$wq",
+		] as $p) {
+			$out["api$p"] = $b->call('GET', $p)->body;
+		}
+		foreach ([
+			"api_export_note.php?id={$fx['bRef']}&format=html_embedded", "api_export_note.php?id={$fx['bRef']}&format=html",
+			"api_export_note.php?id={$fx['bRef']}&format=markdown", "api_export_note.php?id={$fx['bRef']}&format=html&disposition=inline",
+			"api_download_note.php?id={$fx['bRef']}", "api_export_folder.php?folder_id={$fx['bF']}", 'api_export_entries.php',
+			'api_export_structured.php', "api_export_structured.php?$wq", 'api_export_attachments.php',
+		] as $p) {
+			$r = self::page($b, $p);
+			self::assertSame(200, $r->status, "B $p: " . $r->describe());
+			$out[$p] = self::text($r);
+		}
+		return $out;
+	}
+
+	public function testM4ViewsAndExportsWithoutShareAndAfterRevoke(): void {
+		$a = $this->createUser('ma');
+		$b = $this->createUser('mb');
+		$m = 'Mv' . bin2hex(random_bytes(4));
+		$bytes = "A-BYTES-$m";
+		$day = gmdate('Y-m-d');
+		[$wsA, $wsAId] = self::newWorkspace($a, 'IndA');
+		[$wsB] = self::newWorkspace($b, 'IndB');
+		$svc = Server::get(WorkspaceService::class);
+		// A: Notiz mit Erwähnung von B, Anhang, Tagebuch mit Eintrag von heute
+		$svc->share($a->uid, $wsAId, $b->uid, 'read');
+		$gA = self::newNote($a, $wsA, "Geheim $m", "<p>Inhalt $m @{$b->uid}</p>");
+		$att = (int)self::ok($a->upload("/notes/$gA/attachments", "bild-$m.png", $bytes, [], 'image/png'), 'Anhang')['attachment_id'];
+		$aDiary = (int)self::ok($a->call('POST', '/diary/diaries.php', ['name' => "Buch $m", 'workspace' => $wsA]), 'Tagebuch A')['diary']['id'];
+		$look = self::ok($a->call('GET', '/calendar/diary-entry.php?' . http_build_query(['date' => $day, 'workspace' => $wsA, 'diary' => $aDiary])), 'diary-entry A');
+		$aEntry = (int)self::ok($a->call('POST', '/notes', ['heading' => $look['title'], 'folder_name' => $look['folder'], 'workspace' => $wsA,
+			'content' => "<p>Eintrag $m</p>", 'created_date' => $day]), 'Eintrag A')['note']['id'];
+		// B (mit Freigabe angelegt): Verknüpfung auf A in Kanban-Ordner, Speed Dial, Favorit; Notiz mit Verweisen auf A
+		$bF = (int)self::ok($b->call('POST', '/folders', ['folder_name' => 'Board', 'workspace' => $wsB]), 'B-Ordner')['folder_id'];
+		$bLink = (int)self::ok($b->call('POST', '/notes', ['heading' => 'Hülle', 'type' => 'linked', 'workspace' => $wsB, 'folder_id' => $bF, 'linked_note_id' => $gA]), 'Verknüpfung')['note']['id'];
+		self::ok($b->call('PUT', "/notes/$bLink/tags", ['tags' => ['speed-dial'], 'workspace' => $wsB]), 'Speed Dial');
+		self::ok($b->call('POST', "/notes/$bLink/favorite", []), 'Favorit');
+		// Markdown-Notiz: alle Exportformate (html, html_embedded, markdown mit Anhängen) anwendbar
+		$md = "[[$gA]]\n\n[x](index.php?note=$gA)\n\n![i](/api/v1/notes/$gA/attachments/$att)\n\n[d](api_attachments.php?action=download&note_id=$gA&attachment_id=$att)\n";
+		$bRef = (int)self::ok($b->call('POST', '/notes', ['heading' => 'Verweise', 'type' => 'markdown', 'content' => $md, 'workspace' => $wsB, 'folder_id' => $bF]), 'B-Verweise')['note']['id'];
+		$fx = ['wsA' => $wsA, 'wsB' => $wsB, 'gA' => $gA, 'aEntry' => $aEntry, 'aDiary' => $aDiary, 'bF' => $bF, 'bLink' => $bLink, 'bRef' => $bRef, 'day' => $day];
+		$secrets = [$m, $bytes, base64_encode($bytes)];
+		$leaks = static function (array $views) use ($secrets): array {
+			$found = [];
+			foreach ($views as $p => $body) {
+				foreach ($secrets as $s) {
+					if (str_contains($body, $s)) {
+						$found[] = "$p enthält " . substr($s, 0, 12);
+					}
+				}
+			}
+			return $found;
+		};
+
+		// Positivkontrolle mit Lesefreigabe (Q2): Detektor sieht A-Daten über Verknüpfung, Erwähnung, Kanban
+		$shared = self::m4Views($b, $fx);
+		foreach (["kanban_content.php?ajax=1&folder_id=$bF&workspace=" . self::enc($wsB), 'api/mentions', "api_export_folder.php?folder_id=$bF"] as $p) {
+			self::assertStringContainsString($m, $shared[$p], "Kontrolle mit Freigabe: $p zeigt A-Daten nicht");
+		}
+		self::assertNotSame([], $leaks($shared), 'Detektor erkennt Freigabe nicht');
+
+		$svc->unshare($a->uid, $wsAId, $b->uid);
+		self::assertSame([], $leaks(self::m4Views($b, $fx)), 'nach Entzug der Freigabe');
+		// ohne je geteilt: C mit denselben Verweisen (Verknüpfung per DB, API verweigert fremdes Ziel)
+		$c = $this->createUser('mc');
+		[$wsC] = self::newWorkspace($c, 'IndC');
+		$cF = (int)self::ok($c->call('POST', '/folders', ['folder_name' => 'Board', 'workspace' => $wsC]), 'C-Ordner')['folder_id'];
+		$r = $c->call('POST', '/notes', ['heading' => 'Hülle', 'type' => 'linked', 'workspace' => $wsC, 'folder_id' => $cF, 'linked_note_id' => $gA]);
+		self::assertSame(404, $r->status, 'Verknüpfung auf fremde Notiz: ' . $r->describe());
+		$spare = self::newNote($c, $wsC, 'Platzhalter', '<p>p</p>');
+		$cLink = (int)self::ok($c->call('POST', '/notes', ['heading' => 'Hülle', 'type' => 'linked', 'workspace' => $wsC, 'folder_id' => $cF, 'linked_note_id' => $spare]), 'C-Verknüpfung')['note']['id'];
+		$qb = self::db()->getQueryBuilder();
+		$qb->update('nextnotes_notes')->set('linked_note_id', $qb->createNamedParameter($gA))->where($qb->expr()->eq('id', $qb->createNamedParameter($cLink)))->executeStatement();
+		self::ok($c->call('PUT', "/notes/$cLink/tags", ['tags' => ['speed-dial'], 'workspace' => $wsC]), 'C Speed Dial');
+		$cRef = (int)self::ok($c->call('POST', '/notes', ['heading' => 'Verweise', 'type' => 'markdown', 'content' => $md, 'workspace' => $wsC, 'folder_id' => $cF]), 'C-Verweise')['note']['id'];
+		$fxC = ['wsB' => $wsC, 'bF' => $cF, 'bLink' => $cLink, 'bRef' => $cRef] + $fx;
+		self::assertSame([], $leaks(self::m4Views($c, $fxC)), 'ohne Freigabe');
+		// Einzelexport der verknüpften Notiz ohne Leserecht → 404 (B42)
+		foreach (["api_export_note.php?id=$cLink", "api_export_note.php?id=$cLink&format=html", "api_download_note.php?id=$cLink"] as $p) {
+			$r = self::page($c, $p);
+			self::assertSame(404, $r->status, "C $p: " . $r->describe());
+			self::assertStringNotContainsString($m, $r->body, "C $p");
+		}
 	}
 }

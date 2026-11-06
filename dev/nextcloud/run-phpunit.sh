@@ -18,6 +18,7 @@ stage="$(mktemp -d)"; trap 'rm -rf "$stage"' EXIT
 mkdir -p "$stage/ref"
 cp "$NN_REPO_ROOT/src/public/api/v1/index.php" "$stage/ref/index.php"
 cp "$NN_REPO_ROOT/docs/inventory/A-backend.md" "$stage/ref/A-backend.md"
+cp "$NN_REPO_ROOT/docs/inventory/B-frontend.md" "$stage/ref/B-frontend.md"
 # Upstream-Importfunktionen nur lesend (Export-Lesbarkeit, Plan M4d Done 2)
 cp "$NN_REPO_ROOT/src/import_helpers.php" "$stage/ref/import_helpers.php"
 { tar -C "$tests" --exclude=.phpunit.cache -cf - . ; } \

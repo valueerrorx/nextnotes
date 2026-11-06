@@ -3,6 +3,7 @@
 // M3a2 (Plan M3 §2 Done M3a2 3): Gestrichenes und noch nicht portierte Seiten nicht sichtbar – Hauptansicht und alle Menüs
 // (Icon-Leiste/Überlauf, Workspace, „+“, Baumoptionen, Favoriten, Ordner-, Notiz-Aktionen). Smoke: Menüaktionen
 // („+“, Kanban, Modal-Aktionen) → 0 pageerror/Konsolenfehler; fehlende Funktion bis M3b/M3c wird als FAIL mit Detail gemeldet.
+// M4i: zusätzlich alle M4-Seiten (Dashboard … Einstellungen) gescannt.
 // Liste abgeleitet aus Upstream src/icon_sidebar.php, src/notes_list.php, src/folders_display.php, public/js/utils-menus.js,
 // public/js/workspaces-core.js.
 import { runSpec } from './lib/harness.mjs';
@@ -179,6 +180,29 @@ await runSpec(import.meta.url, async (ctx, page) => {
 		}
 		await page.keyboard.press('Escape').catch(() => {});
 	}
+	// M4i (Plan Krit. 3): alle M4-Seiten ohne Gestrichenes; portierte Export-/Download-Funktionen je Seite erlaubt (M4c/M4d/M4h)
+	// eigene Notiz: die Menünotiz kann der Löschdialog oben schon in den Papierkorb gelegt haben
+	const pnid = await api.note(WS, `Seitennotiz ${RUN}`, fid);
+	const RESTORE = /^(?!.*(backup|sicherung)).*wiederherstel/i;
+	const shown = (b) => b.match(/„([^“]*)“/)?.[1] ?? b; // Ausnahmen nur gegen den sichtbaren Text, nicht die Regex-Quelle
+	const M4_PAGES = {
+		'dashboard.php': [], 'diary.php': [], 'tasks.php': [], 'graph.php': [], 'speed_dial.php': [], 'mentions.php': [], 'notes_manager.php': [],
+		// Papierkorb/Revisionen: „wiederherstellen“ ist dort die Hauptaktion, kein Backup-Restore; Einstellungen: Hinweis-Karte „Mein Konto“ verlinkt NC (M4h)
+		'list_tags.php': [], 'list_folders.php': [], 'attachments_list.php': [/herunterladen|download/i], 'trash.php': [RESTORE], 'create.php': [],
+		[`attachments.php?note_id=${pnid}`]: [/herunterladen|download/i], [`revisions.php?note_id=${pnid}`]: [RESTORE],
+		'settings.php': [/export|herunterladen|download/i, /^Mein Konto$/],
+	};
+	for (const [path, extra] of Object.entries(M4_PAGES)) {
+		const mm = ctx.mark();
+		const resp = await page.goto(ctx.appUrl(`${path}${path.includes('?') ? '&' : '?'}workspace=${encodeURIComponent(WS)}`), { waitUntil: 'networkidle' });
+		await page.waitForTimeout(300);
+		ctx.ok(resp?.status() === 200, `${path}: 200`, String(resp?.status()));
+		const items = await visibleUi(page);
+		const bad = forbiddenIn(items).filter((b) => !extra.some((re) => re.test(shown(b))));
+		ctx.ok(bad.length === 0, `${path}: nichts Gestrichenes sichtbar (${items.length} Elemente)`, bad.slice(0, 10).join(' | '));
+		ctx.assertClean(path, mm);
+	}
+
 	// Notiz noch vorhanden (delete-note-Dialog abgelehnt)
 	const still = await api.call('GET', `/notes/${nid}`);
 	ctx.info(`Notiz nach abgelehntem Löschdialog: HTTP ${still.status}`);

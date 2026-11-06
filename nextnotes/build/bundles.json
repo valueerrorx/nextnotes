@@ -978,6 +978,8 @@
 				"js/panel-back.js"
 			],
 			"omit": {
+				"css/tokens.css": "nur Passwortschutz-Seite der Einstellungen (Upstream settings_password, gestrichen); Tokens über nextnotes-tokens.css",
+				"css/public_folder.css": "nur Passwortschutz-Seite der Einstellungen (gestrichen)",
 				"js/background-settings.js": "Hintergrund nur in der Hauptansicht; isIndexPage() hielte /index.php/apps/nextnotes/settings.php für die Hauptansicht",
 				"js/utils-updates.js": "Update-Prüfung gestrichen (/system/updates nicht geroutet, Version kommt vom NC-App-Store)",
 				"js/ui-customization-panel.js": "kein Kontext-Anpassungspanel auf den Seiten (Elementsichtbarkeit über ui-customization.js und Einstellungen)",

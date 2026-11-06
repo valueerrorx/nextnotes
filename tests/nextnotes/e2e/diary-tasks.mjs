@@ -52,8 +52,12 @@ await runSpec(import.meta.url, async (ctx, page) => {
 	await ctx.screenshot(page, 'calendar');
 	await page.keyboard.press('Escape');
 	ctx.assertClean('Hauptansicht/Kalender', m);
-	// Nach Reload sichtbar: Zähler mit einer Anfrage
+	// Nach Reload sichtbar: Zähler mit einer Anfrage. networkidle kann unter Last vor DOMContentLoaded (Kalender-Init) feuern
+	// (> 500 ms Skriptausführung ohne Netz), daher auf die Antwort selbst warten (M4i, flaky M4g)
+	const reloaded = page.waitForResponse((r) => r.url().includes('/calendar/notes-by-date.php'), { timeout: 20000 }).catch(() => null);
 	m = await open('index.php', 'Hauptansicht mit Kalender');
+	ctx.ok((await reloaded)?.status() === 200, 'Kalender nach Reload: Zähler geladen');
+	await page.waitForTimeout(300);
 	ctx.ok(byDate().length === 2, 'Kalender sichtbar nach Reload: eine weitere Anfrage', String(byDate().length));
 	ctx.assertClean('Hauptansicht mit Kalender', m);
 

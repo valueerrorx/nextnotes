@@ -3,7 +3,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # check-upstream (ADR 0007, M3-Teil): (a) src/-Diff = upstream-patches.txt, (b) Bundles = Upstream-Listen,
 # (c) Kopfkommentar der Templates, (d) Adapter-Namen in src/, (e) gebaute CSS ohne 'Inter', (e2) Spezifitäts-Zusatz mit Chromium geprüft (ADR 0017),
-# (f) Port-Hashes, (g) Pcre in Ports, (h) loadHTML nur über HtmlSanitizer (B39).
+# (f) Port-Hashes, (g) Pcre in Ports, (h) loadHTML nur über HtmlSanitizer (B39), (i) FORCED_HIDDEN/KNOWN_MISSING leer.
+# (b) prüft auch direkte Asset-Tags der Seiten (O8).
 # Voraussetzung: git, Host-php, node, Chromium (CHROMIUM=). SRC= prüft (b)/(d)/(e2) in einer Kopie, OUT_DIR= anderes Build-Ziel.
 set -euo pipefail
 app="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -82,6 +83,10 @@ if hits="$(grep -rniE '(->|::)load(HTML|XML|HTMLFile)\(|libxml_use_internal_erro
 else
 	echo "check-upstream (h): DOM-Parser nur über HtmlSanitizer::loadHtmlQuiet"
 fi
+# (i) Abschluss M4 (Plan M4i, O8): keine bekannten Lücken, kein erzwungenes Ausblenden
+if ! grep -qE '^\s*public const FORCED_HIDDEN = \[\];' "$app/lib/Service/View/IndexViewService.php"; then err "IndexViewService::FORCED_HIDDEN nicht leer"; fi
+if [[ -f "$repo/tests/nextnotes/e2e/stripped.mjs" ]] && ! grep -qE '^const KNOWN_MISSING = \{\};' "$repo/tests/nextnotes/e2e/stripped.mjs"; then err "stripped.mjs KNOWN_MISSING nicht leer"; fi
+if [[ $fail -eq 0 ]]; then echo "check-upstream (i): FORCED_HIDDEN und KNOWN_MISSING leer"; fi
 
 if [[ $fail -ne 0 ]]; then
 	echo "check-upstream: ROT" >&2

@@ -20,6 +20,11 @@ await runSpec(import.meta.url, async (ctx, page) => {
 	const WS = await api.workspace(`Einst ${RUN}`);
 	// Standard-Workspace am Ende zurücksetzen (Folge-Specs wie frame erwarten „Notizen“)
 	const defaultBefore = (await api.setting('default_workspace')).body?.value ?? '';
+	// Geänderte Einstellungen am Ende zurücksetzen (Folge-Specs wie excalidraw erwarten den Slash-Auslöser „/“)
+	const RESTORE = { backlinks_at_bottom: '0', slash_menu_trigger: 'slash', tasklist_insert_order: 'bottom',
+		diary_default_note_type: '', notes_without_folders_after_folders: '1', note_color_palette: null };
+	const restoreVals = {};
+	for (const [k, def] of Object.entries(RESTORE)) restoreVals[k] = (await api.setting(k)).body?.value || def;
 	const wq = `workspace=${encodeURIComponent(WS)}`;
 	await api.note(WS, `Notiz ${RUN}`);
 	const settingsUrl = (extra = '') => ctx.appUrl(`settings.php?${wq}${extra}`);
@@ -190,4 +195,5 @@ await runSpec(import.meta.url, async (ctx, page) => {
 	ctx.ok(await page.locator('#check-updates-card').isVisible(), 'Über: Version sichtbar', await page.evaluate(() => document.querySelector('.settings-nav-item.is-active')?.dataset.section ?? '-'));
 	ctx.assertClean('Über', m);
 	await api.must('PUT', '/settings/default_workspace', { value: defaultBefore });
+	for (const [k, v] of Object.entries(restoreVals)) if (v !== null) await api.must('PUT', `/settings/${k}`, { value: v });
 });

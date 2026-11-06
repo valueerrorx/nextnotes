@@ -15,6 +15,7 @@ use OCA\NextNotes\Db\Note;
 use OCA\NextNotes\Db\NoteMapper;
 use OCA\NextNotes\Db\NoteTagMapper;
 use OCA\NextNotes\Db\Workspace;
+use OCA\NextNotes\Db\WorkspaceMapper;
 use OCA\NextNotes\Service\Exception\BadRequestException;
 use OCA\NextNotes\Service\Exception\ConflictException;
 use OCA\NextNotes\Service\Exception\NotFoundException;
@@ -32,6 +33,7 @@ class FolderService {
 		private InputValidator $validator,
 		private Transaction $tx,
 		private ITimeFactory $time,
+		private WorkspaceMapper $wsRows,
 	) {
 	}
 
@@ -174,8 +176,14 @@ class FolderService {
 			}
 		}
 		$parentId = null;
+		$locked = false;
 		foreach ($segments as $seg) {
 			$found = $this->folders->findSibling($wsId, $parentId, $seg);
+			if ($found === null && $create && !$locked) {
+				// B64: gleichzeitiges Anlegen desselben Pfads serialisieren, danach erneut suchen
+				$locked = $this->lockForCreate($wsId);
+				$found = $this->folders->findSibling($wsId, $parentId, $seg);
+			}
 			if ($found !== null) {
 				$parentId = (int)$found->getId();
 			} elseif ($create) {
@@ -185,6 +193,15 @@ class FolderService {
 			}
 		}
 		return $parentId;
+	}
+
+	// B64: Zeilensperre des Workspace bis Transaktionsende; Aufrufer läuft in Transaction::run (READ COMMITTED sieht danach fremde Ordner)
+	private function lockForCreate(int $wsId): bool {
+		// Workspace parallel gelöscht: keinen verwaisten Ordner anlegen
+		if ($this->wsRows->lockRows([$wsId]) < 1) {
+			throw new NotFoundException('Workspace not found');
+		}
+		return true;
 	}
 
 	// ---------- Routen ----------
@@ -254,6 +271,7 @@ class FolderService {
 			throw new BadRequestException('folder_name or folder_path is required');
 		}
 		return $this->tx->run(function () use ($uid, $data, $ws, $wsId, $wsKey, $folderPath, $createParents, $folderName, $isDiary) {
+			$this->lockForCreate($wsId);
 			if ($folderPath !== '') {
 				$segments = array_values(array_filter(array_map('trim', explode('/', trim($folderPath, "/ \t\n\r\0\x0B"))), static fn ($s) => $s !== ''));
 				if ($segments === []) {

@@ -264,6 +264,8 @@ class MentionService {
 			}
 			asort($found);
 			$sent = 0;
+			// Name bleibt nach Kontolöschung des Erwähnenden lesbar (Thomas, M4i); UID nie anzeigen
+			$byName = $found === [] ? '' : (string)($this->users->getDisplayName($uid) ?? '');
 			foreach (array_keys($found) as $member) {
 				if ($sent >= self::MAX_NOTIFY) {
 					break;
@@ -276,7 +278,7 @@ class MentionService {
 					->setUser($member)
 					->setDateTime((new \DateTime())->setTimestamp($this->time->getTime()))
 					->setObject('note', (string)$note->getId())
-					->setSubject('mention', ['by' => $uid]);
+					->setSubject('mention', ['by' => $uid, 'byName' => $byName]);
 				$this->notifications->notify($n);
 				$sent++;
 			}

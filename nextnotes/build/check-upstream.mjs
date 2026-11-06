@@ -58,6 +58,11 @@ for (const [p, def] of Object.entries(b.pages)) {
 	if (html === '') { errors.push(`pages.${p}: src/public/${p}.php fehlt`); continue; }
 	const scripts = [...html.matchAll(/(?:src="|poznoteAsset\(')(js\/[^"'?]+\.js)/g)].map((m) => m[1]).filter((f) => !matches(def.omit ?? {}, f));
 	same(`pages.${p}.js (src/public/${p}.php)`, [...new Set(scripts)], def.js);
+	// O8: direkte Asset-Tags außerhalb von js/ bzw. css_assets.php müssen gelistet, ausgeschlossen oder begründet weggelassen sein
+	const direct = [...html.matchAll(/(?:src="|href="|poznoteAsset\(')((?:css|pwa)\/[^"'?]+\.(?:css|js)|[^"'?/:]+\.js)/g)].map((m) => m[1]);
+	for (const f of new Set(direct)) {
+		if (!(b.cssPages[p] ?? []).includes(f) && !matches(b.exclude, f) && !matches(def.omit ?? {}, f)) errors.push(`pages.${p}: direktes Asset ${f} weder in cssPages noch exclude/omit`);
+	}
 }
 
 // Einzeldateien und Vendor existieren

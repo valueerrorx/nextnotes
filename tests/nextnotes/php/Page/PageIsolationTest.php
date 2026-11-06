@@ -19,6 +19,7 @@ use OCP\Server;
 // Done M3 6 / SPEC §3 (AccessService: alle Seiten- und Kompatibilitätsrouten), §4.2, §4.5, §11.2 B33:
 // Seiten (revisions, attachments, kanban_content, audio_player) und Compat-Routen (api_note_info, api_download_note,
 // api_export_*, api_attachments; M3c2: excalidraw_editor, api_save_excalidraw, workspaces.php) – jede ID-Stelle einzeln fremd → 404 ohne Daten; Lesefreigabe → lesend 200, schreibend 403.
+// M4i (SPEC §13 M4.4): alle M4-Seiten/Kompatibilitätsrouten; testEveryPageRouteHasForeignCase verlangt für jede Nicht-API-Route einen Fall.
 final class PageIsolationTest extends ApiTestCase {
 	private const APP = '/index.php/apps/nextnotes/';
 
@@ -517,4 +518,163 @@ final class PageIsolationTest extends ApiTestCase {
 		self::assertSame(200, self::saveEmbedded($b, $n, 'B schreibt')->status, 'B mit Schreibfreigabe');
 	}
 
+	// ---- M4i: Vollständigkeit über alle Seiten- und Kompatibilitätsrouten ----
+
+	private const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+	/** Jede Nicht-API-Route (Verb + URL aus routes.php) → Testmethode mit Fremdzugriff-Fall */
+	private const COVERED = [
+		'GET /' => 'testM4PagesForeignShowOwnOnly', 'GET /index.php' => 'testM4PagesForeignShowOwnOnly', 'POST /index.php' => 'testM4PagesForeignShowOwnOnly',
+		'GET /dashboard.php' => 'testM4PagesForeignShowOwnOnly', 'GET /graph.php' => 'testM4PagesForeignShowOwnOnly',
+		'GET /speed_dial.php' => 'testM4PagesForeignShowOwnOnly', 'GET /mentions.php' => 'testM4PagesForeignShowOwnOnly',
+		'GET /diary.php' => 'testM4PagesForeignShowOwnOnly', 'GET /tasks.php' => 'testM4PagesForeignShowOwnOnly', 'GET /settings.php' => 'testM4PagesForeignShowOwnOnly',
+		'GET /login.php' => 'testM4PagesForeignShowOwnOnly', 'GET /logout.php' => 'testM4PagesForeignShowOwnOnly',
+		'GET /audio_player.php' => 'testForeignEveryIdPositionIs404', 'GET /revisions.php' => 'testForeignEveryIdPositionIs404',
+		'GET /attachments.php' => 'testForeignEveryIdPositionIs404', 'GET /kanban_content.php' => 'testForeignEveryIdPositionIs404',
+		'GET /excalidraw_editor.php' => 'testExcalidrawAndWorkspacesForeignIs404',
+		'GET /trash.php' => 'testListPagesForeignWorkspaceFallsBackToOwn', 'POST /trash.php' => 'testListPagesForeignWorkspaceFallsBackToOwn',
+		'GET /list_tags.php' => 'testListPagesForeignWorkspaceFallsBackToOwn', 'GET /list_folders.php' => 'testListPagesForeignWorkspaceFallsBackToOwn',
+		'GET /attachments_list.php' => 'testListPagesForeignWorkspaceFallsBackToOwn', 'GET /notes_manager.php' => 'testListPagesForeignWorkspaceFallsBackToOwn',
+		'GET /create.php' => 'testListPagesForeignWorkspaceFallsBackToOwn',
+		'POST /admin/settings' => 'testM4CompatRoutesForeign',
+		'GET /api_note_info.php' => 'testForeignEveryIdPositionIs404', 'GET /api_download_note.php' => 'testForeignEveryIdPositionIs404',
+		'GET /api_export_note.php' => 'testForeignEveryIdPositionIs404', 'GET /api_export_folder.php' => 'testForeignEveryIdPositionIs404',
+		'GET /api_attachments.php' => 'testForeignEveryIdPositionIs404',
+		'POST /api_save_excalidraw.php' => 'testExcalidrawAndWorkspacesForeignIs404', 'POST /workspaces.php' => 'testExcalidrawAndWorkspacesForeignIs404',
+		'GET /api_export_entries.php' => 'testM4CompatRoutesForeign', 'GET /api_export_structured.php' => 'testM4CompatRoutesForeign',
+		'GET /api_export_attachments.php' => 'testM4CompatRoutesForeign', 'GET /workspaces.php' => 'testM4CompatRoutesForeign',
+		'GET /storage-stats-user.php' => 'testM4CompatRoutesForeign', 'POST /api_import_dropped_notes.php' => 'testM4CompatRoutesForeign',
+		'GET /api_upload_background.php' => 'testM4CompatRoutesForeign', 'POST /api_upload_background.php' => 'testM4CompatRoutesForeign',
+		'DELETE /api_upload_background.php' => 'testM4CompatRoutesForeign',
+	];
+
+	public function testEveryPageRouteHasForeignCase(): void {
+		$file = Server::get(\OCP\App\IAppManager::class)->getAppPath('nextnotes') . '/appinfo/routes.php';
+		$routes = (static fn () => require $file)();
+		$actual = [];
+		foreach ($routes['routes'] as $r) {
+			if (!str_starts_with($r['url'], '/api/v1/')) {
+				$actual[] = ($r['verb'] ?? 'GET') . ' ' . $r['url'];
+			}
+		}
+		sort($actual);
+		$covered = array_keys(self::COVERED);
+		sort($covered);
+		self::assertSame($covered, array_values(array_unique($actual)), 'Seiten-/Kompatibilitätsroute ohne Fremdzugriff-Fall (COVERED ergänzen) bzw. veraltet');
+		foreach (array_unique(self::COVERED) as $method) {
+			self::assertTrue(method_exists($this, $method), "Testmethode $method fehlt");
+		}
+	}
+
+	/** A: Daten in allen M4-Ansichten (Speed Dial, Tagebuch, Hintergrund, Erwähnung von B ohne Freigabe) */
+	private function m4Fixture(): array {
+		$x = $this->fixture();
+		['a' => $a, 'b' => $b, 'mark' => $mark, 'ws' => $ws, 'n' => $n] = $x;
+		self::ok($a->call('PUT', "/notes/$n/tags", ['tags' => ['speed-dial', "tag$mark"], 'workspace' => $ws]), 'Speed Dial');
+		self::ok($a->call('PATCH', "/notes/$n", ['content' => "<p>Text $mark https://example.org/$mark @{$b->uid}</p>", 'workspace' => $ws]), 'Erwähnung');
+		$x['diary'] = (int)self::ok($a->call('POST', '/diary/diaries.php', ['name' => "Buch $mark", 'workspace' => $ws]), 'Tagebuch')['diary']['id'];
+		self::ok($a->uploadField(self::APP . 'api_upload_background.php', 'background', 'bg.png', (string)base64_decode(self::PNG), ['workspace' => $ws, 'scope' => 'background'], 'image/png'), 'Hintergrund');
+		return $x;
+	}
+
+	public function testM4PagesForeignShowOwnOnly(): void {
+		$x = $this->m4Fixture();
+		['a' => $a, 'b' => $b, 'mark' => $mark, 'n' => $n, 'ws' => $ws, 'wsId' => $wsId] = $x;
+		$before = self::dump($a->uid);
+		$wq = 'workspace=' . self::enc($ws);
+		// Positivkontrolle: A sieht die eigenen Daten serverseitig gerendert (tasks.php lädt per API)
+		foreach (["dashboard.php?$wq", "speed_dial.php?$wq", "diary.php?$wq", "index.php?$wq"] as $p) {
+			$r = self::get($a, $p);
+			self::assertSame(200, $r->status, "A $p: " . $r->describe());
+			self::assertStringContainsString($mark, $r->body, "A $p: eigene Daten fehlen (Detektor)");
+		}
+		foreach (['', 'index.php', "index.php?$wq", "?workspace=$wsId", "dashboard.php?$wq", 'dashboard.php?scope=all', 'dashboard.php?scope=list&ws[]=' . self::enc($ws),
+			"graph.php?$wq", "speed_dial.php?$wq", "mentions.php?$wq", 'mentions.php?handled=1', "diary.php?$wq", "diary.php?$wq&diary={$x['diary']}",
+			"tasks.php?$wq", "settings.php?$wq", 'settings.php?open=about'] as $p) {
+			$r = self::get($b, $p);
+			self::assertSame(200, $r->status, "B $p: " . $r->describe());
+			self::assertStringNotContainsString($mark, $r->body, "B $p: Daten von A");
+			self::assertStringNotContainsString(htmlspecialchars($ws), $r->body, "B $p: Workspace-Name von A");
+		}
+		foreach (["index.php?note=$n", "index.php?$wq&note=$n"] as $p) {
+			self::assertNotFoundClean(self::get($b, $p), $mark, "B $p");
+		}
+		// Fragmente (left_col/right_col) mit A-Notiz
+		foreach (['left_col', 'right_col'] as $frag) {
+			$r = $b->withHeaders(["X-Poznote-Fragment: $frag"])->absolute('GET', self::APP . "index.php?$wq&note=$n");
+			self::assertNotFoundClean($r, $mark, "B Fragment $frag");
+		}
+		// Such-POST mit A-Workspace
+		$r = $b->form(self::APP . 'index.php', ['search' => 'Karte', 'workspace' => $ws]);
+		self::assertSame(200, $r->status, 'B POST index.php: ' . $r->describe());
+		self::assertStringNotContainsString($mark, $r->body, 'B POST index.php: Daten von A');
+		// Login/Logout: nur Weiterleitung in die App, nichts von A
+		foreach (['login.php', 'logout.php'] as $p) {
+			$r = self::get($b, "$p?redirect_url=" . self::enc(self::APP . "index.php?note=$n"));
+			self::assertContains($r->status, [302, 303], "B $p: " . $r->describe());
+			self::assertStringNotContainsString($mark, $r->body);
+		}
+		self::assertSame($before, self::dump($a->uid), 'GET-Seiten von B ändern A nicht');
+	}
+
+	public function testM4CompatRoutesForeign(): void {
+		$x = $this->m4Fixture();
+		['a' => $a, 'b' => $b, 'mark' => $mark, 'n' => $n, 'ws' => $ws, 'wsId' => $wsId, 'f' => $f] = $x;
+		[$bws] = self::newWorkspace($b, 'Eigen');
+		$before = self::dump($a->uid);
+		$wq = 'workspace=' . self::enc($ws);
+		foreach (["api_export_entries.php?$wq", "api_export_structured.php?$wq", "api_export_structured.php?workspace=$wsId",
+			"api_upload_background.php?$wq", "api_upload_background.php?$wq&scope=speed_dial", "api_upload_background.php?$wq&image=1",
+			"api_upload_background.php?$wq&scope=background&image=1"] as $p) {
+			self::assertNotFoundClean(self::get($b, $p), $mark, "B $p");
+		}
+		// eigene ZIP-Exporte von B (ohne workspace = nur eigene Workspaces): nichts von A
+		foreach (['api_export_entries.php', 'api_export_structured.php', 'api_export_attachments.php'] as $p) {
+			$r = self::get($b, $p);
+			self::assertSame(200, $r->status, "B $p: " . $r->describe());
+			self::assertStringNotContainsString($mark, self::zipText($r), "B $p: Daten von A");
+		}
+		// Gegenprobe: A exportiert eigene Daten (Detektor)
+		self::assertStringContainsString($mark, self::zipText(self::get($a, 'api_export_entries.php')), 'A: eigener Export');
+		// Speicherstatistik und alte Workspaces-URL
+		$r = self::get($b, "storage-stats-user.php?fragment=1&$wq");
+		self::assertSame(200, $r->status, 'B storage-stats: ' . $r->describe());
+		self::assertStringNotContainsString($mark, $r->body);
+		self::assertStringNotContainsString(htmlspecialchars($ws), $r->body, 'B storage-stats: Workspace-Name von A');
+		$r = self::get($b, "workspaces.php?$wq");
+		self::assertContains($r->status, [302, 303], 'B workspaces.php GET: ' . $r->describe());
+		self::assertStringNotContainsString($mark, $r->body . (string)$r->header('Location'));
+		// Schreibende Kompatibilitätsrouten auf A's Workspace → 404, nichts geändert
+		$png = (string)base64_decode(self::PNG);
+		foreach ([
+			'Hintergrund hochladen' => $b->uploadField(self::APP . 'api_upload_background.php', 'background', 'bg.png', $png, ['workspace' => $ws, 'scope' => 'background'], 'image/png'),
+			'Hintergrund löschen' => $b->absolute('DELETE', self::APP . "api_upload_background.php?$wq&scope=background"),
+			'Import in A' => $b->uploadFiles(self::APP . 'api_import_dropped_notes.php', [["import-$mark.md", "# x\n"]], ['workspace' => $ws, 'file_count' => 1]),
+			'Import in A-Ordner' => $b->uploadFiles(self::APP . 'api_import_dropped_notes.php', [['import.md', "# x\n"]], ['workspace' => $bws, 'folder_id' => $f, 'file_count' => 1]),
+		] as $label => $r) {
+			self::assertContains($r->status, [400, 404], "B $label: " . $r->describe());
+			self::assertStringNotContainsString($mark, $r->body, "B $label");
+		}
+		// Admin-Formular: kein Admin → 403
+		$r = $b->form(self::APP . 'admin/settings', ['allowed_iframe_domains' => 'example.org']);
+		self::assertSame(403, $r->status, 'B admin/settings: ' . $r->describe());
+		self::assertSame($before, self::dump($a->uid), 'Fremdzugriff hat Daten von A verändert');
+		// Hintergrund von A steht noch
+		self::assertSame(200, self::get($a, "api_upload_background.php?$wq&image=1")->status, 'A: Hintergrund unverändert');
+	}
+
+	private static function zipText(Response $r): string {
+		self::assertStringStartsWith('application/zip', (string)$r->header('Content-Type'), $r->describe());
+		$path = tempnam(sys_get_temp_dir(), 'nnpiso');
+		file_put_contents($path, $r->body);
+		$zip = new \ZipArchive();
+		self::assertTrue($zip->open($path) === true, 'ZIP lesbar');
+		$out = '';
+		for ($i = 0; $i < $zip->numFiles; $i++) {
+			$out .= $zip->getNameIndex($i) . "\n" . $zip->getFromIndex($i) . "\n";
+		}
+		$zip->close();
+		unlink($path);
+		return $out;
+	}
 }

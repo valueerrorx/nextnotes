@@ -108,6 +108,39 @@ final class DiaryTest extends ApiTestCase {
 		self::assertSame([], $e['truncated']);
 	}
 
+	// B64 (M4f-r1 Hinweis 3): gleichzeitige Einträge desselben Monats und gleichzeitiges Ordner-Anlegen → je ein Ordner
+	public function testConcurrentCreatesShareOneFolder(): void {
+		$a = $this->createUser('dc');
+		$mark = 'DRACE' . bin2hex(random_bytes(4));
+		[$ws] = self::newWorkspace($a, 'Rennen');
+		[, $d] = self::createEntry($a, $ws, '2026-03-14');
+		$root = explode('/', $d['folder'])[0];
+		$reqs = [];
+		for ($i = 1; $i <= 8; $i++) {
+			$reqs[] = ['POST', '/notes', ['heading' => "Tag $i $mark", 'folder_name' => "$root/2027/07", 'workspace' => $ws, 'content' => '<p>x</p>']];
+		}
+		$ok = 0;
+		foreach ($a->parallel($reqs) as $i => $r) {
+			// SQLite serialisiert Schreiber selbst; Sperr-Timeout → 503 (M2d), sonst angelegt
+			self::assertContains($r->status, [200, 201, 503], "Eintrag $i: " . $r->describe());
+			$ok += $r->status === 503 ? 0 : 1;
+		}
+		self::assertGreaterThan(0, $ok, 'mindestens ein Eintrag angelegt');
+		$byName = static fn (array $dump, string $name, ?string $parent) => array_values(array_filter($dump['folders'],
+			static fn ($f) => $f['name'] === $name && ($parent === null ? $f['parent_id'] === null : (string)$f['parent_id'] === $parent)));
+		$dump = self::dump($a->uid);
+		$rootRow = $byName($dump, $root, null);
+		self::assertCount(1, $rootRow, 'ein Tagebuch-Ordner');
+		$year = $byName($dump, '2027', (string)$rootRow[0]['id']);
+		self::assertCount(1, $year, 'ein Jahresordner');
+		self::assertCount(1, $byName($dump, '07', (string)$year[0]['id']), 'ein Monatsordner');
+
+		$reqs = array_fill(0, 6, ['POST', '/folders', ['folder_name' => "Gleich $mark", 'workspace' => $ws]]);
+		$codes = array_map(static fn ($r) => $r->status, $a->parallel($reqs));
+		self::assertSame([], array_diff($codes, [201, 409, 503]), 'Ordner parallel: ' . implode(',', $codes));
+		self::assertCount(1, $byName(self::dump($a->uid), "Gleich $mark", null), 'ein Ordner trotz paralleler Anfragen: ' . implode(',', $codes));
+	}
+
 	// M4f-r1 Hinweis 4: Leser einer Freigabe legt nichts an; Vorlage aus fremdem Workspace wird ignoriert
 	public function testReadOnlyShareAndForeignTemplate(): void {
 		$a = $this->createUser('dr');
