@@ -40,3 +40,4 @@ src/public/js/utils-export-create.js
 src/public/js/workspaces-create.js
 src/public/js/mention-autocomplete.js
 src/public/js/tasks-page.js
+src/public/js/font-size-settings.js

@@ -21,7 +21,7 @@
                 </div>
                 <div class="font-size-row">
                     <label for="sidebarFontSizeInput"><?php p($tr->t('modals.font_size.sidebar_label')); ?></label>
-                    <input type="number" id="sidebarFontSizeInput" min="10" max="32" step="1" value="13">
+                    <input type="number" id="sidebarFontSizeInput" min="10" max="32" step="1" value="15">
                 </div>
                 <div class="font-size-row">
                     <label for="codeBlockFontSizeInput"><?php p($tr->t('modals.font_size.code_block_label')); ?></label>

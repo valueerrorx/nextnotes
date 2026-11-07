@@ -854,7 +854,7 @@
     function refreshFontSizeBadge() {
         var fontBadges = [
             { id: 'font-size-badge', key: 'note_font_size', default: '15', i18nKey: 'display.badges.note_font_size', fallback: '' },
-            { id: 'sidebar-font-size-badge', key: 'sidebar_font_size', default: '13', i18nKey: 'display.badges.sidebar_font_size', fallback: '' },
+            { id: 'sidebar-font-size-badge', key: 'sidebar_font_size', default: '15', i18nKey: 'display.badges.sidebar_font_size', fallback: '' },
             { id: 'code-block-font-size-badge', key: 'code_block_font_size', default: '15', i18nKey: 'display.badges.code_block_font_size', fallback: '' },
             { id: 'settings-font-size-badge', key: 'settings_font_size', default: settingsFontSizeFallback(), i18nKey: 'display.badges.settings_font_size', fallback: '' }
         ];

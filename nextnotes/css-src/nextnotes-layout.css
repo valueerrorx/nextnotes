@@ -31,18 +31,28 @@ body {
 	font-family: var(--font-face);
 }
 
-/* Gegen Flackern: sichtbar und bedienbar, sobald der Adapter startet; Rückfall nach 2 s ohne JS (inert setzt der Adapter).
-   opacity statt visibility: ui-customization.js prüft visibility und blendete sonst Abschnitte vor dem Start aus */
-#app-content {
+/* Gegen Flackern: nur der Inhalt wartet bis zum Adapter-Start, Icon-Leiste und Seitenleiste stehen sofort (UI-nav); Seiten ohne Leiste
+   ganz. Rückfall nach 2 s ohne JS (inert setzt der Adapter). opacity statt visibility: ui-customization.js prüft visibility */
+#nextnotes-root > :is(#right_pane, .nn-page-main, #outline-panel),
+#nextnotes-root:is(.nextnotes-subpage, .nextnotes-excalidraw) {
 	opacity: 0;
 	pointer-events: none;
 	animation: nextnotes-reveal 0s linear 2s forwards;
 }
 
-html.nextnotes-ready #app-content {
+html.nextnotes-ready #nextnotes-root > :is(#right_pane, .nn-page-main, #outline-panel),
+html.nextnotes-ready #nextnotes-root:is(.nextnotes-subpage, .nextnotes-excalidraw) {
 	opacity: 1;
 	pointer-events: auto;
 	animation: none;
+	transition: opacity 120ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html.nextnotes-ready #nextnotes-root > :is(#right_pane, .nn-page-main, #outline-panel),
+	html.nextnotes-ready #nextnotes-root:is(.nextnotes-subpage, .nextnotes-excalidraw) {
+		transition: none;
+	}
 }
 
 @keyframes nextnotes-reveal {
@@ -801,4 +811,182 @@ html[data-theme='dark'] #nextnotes-root.graph-page {
 	cursor: pointer;
 	padding: 2px;
 	min-height: 0;
+}
+
+/*
+ * UI-nav: Rahmen und Navigation wie NC-Apps (Files/NcAppNavigation, NC 35), nur NC-Theme-Variablen.
+ * Leisten liegen auf der Blur-Fläche von #content, der Inhalt auf der Hauptfläche mit Radius links.
+ */
+/* Blur als Pseudo-Element: backdrop-filter am Element selbst machte es zum Bezugsrahmen der fixed-Menüs/Dialoge darin */
+#content.app-nextnotes::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	background-color: var(--color-main-background-blur, var(--color-main-background));
+	-webkit-backdrop-filter: var(--filter-background-blur, none);
+	backdrop-filter: var(--filter-background-blur, none);
+	pointer-events: none;
+}
+
+#content.app-nextnotes > #app-content {
+	background-color: transparent;
+}
+
+#nextnotes-root > :is(#right_pane, .nn-page-main, .outline-resize-handle, #outline-panel),
+#nextnotes-root:is(.nextnotes-subpage, .nextnotes-excalidraw) {
+	background-color: var(--color-main-background);
+}
+
+#nextnotes-root > :is(#right_pane, .nn-page-main) {
+	border-start-start-radius: var(--body-container-radius);
+	border-end-start-radius: var(--body-container-radius);
+}
+
+/* Leisten: transparent (3 IDs gegen Upstream-Dunkel #left_col/#icon_sidebar), Text-Kontrast auf Blur wie NcAppNavigation */
+#content #nextnotes-root :is(#icon_sidebar, #left_col) {
+	--color-text-maxcontrast: var(--color-text-maxcontrast-background-blur, var(--color-text-maxcontrast-default, var(--color-text-maxcontrast)));
+	--pz-text-secondary: var(--color-text-maxcontrast);
+	--pz-text-muted: var(--color-text-maxcontrast);
+	--pz-text-subtle: var(--color-text-maxcontrast);
+	--pz-icon: var(--color-text-maxcontrast);
+	background: transparent;
+	border-right: 0;
+}
+
+/* Höhe der App statt Upstream 100vh (ragte unter #content hinaus, unteres Ende abgeschnitten) */
+#nextnotes-root > :is(#left_col, #right_pane) {
+	height: 100%;
+}
+
+#nextnotes-root #left_col #search-bar-container {
+	background-color: transparent;
+}
+
+/* Trennkante zur Inhaltsfläche nur bei hohem Kontrast (wie NcAppNavigation) */
+#nextnotes-root > .resize-handle {
+	border-right-color: transparent;
+}
+
+[data-themes*='highcontrast'] #nextnotes-root > .resize-handle {
+	border-right-color: var(--color-border);
+}
+
+/* Icon-Leiste: Einträge wie NcAppNavigationItem (Fläche --default-clickable-area, Symbol 20 px) */
+#nextnotes-root #icon_sidebar {
+	padding-block: var(--app-navigation-padding, calc(var(--default-grid-baseline) * 2));
+}
+
+#nextnotes-root #icon_sidebar :is(.icon-sidebar-btn, .icon-sidebar-logo) {
+	position: relative;
+	width: var(--default-clickable-area);
+	height: var(--default-clickable-area);
+	border-radius: var(--border-radius-element);
+	color: var(--color-main-text);
+	transition: background-color var(--animation-quick, 100ms) ease-in-out;
+}
+
+#nextnotes-root #icon_sidebar .icon-sidebar-btn .lucide {
+	width: calc(20px * var(--icon-rail-scale, 1));
+	height: calc(20px * var(--icon-rail-scale, 1));
+}
+
+/* Baumzeilen (Ordner, Notizen, Favoriten-Ordner) wie NcAppNavigationItem */
+#nextnotes-root #left_col :is(.folder-toggle, a.links_arbo_left) {
+	position: relative;
+	box-sizing: border-box;
+	min-height: var(--default-clickable-area);
+	margin-top: 0;
+	margin-bottom: var(--default-grid-baseline);
+	padding-top: 0;
+	padding-bottom: 0;
+	border-radius: var(--border-radius-element);
+	color: var(--color-main-text);
+	line-height: var(--default-clickable-area);
+	transition: background-color var(--animation-quick, 100ms) ease-in-out;
+}
+
+#nextnotes-root #left_col :is(.folder-name, a.links_arbo_left .note-title) {
+	font-weight: var(--font-weight-element, 500);
+	line-height: var(--default-clickable-area);
+}
+
+#nextnotes-root #left_col a.links_arbo_left .note-title:not(.has-title-color),
+#nextnotes-root #left_col .folder-name {
+	color: var(--color-main-text) !important;
+}
+
+#nextnotes-root #left_col :is(.folder-icon, .note-icon, .favorite-folder-icon) {
+	width: 1.34em;
+	height: 1.34em;
+	margin-right: 7px;
+	vertical-align: middle;
+	color: var(--color-main-text);
+}
+
+/* Hover/Fokus 8 %, aktiv 16 % (+ Hover 22 %) der Primärfarbe und Streifen links: Werte von NcAppNavigationItem (NC 35) */
+#nextnotes-root #icon_sidebar :is(.icon-sidebar-btn, .icon-sidebar-logo):is(:hover, :focus-visible),
+#nextnotes-root #left_col :is(.folder-toggle, a.links_arbo_left):hover {
+	background-color: color-mix(in srgb, var(--color-primary-element) 8%, transparent) !important;
+	color: var(--color-main-text);
+}
+
+#nextnotes-root #icon_sidebar :is(.icon-sidebar-btn-active, [aria-current='page']),
+#nextnotes-root #left_col a.links_arbo_left.selected-note {
+	background-color: color-mix(in srgb, var(--color-primary-element) 16%, transparent) !important;
+	color: var(--color-main-text);
+}
+
+#nextnotes-root #icon_sidebar :is(.icon-sidebar-btn-active, [aria-current='page']):hover,
+#nextnotes-root #left_col a.links_arbo_left.selected-note:hover {
+	background-color: color-mix(in srgb, var(--color-primary-element) 22%, transparent) !important;
+}
+
+#nextnotes-root #icon_sidebar :is(.icon-sidebar-btn-active, [aria-current='page'])::before,
+#nextnotes-root #left_col a.links_arbo_left.selected-note::before {
+	content: '';
+	position: absolute;
+	inset-block: calc(var(--default-grid-baseline) * 2);
+	inset-inline-start: 0;
+	width: 3px;
+	border-radius: var(--border-radius-pill, 999px);
+	background-color: var(--color-primary-element);
+}
+
+#nextnotes-root #icon_sidebar :is(.icon-sidebar-btn, .icon-sidebar-logo):focus-visible,
+#nextnotes-root #left_col :is(.folder-toggle, a.links_arbo_left):focus-visible {
+	outline: 2px solid var(--color-main-text);
+	box-shadow: 0 0 0 4px var(--color-main-background);
+}
+
+/* Seitenwechsel als View Transition (gleiche Origin, beide Seiten der App): Kopfleiste, Icon-Leiste und Seitenleiste bleiben stehen,
+   der Inhalt blendet über. Namen nur während des Übergangs (sonst Stapelkontext für die fixed-Menüs der Leisten). */
+@media (prefers-reduced-motion: no-preference) {
+	@view-transition {
+		navigation: auto;
+	}
+}
+
+html:active-view-transition #header {
+	view-transition-name: nn-header;
+}
+
+html:active-view-transition #nextnotes-root #icon_sidebar {
+	view-transition-name: nn-rail;
+}
+
+html:active-view-transition #nextnotes-root #left_col {
+	view-transition-name: nn-sidebar;
+}
+
+::view-transition-group(*) {
+	animation-duration: 150ms;
+}
+
+/* Mini-Kalender (sticky unten): Milchglas statt Hauptfläche, damit die Leiste einheitlich auf der Blur-Fläche liegt */
+#nextnotes-root #left_col .mini-calendar-container {
+	background: transparent;
+	-webkit-backdrop-filter: var(--filter-background-blur, none);
+	backdrop-filter: var(--filter-background-blur, none);
+	border-top-color: var(--color-border);
 }

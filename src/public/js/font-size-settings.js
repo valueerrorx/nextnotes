@@ -122,7 +122,7 @@ function loadCurrentFontSizes() {
     }
 
     // Load sidebar font size from localStorage
-    const sidebarFontSize = fontSizeStore.getItem('sidebar_font_size') || '13';
+    const sidebarFontSize = fontSizeStore.getItem('sidebar_font_size') || '15';
     const sidebarFontSizeInput = document.getElementById('sidebarFontSizeInput');
     if (sidebarFontSizeInput) {
         sidebarFontSizeInput.value = sidebarFontSize;
@@ -209,7 +209,7 @@ function applyFontSizeToNotes() {
     const noteFontSize = fontSizeStore.getItem('note_font_size') || '15';
     document.documentElement.style.setProperty('--note-font-size', noteFontSize + 'px');
 
-    const sidebarFontSize = fontSizeStore.getItem('sidebar_font_size') || '13';
+    const sidebarFontSize = fontSizeStore.getItem('sidebar_font_size') || '15';
     document.documentElement.style.setProperty('--sidebar-font-size', sidebarFontSize + 'px');
 
     const codeBlockFontSize = fontSizeStore.getItem('code_block_font_size') || '15';

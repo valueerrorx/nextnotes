@@ -21,10 +21,11 @@
 		}
 	}
 
-	// 0. Bis zum Start nicht bedienbar (gegen Klick/Fokus im unsichtbaren Inhalt); Rückfall nach 2 s wie im CSS
-	var appContent = document.getElementById('app-content');
-	function releaseContent() { if (appContent) appContent.inert = false; }
-	if (appContent) { appContent.inert = true; setTimeout(releaseContent, 2000); }
+	// 0. Inhalt bis zum Start nicht bedienbar (gegen Klick/Fokus im unsichtbaren Inhalt); Leisten sofort; Rückfall nach 2 s wie im CSS
+	var waiting = document.querySelectorAll('#nextnotes-root > :is(#right_pane, .nn-page-main, #outline-panel), #nextnotes-root:is(.nextnotes-subpage, .nextnotes-excalidraw)');
+	function releaseContent() { waiting.forEach(function (el) { el.inert = false; }); }
+	waiting.forEach(function (el) { el.inert = true; });
+	setTimeout(releaseContent, 2000);
 
 	var config = readState('config') || {};
 	var baseUrl = String(config.baseUrl || '/index.php/apps/nextnotes/').replace(/\/?$/, '/');
@@ -87,6 +88,12 @@
 				if (window.innerWidth > 800 && (stored === null || stored === 'true')) root.classList.add('outline-collapsed');
 			}
 			if (localStorage.getItem('iconSidebarCollapsed') === 'true') body.classList.add('icon-sidebar-collapsed');
+			// Breite/Eingeklappt der Seitenleiste vor dem ersten Zeichnen wie resize-column.js (Leiste wartet nicht mehr, UI-nav)
+			if (document.getElementById('resizeHandle') && document.getElementById('left_col') && document.getElementById('right_col')) {
+				var leftWidth = parseInt(localStorage.getItem('leftColWidth'), 10);
+				if (leftWidth >= 200 && leftWidth <= 800) root.style.setProperty('--left-col-width', leftWidth + 'px');
+				if (localStorage.getItem('sidebarCollapsed') === 'true') body.classList.add('sidebar-collapsed');
+			}
 			var focusParam = new URLSearchParams(window.location.search).get('focus');
 			var focus = focusParam === '1' || focusParam === '0' ? focusParam : localStorage.getItem('focusMode');
 			if (focus === '1' || focus === '2' || focus === 'true') root.classList.add('focus-mode');
@@ -104,6 +111,22 @@
 		}
 	}
 	applyPageState(readIsland('nextnotes-body'));
+
+	// Ausgeblendete Icon-Leisten-Einträge vor dem ersten Zeichnen (UI-nav); ui-customization.js ersetzt denselben Stilblock später
+	(function () {
+		var rail = document.getElementById('icon_sidebar');
+		if (!rail || document.getElementById('ui-customization-styles')) return;
+		var rules = window.__POZNOTE_HIDDEN_UI_ELEMENTS__.map(function (key) {
+			var m = /^card:([A-Za-z][\w-]*)$/.exec(String(key));
+			var el = m && document.getElementById(m[1]);
+			return el && rail.contains(el) ? '#' + m[1] + ' { display: none !important; }' : null;
+		}).filter(Boolean);
+		if (!rules.length) return;
+		var style = document.createElement('style');
+		style.id = 'ui-customization-styles';
+		style.textContent = rules.join('\n');
+		document.head.appendChild(style);
+	})();
 
 	// 2. URL-Präfix für Upstream-Pfade
 	function rewrite(url) {
@@ -520,6 +543,39 @@
 		releaseContent();
 		document.documentElement.classList.add('nextnotes-ready');
 	});
+
+	// 13a. Icon-Leiste: Zielseite bei Hover/Fokus vorladen (Speculation Rules, Nonce der Seite); nur App-Seiten gleicher Origin (GET ohne
+	// Seiteneffekte), Regel nach 30 s entfernt (Daten nicht veraltet)
+	(function () {
+		var rail = document.getElementById('icon_sidebar');
+		if (!rail || !window.HTMLScriptElement || !HTMLScriptElement.supports || !HTMLScriptElement.supports('speculationrules')) return;
+		var nonce = (document.currentScript && document.currentScript.nonce) || '';
+		var pending = {};
+		var timer = null;
+		function prefetch(link) {
+			var url;
+			try { url = new URL(link.href, window.location.href); } catch (e) { return; }
+			url.hash = '';
+			if (url.origin !== origin || (url.pathname.indexOf(baseUrl) !== 0 && url.pathname.indexOf(appPath) !== 0)) return;
+			if (url.href === window.location.href.split('#')[0] || pending[url.href]) return;
+			var rule = document.createElement('script');
+			rule.type = 'speculationrules';
+			if (nonce) rule.nonce = nonce;
+			rule.textContent = JSON.stringify({ prefetch: [{ source: 'list', urls: [url.href] }] });
+			document.head.appendChild(rule);
+			pending[url.href] = rule;
+			setTimeout(function () { rule.remove(); delete pending[url.href]; }, 30000);
+		}
+		function intent(e, delay) {
+			var link = e.target instanceof Element ? e.target.closest('a[href]') : null;
+			if (!link || !rail.contains(link)) return;
+			clearTimeout(timer);
+			timer = setTimeout(function () { prefetch(link); }, delay);
+		}
+		rail.addEventListener('pointerover', function (e) { intent(e, 60); });
+		rail.addEventListener('pointerout', function () { clearTimeout(timer); });
+		rail.addEventListener('focusin', function (e) { intent(e, 0); });
+	})();
 
 	// 14. Upstream-t() schon vor globals.js (B54): Skripte mit `tr = window.t || …` beim Laden fingen sonst NC-t(app, text) ein
 	var ncT = typeof window.t === 'function' ? window.t : null;

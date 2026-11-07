@@ -1,84 +1,168 @@
 // SPDX-FileCopyrightText: 2026 Thomas Weissel
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// M4h: Anti-Flicker-Regel #app-content (opacity 0 bis html.nextnotes-ready, CSS-Rückfall 2 s).
-// A) Normale Ladezeit: Phase „#app-content im DOM, opacity 0“ bis „nextnotes-ready“ < 1 s je Seite.
-// B) Info: Skript künstlich verzögert (Phase verlängert) → können Tab/Klick Elemente in unsichtbarem #app-content erreichen?
-//    Mit opacity (statt visibility) ja; gemeldet als INFO, nicht rot (Anforderung: kein Fokus/Klick ODER Phase < 1 s).
+// Anti-Flicker (M4h, UI-nav ADR 0019): nur der Inhalt (#right_pane, .nn-page-main, #outline-panel; Unterseiten ganz #nextnotes-root)
+// ist bis html.nextnotes-ready unsichtbar (opacity 0) und inert, Rückfall CSS/JS nach 2 s. Icon-Leiste und Seitenleiste sofort.
+// A) Normale Ladezeit: Phase „Inhalt im DOM, opacity 0“ bis „nextnotes-ready“ < 1 s je Seite, danach opacity 1 und nicht inert.
+// B) nextnotes-late.js künstlich verzögert (DOMContentLoaded/ready warten auf defer-Skripte), je index und tasks.php:
+//    B1 vor 2 s: Inhalt opacity 0 + inert, kein Fokus (Tab, focus()), kein Klick; Leisten sichtbar, nicht inert, per Klick/Tab erreichbar.
+//    B2 nach 2 s ohne ready: Rückfall, Inhalt opacity 1 und nicht inert (geprüft 2,8 s nach Erscheinen: JS-Timer startet mit dem Bootstrap).
+// Gegenprobe: AF_STRIP=css entfernt die CSS-Regel (Antwort umgeschrieben), AF_STRIP=js das inert im Bootstrap → B muss rot werden.
 import { runSpec } from './lib/harness.mjs';
+import { apiClient } from './lib/api.mjs';
 
 const PAGES = ['', '', '', 'diary.php', 'tasks.php', 'dashboard.php', 'settings.php', 'trash.php', 'list_tags.php', 'notes_manager.php'];
-const DELAY_MS = 1500;
+const DELAY_MS = 4500;
+const WAITING = '#nextnotes-root > :is(#right_pane, .nn-page-main, #outline-panel), #nextnotes-root:is(.nextnotes-subpage, .nextnotes-excalidraw)';
+const STRIP = process.env.AF_STRIP || '';
 
-const INIT = () => {
-	const s = { seen: null, opacityAtSeen: null, ready: null, dcl: null, clicks: [], focus: [] };
+const INIT = (sel) => {
+	const s = { seen: null, opacityAtSeen: null, ready: null, clicks: [], focus: [] };
 	window.__nnFlicker = s;
 	const check = () => {
 		if (s.seen === null) {
-			const el = document.getElementById('app-content');
+			const el = document.querySelector(sel);
 			if (el) { s.seen = performance.now(); s.opacityAtSeen = getComputedStyle(el).opacity; }
 		}
+		if (s.inertAt === undefined && document.querySelector(sel)?.inert) s.inertAt = performance.now();
 		if (s.ready === null && document.documentElement.classList.contains('nextnotes-ready')) s.ready = performance.now();
 	};
-	new MutationObserver(check).observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
-	document.addEventListener('DOMContentLoaded', () => { s.dcl = performance.now(); check(); }, true);
+	new MutationObserver(check).observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'inert'] });
 	const hidden = (t) => {
-		const ac = document.getElementById('app-content');
-		return !!(ac && t instanceof Node && ac.contains(t) && getComputedStyle(ac).opacity === '0');
+		if (!(t instanceof Element)) return false;
+		const w = [...document.querySelectorAll(sel)].find((el) => el.contains(t));
+		return !!(w && (getComputedStyle(w).opacity === '0' || !document.documentElement.classList.contains('nextnotes-ready')) && !s.released);
 	};
-	window.addEventListener('click', (e) => { if (hidden(e.target)) s.clicks.push(e.target.tagName + (e.target.id ? '#' + e.target.id : '')); }, true);
-	window.addEventListener('focusin', (e) => { if (hidden(e.target)) s.focus.push(e.target.tagName + (e.target.id ? '#' + e.target.id : '')); }, true);
+	const d = (t) => t.tagName + (t.id ? '#' + t.id : '');
+	window.addEventListener('click', (e) => { if (hidden(e.target)) s.clicks.push(d(e.target)); }, true);
+	window.addEventListener('focusin', (e) => { if (hidden(e.target)) s.focus.push(d(e.target)); }, true);
+};
+
+// Zustand der wartenden Inhaltsbereiche und der Leisten
+const STATE = (sel) => {
+	const vis = (el) => { for (let e = el; e; e = e.parentElement) if (getComputedStyle(e).opacity === '0') return false; return true; };
+	const waiting = [...document.querySelectorAll(sel)].map((el) => ({
+		d: el.tagName + (el.id ? '#' + el.id : '') + '.' + String(el.className).split(' ')[0],
+		op: getComputedStyle(el).opacity, pe: getComputedStyle(el).pointerEvents, inert: !!el.closest('[inert]'),
+		shown: el.getClientRects().length > 0 && getComputedStyle(el).display !== 'none',
+	}));
+	const bars = ['#icon_sidebar', '#left_col', '#header'].map((q) => document.querySelector(q)).filter(Boolean).map((el) => {
+		const r = el.getBoundingClientRect();
+		return { d: '#' + el.id, visible: vis(el) && r.width > 0 && r.height > 0, inert: !!el.closest('[inert]') };
+	});
+	return { ready: document.documentElement.classList.contains('nextnotes-ready'), waiting, bars, t: performance.now() - (window.__nnFlicker?.seen ?? 0) };
 };
 
 runSpec(import.meta.url, async (ctx, page, context) => {
-	await context.addInitScript(INIT);
-	// ab hier prüfen: die NC-Startseite nach der Anmeldung (Empfehlungs-Widget, Vorschau 404) gehört nicht zur App
+	await context.addInitScript(INIT, WAITING);
+	if (STRIP === 'css') {
+		ctx.info('Gegenprobe: Anti-Flicker-CSS-Regel entfernt');
+		await context.route(/\/nextnotes\/css\/nextnotes-layout\.css/, async (route) => {
+			const r = await route.fetch();
+			const body = (await r.text()).replace(/opacity:\s*0;\s*pointer-events:\s*none;\s*animation:\s*nextnotes-reveal[^;]*;/, '');
+			await route.fulfill({ response: r, body });
+		});
+	} else if (STRIP === 'js') {
+		ctx.info('Gegenprobe: inert im Bootstrap entfernt');
+		await context.route(/\/nextnotes\/js\/nextnotes-bootstrap\.js/, async (route) => {
+			const r = await route.fetch();
+			await route.fulfill({ response: r, body: (await r.text()).replace('el.inert=!0', 'el.inert=!1') });
+		});
+	}
+	const api = apiClient(ctx, page.request);
+	const WS = await api.defaultWorkspace();
+	const note = await api.note(WS, `Anti-Flicker ${Date.now()}`, null, '<p>Text</p><p><a href="https://example.org">Link</a></p>');
 	const m0 = ctx.mark();
 
 	// A) Phase je Seite
-	let indexUrl = null;
 	for (const p of PAGES) {
 		await page.goto(ctx.appUrl(p), { waitUntil: 'load' });
 		await page.waitForFunction(() => window.__nnFlicker?.ready !== null, null, { timeout: 15000 }).catch(() => {});
-		indexUrl ??= page.url();
 		const s = await page.evaluate(() => window.__nnFlicker);
 		const phase = s.seen !== null && s.ready !== null ? Math.round(s.ready - s.seen) : null;
-		const op = await page.evaluate(() => getComputedStyle(document.getElementById('app-content')).opacity);
-		ctx.ok(phase !== null && phase < 1000, `A ${p || 'index'}: Phase opacity 0 < 1 s`, `Phase ${phase} ms, opacity bei Erscheinen ${s.opacityAtSeen}, danach ${op}`);
-		console.log(`  INFO A ${p || 'index'}: seen ${Math.round(s.seen)} ms, ready ${Math.round(s.ready)} ms, Phase ${phase} ms`);
-		ctx.ok(op === '1', `A ${p || 'index'}: nach Start opacity 1`, `opacity ${op}`);
+		ctx.ok(phase !== null && phase < 1000, `A ${p || 'index'}: Phase bis ready < 1 s`, `Phase ${phase} ms, opacity bei Erscheinen ${s.opacityAtSeen}`);
+		await page.waitForTimeout(200); // Übergang 120 ms
+		const st = await page.evaluate(STATE, WAITING);
+		const bad = st.waiting.filter((w) => w.op !== '1' || w.inert || w.pe === 'none');
+		ctx.ok(st.waiting.length > 0 && bad.length === 0, `A ${p || 'index'}: nach Start Inhalt sichtbar, bedienbar`, JSON.stringify(st.waiting));
 	}
 
-	// B) verlängerte Phase: nextnotes-late/-app um DELAY_MS verzögern (DOMContentLoaded wartet auf defer-Skripte)
-	let hits = 0;
-	await page.route(/\/nextnotes\/js\/nextnotes-late\.js/, async (route) => { hits++; await new Promise((r) => setTimeout(r, DELAY_MS)); await route.continue(); });
-	console.log(`  INFO B URL ${indexUrl}`);
-	const nav = page.goto(indexUrl, { waitUntil: 'load' });
-	await page.waitForFunction(() => {
-		const el = document.getElementById('app-content');
-		return el && document.querySelector('#app-content .note-title, #app-content button, #app-content a') && getComputedStyle(el).opacity === '0';
-	}, null, { timeout: 10000, polling: 20 });
-	const t0 = Date.now();
-	for (let i = 0; i < 15; i++) await page.keyboard.press('Tab');
-	const target = await page.evaluate(() => {
-		const el = [...document.querySelectorAll('#app-content button, #app-content [data-action]:not(a)')].find((e) => { const r = e.getBoundingClientRect(); return r.width > 4 && r.height > 4 && r.top > 0 && r.top < innerHeight; });
-		if (!el) return null;
-		const r = el.getBoundingClientRect();
-		return { x: r.left + r.width / 2, y: r.top + r.height / 2, d: el.tagName + (el.id ? '#' + el.id : '') + (el.className ? '.' + String(el.className).split(' ')[0] : '') };
-	});
-	let navs = 0;
-	page.on('framenavigated', (f) => { if (f === page.mainFrame()) navs++; });
-	const pre = await page.evaluate(() => ({ focus: [...window.__nnFlicker.focus], active: document.activeElement?.tagName + (document.activeElement?.id ? '#' + document.activeElement.id : ''), op: getComputedStyle(document.getElementById('app-content')).opacity }));
-	console.log(`  INFO B nach 15× Tab: activeElement ${pre.active}, opacity ${pre.op}, Fokus in unsichtbarem #app-content ${pre.focus.length} (${pre.focus.slice(0, 5).join(', ')})`);
-	if (target) await page.mouse.click(target.x, target.y);
-	const stillHidden = await page.evaluate(() => getComputedStyle(document.getElementById('app-content')).opacity === '0').catch(() => 'Navigation');
-	console.log(`  INFO B Navigationen nach Klick: ${navs}, verzögerte Skriptabrufe: ${hits}`);
-	const elapsed = Date.now() - t0;
-	await nav;
-	const s = await page.evaluate(() => window.__nnFlicker);
-	console.log(`  INFO B (Skript +${DELAY_MS} ms): Phase ${Math.round(s.ready - s.seen)} ms; Interaktion in ${elapsed} ms, danach noch opacity 0: ${stillHidden}`);
-	console.log(`  INFO B Fokus in unsichtbarem #app-content: ${s.focus.length} (${s.focus.slice(0, 5).join(', ')})`);
-	console.log(`  INFO B Klick in unsichtbarem #app-content: ${s.clicks.length} (${s.clicks.join(', ')}) Ziel ${target?.d ?? '-'}`);
-	await page.unroute(/\/nextnotes\/js\/nextnotes-late\.js/);
-	ctx.ok(true, 'B ausgeführt (Information)');
+	// B) verlängerte Phase je Seitentyp
+	for (const p of ['', 'tasks.php']) {
+		const label = `B ${p || 'index'}`;
+		const url = ctx.appUrl(p || `index.php?workspace=${encodeURIComponent(WS)}&note=${note}`);
+		const re = /\/nextnotes\/js\/nextnotes-late\.js/;
+		await page.route(re, async (route) => { await new Promise((r) => setTimeout(r, DELAY_MS)); await route.continue().catch(() => {}); });
+		const nav = page.goto(url, { waitUntil: 'load', timeout: 30000 });
+		await page.waitForFunction((sel) => document.querySelector(sel) && document.querySelector('#icon_sidebar .icon-sidebar-btn')
+			&& document.querySelector(`:is(${sel}) :is(button, a, input, [tabindex])`), WAITING, { timeout: 10000, polling: 20 });
+		await page.waitForTimeout(150);
+
+		// B1 vor dem Rückfall
+		const st = await page.evaluate(STATE, WAITING);
+		ctx.info(`${label} t=${Math.round(st.t)} ms ready=${st.ready} waiting=${JSON.stringify(st.waiting)} bars=${JSON.stringify(st.bars)}`);
+		ctx.ok(!st.ready && st.t < 1700, `${label}: Messung in der Wartephase (vor ready, vor 2 s)`, `ready ${st.ready}, t ${Math.round(st.t)} ms`);
+		ctx.ok(st.waiting.length > 0 && st.waiting.every((w) => w.op === '0'), `${label}: Inhalt unsichtbar (opacity 0)`, JSON.stringify(st.waiting));
+		ctx.ok(st.waiting.length > 0 && st.waiting.every((w) => w.inert), `${label}: Inhalt inert`, JSON.stringify(st.waiting));
+		const rail = st.bars.find((b) => b.d === '#icon_sidebar');
+		ctx.ok(rail?.visible && !rail.inert, `${label}: Icon-Leiste sofort sichtbar, nicht inert`, JSON.stringify(rail));
+		if (!p) {
+			const side = st.bars.find((b) => b.d === '#left_col');
+			ctx.ok(side?.visible && !side.inert, `${label}: Seitenleiste sofort sichtbar, nicht inert`, JSON.stringify(side));
+		}
+
+		// programmatischer Fokus und Trefferprüfung auf Inhalt bzw. Leiste
+		const probe = await page.evaluate((sel) => {
+			const inContent = (el) => [...document.querySelectorAll(sel)].some((w) => w.contains(el));
+			const visibleIn = (root, q) => [...root.querySelectorAll(q)].find((e) => { const r = e.getBoundingClientRect(); return r.width > 4 && r.height > 4 && r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth; });
+			const ctl = [...document.querySelectorAll(sel)].map((w) => visibleIn(w, 'button, a[href], input, [tabindex]:not([tabindex="-1"])')).find(Boolean);
+			let focusOk = null, hitContent = null, pt = null;
+			if (ctl) {
+				ctl.focus();
+				focusOk = document.activeElement !== ctl;
+				const r = ctl.getBoundingClientRect();
+				pt = { x: r.left + r.width / 2, y: r.top + r.height / 2, d: ctl.tagName + (ctl.id ? '#' + ctl.id : '') };
+				const hit = document.elementFromPoint(pt.x, pt.y);
+				hitContent = !!hit && inContent(hit);
+			}
+			const btn = visibleIn(document.getElementById('icon_sidebar'), '.icon-sidebar-btn');
+			let railHit = null;
+			if (btn) { const r = btn.getBoundingClientRect(); const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); railHit = !!h && (btn === h || btn.contains(h)); }
+			return { focusOk, hitContent, pt, railHit };
+		}, WAITING);
+		ctx.ok(probe.pt !== null, `${label}: Bedienelement im wartenden Inhalt gefunden`, JSON.stringify(probe));
+		ctx.ok(probe.focusOk === true, `${label}: focus() auf Inhalt wirkungslos`, JSON.stringify(probe));
+		ctx.ok(probe.hitContent === false, `${label}: Klickpunkt trifft nicht den Inhalt`, JSON.stringify(probe));
+		ctx.ok(probe.railHit === true, `${label}: Klickpunkt Icon-Leiste trifft die Schaltfläche`, JSON.stringify(probe));
+
+		// Tastatur: Fokus nie im Inhalt, aber Leisten erreichbar
+		await page.evaluate(() => document.activeElement?.blur());
+		const reached = new Set();
+		for (let i = 0; i < 25; i++) {
+			await page.keyboard.press('Tab');
+			reached.add(await page.evaluate(() => {
+				const a = document.activeElement;
+				return a?.closest('#icon_sidebar') ? 'rail' : a?.closest('#left_col') ? 'sidebar' : a?.closest('#header') ? 'header' : 'other';
+			}));
+		}
+		const mid = await page.evaluate(STATE, WAITING);
+		ctx.ok(!mid.ready, `${label}: Tab-Lauf in der Wartephase`, `t ${Math.round(mid.t)} ms`);
+		ctx.ok(reached.has('rail'), `${label}: Icon-Leiste per Tab erreichbar`, [...reached].join(','));
+		if (probe.pt) await page.mouse.click(probe.pt.x, probe.pt.y);
+		const s1 = await page.evaluate(() => window.__nnFlicker);
+		ctx.ok(s1.focus.length === 0, `${label}: kein Fokus im wartenden Inhalt`, s1.focus.slice(0, 5).join(', '));
+		ctx.ok(s1.clicks.length === 0, `${label}: kein Klick im wartenden Inhalt`, s1.clicks.join(', '));
+
+		// B2 Rückfall nach 2 s (ready noch aus)
+		await page.waitForFunction(() => performance.now() - window.__nnFlicker.seen > 2800, null, { timeout: 5000, polling: 50 });
+		const fb = await page.evaluate(STATE, WAITING);
+		ctx.info(`${label} inert gesetzt ${Math.round(s1.inertAt - s1.seen)} ms nach Erscheinen des Inhalts (Bootstrap-Start; Rückfall-Timer ab dort)`);
+		ctx.info(`${label} Rückfall t=${Math.round(fb.t)} ms ready=${fb.ready} waiting=${JSON.stringify(fb.waiting)}`);
+		ctx.ok(!fb.ready, `${label}: Rückfall-Messung vor ready`, `t ${Math.round(fb.t)} ms`);
+		// nicht gerenderte Bereiche (z. B. eingeklappte Gliederung, display none) laufen keine Animation; nur sichtbare zählen
+		ctx.ok(fb.waiting.some((w) => w.shown) && fb.waiting.filter((w) => w.shown).every((w) => w.op === '1' && !w.inert && w.pe !== 'none'), `${label}: Rückfall nach 2 s sichtbar und bedienbar`, JSON.stringify(fb.waiting));
+
+		await nav;
+		await page.unroute(re);
+	}
 	ctx.assertClean('anti-flicker gesamt', m0);
 });

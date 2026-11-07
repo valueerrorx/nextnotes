@@ -41,7 +41,7 @@ class IndexViewService {
 	// Upstream index.php:267-302 (nur Werte, die der Rahmen braucht)
 	private const DEFAULTS = [
 		'note_font_size' => '15',
-		'sidebar_font_size' => '13',
+		'sidebar_font_size' => '15',
 		'center_note_content' => '0',
 		'show_note_created' => '1', // Upstream-DB setzt '1' bei Anlage (db_connect.php:584); Unterzeile mit Info-Knopf
 		'show_note_icons' => '1',
@@ -770,7 +770,7 @@ class IndexViewService {
 		$fontSize = static fn (string $v, string $d) => (ctype_digit($v) && (int)$v >= 8 && (int)$v <= 40 ? (int)$v : (int)$d) . 'px';
 		$rootStyle = [
 			'--note-font-size' => $fontSize($this->value($uid, 'note_font_size'), '15'),
-			'--sidebar-font-size' => $fontSize($this->value($uid, 'sidebar_font_size'), '13'),
+			'--sidebar-font-size' => $fontSize($this->value($uid, 'sidebar_font_size'), '15'),
 			'--note-max-width' => $maxWidth,
 		];
 		$mode = $this->value($uid, 'markdown_default_view_mode');
