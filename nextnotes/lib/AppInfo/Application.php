@@ -14,6 +14,7 @@ use OCA\NextNotes\Middleware\ApiExceptionMiddleware;
 use OCA\NextNotes\Middleware\InputEncodingMiddleware;
 use OCA\NextNotes\Notification\Notifier;
 use OCA\NextNotes\Search\NotesProvider;
+use OCA\NextNotes\Teams\WorkspaceResourceProvider;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
@@ -34,6 +35,7 @@ class Application extends App implements IBootstrap {
 		$context->registerSearchProvider(NotesProvider::class);
 		$context->registerNotifierService(Notifier::class);
 		$context->registerEventListener(UserDeletedEvent::class, UserDeletedListener::class);
+		$context->registerTeamResourceProvider(WorkspaceResourceProvider::class);
 	}
 
 	public function boot(IBootContext $context): void {

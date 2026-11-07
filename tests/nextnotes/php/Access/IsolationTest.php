@@ -163,6 +163,8 @@ final class IsolationTest extends ApiTestCase {
 			'DELETE /trash/{}' => ['owned', 'cases' => [['path' => '/trash/{n3}', 'query' => $wsQ, 'body' => [], 'hints' => $hq]]],
 			// Workspaces
 			'GET /workspaces' => ['scoped', 'path' => '/workspaces', 'sees' => 'ws'],
+			// M5a: Teams des Aufrufers (ohne Objekt-ID); Team-Rechte prüfen Teams/TeamAccessTest
+			'GET /teams' => ['scoped', 'path' => '/teams', 'sees' => null],
 			'POST /workspaces' => ['scoped-write', 'path' => '/workspaces', 'body' => ['name' => 'Neu Iso'], 'reason' => 'keine Objekt-ID; legt nur bei B an'],
 			'PATCH /workspaces/{}' => ['owned', 'cases' => [['path' => '/workspaces/{ws}', 'body' => ['new_name' => 'Umbenannt Iso']]]],
 			'DELETE /workspaces/{}' => ['owned', 'cases' => [['path' => '/workspaces/{ws}', 'body' => []]]],
@@ -440,7 +442,7 @@ final class IsolationTest extends ApiTestCase {
 			}
 		}
 		self::assertSame([], $errors);
-		self::assertCount(118, $table);
+		self::assertCount(119, $table);
 	}
 
 	public function testDetectorsObject(): void {

@@ -482,6 +482,38 @@ class NoteMapper extends QBMapper {
 			->executeStatement();
 	}
 
+	/**
+	 * Autor und Rolle der Notizen, die einen Workspace verlassen würden (jede Rolle, auch Papierkorb; requireLeave)
+	 * @param int[]|null $folderIds null = ganzer Workspace
+	 * @param int[]|null $noteIds null = ohne Einschränkung
+	 * @return list<array{created_by: ?string, role: string}>
+	 */
+	public function leaveRows(int $workspaceId, ?array $folderIds = null, ?array $noteIds = null): array {
+		$qb = $this->db->getQueryBuilder();
+		$expr = $qb->expr();
+		$qb->selectDistinct(['created_by', 'role'])->from(self::TABLE)
+			->where($expr->eq('workspace_id', $qb->createNamedParameter($workspaceId, IQueryBuilder::PARAM_INT)));
+		$limits = [];
+		if ($folderIds !== null && $folderIds !== []) {
+			$limits[] = $expr->in('folder_id', $qb->createNamedParameter(array_values(array_unique($folderIds)), IQueryBuilder::PARAM_INT_ARRAY));
+		}
+		if ($noteIds !== null && $noteIds !== []) {
+			$limits[] = $expr->in('id', $qb->createNamedParameter(array_values(array_unique($noteIds)), IQueryBuilder::PARAM_INT_ARRAY));
+		}
+		if ($limits !== []) {
+			$qb->andWhere($expr->orX(...$limits));
+		} elseif ($folderIds !== null || $noteIds !== null) {
+			return [];
+		}
+		$res = $qb->executeQuery();
+		$out = [];
+		while ($row = $res->fetch()) {
+			$out[] = ['created_by' => $row['created_by'] === null ? null : (string)$row['created_by'], 'role' => (string)$row['role']];
+		}
+		$res->closeCursor();
+		return $out;
+	}
+
 	/** @return int[] alle Notiz-IDs eines Workspace (jede Rolle, auch Papierkorb) */
 	public function idsInWorkspace(int $workspaceId): array {
 		$qb = $this->db->getQueryBuilder();

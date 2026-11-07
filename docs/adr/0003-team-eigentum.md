@@ -30,3 +30,11 @@ Option 2:
 - Abhängigkeit auf Circles-Klassen außerhalb OCP; alle Aufrufe nur im Adapter, mit `class_exists`-Prüfung. Bricht Circles die API, ist nur eine Datei betroffen.
 - Jeder Request mit Team-Workspaces fragt Circles (gecacht pro Request). Leistung bei vielen Teams in M5 messen.
 - Austeilen/Einsammeln (SPEC §9) nutzt dieselben Levels: ≥ 4 Lehrkraft, = 1 Schüler.
+
+## Nachtrag M5a (2026-11-07)
+- Probe-Befund (Plan M5 §0): `removeMember` → `MembershipsRemovedEvent` synchron; `CircleDestroyedEvent` läuft über den Circles-Loopback (`asyncBroadcast`), daher bleibt der Rückfall `CleanupJob`/`orphan-check` maßgeblich (M5b/M5c).
+- Mitgliedschaft über `CirclesManager::probeCircles` mit eigener Probe statt `ITeamManager::getTeamsForUser` (Kern-Standardprobe); Level über `CirclesManager::getLink`. Jeder Circles-Aufruf in eigener Sitzung mit `stopSession` im `finally` (der Kern-`TeamManager` lässt Sitzungen offen). Circles-Fehler → für diesen Request kein Recht, Log `warning`, nie Zustandsänderung; `exists()` (ohne Probe-Regel) lädt den Kreis mit dem Owner als Initiator (`CirclesManager::startOccSession('', TYPE_SINGLE, teamId)`), nicht über `ITeamManager::getTeam` (findet Kreise nicht, wenn Circles im Prozess eine App-Sitzung gesetzt hat, SPEC §14); „fehlt“ nur bei der Circles-Meldung „keine Zeile“, föderierte/fremd verwaltete Kreise, Fehler und Circles aus → `TeamUnavailableException` (nie verwaisen). Vorherige Circles-Sitzung wird danach wiederhergestellt.
+- Probe-Regel: versteckte, Backend-, persönliche und Einzel-Kreise zählen nie als Team (SPEC §3).
+- Verlassen-Regel (Thomas, 2026-11-07): Team-Inhalte verlassen den Team-Workspace nur ins selbe Team oder als eigene Notiz in den eigenen privaten Workspace; eine Prüfstelle `AccessService::requireLeave` (SPEC §3). Ausnahme „In privat umwandeln“ (M5b): übernimmt alle Notizen aller früheren Mitglieder.
+- Teilen gilt nur für Benutzer-Workspaces; Freigabezeilen auf Team-Workspaces verleihen nichts (ADR 0014).
+

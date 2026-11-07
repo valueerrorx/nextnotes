@@ -25,7 +25,8 @@ class SettingsService {
 	// Upstream-Global-, Geheim- und Funktionsschlüssel gestrichener Funktionen
 	private const BLOCKED = ['hidden_ui_elements_global', 'login_display_name', 'discussions_url', 'discord_url', 'custom_css_path',
 		'theme_list', 'allow_executable_attachments', 'login_disabled', 'two_factor_required', 'outbound_allowed_hosts',
-		'whats_new_seen_version', 'schema_version', 'user_profile_username', 'language_source', 'snapshots_expiry_sweep_at'];
+		'whats_new_seen_version', 'schema_version', 'user_profile_username', 'language_source', 'snapshots_expiry_sweep_at',
+		WorkspaceService::FOREIGN_ORDER_KEY];
 	private const BLOCKED_PREFIXES = ['git_', 'github_', 'ai_', 'stt_', 'smtp_', 'mcp_', 'admin_', 'offline_', 'tenant_',
 		'user_max_', 'import_max_', 'login_', 'two_factor', 'webhook', 'push_', 'backup', ...BackgroundFiles::OPACITY_PREFIXES];
 	// Werte aus Nextcloud bzw. vom Server geführt, über die API nur lesbar

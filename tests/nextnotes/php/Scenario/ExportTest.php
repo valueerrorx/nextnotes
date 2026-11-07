@@ -275,6 +275,8 @@ final class ExportTest extends ApiTestCase {
 			return $inner->getStats()['executed'] - $before;
 		};
 		$count($without);
+		// Schlüssel des Workspaces (einmal je Request, nicht je Referenz) vorab berechnen
+		Server::get(\OCA\NextNotes\Service\WorkspaceService::class)->keyFor($a->uid, (int)Server::get(\OCA\NextNotes\Db\NoteMapper::class)->find($with)->getWorkspaceId());
 		$base = $count($without);
 		$many = $count($with);
 		self::assertLessThanOrEqual(3, $many - $base, "50 Referenzen: $many statt $base Abfragen");

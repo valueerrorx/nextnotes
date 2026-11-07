@@ -89,6 +89,35 @@ class AttachmentMapper extends QBMapper {
 		return $sum;
 	}
 
+	/**
+	 * Anhangsgröße der Notizen, die einen Workspace verlassen (Auswahl wie NoteMapper::leaveRows; Quote bei Besitzerwechsel)
+	 * @param int[]|null $folderIds null = ganzer Workspace
+	 * @param int[]|null $noteIds
+	 */
+	public function sizeLeaving(int $workspaceId, ?array $folderIds = null, ?array $noteIds = null): int {
+		$qb = $this->db->getQueryBuilder();
+		$expr = $qb->expr();
+		$qb->select($qb->func()->sum('a.size'))->from(self::TABLE, 'a')
+			->innerJoin('a', NoteMapper::TABLE, 'n', $expr->eq('n.id', 'a.note_id'))
+			->where($expr->eq('n.workspace_id', $qb->createNamedParameter($workspaceId, IQueryBuilder::PARAM_INT)));
+		$limits = [];
+		if ($folderIds !== null && $folderIds !== []) {
+			$limits[] = $expr->in('n.folder_id', $qb->createNamedParameter(array_values(array_unique($folderIds)), IQueryBuilder::PARAM_INT_ARRAY));
+		}
+		if ($noteIds !== null && $noteIds !== []) {
+			$limits[] = $expr->in('n.id', $qb->createNamedParameter(array_values(array_unique($noteIds)), IQueryBuilder::PARAM_INT_ARRAY));
+		}
+		if ($limits !== []) {
+			$qb->andWhere($expr->orX(...$limits));
+		} elseif ($folderIds !== null || $noteIds !== null) {
+			return 0;
+		}
+		$res = $qb->executeQuery();
+		$sum = (int)$res->fetchOne();
+		$res->closeCursor();
+		return $sum;
+	}
+
 	/** @param int[] $noteIds */
 	public function deleteForNotes(array $noteIds): void {
 		foreach (array_chunk(array_values(array_unique($noteIds)), 1000) as $chunk) {

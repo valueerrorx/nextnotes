@@ -30,6 +30,7 @@ use OCA\NextNotes\Service\View\PageFrameService;
 use OCA\NextNotes\Service\View\PageTranslator;
 use OCA\NextNotes\Service\View\SettingsViewService;
 use OCA\NextNotes\Service\View\SpeedDialViewService;
+use OCA\NextNotes\Service\TeamService;
 use OCA\NextNotes\Service\View\TagListViewService;
 use OCA\NextNotes\Service\View\TrashViewService;
 use OCP\App\IAppManager;
@@ -72,6 +73,7 @@ class PageController extends Controller {
 		private SpeedDialViewService $speedDialView,
 		private MentionService $mentions,
 		private SettingsViewService $settingsView,
+		private TeamService $teams,
 	) {
 		parent::__construct(Application::APP_ID, $request);
 	}
@@ -144,7 +146,7 @@ class PageController extends Controller {
 			'uid' => $uid,
 			'displayName' => $this->userSession->getUser()?->getDisplayName() ?? '',
 			'lang' => $lang,
-			'teamsAvailable' => false, // M5
+			'teamsAvailable' => $this->teams->isAvailable(),
 			'excalidrawAssetPath' => $assetBase . '/js/vendor/excalidraw-dist/',
 			'allowedIframeDomains' => $this->embedDomains->domains(),
 		] + $extra);

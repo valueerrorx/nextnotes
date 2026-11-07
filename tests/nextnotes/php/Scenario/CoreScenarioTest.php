@@ -382,7 +382,8 @@ final class CoreScenarioTest extends ApiTestCase {
 				}
 			}
 		}
-		self::assertSame([], $missing, 'Routen ohne Upstream-Fixture');
+		// Port-eigene Routen ohne Upstream-Gegenstück (RouteDiffTest::PORT_ONLY)
+		self::assertSame([], array_values(array_diff($missing, ['GET /teams'])), 'Routen ohne Upstream-Fixture');
 	}
 
 	// Detektor-Selbsttest: fehlende/zusätzliche Schlüssel werden erkannt, Zahlen-Schlüssel ignoriert

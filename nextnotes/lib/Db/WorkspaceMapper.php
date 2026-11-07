@@ -100,6 +100,70 @@ class WorkspaceMapper extends QBMapper {
 		return $out;
 	}
 
+	// Workspaces eines Besitzers (user oder team), optional gefiltert nach kind und Name
+	/** @return Workspace[] */
+	public function findByOwner(string $ownerType, string $ownerId, ?string $kind = null, ?string $name = null): array {
+		if ($ownerType === 'user') {
+			return $this->findOwned($ownerId, $kind, $name);
+		}
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')->from(self::TABLE)
+			->where($qb->expr()->eq('owner_type', $qb->createNamedParameter($ownerType)))
+			->andWhere($qb->expr()->eq('owner_id', $qb->createNamedParameter($ownerId)))
+			->orderBy('id', 'ASC');
+		if ($kind !== null) {
+			$qb->andWhere($qb->expr()->eq('kind', $qb->createNamedParameter($kind)));
+		}
+		if ($name !== null) {
+			$qb->andWhere($qb->expr()->eq('name', $qb->createNamedParameter($name)));
+		}
+		return $this->findEntities($qb);
+	}
+
+	/**
+	 * Team-Workspaces mit Recht für $uid in einer Abfrage (SPEC §3): Mitglied eines aktiven Teams → write; created_by bei verwaistem Team → read.
+	 * Ohne Teams-App ($available false) zählt nur created_by (eingefroren).
+	 * @param string[] $teamIds Teams mit Mitgliedschaft (TeamService::memberTeams)
+	 * @return array<int, string> workspace_id => write|read
+	 */
+	public function teamAccess(string $uid, array $teamIds, bool $available): array {
+		$out = [];
+		$chunks = $teamIds === [] ? [[]] : array_chunk(array_values(array_unique($teamIds)), 1000);
+		foreach ($chunks as $chunk) {
+			$members = array_flip($chunk);
+			$qb = $this->db->getQueryBuilder();
+			$expr = $qb->expr();
+			$qb->select('w.id', 'w.owner_id', 'w.created_by', 't.state')->from(self::TABLE, 'w')
+				->leftJoin('w', TeamMapper::TABLE, 't', $expr->eq('t.team_id', 'w.owner_id'))
+				->where($expr->eq('w.owner_type', $qb->createNamedParameter('team')));
+			$byCreator = $expr->eq('w.created_by', $qb->createNamedParameter($uid));
+			if ($available && $chunk !== []) {
+				$qb->andWhere($expr->orX($expr->in('w.owner_id', $qb->createNamedParameter($chunk, IQueryBuilder::PARAM_STR_ARRAY)), $byCreator));
+			} else {
+				$qb->andWhere($byCreator);
+			}
+			$res = $qb->executeQuery();
+			while ($row = $res->fetch()) {
+				$id = (int)$row['id'];
+				$orphaned = $row['state'] === 'orphaned';
+				if (!$available || $orphaned) {
+					if ($row['created_by'] === $uid) {
+						$out[$id] = 'read';
+					}
+				} elseif (isset($members[(string)$row['owner_id']])) {
+					$out[$id] = 'write';
+				}
+			}
+			$res->closeCursor();
+		}
+		return $out;
+	}
+
+	/** @return Workspace[] Team-Workspaces eines Teams (ITeamResourceProvider) */
+	public function findForTeam(string $teamId): array {
+		return $this->findByOwner('team', $teamId, 'normal');
+	}
+
 	public function deleteById(int $id): void {
 		$qb = $this->db->getQueryBuilder();
 		$qb->delete(self::TABLE)

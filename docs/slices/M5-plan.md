@@ -139,6 +139,7 @@ Reihenfolge = Tabelle. M5b braucht M5a (Zustand, Adapter); M5c braucht M5b (Zust
 
 ### M5c – CleanupJob, orphan-check, verwaiste Dateien
 **App**: `BackgroundJob/CleanupJob.php` (`info.xml`), `Service/TeamCleanupService.php`, `Command/TeamOrphanCheck.php` (`info.xml` `<commands>`), Schritt verwaiste Dateien (§2.6).
+**Hinweis M5a-r1**: Existenz nur über `TeamService::exists()`; `TeamUnavailableException` (Circles aus, Fehler, föderiert/fremd verwaltet, unbekannte Meldung) zählt nie als „fehlt“.
 **Done M5c**
 1. Team ohne Event gelöscht (Circles währenddessen deaktiviert, dann aktiviert): `orphan-check --dry-run` listet es, ändert nichts; erster Joblauf `missing_count=1`, zweiter `orphaned`; Lauf mit deaktiviertem Circles bzw. Fehler zählt nicht hoch; „vorhanden“ setzt 0 (Krit. 7).
 2. Gemockte Zeit: Tag 23 → genau eine `team_deletion_soon`; Tag 30 → Team-Workspaces samt Notizen, Anhängen (DB + `IAppData`), Snapshots, Erinnerungen, Hintergründen, Team-Zeile weg; vorher umgewandelter Workspace bleibt (Krit. 4 Rest). Zweiter Lauf ohne Wirkung.
@@ -152,6 +153,7 @@ Reihenfolge = Tabelle. M5b braucht M5a (Zustand, Adapter); M5c braucht M5b (Zust
 
 ### M5d – Oberfläche: Freigaben, Team-Workspaces, Erwähnungen, Farben
 **App**: `CompatController` (share/unshare, `make_private` falls dort), `UsersApiController::search` (`GET /api/v1/users/search`), `templates/partials/{modals,settings_modals}.php`, `IndexViewService`/`SettingsViewService` (Team-Kennzeichen, Banner), `MentionService` (§2.7), `NotePalette` (R16), Adapter (`nextnotes-late.js`) falls nötig; `src/`: P30 (`workspaces-share.js`), ggf. P31 (`workspaces-create.js`), ggf. Erstellen-Menü-Fix.
+**Hinweis M5a-r1**: `TeamService::members()` prüft keine Rechte des Aufrufers → vorher `read` am Team-Workspace (bzw. Mitgliedschaft) prüfen.
 **Done M5d**
 0. Richtlinie (PHPUnit, BLOCKER 1): `share_workspace` per Hand-Request mit (a) unbekannter UID, (b) UID außerhalb der Gruppe bei `shareapi_only_share_with_group_members=yes`, (c) Akteur in `shareapi_exclude_groups`, (d) `shareapi_enabled=no` → jeweils gleiche Antwort 400 `Invalid share target`, keine Zeile; erlaubtes Ziel → 200. Bestehender Empfänger nach Wechsel auf (b): Rechteänderung und `unshare` → 200. Suche liefert in (b)–(d) und (e) Enumeration aus bei unvollständigem Namen keine Treffer ((e) nur Suche, `share()` nennt immer die volle UID); Antwort ohne E-Mail; 31. Suche in 60 s → 429 (H5).
 1. Freigabe (E2E Hell/Dunkel): A sucht „car“ → Treffer carol; teilt mit C (bearbeiten) → C sieht/schreibt; ändert auf lesen → C Nur-Lesen; Freigabe aufheben → C 404 (Krit. 5). Kein Request auf `/users/profiles`.

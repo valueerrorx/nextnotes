@@ -58,6 +58,7 @@ class AttachmentService {
 		private FileCleanupQueue $cleanup,
 		private IAppData $appData,
 		private IAppConfig $appConfig,
+		private QuotaService $quota,
 		private IMimeTypeDetector $mimeDetector,
 		private ITimeFactory $time,
 	) {
@@ -141,29 +142,16 @@ class AttachmentService {
 	}
 
 	/**
-	 * Quota beim Workspace-Besitzer (Thomas; Team-Workspaces bis M5 einzeln). Vor der Transaktion: Besitzer lesen, Vorprüfung ohne Sperre
+	 * Quote beim Workspace-Besitzer (QuotaService; Team-Workspaces je Team)
 	 * @return array{type: string, id: string, ws: int, bytes: int}|null null = nichts zu prüfen
 	 */
 	public function quotaFor(int $workspaceId, int $bytes): ?array {
-		if ($bytes <= 0) {
-			return null;
-		}
-		$ws = $this->workspaceMapper->find($workspaceId);
-		$quota = ['type' => (string)$ws->getOwnerType(), 'id' => (string)$ws->getOwnerId(), 'ws' => (int)$ws->getId(), 'bytes' => $bytes];
-		$this->checkQuotaSum($quota);
-		return $quota;
+		return $this->quota->quotaFor($workspaceId, $bytes);
 	}
 
-	/**
-	 * Erste Anweisung der Transaktion: Besitzer sperren (SQLite: Schreibsperre vor jedem Lesen), dann unter Sperre erneut prüfen
-	 * @param array{type: string, id: string, ws: int, bytes: int}|null $quota
-	 */
+	/** @param array{type: string, id: string, ws: int, bytes: int}|null $quota */
 	public function enforceQuota(?array $quota): void {
-		if ($quota === null) {
-			return;
-		}
-		$this->workspaceMapper->lockOwner($quota['type'], $quota['id']);
-		$this->checkQuotaSum($quota);
+		$this->quota->enforce($quota);
 	}
 
 	/**
@@ -174,20 +162,8 @@ class AttachmentService {
 		$wsIds = array_map(static fn ($w) => (int)$w->getId(), $this->workspaceMapper->findOwned($uid));
 		return [
 			'used' => $wsIds === [] ? 0 : $this->attachments->sizeInWorkspaces($wsIds),
-			'limit' => $this->appConfig->getValueInt(Application::APP_ID, 'attachment_quota_mb', self::DEFAULT_QUOTA_MB) * self::MB,
+			'limit' => $this->quota->limit(),
 		];
-	}
-
-	/** @param array{type: string, id: string, ws: int, bytes: int} $quota */
-	private function checkQuotaSum(array $quota): void {
-		$limit = $this->appConfig->getValueInt(Application::APP_ID, 'attachment_quota_mb', self::DEFAULT_QUOTA_MB) * self::MB;
-		$wsIds = [$quota['ws']];
-		if ($quota['type'] === 'user') {
-			$wsIds = array_map(static fn ($w) => (int)$w->getId(), $this->workspaceMapper->findOwned($quota['id']));
-		}
-		if ($this->attachments->sizeInWorkspaces($wsIds) + $quota['bytes'] > $limit) {
-			throw new TooLargeException('Storage quota exceeded');
-		}
 	}
 
 	// Upstream poznoteValidateAttachmentFilename
@@ -414,10 +390,13 @@ class AttachmentService {
 		if ($target->getLinkedNoteId() !== null) {
 			throw new BadRequestException('A shortcut cannot hold attachments of its own');
 		}
-		// Inhalte verlassen einen Workspace nur mit manage auf der Quelle (B17)
-		if ($target->getWorkspaceId() !== $source->getWorkspaceId()) {
-			$this->access->requireWorkspace($uid, (int)$source->getWorkspaceId(), 'manage');
-		}
+		// Verlassen-Regel (B17, Plan M5 §2.2): zählt created_by der Quellnotiz; auch im selben Workspace gegen Abgaben/Vorlagen geprüft
+		$this->access->requireLeave($uid, new LeaveRequest(
+			$this->access->requireWorkspace($uid, (int)$source->getWorkspaceId(), 'write'),
+			$this->access->requireWorkspace($uid, (int)$target->getWorkspaceId(), 'write'),
+			LeaveRequest::ATTACHMENT,
+			[$noteId],
+		));
 		// Noch im Quellinhalt verwendet → Kopie, sonst verschieben
 		$keep = self::referenced((string)$source->getContent(), $noteId, $attachmentId);
 		$needsQuota = $keep || $target->getWorkspaceId() !== $source->getWorkspaceId();

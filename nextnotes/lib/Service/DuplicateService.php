@@ -136,11 +136,10 @@ class DuplicateService {
 				$wsId = (int)$folder->getWorkspaceId();
 			}
 		}
-		$this->access->requireWorkspace($uid, $wsId, 'write');
-		// Kopie in einen anderen Workspace = Inhalt verlässt die Quelle (B17)
-		if ($wsId !== $src->getWorkspaceId()) {
-			$this->access->requireWorkspace($uid, (int)$src->getWorkspaceId(), 'manage');
-		}
+		$target = $this->access->requireWorkspace($uid, $wsId, 'write');
+		// Kopie in einen anderen Workspace = Inhalt verlässt die Quelle (B17, Plan M5 §2.2); Vorlagen/Abgaben nie kopieren
+		$source = $wsId === $src->getWorkspaceId() ? $target : $this->access->requireWorkspace($uid, (int)$src->getWorkspaceId(), 'read');
+		$this->access->requireLeave($uid, new LeaveRequest($source, $target, LeaveRequest::COPY, [$id]));
 		$quota = $this->attachments->quotaFor($wsId, $this->attachments->bytesOf([$id]));
 		$created = [];
 		$copy = $this->run(function () use ($src, $wsId, $folderId, $uid, $quota, &$created) {
@@ -160,6 +159,9 @@ class DuplicateService {
 		}
 		$byId = $this->folderService->byId($wsId);
 		$tree = FolderService::subtree($id, $byId);
+		// Kopie im selben Workspace: nur Prüfung gegen systemverwaltete Inhalte (M6)
+		$wsEntity = $this->access->requireWorkspace($uid, $wsId, 'write');
+		$this->access->requireLeave($uid, new LeaveRequest($wsEntity, $wsEntity, LeaveRequest::COPY, [], array_map(static fn (int $fid) => $byId[$fid], $tree)));
 		$sourceNotes = $this->notes->findList([$wsId], ['folder_ids' => $tree], true);
 		$byFolder = [];
 		foreach ($sourceNotes as $n) {

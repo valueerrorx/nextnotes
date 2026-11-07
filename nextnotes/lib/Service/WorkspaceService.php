@@ -20,6 +20,7 @@ use OCA\NextNotes\Db\WorkspaceMapper;
 use OCA\NextNotes\Db\WsShareMapper;
 use OCA\NextNotes\Service\Exception\BadRequestException;
 use OCA\NextNotes\Service\Exception\ConflictException;
+use OCA\NextNotes\Service\Exception\ForbiddenException;
 use OCA\NextNotes\Service\Exception\NotFoundException;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\IUserManager;
@@ -28,6 +29,9 @@ use OCP\L10N\IFactory;
 // Workspaces, Schlüssel (SPEC §4.4), Standard-Workspace, Freigaben (Service-Weg)
 class WorkspaceService {
 	public const ARCHIVE_NAME = 'Archives';
+	// Reihenfolge fremder Workspaces je Benutzer (IUserConfig, über die Settings-API gesperrt)
+	public const FOREIGN_ORDER_KEY = 'foreign_workspace_order';
+	private const TEAM_MANAGE_LEVEL = 4;
 
 	/** @var array<string, array<int, string>> uid → [wsId → Schlüssel] */
 	private array $keys = [];
@@ -49,6 +53,9 @@ class WorkspaceService {
 		private MentionHandledMapper $mentions,
 		private BackgroundFiles $backgrounds,
 		private SettingsService $settings,
+		private TeamService $teams,
+		private TeamStateService $teamState,
+		private QuotaService $quota,
 	) {
 	}
 
@@ -80,11 +87,11 @@ class WorkspaceService {
 		return $l->t('Notes');
 	}
 
-	private function insert(string $uid, string $name, string $kind, array $tags, ?string $color): Workspace {
+	private function insert(string $uid, string $name, string $kind, array $tags, ?string $color, ?string $teamId = null): Workspace {
 		$now = $this->time->getTime();
 		$ws = new Workspace();
-		$ws->setOwnerType('user');
-		$ws->setOwnerId($uid);
+		$ws->setOwnerType($teamId === null ? 'user' : 'team');
+		$ws->setOwnerId($teamId ?? $uid);
 		$ws->setKind($kind);
 		$ws->setName($name);
 		$ws->setTags($tags === [] ? null : implode(',', $tags));
@@ -96,12 +103,15 @@ class WorkspaceService {
 		return $this->workspaces->insert($ws);
 	}
 
-	/** @return Workspace[] sichtbare Workspaces: eigene (Reihenfolge), dann geteilte nach Name */
+	/** @return Workspace[] sichtbare Workspaces: eigene (Reihenfolge), dann geteilte und Team-Workspaces (eigene Reihenfolge des Benutzers, sonst Name) */
 	public function listVisible(string $uid): array {
 		if (!isset($this->visible[$uid])) {
 			$own = $this->workspaces->findOwned($uid);
-			$shared = $this->workspaces->findByIds(array_keys($this->workspaces->findSharedWith($uid)));
-			usort($shared, static fn (Workspace $a, Workspace $b) => strnatcasecmp($a->getName(), $b->getName()) ?: $a->getId() <=> $b->getId());
+			$ownIds = array_map(static fn (Workspace $w) => (int)$w->getId(), $own);
+			$shared = $this->workspaces->findByIds(array_values(array_diff($this->access->visibleWorkspaceIds($uid), $ownIds)));
+			$order = array_flip($this->foreignOrder($uid));
+			usort($shared, static fn (Workspace $a, Workspace $b) => ($order[(int)$a->getId()] ?? PHP_INT_MAX) <=> ($order[(int)$b->getId()] ?? PHP_INT_MAX)
+				?: strnatcasecmp($a->getName(), $b->getName()) ?: $a->getId() <=> $b->getId());
 			$list = [];
 			foreach (array_merge($own, $shared) as $ws) {
 				$list[(int)$ws->getId()] = $ws;
@@ -130,7 +140,7 @@ class WorkspaceService {
 				$keys[$id] = $ws->getName();
 				continue;
 			}
-			$keys[$id] = $ws->getName() . ' (' . $this->ownerName($ws) . ')';
+			$keys[$id] = $ws->getName() . ' (' . $this->ownerName($uid, $ws) . ')';
 			$long[$keys[$id]][] = $id;
 		}
 		foreach ($long as $key => $ids) {
@@ -143,8 +153,19 @@ class WorkspaceService {
 		return $this->keys[$uid] = $keys;
 	}
 
-	private function ownerName(Workspace $ws): string {
-		return $this->userManager->getDisplayName((string)$ws->getOwnerId()) ?? (string)$ws->getOwnerId();
+	// Teamname aus der Mitgliedschaft (Request), sonst Snapshot; GET schreibt nie (SPEC §4.5)
+	private function ownerName(string $uid, Workspace $ws): string {
+		$id = (string)$ws->getOwnerId();
+		if ($ws->getOwnerType() === 'team') {
+			return $this->teams->memberTeams($uid)[$id] ?? $this->teamState->snapshotName($id) ?? $id;
+		}
+		return $this->userManager->getDisplayName($id) ?? $id;
+	}
+
+	/** @return int[] eigene Reihenfolge fremder Workspaces */
+	private function foreignOrder(string $uid): array {
+		$list = json_decode($this->settings->get($uid, self::FOREIGN_ORDER_KEY, '[]'), true);
+		return is_array($list) ? array_values(array_map('intval', array_filter($list, 'is_int'))) : [];
 	}
 
 	public function keyFor(string $uid, int $workspaceId): ?string {
@@ -211,19 +232,45 @@ class WorkspaceService {
 		return $out;
 	}
 
-	/** @return array{0: Workspace, 1: string[]} */
-	public function create(string $uid, mixed $name, mixed $tags, bool $hasColor, mixed $color): array {
+	/**
+	 * Optional Team-Workspace (team = singleId): nur aktives Team, Level ≥ 4, Team passiert die Probe-Regel (Plan M5 §2.3)
+	 * @return array{0: Workspace, 1: string[]}
+	 */
+	public function create(string $uid, mixed $name, mixed $tags, bool $hasColor, mixed $color, mixed $team = null): array {
 		$name = $this->validator->workspaceName($name);
 		$tagList = $this->validator->workspaceTags($tags ?? []);
 		$color = $hasColor ? $this->validator->color($color) : null;
-		$ws = $this->tx->run(function () use ($uid, $name, $tagList, $color) {
-			if ($this->workspaces->findOwned($uid, 'normal', $name) !== []) {
+		$teamId = null;
+		if ($team !== null && $team !== '') {
+			$teamId = $this->requireTeamForCreate($uid, $team);
+			$this->teamState->ensure($teamId, $this->teams->memberTeams($uid)[$teamId] ?? null);
+		}
+		$ws = $this->tx->run(function () use ($uid, $name, $tagList, $color, $teamId) {
+			if ($teamId !== null) {
+				$this->workspaces->lockOwner('team', $teamId);
+			}
+			if ($this->workspaces->findByOwner($teamId === null ? 'user' : 'team', $teamId ?? $uid, 'normal', $name) !== []) {
 				throw new ConflictException('Workspace already exists');
 			}
-			return $this->insert($uid, $name, 'normal', $tagList, $color);
+			return $this->insert($uid, $name, 'normal', $tagList, $color, $teamId);
 		});
 		$this->reset();
 		return [$ws, $tagList];
+	}
+
+	// Nicht Mitglied → 404; Team zählt nicht (versteckt, Backend …), nicht aktiv oder Level < 4 → 403
+	private function requireTeamForCreate(string $uid, mixed $team): string {
+		if (!is_string($team) || strlen($team) > 64 || !$this->teams->isAvailable()) {
+			throw new NotFoundException('Team not found');
+		}
+		$m = $this->teams->membership($team, $uid);
+		if ($m['level'] < 1) {
+			throw new NotFoundException('Team not found');
+		}
+		if (!$m['counts'] || $m['level'] < self::TEAM_MANAGE_LEVEL || $this->teamState->stateOf($team) !== TeamStateService::ACTIVE) {
+			throw new ForbiddenException('Permission denied');
+		}
+		return $team;
 	}
 
 	/**
@@ -247,7 +294,7 @@ class WorkspaceService {
 		$oldKeys = $this->keys($uid);
 		$this->tx->run(function () use ($uid, $ws, $newName, $oldName, $hasTags, $tags, $hasColor, $color) {
 			if ($newName !== '' && $newName !== $oldName) {
-				if ($this->workspaces->findOwned($uid, 'normal', $newName) !== []) {
+				if ($this->workspaces->findByOwner((string)$ws->getOwnerType(), (string)$ws->getOwnerId(), 'normal', $newName) !== []) {
 					throw new ConflictException('Target workspace name already exists');
 				}
 				$ws->setName($newName);
@@ -261,6 +308,10 @@ class WorkspaceService {
 			$ws->setUpdatedAt($this->time->getTime());
 			$this->workspaces->update($ws);
 		});
+		// Team-Name-Snapshot beim Umbenennen auffrischen (SPEC §2.1)
+		if ($ws->getOwnerType() === 'team' && $ws->getName() !== $oldName) {
+			$this->teamState->ensure((string)$ws->getOwnerId(), $this->teams->memberTeams($uid)[(string)$ws->getOwnerId()] ?? null);
+		}
 		$this->reset();
 		// Wie Upstream workspaces.php rename: Standard-/zuletzt geöffneter Workspace folgen ihrem Schlüssel (auch gleichnamige fremde, deren Schlüssel sich verschiebt)
 		if ($ws->getName() !== $oldName) {
@@ -280,9 +331,12 @@ class WorkspaceService {
 		];
 	}
 
-	// Inhalte wandern nur in einen eigenen, nicht geteilten Workspace (Thomas, SPEC §11.2 B18)
+	// Inhalte wandern nur in einen eigenen, nicht geteilten Workspace (Thomas, SPEC §11.2 B18); Team-Workspaces: WorkspaceDeletion
 	public function delete(string $uid, string $key): void {
 		$ws = $this->requireByKey($uid, $key, 'manage');
+		if ($ws->getOwnerType() !== 'user') {
+			throw new BadRequestException('Use the team workspace deletion');
+		}
 		$others = array_values(array_filter(
 			$this->workspaces->findOwned($uid, 'normal'),
 			static fn (Workspace $w) => $w->getId() !== $ws->getId(),
@@ -314,6 +368,7 @@ class WorkspaceService {
 			if ($this->workspaces->lockRows([(int)$ws->getId(), (int)$target->getId()]) < 2) {
 				throw new NotFoundException('Workspace not found');
 			}
+			$this->access->requireLeave($uid, new LeaveRequest($ws, $target, LeaveRequest::WORKSPACE));
 			$this->moveContents($ws, $target);
 			$this->shares->deleteForWorkspace((int)$ws->getId());
 			$this->workspaces->deleteById((int)$ws->getId());
@@ -322,8 +377,8 @@ class WorkspaceService {
 		$this->reset();
 	}
 
-	// Ordner und Notizen in einen anderen Workspace; namensgleiche Wurzelordner im Ziel bekommen einen Zusatz
-	private function moveContents(Workspace $ws, Workspace $target): int {
+	// Ordner und Notizen in einen anderen Workspace; namensgleiche Wurzelordner im Ziel bekommen einen Zusatz (Aufrufer sperrt beide und prüft requireLeave)
+	public function moveContents(Workspace $ws, Workspace $target): int {
 		$folders = $this->folders->findInWorkspace((int)$ws->getId());
 		foreach ($folders as $folder) {
 			if ($folder->getParentId() !== null) {
@@ -342,48 +397,63 @@ class WorkspaceService {
 		return $this->notes->moveWorkspaceNotes((int)$ws->getId(), (int)$target->getId());
 	}
 
-	// workspaces.php move_notes: nur zwischen eigenen Workspaces (Quota beim Besitzer, B17); Quelle bleibt bestehen
+	// workspaces.php move_notes: Quelle verwalten, Ziel schreiben, Verlassen-Regel (B17, Plan M5 §2.3); Quote beim Ziel-Besitzer; Quelle bleibt bestehen
 	public function moveNotes(string $uid, string $key, string $targetKey): int {
 		$ws = $this->requireByKey($uid, $key, 'manage');
-		$target = $this->requireByKey($uid, $targetKey, 'manage');
+		$target = $this->requireByKey($uid, $targetKey, 'write');
 		if ($ws->getId() === $target->getId()) {
 			throw new BadRequestException('Source and target workspaces must differ');
 		}
-		$moved = $this->tx->run(function () use ($uid, $ws, $target) {
+		$this->access->requireLeave($uid, new LeaveRequest($ws, $target, LeaveRequest::WORKSPACE));
+		$quota = $this->quota->forLeave(new LeaveRequest($ws, $target, LeaveRequest::WORKSPACE));
+		$moved = $this->tx->run(function () use ($uid, $ws, $target, $quota) {
+			$this->quota->enforce($quota);
 			// beide sperren und neu lesen: ein paralleles delete darf das Ziel nicht zwischen Prüfung und Verschieben entfernen
 			if ($this->workspaces->lockRows([(int)$ws->getId(), (int)$target->getId()]) !== 2) {
 				throw new NotFoundException('Workspace not found');
 			}
-			return $this->moveContents(
-				$this->access->requireWorkspace($uid, (int)$ws->getId(), 'manage'),
-				$this->access->requireWorkspace($uid, (int)$target->getId(), 'manage'),
-			);
+			$source = $this->access->requireWorkspace($uid, (int)$ws->getId(), 'manage');
+			$dest = $this->access->requireWorkspace($uid, (int)$target->getId(), 'write');
+			return $this->access->moveLeaving($uid, new LeaveRequest($source, $dest, LeaveRequest::WORKSPACE), fn () => $this->moveContents($source, $dest));
 		});
 		$this->reset();
 		return $moved;
 	}
 
 	/**
-	 * workspaces.php reorder: Positionen 1..n; jeder Name braucht Verwaltungsrecht (fremde/geteilte → 404/403)
+	 * workspaces.php reorder: eigene über display_order (1..n), fremde (geteilt/Team) nur in der eigenen Liste (IUserConfig); nie die Reihenfolge anderer (R8)
 	 * @param string[] $keys
 	 */
 	public function reorder(string $uid, array $keys): void {
-		$list = [];
+		$own = [];
+		$foreign = [];
 		foreach ($keys as $key) {
-			$list[] = $this->requireByKey($uid, $key, 'manage');
+			$ws = $this->requireByKey($uid, $key, 'read');
+			if ($ws->getOwnerType() === 'user' && $ws->getOwnerId() === $uid) {
+				$own[] = $ws;
+			} else {
+				$foreign[] = (int)$ws->getId();
+			}
 		}
-		$this->tx->run(function () use ($list) {
-			foreach ($list as $i => $ws) {
+		$this->tx->run(function () use ($own) {
+			foreach ($own as $i => $ws) {
 				$ws->setDisplayOrder($i + 1);
 				$this->workspaces->update($ws);
 			}
 		});
+		if ($foreign !== []) {
+			$this->settings->set($uid, self::FOREIGN_ORDER_KEY, json_encode(array_values(array_unique($foreign))));
+		}
 		$this->reset();
 	}
 
 	// Freigabe nur über Service (UI-Weg M3/M4); nur Besitzer
 	public function share(string $ownerUid, int $workspaceId, string $targetUid, string $permission = 'write'): void {
 		$ws = $this->access->requireWorkspace($ownerUid, $workspaceId, 'manage');
+		// Teilen nur für Benutzer-Workspaces (ADR 0014, Plan M5 §2.2)
+		if ($ws->getOwnerType() !== 'user') {
+			throw new ForbiddenException('Team workspaces cannot be shared');
+		}
 		if ($targetUid === $ownerUid || !$this->userManager->userExists($targetUid)) {
 			throw new BadRequestException('Invalid share target');
 		}
@@ -404,18 +474,22 @@ class WorkspaceService {
 		$this->reset();
 	}
 
-	// „Archives“ beim Besitzer der Quelle, bei Bedarf angelegt (Plan O6)
+	// „Archives“ beim Besitzer der Quelle, bei Bedarf angelegt (Plan O6); Team-Quelle: Archiv desselben Teams, anlegen nur mit verwalten (Plan M5 §2.2)
 	/** @return array{0: Workspace, 1: bool} Workspace, neu angelegt */
-	public function archiveFor(Workspace $source): array {
-		if ($source->getOwnerType() !== 'user') {
+	public function archiveFor(Workspace $source, string $uid): array {
+		$type = (string)$source->getOwnerType();
+		if ($type !== 'user' && $type !== 'team') {
 			throw new BadRequestException('Archiving is not available for this workspace');
 		}
 		$owner = (string)$source->getOwnerId();
-		$existing = $this->workspaces->findOwned($owner, 'normal', self::ARCHIVE_NAME);
+		$existing = $this->workspaces->findByOwner($type, $owner, 'normal', self::ARCHIVE_NAME);
 		if ($existing !== []) {
 			return [$existing[0], false];
 		}
-		$ws = $this->insert($owner, self::ARCHIVE_NAME, 'normal', [], null);
+		if ($type === 'team') {
+			$this->access->requireWorkspace($uid, $source, 'manage');
+		}
+		$ws = $this->insert($type === 'team' ? $uid : $owner, self::ARCHIVE_NAME, 'normal', [], null, $type === 'team' ? $owner : null);
 		$this->reset();
 		return [$ws, true];
 	}

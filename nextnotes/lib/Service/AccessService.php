@@ -30,14 +30,21 @@ class AccessService {
 
 	private const PERMS = ['read' => self::READ, 'write' => self::WRITE, 'manage' => self::MANAGE];
 
+	// Team-Level ab Moderator = verwalten (ADR 0003)
+	private const TEAM_MANAGE_LEVEL = 4;
+
 	/** @var array<string, int> Cache uid|wsId → Stufe für diesen Request */
 	private array $levels = [];
+	/** @var array<string, array<int, int>> Cache uid → [wsId → Stufe] aller sichtbaren Workspaces */
+	private array $visibility = [];
 
 	public function __construct(
 		private WorkspaceMapper $workspaces,
 		private WsShareMapper $shares,
 		private NoteMapper $notes,
 		private FolderMapper $folders,
+		private TeamService $teams,
+		private TeamStateService $teamState,
 	) {
 	}
 
@@ -67,23 +74,49 @@ class AccessService {
 		return self::NONE;
 	}
 
-	// Platzhalter bis M5 (Teams)
+	// SPEC §3: aktiv → Mitglied schreibt (verwalten lazy in requireWorkspace); verwaist/eingefroren → nur created_by liest; Freigaben zählen nie
 	private function teamLevel(string $uid, Workspace $ws): int {
-		return self::NONE;
+		$teamId = (string)$ws->getOwnerId();
+		if ($this->teamState->stateOf($teamId) !== TeamStateService::ACTIVE) {
+			return $ws->getCreatedBy() !== null && $ws->getCreatedBy() === $uid ? self::READ : self::NONE;
+		}
+		return isset($this->teams->memberTeams($uid)[$teamId]) ? self::WRITE : self::NONE;
 	}
 
-	// Nach Änderung von Freigaben/Besitz im selben Request
+	// Nach Änderung von Freigaben, Besitz oder Team-Mitgliedschaft im selben Request (auch Jobs, occ, Tests)
 	public function resetCache(): void {
 		$this->levels = [];
+		$this->visibility = [];
+		$this->teams->resetCache();
+		$this->teamState->resetCache();
+	}
+
+	/**
+	 * Alle sichtbaren Workspaces mit Stufe: eigene, Freigaben (nur Benutzer-Workspaces), Team-Workspaces (eine Circles-Abfrage, eine SQL-Abfrage)
+	 * @return array<int, int>
+	 */
+	private function visibility(string $uid): array {
+		if (isset($this->visibility[$uid])) {
+			return $this->visibility[$uid];
+		}
+		$map = [];
+		foreach ($this->workspaces->findOwned($uid) as $w) {
+			$map[(int)$w->getId()] = self::MANAGE;
+		}
+		foreach ($this->workspaces->findSharedWith($uid) as $id => $permission) {
+			$map[$id] ??= $permission === 'write' ? self::WRITE : self::READ;
+		}
+		$available = $this->teams->isAvailable();
+		$teamIds = $available ? array_map('strval', array_keys($this->teams->memberTeams($uid))) : [];
+		foreach ($this->workspaces->teamAccess($uid, $teamIds, $available) as $id => $permission) {
+			$map[$id] ??= $permission === 'write' ? self::WRITE : self::READ;
+		}
+		return $this->visibility[$uid] = $map;
 	}
 
 	/** @return int[] */
 	public function visibleWorkspaceIds(string $uid): array {
-		$ids = array_map(static fn (Workspace $w) => (int)$w->getId(), $this->workspaces->findOwned($uid));
-		foreach (array_keys($this->workspaces->findSharedWith($uid)) as $id) {
-			$ids[] = $id;
-		}
-		return array_values(array_unique($ids));
+		return array_keys($this->visibility($uid));
 	}
 
 	/** @return int[] eigene Workspaces (owner_type=user), ohne Freigaben (ADR 0008: „alle“-Exporte) */
@@ -93,13 +126,7 @@ class AccessService {
 
 	/** @return int[] Workspaces mit Schreibrecht */
 	public function writableWorkspaceIds(string $uid): array {
-		$ids = array_map(static fn (Workspace $w) => (int)$w->getId(), $this->workspaces->findOwned($uid));
-		foreach ($this->workspaces->findSharedWith($uid) as $id => $permission) {
-			if ($permission === 'write') {
-				$ids[] = $id;
-			}
-		}
-		return array_values(array_unique($ids));
+		return array_keys(array_filter($this->visibility($uid), static fn (int $level) => $level >= self::WRITE));
 	}
 
 	public function requireWorkspace(string $uid, int|Workspace $ws, string $perm): Workspace {
@@ -111,12 +138,98 @@ class AccessService {
 			}
 		}
 		$level = $this->workspaceLevel($uid, $ws);
+		if ($perm === 'manage' && $level === self::WRITE && $this->canManageTeam($uid, $ws)) {
+			$level = self::MANAGE;
+		}
 		$this->check($level, $perm, 'Workspace not found');
 		// Systemverwaltete Schüler-Workspaces verwaltet niemand (SPEC §3)
 		if ($perm === 'manage' && $ws->getKind() !== 'normal') {
 			throw new ForbiddenException('This workspace is managed by the system');
 		}
 		return $ws;
+	}
+
+	// Team-Workspace verwalten: aktives Team, effektives Level ≥ 4 (nur abgefragt, wenn verwalten gefragt ist)
+	public function canManageTeam(string $uid, Workspace $ws): bool {
+		return $ws->getOwnerType() === 'team' && $ws->getKind() === 'normal'
+			&& $this->workspaceLevel($uid, $ws) === self::WRITE
+			&& $this->teams->getLevel((string)$ws->getOwnerId(), $uid) >= self::TEAM_MANAGE_LEVEL;
+	}
+
+	/**
+	 * Einzige Prüfstelle für Inhalte, die einen Workspace verlassen (B17, Plan M5 §2.2/§2.8); write am Ziel prüft der Aufrufer.
+	 * Benutzer-Quelle: verwalten an der Quelle. Team-Quelle: schreiben; Ziel im selben Team, sonst nur eigene Notizen in den eigenen privaten Workspace (Ordner/Workspace zusätzlich verwalten).
+	 * Systemverwaltetes (Vorlagen, Abgaben, Schüler-Workspaces, Aufgaben-Ordner) verlässt nie seinen Workspace und wird nicht kopiert (deny by default bis M6).
+	 */
+	public function requireLeave(string $uid, LeaveRequest $r): void {
+		$src = $r->source;
+		$leaves = $r->leaves();
+		if (!$leaves && $r->kind !== LeaveRequest::COPY && $r->kind !== LeaveRequest::ATTACHMENT) {
+			return;
+		}
+		$rows = match ($r->kind) {
+			LeaveRequest::WORKSPACE => $this->notes->leaveRows((int)$src->getId()),
+			LeaveRequest::FOLDER => $this->notes->leaveRows((int)$src->getId(), self::folderIds($r->folders), null),
+			default => $this->notes->leaveRows((int)$src->getId(), $r->folders === [] ? null : self::folderIds($r->folders), $r->noteIds),
+		};
+		if ($src->getKind() !== 'normal'
+			|| array_filter($r->folders, static fn (Folder $f) => $f->getAssignmentId() !== null) !== []
+			|| array_filter($rows, static fn (array $row) => $row['role'] !== 'note') !== []) {
+			throw new ForbiddenException('This content is managed by the system');
+		}
+		if (!$leaves) {
+			return;
+		}
+		if ($src->getOwnerType() !== 'team') {
+			$this->requireWorkspace($uid, $src, 'manage');
+			return;
+		}
+		$this->requireWorkspace($uid, $src, 'write');
+		$target = $r->target;
+		if ($target->getOwnerType() === 'team' && $target->getOwnerId() === $src->getOwnerId()) {
+			return;
+		}
+		if ($target->getOwnerType() === 'user' && $target->getOwnerId() === $uid && $target->getKind() === 'normal') {
+			if ($r->kind === LeaveRequest::FOLDER || $r->kind === LeaveRequest::WORKSPACE || $r->folders !== []) {
+				$this->requireWorkspace($uid, $src, 'manage');
+			}
+			// created_by NULL (Konto gelöscht) zählt nie als eigene Notiz
+			if (array_filter($rows, static fn (array $row) => $row['created_by'] === null || $row['created_by'] !== $uid) === []) {
+				return;
+			}
+		}
+		throw new ForbiddenException('Content of a team workspace can only be moved within the same team');
+	}
+
+	/**
+	 * Verlassen unter Sperre (Aufrufer hat Quelle und Ziel gesperrt, Reihenfolge Workspace → Notiz): prüfen, verschieben und bei der
+	 * Eigene-Notiz-Ausnahme bestätigen, dass nur Notizen des Akteurs angekommen sind (parallel angelegte fremde → 403, Rollback)
+	 * @template T
+	 * @param callable(): T $move
+	 * @return T
+	 */
+	public function moveLeaving(string $uid, LeaveRequest $r, callable $move): mixed {
+		$this->requireLeave($uid, $r);
+		$own = $r->leaves() && $r->source->getOwnerType() === 'team'
+			&& !($r->target->getOwnerType() === 'team' && $r->target->getOwnerId() === $r->source->getOwnerId());
+		$before = $own ? $this->notes->idsInWorkspace((int)$r->target->getId()) : [];
+		$result = $move();
+		if ($own) {
+			$moved = array_values(array_diff($this->notes->idsInWorkspace((int)$r->target->getId()), $before));
+			$rows = $moved === [] ? [] : $this->notes->leaveRows((int)$r->target->getId(), null, $moved);
+			if (array_filter($rows, static fn (array $row) => $row['created_by'] !== $uid || $row['role'] !== 'note') !== []) {
+				throw new ForbiddenException('Content of a team workspace can only be moved within the same team');
+			}
+		}
+		return $result;
+	}
+
+	/**
+	 * @param Folder[] $folders
+	 * @return int[]
+	 */
+	private static function folderIds(array $folders): array {
+		return array_map(static fn (Folder $f) => (int)$f->getId(), $folders);
 	}
 
 	public function noteLevel(string $uid, Note $note): int {

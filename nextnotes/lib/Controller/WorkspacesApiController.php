@@ -10,10 +10,18 @@ declare(strict_types=1);
 namespace OCA\NextNotes\Controller;
 
 use OCA\NextNotes\Service\Exception\BadRequestException;
+use OCA\NextNotes\Service\WorkspaceDeletion;
+use OCA\NextNotes\Service\WorkspaceService;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\JSONResponse;
+use OCP\IRequest;
+use OCP\IUserSession;
 
 class WorkspacesApiController extends ApiController {
+	public function __construct(IRequest $request, IUserSession $userSession, WorkspaceService $workspaces, private WorkspaceDeletion $deletion) {
+		parent::__construct($request, $userSession, $workspaces);
+	}
+
 	#[NoAdminRequired]
 	public function index(): JSONResponse {
 		$uid = $this->uid();
@@ -26,8 +34,10 @@ class WorkspacesApiController extends ApiController {
 		if (trim((string)($in['name'] ?? '')) === '') {
 			throw new BadRequestException('name is required');
 		}
-		[$ws, $tags] = $this->workspaces->create($this->uid(), $in['name'], $in['tags'] ?? [], array_key_exists('color', $in), $in['color'] ?? null);
-		return $this->ok(['name' => $ws->getName(), 'tags' => $tags, 'color' => $ws->getColor()], 201);
+		$uid = $this->uid();
+		[$ws, $tags] = $this->workspaces->create($uid, $in['name'], $in['tags'] ?? [], array_key_exists('color', $in), $in['color'] ?? null, $in['team'] ?? null);
+		// name = Workspace-Schlüssel (Team-Workspace bei Namensgleichheit „Name (Team)“, SPEC §4.4)
+		return $this->ok(['name' => $this->workspaces->keyFor($uid, (int)$ws->getId()) ?? $ws->getName(), 'tags' => $tags, 'color' => $ws->getColor()], 201);
 	}
 
 	#[NoAdminRequired]
@@ -39,7 +49,8 @@ class WorkspacesApiController extends ApiController {
 
 	#[NoAdminRequired]
 	public function destroy(string $name): JSONResponse {
-		$this->workspaces->delete($this->uid(), $name);
+		$in = $this->input();
+		$this->deletion->delete($this->uid(), $name, $in['target'] ?? null, in_array($in['confirm'] ?? null, [true, 1, '1', 'true'], true));
 		return $this->ok();
 	}
 }

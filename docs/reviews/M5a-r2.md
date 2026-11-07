@@ -1,0 +1,20 @@
+# M5a – Diff-Review r2 (speccritic, letzte Runde)
+
+Basis ea50d52a + untracked, statisch. Circles 35.0.0-Quelle (Image-Auszug) gegengelesen: `Circle::CFG_*`, `CircleRequestBuilder`, `FederatedUserService::commandLineInitiator/setOwnerAsCurrentUser`, `CircleProbe`-Standard.
+
+VERDICT: FREIGABE
+
+## Stand r1
+- B1 gelöst: ADR 0003 Nachtrag, SPEC §3 „Ohne Teams-App“, §5 und §14 beschreiben `exists()` jetzt übereinstimmend mit dem Code: Owner als Initiator, nicht `getTeam()`, „fehlt“ nur bei „keine Zeile“, `probeCircles`/`getInheritedMembers`. `getTeamsForUser`/`getMembersOfTeam` werden laut Text nicht genutzt.
+- H1 gelöst: `forLeave` steht an PATCH `NoteService.php:451`, `moveToFolder` `:917`, Ordner verschieben `FolderService.php:542`, `move-files` `:823` und `move_notes` `WorkspaceService.php:408`. `enforce` ist jeweils die erste Anweisung der Transaktion. Archiv, Team-Workspace löschen und Benutzer-Workspace löschen behalten den Besitzer, Anhang verschieben prüfte schon vorher. `checkSum` zählt nur die Workspaces des Ziel-Besitzers plus die bewegten Bytes, damit ist keine Doppelzählung möglich. `combine` addiert neue Bilder und vorhandene Anhänge gegen denselben Ziel-Workspace. `sizeLeaving` wählt dieselben Zeilen wie `leaveRows`, leere Liste ergibt 0.
+- H2 gelöst: Remote-Kreise liefern die Meldung „not managed from this instance“, daraus wird `TeamUnavailableException`. „Circle not found“ stammt aus `CircleRequestBuilder.php:87`. `EXCLUDED = 1|2|1024|2048` stimmt mit SINGLE/PERSONAL/HIDDEN/BACKEND aus Circles 35 überein. Die Standard-Probe von `getCircle` filtert nur SINGLE, versteckte, persönliche und Backend-Kreise werden also gefunden. Bei deaktiviertem Circles wird keine Circles-Klasse geladen: `use`, Typ-Hinweise, `catch` und `instanceof` lösen nicht auf, der einzige Ladeversuch ist `class_exists`, außerhalb von `TeamService` gibt es keine Circles-Referenz.
+- H4 gelöst: Ordner verschieben und `move_notes` laufen über `moveLeaving` unter `lockRows(Quelle, Ziel)` mit Nachprüfung, ein Fehler führt zu Rollback ohne Datei-Nebenwirkung. `move-files` verschiebt nur die geprüften Notiz-IDs.
+- H5 teilweise gelöst: Der Test „eingefroren“ (`TeamAccessTest.php:142-157`) ist aussagekräftig. Er prüft B/E ohne Zugriff, `created_by` mit Leserecht, Schreiben und Anlegen mit 403, `/teams` leer ohne 500, Zustand bleibt `active`, nach Reaktivierung liest B wieder. TTFB (Done 8, +30 ms) ist weiterhin nicht gemessen.
+- H3 offen (Super-Session-Bypass wird nicht wiederhergestellt), unverändert kein Blocker.
+
+## Hinweise (keine Blocker)
+H1 **Deadlock bei gegenläufigem Verschieben** (`FolderService.php:572-574`, `WorkspaceService.php:413-415`): `enforce` sperrt zuerst alle Zeilen des Ziel-Besitzers, danach `lockRows(Quelle, Ziel)`. Laufen privat→Team und Team→privat desselben Benutzers parallel (beide mit Anhängen), sperrt Tx1 die Team-Zeilen und wartet auf den privaten Workspace, Tx2 umgekehrt. InnoDB/PG erkennen den Deadlock und brechen eine Transaktion ab, das gibt 500 ohne Datenschaden. SQLite ist nicht betroffen. Die Kollision mit Workspace-Löschen habe ich geprüft, dort gibt es keinen Zyklus. Abhilfe: beide Besitzer in fester Reihenfolge sperren oder `lockRows` vor `enforce`.
+H2 **Bytes vor der Transaktion berechnet** (`QuotaService::forLeave`): `enforce` prüft die Summe unter Sperre neu, `bytes` bleibt aber der Wert vor der Transaktion. Ergibt die Vorprüfung 0 Bytes, findet gar keine Prüfung statt. Ein paralleler Upload an eine bewegte Notiz kann die Quote also um diesen Upload überschreiten. SPEC §2.2 („unter derselben Sperre“) gilt damit nur annähernd.
+H3 **Falsches 403 in `moveLeaving`** (`AccessService.php:213-221`): Gezählt wird die Differenz `idsInWorkspace(Ziel)`. Legt ein Freigabe-Empfänger des privaten Ziel-Workspace gleichzeitig eine Notiz an, endet ein legitimer Umzug mit 403 und Rollback. Rechte sind nicht betroffen.
+H4 **SPEC §9 (Zeile 447)** nennt noch „Team-IDs aus `TeamService::getTeamsForUser`“. Diese Methode gibt es nicht, im Code heißt sie `memberTeams()`, siehe §3. Vor M6 angleichen.
+H5 **TTFB Done 8** messen oder ausdrücklich auf M5e verschieben (Lead).

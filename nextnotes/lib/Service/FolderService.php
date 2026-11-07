@@ -34,6 +34,7 @@ class FolderService {
 		private Transaction $tx,
 		private ITimeFactory $time,
 		private WorkspaceMapper $wsRows,
+		private QuotaService $quota,
 	) {
 	}
 
@@ -531,9 +532,14 @@ class FolderService {
 		$folder = $this->access->requireFolder($uid, $id, 'manage');
 		$source = $this->access->requireWorkspace($uid, (int)$folder->getWorkspaceId(), 'write');
 		$target = $this->workspaces->resolveOptional($uid, $data['target_workspace'] ?? null, 'write') ?? $source;
+		$leave = null;
+		$quota = null;
 		if ($target->getId() !== $source->getId()) {
-			// Inhalte verlassen einen Workspace nur durch dessen Verwalter
-			$this->access->requireWorkspace($uid, $source, 'manage');
+			// Inhalte verlassen einen Workspace nur über die Verlassen-Regel (B17, Plan M5 §2.2); Vorprüfung, unter Sperre erneut
+			$branch = $this->byId((int)$source->getId());
+			$leave = new LeaveRequest($source, $target, LeaveRequest::FOLDER, [], array_map(static fn (int $fid) => $branch[$fid], self::subtree($id, $branch)));
+			$this->access->requireLeave($uid, $leave);
+			$quota = $this->quota->forLeave($leave);
 		}
 		$newParentRaw = $data['new_parent_folder_id'] ?? $data['new_parent_id'] ?? $data['parent_id'] ?? null;
 		$newParentPath = isset($data['new_parent_folder']) ? trim((string)$data['new_parent_folder']) : '';
@@ -562,16 +568,22 @@ class FolderService {
 		}
 		$same = $folder->getParentId() === $targetParent && $target->getId() === $source->getId();
 		if (!$same) {
-			$this->tx->run(function () use ($folder, $targetParent, $target, $source, $byId, $id) {
+			$this->tx->run(function () use ($uid, $folder, $targetParent, $target, $source, $byId, $id, $leave, $quota) {
+				$this->quota->enforce($quota);
 				$now = $this->time->getTime();
+				if ($leave !== null && $this->wsRows->lockRows([(int)$source->getId(), (int)$target->getId()]) < 2) {
+					throw new NotFoundException('Workspace not found');
+				}
 				$folder->setParentId($targetParent);
 				$folder->setDisplayOrder(0);
 				$folder->setUpdatedAt($now);
 				$this->folders->update($folder);
-				if ($target->getId() !== $source->getId()) {
+				if ($leave !== null) {
 					$ids = self::subtree($id, $byId);
-					$this->folders->moveToWorkspace($ids, (int)$target->getId(), $now);
-					$this->notes->moveFolderNotesToWorkspace($ids, (int)$target->getId());
+					$this->access->moveLeaving($uid, $leave, function () use ($ids, $target, $now): void {
+						$this->folders->moveToWorkspace($ids, (int)$target->getId(), $now);
+						$this->notes->moveFolderNotesToWorkspace($ids, (int)$target->getId());
+					});
 				}
 			});
 		}
@@ -800,14 +812,18 @@ class FolderService {
 				throw new BadRequestException('Target folder belongs to a different workspace');
 			}
 		}
-		if ($targetWs->getId() !== $sourceWs->getId()) {
-			$this->access->requireWorkspace($uid, $sourceWs, 'manage');
-		}
 		$notes = $this->notes->findList([(int)$sourceWs->getId()], ['folder_id' => $sourceId]);
 		if ($notes === []) {
 			throw new BadRequestException('No files found in source folder');
 		}
-		$this->tx->run(function () use ($notes, $target, $targetWs, $uid) {
+		$quota = null;
+		if ($targetWs->getId() !== $sourceWs->getId()) {
+			$leave = new LeaveRequest($sourceWs, $targetWs, LeaveRequest::NOTES, array_map(static fn (Note $n) => (int)$n->getId(), $notes));
+			$this->access->requireLeave($uid, $leave);
+			$quota = $this->quota->forLeave($leave);
+		}
+		$this->tx->run(function () use ($notes, $target, $targetWs, $uid, $quota) {
+			$this->quota->enforce($quota);
 			$now = $this->time->getTime();
 			foreach ($notes as $note) {
 				$note->setFolderId($target?->getId());
@@ -900,7 +916,8 @@ class FolderService {
 	/** @return array{0: array<string, mixed>, 1: int} */
 	public function archive(string $uid, int $id): array {
 		$folder = $this->access->requireFolder($uid, $id, 'manage');
-		$source = $this->access->requireWorkspace($uid, (int)$folder->getWorkspaceId(), 'manage');
+		// Benutzer-Quelle: verwalten (B17); Team-Quelle: Archiv desselben Teams über requireLeave
+		$source = $this->access->requireWorkspace($uid, (int)$folder->getWorkspaceId(), 'write');
 		$sourceKey = $this->workspaces->keyFor($uid, (int)$source->getId());
 		if ($this->workspaces->isOwnArchive($source)) {
 			return [['already_archived' => true, 'workspace' => $sourceKey, 'message' => 'Folder is already archived'], 200];
@@ -910,7 +927,9 @@ class FolderService {
 		$noteIds = array_map(static fn (Note $n) => (int)$n->getId(), $this->notes->findList([(int)$source->getId()], ['folder_ids' => $branch]));
 		$parentPath = $this->ancestry($folder->getParentId(), $byId);
 		return $this->tx->run(function () use ($uid, $folder, $id, $source, $sourceKey, $byId, $parentPath, $noteIds) {
-			[$archive, $createdWs] = $this->workspaces->archiveFor($source);
+			[$archive, $createdWs] = $this->workspaces->archiveFor($source, $uid);
+			$this->access->requireLeave($uid, new LeaveRequest($source, $archive, LeaveRequest::FOLDER, [],
+				array_map(static fn (int $fid) => $byId[$fid], self::subtree($id, $byId))));
 			$created = [];
 			$parentId = $this->mirrorPath($archive, $parentPath, $created);
 			$conflicts = [];

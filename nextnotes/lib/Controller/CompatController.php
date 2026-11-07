@@ -31,6 +31,7 @@ use OCA\NextNotes\Service\SettingsService;
 use OCA\NextNotes\Service\View\PageAssets;
 use OCA\NextNotes\Service\View\PageTranslator;
 use OCA\NextNotes\Service\View\SettingsViewService;
+use OCA\NextNotes\Service\WorkspaceDeletion;
 use OCA\NextNotes\Service\WorkspaceService;
 use OCA\NextNotes\Service\ZipExportService;
 use OCP\AppFramework\Http;
@@ -75,6 +76,7 @@ class CompatController extends ApiController {
 		private BackgroundService $backgrounds,
 		private SettingsViewService $settingsView,
 		private IURLGenerator $urls,
+		private WorkspaceDeletion $deletion,
 	) {
 		parent::__construct($request, $userSession, $workspaces);
 	}
@@ -260,7 +262,7 @@ class CompatController extends ApiController {
 
 	/**
 	 * Upstream workspaces.php (POST-Aktionen der Workspace-Liste); Schlüssel wie SPEC §4.4, nur Besitzer (manage).
-	 * Abweichungen: Fehler mit HTTP-Status statt 200; delete verschiebt Inhalte wie DELETE /workspaces (B18); Teilen bis M5 → 501.
+	 * Abweichungen: Fehler mit HTTP-Status statt 200; delete verschiebt Inhalte wie DELETE /workspaces (B18, Team: target/confirm); Teilen bis M5d → 501.
 	 */
 	#[NoAdminRequired]
 	public function workspaces(): JSONResponse {
@@ -286,7 +288,8 @@ class CompatController extends ApiController {
 		}
 		switch ($action) {
 			case 'delete':
-				$this->workspaces->delete($uid, $name);
+				// Team-Workspace: Ziel desselben Teams (target) oder endgültig mit confirm (Plan M5 §2.3)
+				$this->deletion->delete($uid, $name, $this->param('target'), in_array($this->param('confirm'), [true, 1, '1', 'true'], true));
 				return $this->ok(['message' => 'Workspace deleted']);
 			case 'set_tags':
 				$r = $this->workspaces->update($uid, $name, ['tags' => $this->param('tags') ?? '']);

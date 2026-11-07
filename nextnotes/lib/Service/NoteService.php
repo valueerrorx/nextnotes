@@ -65,6 +65,7 @@ class NoteService {
 		private INotificationManager $notifications,
 		private EmbeddedImageService $images,
 		private MentionService $mentionService,
+		private QuotaService $quota,
 	) {
 	}
 
@@ -446,10 +447,15 @@ class NoteService {
 		if (is_scalar($content) && $writable->getType() === 'note') {
 			$images = $this->images->prepare((string)$content, $targetWsId);
 		}
+		// Besitzerwechsel: vorhandene Anhänge zählen beim Ziel-Besitzer, zusammen mit neuen Bildern (H1 M5a)
+		$moveQuota = $target !== null && $targetWsId !== (int)$writable->getWorkspaceId()
+			? $this->quota->forLeave(new LeaveRequest($this->access->requireWorkspace($uid, (int)$writable->getWorkspaceId(), 'write'), $target, LeaveRequest::NOTES, [$id]))
+			: null;
+		$quota = $this->quota->combine($images['quota'] ?? null, $moveQuota);
 		$lockWs = self::mayCreateFolder($uid, $in, $newHeading, $writable, $diary) ? $targetWsId : null;
 		$this->pendingMention = null;
-		$out = $this->tx->run(function () use ($uid, $id, $in, $expected, $newHeading, $content, $tagList, $stateHash, $images, $diary, $lockWs) {
-			$this->attachments->enforceQuota($images['quota'] ?? null);
+		$out = $this->tx->run(function () use ($uid, $id, $in, $expected, $newHeading, $content, $tagList, $stateHash, $images, $diary, $lockWs, $quota) {
+			$this->quota->enforce($quota);
 			// B64: Workspace vor der Notiz sperren (Reihenfolge wie Löschen/Verschieben), falls ein Ordner entstehen kann
 			if ($lockWs !== null) {
 				$this->folderService->lockWorkspace($lockWs);
@@ -499,7 +505,7 @@ class NoteService {
 			$ws = $this->workspaces->requireByKey($uid, trim($in['workspace']), 'write');
 			$wsId = (int)$ws->getId();
 			if ($wsId !== $sourceWs) {
-				$this->access->requireWorkspace($uid, $sourceWs, 'manage');
+				$this->access->requireLeave($uid, new LeaveRequest($this->access->requireWorkspace($uid, $sourceWs, 'write'), $ws, LeaveRequest::NOTES, [$id]));
 			}
 		}
 		$folderId = $note->getFolderId();
@@ -908,7 +914,11 @@ class NoteService {
 		$targetId = ($raw === null || $raw === '') ? null : (int)$raw;
 		$name = $in['folder'] ?? $in['target_folder'] ?? null;
 		$folderName = null;
-		return $this->tx->run(function () use ($uid, $note, $id, $sourceWs, $targetWs, $targetId, $name, &$folderName) {
+		$quota = $ws !== null && $targetWs !== $sourceWs
+			? $this->quota->forLeave(new LeaveRequest($this->access->requireWorkspace($uid, $sourceWs, 'write'), $ws, LeaveRequest::NOTES, [$id]))
+			: null;
+		return $this->tx->run(function () use ($uid, $note, $id, $sourceWs, $targetWs, $targetId, $name, &$folderName, $quota) {
+			$this->quota->enforce($quota);
 			if ($targetId !== null && $targetId > 0) {
 				$f = $this->access->requireFolder($uid, $targetId, 'write');
 				if ($f->getWorkspaceId() !== $targetWs) {
@@ -924,7 +934,12 @@ class NoteService {
 				$targetId = null;
 			}
 			if ($targetWs !== $sourceWs) {
-				$this->access->requireWorkspace($uid, $sourceWs, 'manage');
+				$this->access->requireLeave($uid, new LeaveRequest(
+					$this->access->requireWorkspace($uid, $sourceWs, 'write'),
+					$this->access->requireWorkspace($uid, $targetWs, 'write'),
+					LeaveRequest::NOTES,
+					[$id],
+				));
 			}
 			if ($this->notes->headingExists($targetWs, $targetId, (string)$note->getHeading(), $id)) {
 				throw new ConflictException('A note with the same title already exists in the destination folder');
@@ -971,7 +986,8 @@ class NoteService {
 	/** @return array<string, mixed> POST /notes/{id}/archive */
 	public function archive(string $uid, int $id): array {
 		$note = $this->access->requireNote($uid, $id, 'write');
-		$source = $this->access->requireWorkspace($uid, (int)$note->getWorkspaceId(), 'manage');
+		// Benutzer-Quelle: verwalten (B17); Team-Quelle: Archiv desselben Teams über requireLeave
+		$source = $this->access->requireWorkspace($uid, (int)$note->getWorkspaceId(), 'write');
 		$sourceKey = $this->workspaces->keyFor($uid, (int)$source->getId());
 		if ($this->workspaces->isOwnArchive($source)) {
 			return ['already_archived' => true, 'workspace' => $sourceKey, 'message' => 'Note is already archived'];
@@ -979,7 +995,8 @@ class NoteService {
 		$byId = $this->folderService->byId((int)$source->getId());
 		$path = $this->folderService->ancestry($note->getFolderId(), $byId);
 		return $this->tx->run(function () use ($uid, $note, $id, $source, $sourceKey, $path) {
-			[$archive, $createdWs] = $this->workspaces->archiveFor($source);
+			[$archive, $createdWs] = $this->workspaces->archiveFor($source, $uid);
+			$this->access->requireLeave($uid, new LeaveRequest($source, $archive, LeaveRequest::NOTES, [$id]));
 			$created = [];
 			$targetId = $this->folderService->mirrorPath($archive, $path, $created);
 			if ($this->notes->headingExists((int)$archive->getId(), $targetId, (string)$note->getHeading(), $id)) {

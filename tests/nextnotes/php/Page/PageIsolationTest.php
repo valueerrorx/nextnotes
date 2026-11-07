@@ -492,7 +492,9 @@ final class PageIsolationTest extends ApiTestCase {
 			'voll' => self::saveFull($b, $n, 'B')] as $label => $r) {
 			self::assertSame(403, $r->status, "B lesend api_save_excalidraw $label: " . $r->describe());
 		}
-		foreach (self::wsActions($ws, $ws) + ['move eigen→A' => ['action' => 'move_notes', 'name' => $bws, 'target' => $ws],
+		// reorder ist je Benutzer (M5a, B17): B ordnet nur die eigene Ansicht, Daten von A bleiben unverändert (Prüfung unten)
+		self::assertSame(200, self::wsPost($b, ['action' => 'reorder', 'names' => [$ws]])->status, 'B lesend reorder (eigene Ansicht)');
+		foreach (array_diff_key(self::wsActions($ws, $ws), ['reorder' => 1]) + ['move eigen→A' => ['action' => 'move_notes', 'name' => $bws, 'target' => $ws],
 			'move A→eigen' => ['action' => 'move_notes', 'name' => $ws, 'target' => $bws]] as $act => $f) {
 			$r = self::wsPost($b, $f);
 			self::assertSame(403, $r->status, "B lesend workspaces.php $act: " . $r->describe());
