@@ -160,4 +160,18 @@ class ReminderMapper extends QBMapper {
 			$qb->executeStatement();
 		}
 	}
+
+	/**
+	 * Alle außer $keepUid (Umwandeln in privat, M5b)
+	 * @param int[] $noteIds
+	 */
+	public function deleteForNotesExcept(array $noteIds, string $keepUid): void {
+		foreach (array_chunk(array_values(array_unique($noteIds)), 1000) as $chunk) {
+			$qb = $this->db->getQueryBuilder();
+			$qb->delete(self::TABLE)
+				->where($qb->expr()->in('note_id', $qb->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY)))
+				->andWhere($qb->expr()->neq('user_id', $qb->createNamedParameter($keepUid)))
+				->executeStatement();
+		}
+	}
 }

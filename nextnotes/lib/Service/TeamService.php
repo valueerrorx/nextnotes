@@ -10,11 +10,15 @@ declare(strict_types=1);
 namespace OCA\NextNotes\Service;
 
 use OCA\Circles\CirclesManager;
+use OCA\Circles\Events\CircleGenericEvent;
+use OCA\Circles\Events\CircleResultGenericEvent;
+use OCA\Circles\Events\MembershipsRemovedEvent;
 use OCA\Circles\Exceptions\CircleNotFoundException;
 use OCA\Circles\Exceptions\MembershipNotFoundException;
 use OCA\Circles\Model\Circle;
 use OCA\Circles\Model\FederatedUser;
 use OCA\Circles\Model\Member;
+use OCA\Circles\Model\Membership;
 use OCA\Circles\Model\Probes\CircleProbe;
 use OCA\NextNotes\Service\Exception\TeamUnavailableException;
 use OCP\Teams\ITeamManager;
@@ -27,6 +31,10 @@ class TeamService {
 	private const CIRCLE_MISSING = 'Circle not found';
 	// Kreise, die nie als Team zählen (Probe-Regel): Circle::CFG_SINGLE|CFG_PERSONAL|CFG_HIDDEN|CFG_BACKEND als Zahl, damit ohne Circles keine Klasse geladen wird
 	private const EXCLUDED = 1 | 2 | 1024 | 2048;
+	// Circles-Events als Namen (Registrierung ohne Klassenladen, M5b)
+	public const EVENT_DESTROYING = 'OCA\\Circles\\Events\\DestroyingCircleEvent';
+	public const EVENT_DESTROYED = 'OCA\\Circles\\Events\\CircleDestroyedEvent';
+	public const EVENT_MEMBERSHIPS_REMOVED = 'OCA\\Circles\\Events\\MembershipsRemovedEvent';
 
 	private ?bool $available = null;
 	/** @var array<string, array<string, string>> uid → [teamId → Name] */
@@ -155,7 +163,11 @@ class TeamService {
 		if (!$this->isAvailable()) {
 			throw new TeamUnavailableException('Teams not available');
 		}
-		$cm = $this->container->get(CirclesManager::class);
+		try {
+			$cm = $this->container->get(CirclesManager::class);
+		} catch (\Throwable $e) {
+			throw new TeamUnavailableException('Teams not available', 0, $e);
+		}
 		$previous = $this->current($cm);
 		try {
 			$circle = $this->circleAsOwner($cm, $teamId);
@@ -179,6 +191,49 @@ class TeamService {
 	private function circleAsOwner(CirclesManager $cm, string $teamId): Circle {
 		$cm->startOccSession('', Member::TYPE_SINGLE, $teamId);
 		return $cm->getCircle($teamId);
+	}
+
+	/**
+	 * Effektives Level ohne Cache und ohne Probe-Regel; Fehler werfen statt 0 (Austritt löscht nur bei sicherem „kein Mitglied“)
+	 * @throws TeamUnavailableException
+	 */
+	public function currentLevel(string $teamId, string $uid): int {
+		if (!$this->isAvailable()) {
+			throw new TeamUnavailableException('Teams not available');
+		}
+		try {
+			$cm = $this->container->get(CirclesManager::class);
+		} catch (\Throwable $e) {
+			throw new TeamUnavailableException('Teams not available', 0, $e);
+		}
+		$previous = $this->current($cm);
+		try {
+			$singleId = $cm->getLocalFederatedUser($uid)->getSingleId();
+			return $cm->getLink($teamId, $singleId)->getLevel();
+		} catch (MembershipNotFoundException) {
+			return 0;
+		} catch (\Throwable $e) {
+			throw new TeamUnavailableException('Team level lookup failed', 0, $e);
+		} finally {
+			$this->restore($cm, $previous);
+		}
+	}
+
+	/** @return array{id: string, name: string}|null gelöschtes Team aus DestroyingCircleEvent/CircleDestroyedEvent */
+	public function destroyedTeam(object $event): ?array {
+		if (!$event instanceof CircleGenericEvent && !$event instanceof CircleResultGenericEvent) {
+			return null;
+		}
+		$circle = $event->getCircle();
+		return ['id' => $circle->getSingleId(), 'name' => $circle->getDisplayName()];
+	}
+
+	/** @return list<array{team: string, single: string}> entfernte Mitgliedschaften aus MembershipsRemovedEvent (direkt und geerbt) */
+	public function removedMemberships(object $event): array {
+		if (!$event instanceof MembershipsRemovedEvent) {
+			return [];
+		}
+		return array_values(array_map(static fn (Membership $m) => ['team' => $m->getCircleId(), 'single' => $m->getSingleId()], $event->getMemberships()));
 	}
 
 	/** Für MembershipsRemovedEvent (M5b) */

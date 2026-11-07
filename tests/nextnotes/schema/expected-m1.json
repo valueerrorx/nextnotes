@@ -20,7 +20,8 @@
       },
       "indexes": {
         "nn_ws_owner": [false, ["owner_type", "owner_id"]],
-        "nn_ws_asg": [true, ["owner_id", "linked_team_id"]]
+        "nn_ws_asg": [true, ["owner_id", "linked_team_id"]],
+        "nn_ws_cby": [false, ["created_by"]]
       }
     },
     "nextnotes_teams": {

@@ -32,6 +32,18 @@ up_one() {
 		dc "$env" exec -T -u www-data -e OC_PASS="$NN_TEST_PASS" "$svc" \
 			php occ user:add --password-from-env "$NN_TEST_USER" >/dev/null
 	fi
+	# Circles-Loopback (R17): nginx/fpm erreicht sich nicht über localhost → Dienstname als Loopback und vertrauenswürdige Domain
+	[[ "$env" == nginx ]] && occ "$env" config:system:set trusted_domains 1 --value=web-nginx >/dev/null
+	# direkt nach Konfig-Änderungen antwortet der Loopback kurz mit 401 → bis zu 5 Versuche; ein Fehlschlag leert loopback_tmp_*
+	for i in $(seq 1 5); do
+		if [[ "$env" == nginx ]]; then
+			occ "$env" config:app:set circles loopback_tmp_scheme --value=http >/dev/null
+			occ "$env" config:app:set circles loopback_tmp_id --value=web-nginx >/dev/null
+		fi
+		occ "$env" circles:check --type loopback -n </dev/null >/dev/null 2>&1 && break
+		[[ $i -eq 5 ]] && die "$env: circles:check loopback fehlgeschlagen"
+		sleep 3
+	done
 	echo "$env: bereit ($(base_url "$env"), Nextcloud $ver)"
 }
 

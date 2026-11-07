@@ -41,48 +41,55 @@ class QuotaService {
 	}
 
 	/**
-	 * Besitzerwechsel (Verschieben aus requireLeave-Wegen): Anhänge der verschobenen Notizen zählen beim Ziel-Besitzer
-	 * @return array{type: string, id: string, ws: int, bytes: int}|null
+	 * Besitzerwechsel (Verschieben aus requireLeave-Wegen): Anhänge der verschobenen Notizen zählen beim Ziel-Besitzer.
+	 * Vorprüfung ohne Sperre; enforce() sperrt Quell- und Ziel-Besitzer und zählt die Bytes unter Sperre neu (auch bei 0 in der Vorprüfung)
+	 * @return array{type: string, id: string, ws: int, bytes: int, leave?: LeaveRequest}|null
 	 */
 	public function forLeave(LeaveRequest $r): ?array {
 		if (!$r->leaves() || !$r->changesOwner()) {
 			return null;
 		}
-		$src = (int)$r->source->getId();
-		$folders = array_map(static fn ($f) => (int)$f->getId(), $r->folders);
-		$bytes = match ($r->kind) {
-			LeaveRequest::WORKSPACE => $this->attachments->sizeLeaving($src),
-			LeaveRequest::FOLDER => $this->attachments->sizeLeaving($src, $folders, null),
-			LeaveRequest::NOTES => $this->attachments->sizeLeaving($src, $folders === [] ? null : $folders, $r->noteIds),
-			default => 0,
-		};
-		return $this->quotaFor((int)$r->target->getId(), $bytes);
+		$quota = ['type' => (string)$r->target->getOwnerType(), 'id' => (string)$r->target->getOwnerId(), 'ws' => (int)$r->target->getId(), 'bytes' => 0, 'leave' => $r];
+		$this->checkSum($quota);
+		return $quota;
 	}
 
 	/**
 	 * Zwei Prüfungen gegen denselben Ziel-Workspace zusammenfassen (z. B. neue Bilder + Umzug beim PATCH)
-	 * @param array{type: string, id: string, ws: int, bytes: int}|null $a
-	 * @param array{type: string, id: string, ws: int, bytes: int}|null $b
-	 * @return array{type: string, id: string, ws: int, bytes: int}|null
+	 * @param array{type: string, id: string, ws: int, bytes: int, leave?: LeaveRequest}|null $a
+	 * @param array{type: string, id: string, ws: int, bytes: int, leave?: LeaveRequest}|null $b
+	 * @return array{type: string, id: string, ws: int, bytes: int, leave?: LeaveRequest}|null
 	 */
 	public function combine(?array $a, ?array $b): ?array {
 		if ($a === null || $b === null) {
 			return $a ?? $b;
 		}
 		$a['bytes'] += $b['bytes'];
+		if (isset($b['leave'])) {
+			$a['leave'] = $b['leave'];
+		}
 		$this->checkSum($a);
 		return $a;
 	}
 
 	/**
-	 * Erste Anweisung der Transaktion: alle Workspace-Zeilen des Besitzers sperren (SQLite: Schreibsperre vor jedem Lesen), dann unter Sperre erneut prüfen
-	 * @param array{type: string, id: string, ws: int, bytes: int}|null $quota
+	 * Erste Anweisung der Transaktion: Workspace-Zeilen der Besitzer sperren (SQLite: Schreibsperre vor jedem Lesen), dann unter Sperre erneut prüfen.
+	 * Feste Reihenfolge über alle Besitzer (Typ, ID), damit gegenläufiges Verschieben nicht verklemmt (M5a-r2 H1); Aufrufer sperren danach nur noch Zeilen dieser Besitzer
+	 * @param array{type: string, id: string, ws: int, bytes: int, leave?: LeaveRequest}|null $quota
 	 */
 	public function enforce(?array $quota): void {
 		if ($quota === null) {
 			return;
 		}
-		$this->workspaceMapper->lockOwner($quota['type'], $quota['id']);
+		$owners = [$quota['type'] . "\0" . $quota['id'] => [$quota['type'], $quota['id']]];
+		if (isset($quota['leave'])) {
+			$src = $quota['leave']->source;
+			$owners[$src->getOwnerType() . "\0" . $src->getOwnerId()] = [(string)$src->getOwnerType(), (string)$src->getOwnerId()];
+		}
+		ksort($owners, SORT_STRING);
+		foreach ($owners as [$type, $id]) {
+			$this->workspaceMapper->lockOwner($type, $id);
+		}
 		$this->checkSum($quota);
 	}
 
@@ -90,13 +97,29 @@ class QuotaService {
 		return $this->appConfig->getValueInt(Application::APP_ID, 'attachment_quota_mb', AttachmentService::DEFAULT_QUOTA_MB) * self::MB;
 	}
 
-	/** @param array{type: string, id: string, ws: int, bytes: int} $quota */
+	// Anhänge, die mit dem Verschieben den Besitzer wechseln (gleiche Zeilen wie AccessService::requireLeave)
+	private function leavingBytes(LeaveRequest $r): int {
+		$src = (int)$r->source->getId();
+		$folders = array_map(static fn ($f) => (int)$f->getId(), $r->folders);
+		return match ($r->kind) {
+			LeaveRequest::WORKSPACE => $this->attachments->sizeLeaving($src),
+			LeaveRequest::FOLDER => $this->attachments->sizeLeaving($src, $folders, null),
+			LeaveRequest::NOTES => $this->attachments->sizeLeaving($src, $folders === [] ? null : $folders, $r->noteIds),
+			default => 0,
+		};
+	}
+
+	/** @param array{type: string, id: string, ws: int, bytes: int, leave?: LeaveRequest} $quota */
 	private function checkSum(array $quota): void {
+		$bytes = $quota['bytes'] + (isset($quota['leave']) ? $this->leavingBytes($quota['leave']) : 0);
+		if ($bytes <= 0) {
+			return;
+		}
 		$wsIds = [$quota['ws']];
 		if ($quota['type'] === 'user' || $quota['type'] === 'team') {
 			$wsIds = array_map(static fn ($w) => (int)$w->getId(), $this->workspaceMapper->findByOwner($quota['type'], $quota['id']));
 		}
-		if ($this->attachments->sizeInWorkspaces($wsIds) + $quota['bytes'] > $this->limit()) {
+		if ($this->attachments->sizeInWorkspaces($wsIds) + $bytes > $this->limit()) {
 			throw new TooLargeException('Storage quota exceeded');
 		}
 	}

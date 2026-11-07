@@ -29,6 +29,9 @@ use Psr\Log\LoggerInterface;
 class UserDataService {
 	public const DELETED = 'deleted';
 
+	/** @var array<string, string[]> uid → Team-IDs aus BeforeUserDeletedEvent (Circles entfernt die Mitgliedschaft im UserDeletedEvent) */
+	private array $teamsBefore = [];
+
 	public function __construct(
 		private IDBConnection $db,
 		private Transaction $tx,
@@ -43,6 +46,11 @@ class UserDataService {
 		private LoggerInterface $logger,
 		private BackgroundFiles $backgrounds,
 	) {
+	}
+
+	/** @param string[] $teamIds */
+	public function rememberTeams(string $uid, array $teamIds): void {
+		$this->teamsBefore[$uid] = $teamIds;
 	}
 
 	/**
@@ -61,8 +69,9 @@ class UserDataService {
 				->where($qb->expr()->eq('owner_type', $qb->createNamedParameter('user')))
 				->andWhere($qb->expr()->eq('owner_id', $qb->createNamedParameter($uid)))
 				->executeStatement();
-			// Hintergrundbilder in fremden Workspaces (eigene gehen mit dem Workspace im Job)
-			$this->backgrounds->queueUser($this->shares->workspaceIdsSharedWith($uid), $uid);
+			// Hintergrundbilder in fremden Workspaces: Freigaben und Team-Workspaces der Teams vor der Löschung bzw. mit created_by (R15); eigene gehen mit dem Workspace im Job
+			$teamWs = $this->workspaces->teamWorkspaceIdsFor($this->teamsBefore[$uid] ?? [], $uid);
+			$this->backgrounds->queueUser(array_merge($this->shares->workspaceIdsSharedWith($uid), $teamWs), $uid, false);
 			$qb = $this->db->getQueryBuilder();
 			$qb->delete(WsShareMapper::TABLE)
 				->where($qb->expr()->eq('share_type', $qb->createNamedParameter('user')))
@@ -77,12 +86,13 @@ class UserDataService {
 			$this->clear(NoteMapper::TABLE, 'updated_by', $uid);
 			$this->clear(AttachmentMapper::TABLE, 'created_by', $uid);
 			$this->clear(SnapshotMapper::TABLE, 'created_by', $uid);
-			// M5/M6: Team-Workspaces, Aufgaben (owner_uid, created_by) und Abgaben (student_uid, feedback_by) hier ergänzen
+			// Team-Workspaces bleiben (gehören dem Team, ADR 0003), created_by oben NULL; M6: Aufgaben (owner_uid, created_by) und Abgaben (student_uid, feedback_by) hier ergänzen
 			if ($moved > 0) {
 				$this->jobs->add(UserDataDeletionJob::class, ['token' => $token]);
 			}
 			return $moved > 0;
 		});
+		unset($this->teamsBefore[$uid]);
 		$this->workspaceService->reset();
 		return $found ? $token : null;
 	}

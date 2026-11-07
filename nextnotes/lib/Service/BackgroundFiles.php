@@ -73,16 +73,17 @@ class BackgroundFiles {
 	/**
 	 * Freigabe entzogen bzw. Konto gelöscht: Bilder und Deckkraft von $uid in diesen Workspaces
 	 * @param int[] $wsIds
+	 * @param bool $withConfig false bei Kontolöschung (der Kern löscht alle Benutzerwerte)
 	 */
-	public function queueUser(array $wsIds, string $uid): void {
+	public function queueUser(array $wsIds, string $uid, bool $withConfig = true): void {
 		$wsIds = array_values(array_unique(array_map('intval', $wsIds)));
 		if ($wsIds === []) {
 			return;
 		}
-		$this->cleanup->add(function () use ($wsIds, $uid): void {
+		$this->cleanup->add(function () use ($wsIds, $uid, $withConfig): void {
 			foreach ($wsIds as $wsId) {
 				$this->folder($wsId, $uid, false)?->delete();
-				foreach (self::OPACITY_PREFIXES as $prefix) {
+				foreach ($withConfig ? self::OPACITY_PREFIXES : [] as $prefix) {
 					$this->config->deleteUserConfig($uid, Application::APP_ID, $prefix . $wsId);
 				}
 			}

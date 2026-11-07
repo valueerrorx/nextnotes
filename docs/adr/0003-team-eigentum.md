@@ -38,3 +38,9 @@ Option 2:
 - Verlassen-Regel (Thomas, 2026-11-07): Team-Inhalte verlassen den Team-Workspace nur ins selbe Team oder als eigene Notiz in den eigenen privaten Workspace; eine Prüfstelle `AccessService::requireLeave` (SPEC §3). Ausnahme „In privat umwandeln“ (M5b): übernimmt alle Notizen aller früheren Mitglieder.
 - Teilen gilt nur für Benutzer-Workspaces; Freigabezeilen auf Team-Workspaces verleihen nichts (ADR 0014).
 
+
+## Nachtrag M5b (2026-11-07)
+- Events: `CircleDestroy`/`MemberRemove` sind in Circles asynchron; `manage()` läuft im Web im Loopback-Request, in CLI synchron. Next Notes hört auf `DestroyingCircleEvent` (aus `manage()`) und `CircleDestroyedEvent` (aus `result()`), beide idempotent (bedingtes UPDATE `active → orphaned`), und auf `MembershipsRemovedEvent`. Registrierung über Klassennamen, Auswertung nur in `TeamService`; Listener werfen nie.
+- Austritt räumt nur, wenn das Team noch existiert und das effektive Level strikt (ohne Cache, Fehler → nichts tun) 0 ist; bei Team-Löschung räumt nicht der Austritt, sondern Umwandeln bzw. Purge (M5c).
+- Umwandeln verlangt zusätzlich, dass das Team eindeutig fehlt (`exists()` = null): `DestroyingCircleEvent` kommt vor dem eigentlichen Löschen, ein verwaister Zustand allein darf die Notizen eines noch bestehenden Teams nicht an `created_by` geben (Review M5b-r1).
+- „In privat umwandeln“ (Thomas, 2026-11-07): Der verwaiste Team-Workspace geht samt **allen** Notizen aller früheren Mitglieder an `created_by` – bewusste Ausnahme von der Verlassen-Regel, weil die Notizen sonst nach 30 Tagen gelöscht würden. Spuren anderer Konten (Erinnerungen, Erwähnungs-Status, Sperren, Hintergrundbilder) und alte Freigabezeilen werden dabei entfernt; Autorenangaben (`notes.created_by`) bleiben.

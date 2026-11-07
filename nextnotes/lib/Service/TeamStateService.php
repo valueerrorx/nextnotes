@@ -49,6 +49,17 @@ class TeamStateService {
 		return $this->teams->findByTeamId($teamId)?->getTeamNameSnapshot();
 	}
 
+	// Team gelöscht (Event): Zeile sicherstellen, dann bedingt active → orphaned; true nur beim ersten Übergang
+	public function markOrphaned(string $teamId, ?string $name): bool {
+		$now = $this->time->getTime();
+		$this->teams->insertIgnore($teamId, $name, $now);
+		if ($name !== null && $name !== '') {
+			$this->teams->updateSnapshot($teamId, $name, $now);
+		}
+		unset($this->stored[$teamId]);
+		return $this->teams->markOrphaned($teamId, $now);
+	}
+
 	public function resetCache(): void {
 		$this->stored = [];
 	}

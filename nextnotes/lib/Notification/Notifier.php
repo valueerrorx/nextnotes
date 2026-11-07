@@ -11,6 +11,9 @@ namespace OCA\NextNotes\Notification;
 
 use OCA\NextNotes\AppInfo\Application;
 use OCA\NextNotes\Db\NoteMapper;
+use OCA\NextNotes\Db\TeamMapper;
+use OCA\NextNotes\Db\Workspace;
+use OCA\NextNotes\Db\WorkspaceMapper;
 use OCA\NextNotes\Service\AccessService;
 use OCA\NextNotes\Service\WorkspaceService;
 use OCP\AppFramework\Db\DoesNotExistException;
@@ -22,7 +25,7 @@ use OCP\Notification\INotification;
 use OCP\Notification\INotifier;
 use OCP\Notification\UnknownNotificationException;
 
-// Erinnerungen und Erwähnungen in der NC-Glocke (SPEC §6); ohne Leserecht oder Notiz verschwindet die Benachrichtigung
+// Erinnerungen, Erwähnungen und Team-Lebenszyklus in der NC-Glocke (SPEC §6); ohne Leserecht oder Objekt verschwindet die Benachrichtigung
 class Notifier implements INotifier {
 	public function __construct(
 		private IFactory $l10nFactory,
@@ -31,6 +34,8 @@ class Notifier implements INotifier {
 		private NoteMapper $notes,
 		private WorkspaceService $workspaces,
 		private IUserManager $users,
+		private TeamMapper $teams,
+		private WorkspaceMapper $workspaceRows,
 	) {
 	}
 
@@ -42,7 +47,14 @@ class Notifier implements INotifier {
 		return $this->l10nFactory->get(Application::APP_ID)->t('Next Notes');
 	}
 
+	// Löschfrist verwaister Team-Workspaces (SPEC §8)
+	public const ORPHAN_DAYS = 30;
+
 	public function prepare(INotification $notification, string $languageCode): INotification {
+		if ($notification->getApp() === Application::APP_ID && $notification->getObjectType() === 'team'
+			&& in_array($notification->getSubject(), ['team_orphaned', 'team_deletion_soon'], true)) {
+			return $this->prepareTeam($notification, $languageCode);
+		}
 		if ($notification->getApp() !== Application::APP_ID || $notification->getObjectType() !== 'note'
 			|| !in_array($notification->getSubject(), ['reminder', 'task_reminder', 'mention'], true)) {
 			throw new UnknownNotificationException();
@@ -105,5 +117,32 @@ class Notifier implements INotifier {
 			$notification->setParsedMessage($message);
 		}
 		return $notification;
+	}
+
+	// Nur solange das Team verwaist ist und der Empfänger noch created_by eines Team-Workspace ist (umgewandelt/gelöscht → weg)
+	private function prepareTeam(INotification $notification, string $languageCode): INotification {
+		$uid = $notification->getUser();
+		$teamId = $notification->getObjectId();
+		$team = $this->teams->findByTeamId($teamId);
+		$own = array_values(array_filter($this->workspaceRows->findForTeam($teamId), static fn (Workspace $w) => $w->getCreatedBy() === $uid));
+		if ($team === null || $team->getState() !== 'orphaned' || $team->getOrphanedAt() === null || $own === []) {
+			throw new AlreadyProcessedException();
+		}
+		$l = $this->l10nFactory->get(Application::APP_ID, $languageCode);
+		$name = trim((string)($notification->getSubjectParameters()['team'] ?? '')) ?: trim((string)$team->getTeamNameSnapshot());
+		$date = (string)$l->l('date', (int)$team->getOrphanedAt() + self::ORPHAN_DAYS * 86400);
+		$subject = $notification->getSubject() === 'team_orphaned'
+			? $l->t('The team {team} was deleted. Its workspaces will be deleted on {date}.')
+			: $l->t('Workspaces of the deleted team {team} will be deleted on {date}.');
+		$message = $l->t('Export them or convert them into a private workspace to keep the notes.');
+		$key = $this->workspaces->keyFor($uid, (int)$own[0]->getId());
+		$link = $this->urls->linkToRouteAbsolute('nextnotes.page.indexphp') . ($key !== null ? '?' . http_build_query(['workspace' => $key]) : '');
+		$teamParam = ['type' => 'highlight', 'id' => $teamId, 'name' => $name !== '' ? $name : $l->t('Team')];
+		$dateParam = ['type' => 'highlight', 'id' => 'deletion-date', 'name' => $date];
+		return $notification->setParsedSubject(str_replace(['{team}', '{date}'], [$teamParam['name'], $date], $subject))
+			->setRichSubject($subject, ['team' => $teamParam, 'date' => $dateParam])
+			->setParsedMessage($message)
+			->setLink($link)
+			->setIcon($this->urls->getAbsoluteURL($this->urls->imagePath(Application::APP_ID, 'app-dark.svg')));
 	}
 }

@@ -41,6 +41,20 @@ class TeamMapper extends QBMapper {
 		]);
 	}
 
+	// Nur active → orphaned (bedingt, idempotent); Rückgabe: Zeile geändert
+	public function markOrphaned(string $teamId, int $now): bool {
+		$qb = $this->db->getQueryBuilder();
+		return $qb->update(self::TABLE)
+			->set('state', $qb->createNamedParameter('orphaned'))
+			->set('orphaned_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT))
+			->set('missing_count', $qb->createNamedParameter(0, IQueryBuilder::PARAM_INT))
+			->set('deletion_notified_at', $qb->createNamedParameter(null, IQueryBuilder::PARAM_NULL))
+			->set('updated_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT))
+			->where($qb->expr()->eq('team_id', $qb->createNamedParameter($teamId)))
+			->andWhere($qb->expr()->eq('state', $qb->createNamedParameter('active')))
+			->executeStatement() > 0;
+	}
+
 	public function updateSnapshot(string $teamId, string $name, int $now): void {
 		$qb = $this->db->getQueryBuilder();
 		$qb->update(self::TABLE)

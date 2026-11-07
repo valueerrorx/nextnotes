@@ -161,6 +161,7 @@ return [
 		['name' => 'workspaces_api#store', 'url' => '/api/v1/workspaces', 'verb' => 'POST'],
 		['name' => 'workspaces_api#update', 'url' => '/api/v1/workspaces/{name}', 'verb' => 'PATCH', 'requirements' => ['name' => '.+']],
 		['name' => 'workspaces_api#destroy', 'url' => '/api/v1/workspaces/{name}', 'verb' => 'DELETE', 'requirements' => ['name' => '.+']],
+		['name' => 'workspaces_api#makePrivate', 'url' => '/api/v1/workspaces/{name}/make-private', 'verb' => 'POST', 'requirements' => ['name' => '.+']],
 		['name' => 'teams_api#index', 'url' => '/api/v1/teams', 'verb' => 'GET'],
 		['name' => 'tags_api#index', 'url' => '/api/v1/tags', 'verb' => 'GET'],
 		['name' => 'tags_api#rename', 'url' => '/api/v1/tags/{tag}', 'verb' => 'PATCH', 'requirements' => ['tag' => '[^/]+']],

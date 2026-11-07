@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OCA\NextNotes\Controller;
 
 use OCA\NextNotes\Service\Exception\BadRequestException;
+use OCA\NextNotes\Service\TeamLifecycleService;
 use OCA\NextNotes\Service\WorkspaceDeletion;
 use OCA\NextNotes\Service\WorkspaceService;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
@@ -18,7 +19,7 @@ use OCP\IRequest;
 use OCP\IUserSession;
 
 class WorkspacesApiController extends ApiController {
-	public function __construct(IRequest $request, IUserSession $userSession, WorkspaceService $workspaces, private WorkspaceDeletion $deletion) {
+	public function __construct(IRequest $request, IUserSession $userSession, WorkspaceService $workspaces, private WorkspaceDeletion $deletion, private TeamLifecycleService $lifecycle) {
 		parent::__construct($request, $userSession, $workspaces);
 	}
 
@@ -52,5 +53,11 @@ class WorkspacesApiController extends ApiController {
 		$in = $this->input();
 		$this->deletion->delete($this->uid(), $name, $in['target'] ?? null, in_array($in['confirm'] ?? null, [true, 1, '1', 'true'], true));
 		return $this->ok();
+	}
+
+	// Verwaisten Team-Workspace in privaten umwandeln (nur created_by, Plan M5 §2.4)
+	#[NoAdminRequired]
+	public function makePrivate(string $name): JSONResponse {
+		return $this->ok(['name' => $this->lifecycle->makePrivate($this->uid(), $name)]);
 	}
 }

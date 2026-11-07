@@ -164,6 +164,26 @@ class WorkspaceMapper extends QBMapper {
 		return $this->findByOwner('team', $teamId, 'normal');
 	}
 
+	/**
+	 * Team-Workspaces (kind=normal) dieser Teams oder mit created_by = $uid (Kontolöschung: Hintergrundbilder gezielt, Plan M5 §2.4)
+	 * @param string[] $teamIds
+	 * @return int[]
+	 */
+	public function teamWorkspaceIdsFor(array $teamIds, string $uid): array {
+		$ids = [];
+		foreach (array_chunk(array_values(array_unique($teamIds)), 1000) ?: [[]] as $chunk) {
+			$qb = $this->db->getQueryBuilder();
+			$expr = $qb->expr();
+			$byCreator = $expr->eq('created_by', $qb->createNamedParameter($uid));
+			$qb->select('id')->from(self::TABLE)
+				->where($expr->eq('owner_type', $qb->createNamedParameter('team')))
+				->andWhere($expr->eq('kind', $qb->createNamedParameter('normal')))
+				->andWhere($chunk === [] ? $byCreator : $expr->orX($expr->in('owner_id', $qb->createNamedParameter($chunk, IQueryBuilder::PARAM_STR_ARRAY)), $byCreator));
+			array_push($ids, ...array_map('intval', $qb->executeQuery()->fetchFirstColumn()));
+		}
+		return array_values(array_unique($ids));
+	}
+
 	public function deleteById(int $id): void {
 		$qb = $this->db->getQueryBuilder();
 		$qb->delete(self::TABLE)

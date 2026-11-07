@@ -168,6 +168,8 @@ final class IsolationTest extends ApiTestCase {
 			'POST /workspaces' => ['scoped-write', 'path' => '/workspaces', 'body' => ['name' => 'Neu Iso'], 'reason' => 'keine Objekt-ID; legt nur bei B an'],
 			'PATCH /workspaces/{}' => ['owned', 'cases' => [['path' => '/workspaces/{ws}', 'body' => ['new_name' => 'Umbenannt Iso']]]],
 			'DELETE /workspaces/{}' => ['owned', 'cases' => [['path' => '/workspaces/{ws}', 'body' => []]]],
+			// M5b: eigener privater Workspace → 400 (kein Team-Workspace); Team-Fälle in Teams/TeamLifecycleTest
+			'POST /workspaces/{}/make-private' => ['owned', 'cases' => [['path' => '/workspaces/{ws}/make-private', 'body' => [], 'control' => 400]]],
 			// Tags: {tag} ist ein Name, kein Objekt (Plan M2c: SCOPED); Wirkung nur im Workspace-Scope des Aufrufers
 			'GET /tags' => ['scoped', 'path' => '/tags', 'sees' => 'tag'],
 			'PATCH /tags/{}' => ['owned', 'cases' => [
@@ -442,7 +444,7 @@ final class IsolationTest extends ApiTestCase {
 			}
 		}
 		self::assertSame([], $errors);
-		self::assertCount(119, $table);
+		self::assertCount(120, $table);
 	}
 
 	public function testDetectorsObject(): void {

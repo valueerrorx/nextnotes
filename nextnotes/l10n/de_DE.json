@@ -51,7 +51,11 @@
   "Next Notes is based on Poznote by Timothé Poznanski and is updated through the Nextcloud app store.": "Next Notes basiert auf Poznote von Timothé Poznanski und wird über den Nextcloud-App-Store aktualisiert.",
   "Next Notes uses the language and time zone of your Nextcloud account.": "Next Notes verwendet die Sprache und Zeitzone Ihres Nextcloud-Kontos.",
   "Profile and security": "Profil und Sicherheit",
-  "Your name, e-mail address, password, two-factor authentication and app passwords are managed in your Nextcloud settings.": "Name, E-Mail-Adresse, Passwort, Zwei-Faktor-Authentifizierung und App-Passwörter verwalten Sie in Ihren Nextcloud-Einstellungen."
+  "Your name, e-mail address, password, two-factor authentication and app passwords are managed in your Nextcloud settings.": "Name, E-Mail-Adresse, Passwort, Zwei-Faktor-Authentifizierung und App-Passwörter verwalten Sie in Ihren Nextcloud-Einstellungen.",
+  "The team {team} was deleted. Its workspaces will be deleted on {date}.": "Das Team {team} wurde gelöscht. Seine Workspaces werden am {date} gelöscht.",
+  "Workspaces of the deleted team {team} will be deleted on {date}.": "Die Workspaces des gelöschten Teams {team} werden am {date} gelöscht.",
+  "Export them or convert them into a private workspace to keep the notes.": "Exportiere sie oder wandle sie in einen privaten Workspace um, um die Notizen zu behalten.",
+  "Team": "Team"
  },
  "pluralForm": "nplurals=2; plural=(n != 1);"
 }

@@ -24,6 +24,8 @@ final class Teams {
 	private array $teams = [];
 	/** @var string[] angelegte Gruppen */
 	private array $groups = [];
+	// zuletzt von addGroup() angelegte Gruppe
+	public string $lastGroup = '';
 
 	public static function cm(): CirclesManager {
 		return Server::get(CirclesManager::class);
@@ -73,6 +75,7 @@ final class Teams {
 			$group->addUser(Server::get(IUserManager::class)->get($uid));
 		}
 		$this->groups[] = $gid;
+		$this->lastGroup = $gid;
 		return $this->add($teamId, $ownerUid, self::cm()->getFederatedUser($gid, Member::TYPE_GROUP), Member::LEVEL_MEMBER);
 	}
 
@@ -103,7 +106,8 @@ final class Teams {
 		self::reset();
 	}
 
-	public function destroy(string $ownerUid, string $teamId): void {
+	// $keepData: Team-Workspaces bleiben (Lebenszyklus M5b), Aufräumen im cleanup()
+	public function destroy(string $ownerUid, string $teamId, bool $keepData = false): void {
 		$cm = self::cm();
 		try {
 			$cm->startSession($cm->getLocalFederatedUser($ownerUid));
@@ -111,9 +115,16 @@ final class Teams {
 		} finally {
 			$cm->stopSession();
 		}
-		unset($this->teams[$teamId]);
-		self::purgeTeamData($teamId);
+		if (!$keepData) {
+			unset($this->teams[$teamId]);
+			self::purgeTeamData($teamId);
+		}
 		self::reset();
+	}
+
+	// Team nur für cleanup() vormerken (z. B. über HTTP zerstört)
+	public function track(string $teamId, string $ownerUid): void {
+		$this->teams[$teamId] = $ownerUid;
 	}
 
 	public static function reset(): void {

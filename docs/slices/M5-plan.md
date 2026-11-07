@@ -209,6 +209,7 @@ Reihenfolge = Tabelle. M5b braucht M5a (Zustand, Adapter); M5c braucht M5b (Zust
 | Q2 | Team-Workspace löschen | **entschieden** (Thomas 2026-11-07): nur in Workspace desselben Teams verschieben, sonst nach Bestätigung endgültig löschen; nie privat | – |
 | Q3 | „nur lesen“ im Freigabe-Dialog | **entschieden** (Thomas 2026-11-07): ja, Standard „bearbeiten“ | – |
 | Q4 | Teams anlegen/verwalten | **entschieden** (Thomas 2026-11-07): Next Notes legt keine Teams an; Link nur bei aktiver Contacts-App | – |
+| O6 | Teams ohne `kind=normal`-Workspace (nur Aufgaben) beim Lösch-Event verwaisen (M5b behandelt nur Teams mit Team-Workspace; Review M5b-r1 H4) | in M6 `TeamLifecycleService::teamDeleted` um Aufgaben-Teams erweitern | M6 |
 | Q5 | R16 Notizfarben: Palette des Besitzers in geteilten, Standardpalette in Team-Workspaces (vorläufig Lead) | Produkt (gering) | Lead, zur Durchsicht |
 
 ## 7. Änderungen r2
