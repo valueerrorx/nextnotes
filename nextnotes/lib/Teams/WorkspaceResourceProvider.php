@@ -23,6 +23,8 @@ use OCP\Teams\TeamResource;
 
 // Team-Workspaces als Ressourcen des Teams (Plan M5 §2.3); Mitgliedschaft prüft der Kern, die Probe-Regel prüfen wir
 class WorkspaceResourceProvider implements ITeamResourceProvider {
+	private ?string $icon = null;
+
 	public function __construct(
 		private WorkspaceMapper $workspaces,
 		private TeamService $teams,
@@ -41,9 +43,13 @@ class WorkspaceResourceProvider implements ITeamResourceProvider {
 		return $this->l->t('Next Notes');
 	}
 
+	// App-Icon in Textfarbe (hell/dunkel); dasselbe Icon an jedem Workspace statt des allgemeinen Dokument-Icons
 	public function getIconSvg(): string {
-		$svg = @file_get_contents($this->appManager->getAppPath(Application::APP_ID) . '/img/app-dark.svg');
-		return is_string($svg) ? $svg : '';
+		if ($this->icon === null) {
+			$svg = @file_get_contents($this->appManager->getAppPath(Application::APP_ID) . '/img/app-dark.svg');
+			$this->icon = is_string($svg) ? str_replace('fill="#000"', 'fill="currentColor"', $svg) : '';
+		}
+		return $this->icon;
 	}
 
 	/** @return TeamResource[] */
@@ -53,12 +59,14 @@ class WorkspaceResourceProvider implements ITeamResourceProvider {
 		}
 		$team = $this->teamState->snapshotName($teamId) ?? $teamId;
 		$base = $this->urls->linkToRouteAbsolute('nextnotes.page.indexphp');
+		$icon = $this->getIconSvg();
 		return array_map(fn (Workspace $ws) => new TeamResource(
 			$this,
 			(string)$ws->getId(),
 			(string)$ws->getName(),
 			// Langform „Name (Team, #id)“ löst resolveKey für jedes Mitglied auf (SPEC §4.4)
 			$base . '?' . http_build_query(['workspace' => $ws->getName() . ' (' . $team . ', #' . $ws->getId() . ')']),
+			$icon !== '' ? $icon : null,
 		), $this->workspaces->findForTeam($teamId));
 	}
 

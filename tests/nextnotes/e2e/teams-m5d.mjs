@@ -5,7 +5,7 @@
 // Umwandeln; Editor Nur-Lesen ohne Sperr-Request; Erstellen-Menü schließt per Escape und Klick direkt nach Öffnen (B65). 0 CSP/Konsole.
 import { runSpec } from './lib/harness.mjs';
 import { apiClient } from './lib/api.mjs';
-import { createTeam, ensureUser, occ, orphanTeam } from './lib/docker.mjs';
+import { createTeam, ensureUser, occ, orphanTeam, share } from './lib/docker.mjs';
 
 const RUN = `${process.argv[3]}${Date.now().toString(36)}`;
 const A = process.env.NN_USER;
@@ -106,6 +106,60 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	const rowB = (htmlB.match(new RegExp(`<li class="ws-row[^"]*" data-ws="${TW}">([\\s\\S]*?)</li>`)) || [])[1] || '';
 	ctx.ok(rowB.includes('nn-team-badge') && !rowB.includes('workspace-rename-action') && !rowB.includes('btn-delete'), 'B: Kennzeichen, keine Verwalten-Einträge');
 
+	// ---------- 3a. „@“ ohne Neuladen (M5d2, P32): neuer Team-Workspace, Wechsel privat/geteilt/anderes Team ----------
+	const members = () => page.evaluate(() => (Array.isArray(window.PoznoteMentionMembers) ? window.PoznoteMentionMembers.slice().sort() : null));
+	const membersAre = async (want) => page.waitForFunction((w) => JSON.stringify((window.PoznoteMentionMembers || []).slice().sort()) === JSON.stringify(w), [...want].sort(), { timeout: 8000 }).then(() => true, () => false);
+	const switchWs = async (key) => {
+		await page.evaluate((k) => window.switchToWorkspace(k), key);
+		await page.waitForLoadState('networkidle');
+	};
+	const m3 = ctx.mark();
+	ctx.ok(await membersAre([B]), 'neuer Team-Workspace ohne Neuladen: B vorgeschlagen', JSON.stringify(await members()));
+	// neue Notiz direkt nach dem Anlegen (Ablauf Thomas): „@“ öffnet das Menü, Enter schreibt „@uid“
+	await page.click('#sidebarCreateBtn');
+	await Promise.all([page.waitForLoadState('networkidle'), page.click('#create-menu [data-type="html"]')]);
+	const entry = page.locator('#right_col .noteentry');
+	await entry.waitFor({ state: 'visible', timeout: 8000 });
+	const uiNote = await entry.getAttribute('data-note-id');
+	await entry.click();
+	await page.keyboard.type('Bitte ');
+	await page.keyboard.type(`@${B.slice(0, 1)}`);
+	const menuEl = page.locator('.mention-autocomplete-menu');
+	ctx.ok(await menuEl.waitFor({ state: 'visible', timeout: 5000 }).then(() => true, () => false), '„@“ öffnet das Erwähnungs-Menü');
+	ctx.ok((await menuEl.innerText().catch(() => '')).includes(B), 'Menü nennt B');
+	await ctx.screenshot(page, 'mention-menu');
+	await page.keyboard.press('Enter');
+	ctx.ok(await menuEl.count() === 0, 'Menü nach Auswahl zu');
+	await page.keyboard.type('prüfen');
+	ctx.ok((await entry.innerText()).includes(`@${B} prüfen`), 'Auswahl schreibt „@uid“');
+	let saved = false;
+	for (let i = 0; i < 20 && !saved; i++) {
+		saved = ((await api.must('GET', `/notes/${uiNote}`)).note?.content ?? '').includes(`@${B}`);
+		if (!saved) await page.waitForTimeout(500);
+	}
+	ctx.ok(saved, 'Autosave speichert die Erwähnung');
+	// privater, nicht geteilter Workspace: keine Vorschläge; geteilter: Empfänger; anderes Team: dessen Mitglieder
+	await switchWs(start);
+	ctx.ok(await membersAre([]), 'privat ohne Freigabe: keine Vorschläge', JSON.stringify(await members()));
+	const SW = `Geteilt ${RUN}`;
+	await api.must('POST', '/workspaces', { name: SW });
+	share(ctx.base, A, SW, C, 'write');
+	await switchWs(SW);
+	ctx.ok(await membersAre([C]), 'geteilter Workspace: Empfänger C', JSON.stringify(await members()));
+	const team2 = createTeam(ctx.base, B, `Fachgruppe ${RUN}`, { [A]: 4, [C]: 1 });
+	const TW2 = `Fach ${RUN}`;
+	await apiB.must('POST', '/workspaces', { name: TW2, team: team2 });
+	const key2 = ((await api.must('GET', '/workspaces')).workspaces ?? []).map((w) => w.name).find((n) => n.startsWith(TW2));
+	ctx.ok(!!key2, 'A (Moderator) sieht Team-Workspace des zweiten Teams', key2);
+	await switchWs(TW);
+	ctx.ok(await membersAre([B]), 'zurück im Team-Workspace: B', JSON.stringify(await members()));
+	await switchWs(key2);
+	ctx.ok(await membersAre([B, C]), 'anderes Team ohne Neuladen: B und C, nicht A selbst', JSON.stringify(await members()));
+	await page.goBack({ waitUntil: 'networkidle' });
+	ctx.ok(await membersAre([B]), 'Zurück-Taste: wieder B', JSON.stringify(await members()));
+	ctx.ok(!ctx.requests.slice(m3.q).some((r) => r.url.includes('/mentions/members') && !r.url.includes('/apps/nextnotes/')), 'Mitglieder-Abfrage in der App');
+	ctx.assertClean('Erwähnung ohne Neuladen', m3);
+
 	// ---------- 3. Erwähnung im Team ----------
 	await page.goto(ctx.appUrl(`index.php?workspace=${encodeURIComponent(TW)}`), { waitUntil: 'networkidle' });
 	ctx.ok(await page.evaluate((b) => Array.isArray(window.PoznoteMentionMembers) && window.PoznoteMentionMembers.includes(b), B), 'B in den Erwähnungs-Vorschlägen');
@@ -119,6 +173,10 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	};
 	ctx.ok((await notif(ctxB.request, B)).length === 1, 'B erhält die Erwähnung');
 	ctx.ok((await notif(ctxC.request, C)).length === 0, 'C (kein Mitglied) erhält nichts');
+	const uiNotif = await ctxB.request.get(`${ctx.base}/ocs/v2.php/apps/notifications/api/v2/notifications?format=json`, {
+		headers: { Authorization: `Basic ${Buffer.from(`${B}:${process.env.NN_PASS2}`).toString('base64')}`, 'OCS-APIRequest': 'true' },
+	}).then((r) => r.json()).catch(() => ({}));
+	ctx.ok((uiNotif?.ocs?.data ?? []).some((n) => n.app === 'nextnotes' && n.object_id === String(uiNote)), 'B erhält die im Editor geschriebene Erwähnung');
 	ctx.assertClean('Team-Workspace', m2);
 
 	// ---------- 4. Banner eingefroren ----------

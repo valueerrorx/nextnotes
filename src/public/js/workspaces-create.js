@@ -189,6 +189,25 @@ function switchToWorkspace(workspaceName) {
     refreshLeftColumnForWorkspace(workspaceName);
 }
 
+// Next Notes (P32): "@" suggestions follow every in-place switch (the page
+// global was set for the workspace the page loaded with)
+function refreshMentionMembers(workspaceName) {
+    window.PoznoteMentionMembers = [];
+    fetch('/api/v1/mentions/members?workspace=' + encodeURIComponent(workspaceName), {
+        headers: { 'Accept': 'application/json' },
+        credentials: 'same-origin'
+    })
+        .then(function (response) { return response.ok ? response.json() : null; })
+        .then(function (data) {
+            if (!data || !Array.isArray(data.members) || selectedWorkspace !== workspaceName) return;
+            var self = String(window.userId || '').toLowerCase();
+            window.PoznoteMentionMembers = data.members.filter(function (m) {
+                return String(m).toLowerCase() !== self;
+            });
+        })
+        .catch(function () {});
+}
+
 function closeWorkspaceMenus() {
     var menu1 = document.getElementById('workspaceMenu');
     var menu2 = document.getElementById('workspaceMenuMobile');
@@ -209,6 +228,7 @@ function updateWorkspaceNameInHeaders(workspaceName) {
 }
 
 function refreshLeftColumnForWorkspace(workspaceName) {
+    refreshMentionMembers(workspaceName);
     var url = new URL(window.location.href);
     url.searchParams.delete('note');
     url.searchParams.set('workspace', workspaceName);
