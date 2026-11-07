@@ -134,6 +134,32 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	ctx.ok(await entry.getAttribute('data-nn-material-copy') === '1', 'S: Duplikat-Kennzeichen am Editor');
 	ctx.ok(locks.length === 0, 'S: kein Sperr-Request', locks.join(' '));
 	ctx.ok(await pb.locator('.note-edit-lock-banner').count() === 0, 'S: kein Sperr-Banner');
+	// M6c-fix: Glocke und Duplizieren aktiv, Schreibwerkzeuge gesperrt; Erinnerung als Schüler setzen und löschen
+	const tb = pb.locator(`#note${n1} .note-edit-toolbar`);
+	const usable = (sel) => tb.locator(sel).first().evaluate((b) => !b.disabled && getComputedStyle(b).pointerEvents !== 'none');
+	ctx.ok(await usable('.btn-reminder'), 'S: Glocke aktiv');
+	ctx.ok(await usable('.btn-duplicate'), 'S: Duplizieren in der Leiste aktiv');
+	for (const sel of ['.btn-bold', '.btn-trash', '.btn-move', '.btn-attachment']) {
+		ctx.ok(!(await usable(sel)), `S: ${sel} gesperrt`);
+	}
+	await tb.locator('.btn-reminder').click();
+	ctx.ok(await pb.locator('#reminderModal').isVisible(), 'S: Erinnerungs-Dialog offen');
+	const when = new Date(Date.now() + 86400000);
+	const pad = (x) => String(x).padStart(2, '0');
+	// Feld ist versteckt (eigene Datums-/Zeitknöpfe): Wert direkt setzen
+	await pb.locator('#reminderDateInput').evaluate((i, v) => { i.value = v; i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new Event('change', { bubbles: true })); },
+		`${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())}T${pad(when.getHours())}:${pad(when.getMinutes())}`);
+	const setRem = pb.waitForResponse((r) => r.url().includes(`/notes/${n1}/reminder`) && r.request().method() === 'POST');
+	await pb.locator('#reminderSaveBtn').click();
+	ctx.ok((await setRem).status() === 200, 'S: Erinnerung gesetzt → 200');
+	ctx.ok(await tb.locator('.btn-reminder.has-reminder').count() === 1, 'S: Glocke markiert');
+	ctx.ok(!!(await apiB.must('GET', `/notes/${n1}/reminder`)).reminder_at, 'S: Erinnerung gespeichert');
+	await tb.locator('.btn-reminder').click();
+	const delRem = pb.waitForResponse((r) => r.url().includes(`/notes/${n1}/reminder`) && r.request().method() === 'DELETE');
+	await pb.locator('#reminderRemoveBtn').click();
+	ctx.ok((await delRem).status() === 200, 'S: Erinnerung gelöscht → 200');
+	ctx.ok((await apiB.must('GET', `/notes/${n1}/reminder`)).reminder_at === null, 'S: keine Erinnerung mehr');
+	await ctx.screenshot(pb, 'reminder-student');
 	// Notiz-Menü: Duplizieren bleibt, Schreibaktionen weg
 	const openNoteMenu = async (p, id) => {
 		await p.locator(`#left_col a[data-note-id="${id}"]`).first().hover();

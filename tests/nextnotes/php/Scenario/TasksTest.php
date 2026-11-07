@@ -167,4 +167,64 @@ final class TasksTest extends ApiTestCase {
 		}
 		self::assertCount(count($ids), self::tasks($a, $tl));
 	}
+
+	/** Erwähnungs-Benachrichtigungen (App nextnotes) zu Notiz und Empfänger */
+	private static function mentionNotifications(int $noteId, string $uid): int {
+		$qb = self::db()->getQueryBuilder();
+		$qb->select($qb->func()->count('*'))->from('notifications')
+			->where($qb->expr()->eq('app', $qb->createNamedParameter('nextnotes')))
+			->andWhere($qb->expr()->eq('subject', $qb->createNamedParameter('mention')))
+			->andWhere($qb->expr()->eq('object_type', $qb->createNamedParameter('note')))
+			->andWhere($qb->expr()->eq('object_id', $qb->createNamedParameter((string)$noteId)))
+			->andWhere($qb->expr()->eq('user', $qb->createNamedParameter($uid)));
+		return (int)$qb->executeQuery()->fetchOne();
+	}
+
+	// M6c-fix: REST-Aufgaben benachrichtigen neu genannte @uid wie PATCH /notes/{id} (SPEC §6)
+	public function testRestTaskMentionsNotify(): void {
+		$a = $this->createUser('na');
+		$b = $this->createUser('nb');
+		$c = $this->createUser('nc');
+		$d = $this->createUser('nd');
+		[$ws, $wsId] = self::newWorkspace($a, 'Erwähnt');
+		Server::get(WorkspaceService::class)->share($a->uid, $wsId, $b->uid, 'read');
+		Server::get(WorkspaceService::class)->share($a->uid, $wsId, $d->uid, 'write');
+		$tl = self::tasklist($a, $ws);
+		$t = self::ok($a->call('POST', "/notes/$tl/tasks", ['text' => "Bitte @{$b->uid} und @{$a->uid} und @{$c->uid}"]), 'create')['task'];
+		$tid = TaskService::idString($t['id']);
+		self::assertSame(1, self::mentionNotifications($tl, $b->uid), 'B (Leserecht): genau eine');
+		self::assertSame(0, self::mentionNotifications($tl, $a->uid), 'nie an sich selbst');
+		self::assertSame(0, self::mentionNotifications($tl, $c->uid), 'C ohne Recht: keine');
+		self::ok($a->call('PATCH', "/notes/$tl/tasks/$tid", ['text' => "Bitte @{$b->uid} heute"]), 'patch');
+		self::assertSame(1, self::mentionNotifications($tl, $b->uid), 'schon genannt: keine weitere');
+		$sid = TaskService::idString(self::ok($a->call('POST', "/notes/$tl/tasks/$tid/subtasks", ['text' => "Teil für @{$d->uid}"]), 'sub')['subtask']['id']);
+		self::assertSame(1, self::mentionNotifications($tl, $d->uid), 'Unteraufgabe: D benachrichtigt');
+		self::ok($a->call('PATCH', "/notes/$tl/tasks/$tid/subtasks/$sid", ['completed' => true]), 'sub patch');
+		self::assertSame(1, self::mentionNotifications($tl, $d->uid), 'unveränderter Text: keine weitere');
+		self::ok($d->call('POST', "/notes/$tl/tasks", ['text' => "Rückfrage @{$a->uid}"]), 'D legt an');
+		self::assertSame(1, self::mentionNotifications($tl, $a->uid), 'A von D genannt');
+	}
+
+	// M6c-fix: persönliche Erinnerungen mit Leserecht (SPEC §2.2/§3); Fälligkeit (dueAt) nur mit Schreibrecht
+	public function testReadOnlyPersonalReminders(): void {
+		$a = $this->createUser('ra');
+		$b = $this->createUser('rb');
+		[$ws, $wsId] = self::newWorkspace($a, 'Lesen');
+		Server::get(WorkspaceService::class)->share($a->uid, $wsId, $b->uid, 'read');
+		$n = self::newNote($a, $ws, 'Notiz', '<p>x</p>');
+		$tl = self::tasklist($a, $ws);
+		$tid = TaskService::idString(self::ok($a->call('POST', "/notes/$tl/tasks", ['text' => 'Eins']), 'task')['task']['id']);
+		$before = self::dump($a->uid)['notes'];
+		$at = gmdate('Y-m-d\TH:i:s\Z', time() + 3600);
+		self::ok($b->call('POST', "/notes/$n/reminder", ['reminder_at' => $at]), 'B Erinnerung setzen');
+		self::assertNotNull(self::ok($b->call('GET', "/notes/$n/reminder"), 'B GET')['reminder_at']);
+		self::assertNull(self::ok($a->call('GET', "/notes/$n/reminder"), 'A GET')['reminder_at'], 'gehört nur B');
+		self::ok($b->call('POST', "/notes/$n/reminder", ['reminder_at' => gmdate('Y-m-d\TH:i:s\Z', time() + 7200)]), 'B ändern');
+		self::ok($b->call('DELETE', "/notes/$n/reminder"), 'B löschen');
+		self::assertNull(self::ok($b->call('GET', "/notes/$n/reminder"), 'B GET danach')['reminder_at']);
+		self::ok($b->call('POST', "/notes/$tl/task-reminder", ['task_id' => $tid, 'reminder_at' => $at]), 'B Aufgaben-Erinnerung');
+		self::ok($b->call('DELETE', "/notes/$tl/task-reminder" . self::q(['task_id' => $tid])), 'B Aufgaben-Erinnerung löschen');
+		self::assertSame(403, $b->call('PATCH', "/notes/$tl/tasks/$tid", ['due_at' => '2030-01-01'])->status, 'dueAt nur mit Schreibrecht');
+		self::assertSame($before, self::dump($a->uid)['notes'], 'Erinnerungen ändern keinen Inhalt');
+	}
 }

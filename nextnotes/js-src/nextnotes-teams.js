@@ -585,6 +585,31 @@
 		};
 	}
 
+	// Nur-Lesen (P11) sperrt die ganze Werkzeugleiste; Erinnerung (persönlich) und bei Material Duplizieren (Q1) wieder freigeben
+	function releaseControl(c) {
+		if (!c || !c.hasAttribute('data-note-lock-managed')) return;
+		if ('disabled' in c) c.disabled = c.getAttribute('data-note-lock-prev-disabled') === '1';
+		c.style.pointerEvents = c.getAttribute('data-note-lock-prev-pointer-events') || '';
+		c.style.opacity = c.getAttribute('data-note-lock-prev-opacity') || '';
+		c.classList.remove('note-lock-disabled');
+		c.removeAttribute('aria-disabled');
+		['managed', 'prev-disabled', 'prev-pointer-events', 'prev-opacity'].forEach(function (k) { c.removeAttribute('data-note-lock-' + k); });
+	}
+	function personalControls() {
+		document.querySelectorAll('.noteentry[data-nextnotes-readonly][data-note-id]').forEach(function (entry) {
+			var card = document.getElementById('note' + entry.getAttribute('data-note-id'));
+			if (!card) return;
+			var sel = '.note-edit-toolbar .btn-reminder';
+			if (entry.hasAttribute('data-nn-material-copy')) sel += ', .note-edit-toolbar .btn-duplicate, .mobile-toolbar-menu [data-selector=".btn-duplicate"]';
+			card.querySelectorAll(sel).forEach(releaseControl);
+		});
+	}
+	// nach note-edit-lock.js registriert → läuft nach P11 (Seitenaufbau, Notiz-Wechsel, bfcache)
+	if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', personalControls);
+	else personalControls();
+	document.addEventListener('noteLoaded', personalControls);
+	window.addEventListener('pageshow', function (e) { if (e && e.persisted) personalControls(); });
+
 	// Duplikat einer Material-Notiz ohne Schreibrecht (Q1): Kopie im privaten Workspace, Hinweis mit Link, Ansicht bleibt
 	function copyNotice(workspace, noteId) {
 		var old = document.querySelector('.nn-copy-notice');

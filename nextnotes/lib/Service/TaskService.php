@@ -28,6 +28,7 @@ class TaskService {
 		private WorkspaceService $workspaces,
 		private FolderService $folders,
 		private ReminderMapper $reminders,
+		private MentionService $mentions,
 		private Transaction $tx,
 		private ITimeFactory $time,
 		private IDateTimeZone $timeZone,
@@ -273,14 +274,18 @@ class TaskService {
 	 * @return array<string, mixed>
 	 */
 	private function mutate(string $uid, int $id, callable $change): array {
-		return $this->tx->run(function () use ($uid, $id, $change) {
+		[$out, $note, $old] = $this->tx->run(function () use ($uid, $id, $change) {
 			$this->notes->lockRow($id);
 			$note = $this->notes->find($id);
-			[$tasks, $out, $after] = $change(self::rawTasks((string)$note->getContent()), $note);
+			$old = (string)$note->getContent();
+			[$tasks, $out, $after] = $change(self::rawTasks($old), $note);
 			$this->noteService->saveContent($note, self::encode($tasks), $uid);
 			$after();
-			return $out;
+			return [$out, $note, $old];
 		});
+		// neu genannte @uid wie PATCH /notes/{id} (§6), erst nach dem Commit
+		$this->mentions->notifyNew($uid, $note, $old);
+		return $out;
 	}
 
 	/** @return array<string, mixed> */
