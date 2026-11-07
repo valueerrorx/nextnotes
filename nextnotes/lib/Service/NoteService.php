@@ -355,7 +355,7 @@ class NoteService {
 			}
 			$folderId = $folder?->getId();
 			if ($folderId === null && $folderPath !== '') {
-				$folderId = $this->folderService->resolvePath($ws, $folderPath, true);
+				$folderId = $this->folderService->resolvePath($uid, $ws, $folderPath, true);
 			}
 			$linked = null;
 			if (isset($in['linked_note_id']) && (int)$in['linked_note_id'] > 0) {
@@ -527,7 +527,7 @@ class NoteService {
 			if ($path === '') {
 				$folderId = null;
 			} else {
-				$folderId = $this->folderService->resolvePath($ws ?? $this->access->requireWorkspace($uid, $wsId, 'write'), $path, true);
+				$folderId = $this->folderService->resolvePath($uid, $ws ?? $this->access->requireWorkspace($uid, $wsId, 'write'), $path, true);
 				if ($folderId === null) {
 					throw new NotFoundException('Folder not found');
 				}
@@ -579,8 +579,9 @@ class NoteService {
 		}
 		$linked = [];
 		if ($heading !== $oldHeading) {
+			// Verknüpfungen im Material-Zweig ohne Schreibrecht bleiben unverändert (M6a)
 			$writable = $this->access->writableWorkspaceIds($uid);
-			foreach ($this->notes->findList($writable, ['linked_note_id' => (int)$note->getId()], true) as $link) {
+			foreach ($this->access->filterWritable($uid, $this->notes->findList($writable, ['linked_note_id' => (int)$note->getId()], true)) as $link) {
 				$link->setHeading($heading);
 				$link->setUpdatedAt($now);
 				$link->setUpdatedBy($uid);
@@ -634,7 +635,7 @@ class NoteService {
 			if ($meta && $heading !== '' && $heading !== (string)$note->getHeading()) {
 				$changedHeading = $this->uniqueHeading((int)$note->getWorkspaceId(), $note->getFolderId(), $heading, (int)$note->getId());
 				$note->setHeading($changedHeading);
-				foreach ($this->notes->findList($this->access->writableWorkspaceIds($uid), ['linked_note_id' => (int)$note->getId()], true) as $link) {
+				foreach ($this->access->filterWritable($uid, $this->notes->findList($this->access->writableWorkspaceIds($uid), ['linked_note_id' => (int)$note->getId()], true)) as $link) {
 					$link->setHeading($changedHeading);
 					$link->setUpdatedAt($now);
 					$link->setUpdatedBy($uid);
@@ -657,7 +658,7 @@ class NoteService {
 		if ($ws !== null && $ws->getId() !== $note->getWorkspaceId()) {
 			throw new NotFoundException('Note not found');
 		}
-		$links = $this->notes->findList($this->access->writableWorkspaceIds($uid), ['linked_note_id' => $id, 'trashed' => null]);
+		$links = $this->access->filterWritable($uid, $this->notes->findList($this->access->writableWorkspaceIds($uid), ['linked_note_id' => $id, 'trashed' => null]));
 		if ($permanent) {
 			$this->purge(array_merge([$id], array_map(static fn (Note $n) => (int)$n->getId(), $links)));
 			return ['message' => 'Note permanently deleted', 'note' => [
@@ -697,6 +698,8 @@ class NoteService {
 			throw new NotFoundException('Note not found');
 		}
 		$note->setTrashedAt(null);
+		// Wiederherstellen (nur mit Schreibrecht, bei Material Lehrkraft) hebt die Papierkorb-Markierung auf
+		$note->setTrashMaterial(0);
 		// Ordner inzwischen gelöscht → Wurzel (Upstream lässt die Notiz unsichtbar)
 		if ($note->getFolderId() !== null) {
 			try {
@@ -897,9 +900,11 @@ class NoteService {
 		if ($ws === null) {
 			throw new BadRequestException('workspace is required');
 		}
+		// Material ohne Schreibrecht behält Favoriten (M6a)
+		$exclude = $this->access->materialRestricted($uid, $ws) ? array_keys($this->access->materialFolderIds($ws)) : null;
 		return $this->tx->run(fn () => [
-			'notes' => $this->notes->clearFavorites((int)$ws->getId()),
-			'folders' => $this->folders->clearFavorites((int)$ws->getId()),
+			'notes' => $this->notes->clearFavorites((int)$ws->getId(), $exclude),
+			'folders' => $this->folders->clearFavorites((int)$ws->getId(), $exclude ?? []),
 		]);
 	}
 
@@ -929,7 +934,9 @@ class NoteService {
 			} elseif (($targetId === null || $targetId === 0) && is_string($name) && $name !== '' && $targetId === null) {
 				$targetWsEntity = $this->access->requireWorkspace($uid, $targetWs, 'write');
 				$found = array_values(array_filter($this->folders->findInWorkspace($targetWs), static fn (Folder $f) => $f->getName() === $name));
-				$targetId = $found !== [] ? (int)$found[0]->getId() : $this->folderService->resolvePath($targetWsEntity, $this->validator->folderName($name), true);
+				// Ordner per Name: gleiches Schreibrecht wie per ID (Material, M6a)
+				$targetId = $found !== [] ? (int)$this->access->requireFolder($uid, (int)$found[0]->getId(), 'write')->getId()
+					: $this->folderService->resolvePath($uid, $targetWsEntity, $this->validator->folderName($name), true);
 				$folderName = $name;
 			} else {
 				$targetId = null;
@@ -1000,6 +1007,11 @@ class NoteService {
 			$this->access->requireLeave($uid, new LeaveRequest($source, $archive, LeaveRequest::NOTES, [$id]));
 			$created = [];
 			$targetId = $this->folderService->mirrorPath($archive, $path, $created);
+			// Archiv-Ordner im Material-Zweig: nur Lehrkraft (M6a)
+			if ($targetId !== null) {
+				$this->access->resetMaterialCache((int)$archive->getId());
+				$this->access->requireNoMaterial($uid, $archive, [$targetId]);
+			}
 			if ($this->notes->headingExists((int)$archive->getId(), $targetId, (string)$note->getHeading(), $id)) {
 				throw new ConflictException('A note with the same title is already archived in this folder');
 			}
@@ -1095,9 +1107,20 @@ class NoteService {
 			foreach ($siblings as $s) {
 				$byId[(int)$s->getId()] = $s;
 			}
-			$index = $this->insertAt($order, $targetId, $noteId, $position);
-			$this->tx->run(function () use ($order, $byId, $column) {
+			// speed_dial ist workspaceweit: Material ohne Schreibrecht behält seine Position (M6a); andere Bereiche liegen im Ordner des Ziels
+			$writable = array_flip(array_map(static fn (Note $n) => (int)$n->getId(), $this->access->filterWritable($uid, $siblings)));
+			$fixed = array_diff_key(array_flip($order), $writable);
+			if ($fixed === []) {
+				$index = $this->insertAt($order, $targetId, $noteId, $position);
+			} else {
+				$order = FolderService::placeAround($order, $fixed, $noteId, $targetId, $position);
+				$index = (int)array_search($noteId, $order, true);
+			}
+			$this->tx->run(function () use ($order, $byId, $column, $fixed) {
 				foreach ($order as $i => $nid) {
+					if (isset($fixed[$nid])) {
+						continue;
+					}
 					$byId[$nid]->{'set' . $column}($i + 1);
 					$this->notes->update($byId[$nid]);
 				}

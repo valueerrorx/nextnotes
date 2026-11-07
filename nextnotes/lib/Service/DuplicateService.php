@@ -13,6 +13,7 @@ use OCA\NextNotes\Db\Folder;
 use OCA\NextNotes\Db\FolderMapper;
 use OCA\NextNotes\Db\Note;
 use OCA\NextNotes\Db\NoteMapper;
+use OCA\NextNotes\Db\Workspace;
 use OCA\NextNotes\Service\Exception\BadRequestException;
 use OCA\NextNotes\Service\Exception\NotFoundException;
 use OCP\AppFramework\Utility\ITimeFactory;
@@ -118,6 +119,11 @@ class DuplicateService {
 	/** @return array<string, mixed> POST /notes/{id}/duplicate (200 wie Upstream) */
 	public function duplicateNote(string $uid, int $id, array $in): array {
 		$src = $this->access->requireNote($uid, $id, 'read');
+		// Q1: Material ohne Schreibrecht → Kopie in den eigenen privaten Workspace; ausdrückliches Ziel (folder_id) prüft der normale Weg
+		$explicit = isset($in['folder_id']) && $in['folder_id'] !== '' && (int)$in['folder_id'] !== 0;
+		if (!$explicit && $this->access->isMaterialReadOnly($uid, $src)) {
+			return $this->copyMaterialToPrivate($uid, $src, $in);
+		}
 		$wsId = (int)$src->getWorkspaceId();
 		$folderId = $src->getFolderId();
 		if (array_key_exists('folder_id', $in)) {
@@ -149,6 +155,48 @@ class DuplicateService {
 		return ['id' => (int)$copy->getId(), 'heading' => $copy->getHeading(), 'message' => 'Note duplicated successfully', 'share_delta' => 0];
 	}
 
+	/**
+	 * Q1 (Thomas 2026-11-07): Kopie einer Material-Notiz in den privaten Workspace des Schülers (Wurzel, gehört ihm, Schüler-Quote).
+	 * Kopie, keine Verschiebung: die Verlassen-Regel bleibt für alle anderen Wege unverändert.
+	 * @return array<string, mixed>
+	 */
+	private function copyMaterialToPrivate(string $uid, Note $src, array $in): array {
+		// Verknüpfung → Ziel; das Ziel muss selbst Material sein oder die Verlassen-Regel erfüllen (Review M6-Plan r2 Hinweis 2)
+		$note = $this->access->resolveLinked($uid, $src);
+		$target = $this->privateTarget($uid, $in['workspace'] ?? null);
+		if ((int)$note->getId() !== (int)$src->getId() && !$this->access->isMaterialReadOnly($uid, $note)) {
+			$this->access->requireLeave($uid, new LeaveRequest(
+				$this->access->requireWorkspace($uid, (int)$note->getWorkspaceId(), 'read'), $target, LeaveRequest::COPY, [(int)$note->getId()]));
+		}
+		$wsId = (int)$target->getId();
+		$quota = $this->attachments->quotaFor($wsId, $this->attachments->bytesOf([(int)$note->getId()]));
+		$created = [];
+		$copy = $this->run(function () use ($note, $wsId, $uid, $quota, &$created) {
+			$this->attachments->enforceQuota($quota);
+			return $this->cloneNote($note, $wsId, null, $uid, $created);
+		}, $created);
+		return [
+			'id' => (int)$copy->getId(),
+			'heading' => $copy->getHeading(),
+			'message' => 'Note duplicated successfully',
+			'share_delta' => 0,
+			'workspace' => $this->workspaces->keyFor($uid, $wsId),
+		];
+	}
+
+	// Eigener privater Workspace (owner_type=user, kind=normal) aus dem Parameter, sonst der Standard-Workspace; nie Team/geteilt/Aufgaben
+	private function privateTarget(string $uid, mixed $key): Workspace {
+		try {
+			$ws = $this->workspaces->resolveOptional($uid, $key);
+		} catch (NotFoundException) {
+			$ws = null;
+		}
+		if ($ws !== null && $ws->getOwnerType() === 'user' && $ws->getOwnerId() === $uid && $ws->getKind() === 'normal') {
+			return $ws;
+		}
+		return $this->workspaces->defaultWorkspace($uid);
+	}
+
 	/** @return array<string, mixed> POST /folders/{id}/duplicate (201) */
 	public function duplicateFolder(string $uid, int $id, mixed $wsKey): array {
 		$folder = $this->access->requireFolder($uid, $id, 'write');
@@ -159,8 +207,9 @@ class DuplicateService {
 		}
 		$byId = $this->folderService->byId($wsId);
 		$tree = FolderService::subtree($id, $byId);
-		// Kopie im selben Workspace: nur Prüfung gegen systemverwaltete Inhalte (M6)
+		// Kopie im selben Workspace: nur Prüfung gegen systemverwaltete Inhalte (M6); Zweig mit Material nur Lehrkraft (kein Sammel-Kopieren)
 		$wsEntity = $this->access->requireWorkspace($uid, $wsId, 'write');
+		$this->access->requireNoMaterial($uid, $wsEntity, $tree);
 		$this->access->requireLeave($uid, new LeaveRequest($wsEntity, $wsEntity, LeaveRequest::COPY, [], array_map(static fn (int $fid) => $byId[$fid], $tree)));
 		$sourceNotes = $this->notes->findList([$wsId], ['folder_ids' => $tree], true);
 		$byFolder = [];
@@ -207,6 +256,8 @@ class DuplicateService {
 			$f->{'set' . $field}($src->{'get' . $field}());
 		}
 		$f->setKanbanEnabled((int)$src->getKanbanEnabled());
+		// Lehrkraft kopiert Material im selben Team-Workspace: Kennzeichen bleibt
+		$f->setMaterial((int)$src->getMaterial());
 		$f->setDisplayOrder((int)$src->getDisplayOrder());
 		$f->setPinned(0);
 		$f->setFavorite(0);

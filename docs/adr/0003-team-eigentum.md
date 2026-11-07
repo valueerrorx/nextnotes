@@ -52,3 +52,7 @@ Option 2:
 - Löschtermin = `orphaned_at` + 30 Tage, frühestens 7 Tage nach dem Hinweis `team_deletion_soon` (Tag 23). Lief Cron nicht, verschiebt sich die Löschung, statt ohne Hinweis zu löschen; die Benachrichtigungen zeigen diesen Termin.
 - `occ nextnotes:team:orphan-check` ohne `--dry-run` verwaist fehlende Teams sofort (der Admin ist die zweite Bestätigung), löscht aber nie; `--force` übergeht nur den Massenschutz.
 - Sperrreihenfolge Team-Zeile vor Workspace-Zeilen (Purge, Umwandeln); Excalidraw-Vorschauen werden nur gelöscht, wenn keine Notiz und kein Snapshot mehr auf sie verweist (M5c-r1 H2/H4).
+
+## Nachtrag M6a (2026-11-09)
+- Material-Ordner (Thomas, 2026-11-07): Rechte unterhalb des Workspace gibt es nur für Schreiben. Ein Ordner mit `material=1` (rekursiv) ist für Mitglieder (Level 1) eine Nur-Lesen-Freigabe dieses Zweigs; schreiben, verwalten und das Kennzeichen setzen nur Lehrkräfte (Level ≥ 4) eines aktiven Teams. Lesen bleibt workspaceweit, daher bleiben Filter, Suche und Exporte unverändert. Das Kennzeichen wirkt nur in Team-Workspaces `kind=normal` und wird beim Verlassen des Teams und bei „In privat umwandeln“ entfernt.
+- Duplizieren einer Material-Notiz durch einen Schüler (Q1) legt eine Kopie im eigenen privaten Workspace an. Das ist eine Kopie, keine Verschiebung und keine Ausnahme der Verlassen-Regel: Die Quelle bleibt im Team; für alle anderen Notizen (auch das Ziel einer Verknüpfung außerhalb von Material) gilt `requireLeave` unverändert.

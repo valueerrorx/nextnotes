@@ -143,6 +143,11 @@ class FoldersApiController extends ApiController {
 	}
 
 	#[NoAdminRequired]
+	public function material(int $id): JSONResponse {
+		return $this->ok($this->folders->setMaterial($this->uid(), $id, $this->flag('material')));
+	}
+
+	#[NoAdminRequired]
 	public function noteCount(int $id): JSONResponse {
 		return $this->ok($this->folders->noteCount($this->uid(), $id, $this->param('workspace')));
 	}

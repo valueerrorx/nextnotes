@@ -297,6 +297,7 @@ class DiaryService {
 			// Altes Standard-Tagebuch erst markieren, sonst gälte es neben dem neuen nicht mehr als Tagebuch (wie Upstream)
 			$legacy = array_filter($byId, static fn (Folder $f) => (int)$f->getIsDiary() === 1) === [] ? $this->legacyRoot($uid, $byId) : null;
 			if ($legacy !== null && $legacy->getId() !== $existing?->getId()) {
+				$this->access->requireFolder($uid, (int)$legacy->getId(), 'write');
 				$this->markDiary($legacy);
 			}
 			[$result] = $this->folderService->create($uid, ['folder_name' => $name, 'workspace' => $key, 'is_diary' => true]);
@@ -501,7 +502,7 @@ class DiaryService {
 		if ($root === null || !in_array((int)$root->getId(), array_column($this->roots($uid, $byId), 'id'), true)) {
 			return null;
 		}
-		$target = $this->folderService->resolvePath($ws, $root->getName() . '/' . substr($date, 0, 4) . '/' . substr($date, 5, 2), true);
+		$target = $this->folderService->resolvePath($uid, $ws, $root->getName() . '/' . substr($date, 0, 4) . '/' . substr($date, 5, 2), true);
 		return $target !== null && $target !== $currentFolderId ? $target : null;
 	}
 }

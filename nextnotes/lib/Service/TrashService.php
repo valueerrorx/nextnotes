@@ -65,7 +65,8 @@ class TrashService {
 	public function empty(string $uid, mixed $wsKey): int {
 		$ws = $this->workspaces->resolveOptional($uid, $wsKey, 'write');
 		$wsIds = $ws !== null ? [(int)$ws->getId()] : $this->access->writableWorkspaceIds($uid);
-		$ids = array_map(static fn (Note $n) => (int)$n->getId(), $this->notes->findList($wsIds, ['trashed' => true]));
+		// Papierkorb-Notizen aus dem Material-Zweig nur durch Lehrkräfte (M6a)
+		$ids = array_map(static fn (Note $n) => (int)$n->getId(), $this->access->filterWritable($uid, $this->notes->findList($wsIds, ['trashed' => true])));
 		$this->noteService->purge($ids);
 		return count($ids);
 	}

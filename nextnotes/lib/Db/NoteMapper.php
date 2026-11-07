@@ -20,7 +20,7 @@ class NoteMapper extends QBMapper {
 	// Spalten für Listen (ohne Inhalt)
 	public const LIST_COLUMNS = ['id', 'workspace_id', 'folder_id', 'heading', 'type', 'role', 'linked_note_id',
 		'favorite', 'pinned', 'icon', 'icon_color', 'color', 'title_color', 'title_size', 'content_width',
-		'display_order', 'dashboard_order', 'speed_dial_order', 'kanban_order', 'kanban_completed', 'trashed_at',
+		'display_order', 'dashboard_order', 'speed_dial_order', 'kanban_order', 'kanban_completed', 'trashed_at', 'trash_material',
 		'created_by', 'updated_by', 'created_at', 'updated_at'];
 
 	public function __construct(IDBConnection $db) {
@@ -464,14 +464,56 @@ class NoteMapper extends QBMapper {
 		}
 	}
 
-	public function clearFavorites(int $workspaceId): int {
+	/** @param int[]|null $excludeFolderIds Ordner ohne Schreibrecht (Material, M6a); gesetzt → auch trash_material ausgelassen */
+	public function clearFavorites(int $workspaceId, ?array $excludeFolderIds = null): int {
 		$qb = $this->db->getQueryBuilder();
-		return $qb->update(self::TABLE)
+		$expr = $qb->expr();
+		$qb->update(self::TABLE)
 			->set('favorite', $qb->createNamedParameter(0, IQueryBuilder::PARAM_INT))
-			->where($qb->expr()->eq('workspace_id', $qb->createNamedParameter($workspaceId, IQueryBuilder::PARAM_INT)))
-			->andWhere($qb->expr()->eq('favorite', $qb->createNamedParameter(1, IQueryBuilder::PARAM_INT)))
-			->andWhere($qb->expr()->eq('role', $qb->createNamedParameter('note')))
-			->executeStatement();
+			->where($expr->eq('workspace_id', $qb->createNamedParameter($workspaceId, IQueryBuilder::PARAM_INT)))
+			->andWhere($expr->eq('favorite', $qb->createNamedParameter(1, IQueryBuilder::PARAM_INT)))
+			->andWhere($expr->eq('role', $qb->createNamedParameter('note')));
+		if ($excludeFolderIds !== null) {
+			$qb->andWhere($expr->eq('trash_material', $qb->createNamedParameter(0, IQueryBuilder::PARAM_INT)));
+		}
+		if ($excludeFolderIds !== null && $excludeFolderIds !== []) {
+			$qb->andWhere($expr->orX($expr->isNull('folder_id'),
+				$expr->notIn('folder_id', $qb->createNamedParameter(array_values($excludeFolderIds), IQueryBuilder::PARAM_INT_ARRAY))));
+		}
+		return $qb->executeStatement();
+	}
+
+	/**
+	 * Papierkorb-Markierung für Notizen aus einem gelöschten Material-Zweig (M6a)
+	 * @param int[] $folderIds
+	 */
+	public function markTrashMaterial(int $workspaceId, array $folderIds): void {
+		foreach (array_chunk(array_values(array_unique($folderIds)), 1000) as $chunk) {
+			$qb = $this->db->getQueryBuilder();
+			$qb->update(self::TABLE)
+				->set('trash_material', $qb->createNamedParameter(1, IQueryBuilder::PARAM_INT))
+				->where($qb->expr()->eq('workspace_id', $qb->createNamedParameter($workspaceId, IQueryBuilder::PARAM_INT)))
+				->andWhere($qb->expr()->in('folder_id', $qb->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY)))
+				->executeStatement();
+		}
+	}
+
+	/**
+	 * Papierkorb-Markierung entfernen (Verlassen des Teams, make_private; Review M6a-r1 Hinweis 2)
+	 * @param int[]|null $folderIds null = ganzer Workspace
+	 */
+	public function clearTrashMaterial(int $workspaceId, ?array $folderIds = null): void {
+		foreach ($folderIds === null ? [null] : array_chunk(array_values(array_unique($folderIds)), 1000) as $chunk) {
+			$qb = $this->db->getQueryBuilder();
+			$qb->update(self::TABLE)
+				->set('trash_material', $qb->createNamedParameter(0, IQueryBuilder::PARAM_INT))
+				->where($qb->expr()->eq('workspace_id', $qb->createNamedParameter($workspaceId, IQueryBuilder::PARAM_INT)))
+				->andWhere($qb->expr()->eq('trash_material', $qb->createNamedParameter(1, IQueryBuilder::PARAM_INT)));
+			if ($chunk !== null) {
+				$qb->andWhere($qb->expr()->in('folder_id', $qb->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY)));
+			}
+			$qb->executeStatement();
+		}
 	}
 
 	// Zeilensperre bis zum Ende der Transaktion (Update ohne Wertänderung, DB-neutral)

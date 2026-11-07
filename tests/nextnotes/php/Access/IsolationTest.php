@@ -155,6 +155,8 @@ final class IsolationTest extends ApiTestCase {
 			'PUT /folders/{}/color' => ['owned', 'cases' => [['path' => '/folders/{f1}/color', 'body' => ['color' => '#00ff00']]]],
 			'PUT /folders/{}/pinned' => ['owned', 'cases' => [['path' => '/folders/{f1}/pinned', 'body' => ['pinned' => true]]]],
 			'PUT /folders/{}/favorite' => ['owned', 'cases' => [['path' => '/folders/{f1}/favorite', 'body' => ['favorite' => true]]]],
+			// M6a: eigener privater Ordner → 400 not_a_team_workspace; Team-Fälle in Material/MaterialAccessTest
+			'PUT /folders/{}/material' => ['owned', 'cases' => [['path' => '/folders/{f1}/material', 'body' => ['material' => true], 'control' => 400]]],
 			'GET /folders/{}/notes' => ['owned', 'cases' => [['path' => '/folders/{f1}/notes', 'query' => $wsQ, 'hints' => $hq]]],
 			'GET /folders/{}/path' => ['owned', 'cases' => [['path' => '/folders/{f1}/path', 'query' => $wsQ, 'hints' => $hq]]],
 			// Papierkorb
@@ -446,7 +448,7 @@ final class IsolationTest extends ApiTestCase {
 			}
 		}
 		self::assertSame([], $errors);
-		self::assertCount(121, $table);
+		self::assertCount(122, $table);
 	}
 
 	public function testDetectorsObject(): void {

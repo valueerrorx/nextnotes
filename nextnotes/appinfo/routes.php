@@ -152,6 +152,7 @@ return [
 		['name' => 'folders_api#updateColor', 'url' => '/api/v1/folders/{id}/color', 'verb' => 'PUT', 'requirements' => ['id' => '\d+']],
 		['name' => 'folders_api#updatePinned', 'url' => '/api/v1/folders/{id}/pinned', 'verb' => 'PUT', 'requirements' => ['id' => '\d+']],
 		['name' => 'folders_api#updateFavorite', 'url' => '/api/v1/folders/{id}/favorite', 'verb' => 'PUT', 'requirements' => ['id' => '\d+']],
+		['name' => 'folders_api#material', 'url' => '/api/v1/folders/{id}/material', 'verb' => 'PUT', 'requirements' => ['id' => '\d+']],
 		['name' => 'folders_api#noteCount', 'url' => '/api/v1/folders/{id}/notes', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
 		['name' => 'folders_api#path', 'url' => '/api/v1/folders/{id}/path', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
 		['name' => 'trash_api#index', 'url' => '/api/v1/trash', 'verb' => 'GET'],

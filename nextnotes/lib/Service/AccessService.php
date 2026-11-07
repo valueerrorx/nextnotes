@@ -37,6 +37,8 @@ class AccessService {
 	private array $levels = [];
 	/** @var array<string, array<int, int>> Cache uid → [wsId → Stufe] aller sichtbaren Workspaces */
 	private array $visibility = [];
+	/** @var array<int, array<int, true>> Cache wsId → Ordner im Material-Zweig (M6a) */
+	private array $material = [];
 
 	public function __construct(
 		private WorkspaceMapper $workspaces,
@@ -87,6 +89,7 @@ class AccessService {
 	public function resetCache(): void {
 		$this->levels = [];
 		$this->visibility = [];
+		$this->material = [];
 		$this->teams->resetCache();
 		$this->teamState->resetCache();
 	}
@@ -233,6 +236,11 @@ class AccessService {
 	}
 
 	public function noteLevel(string $uid, Note $note): int {
+		return $this->noteLevelFor($uid, $note, true);
+	}
+
+	// $write = false: nur Leserecht gefragt, Material-Prüfung entfällt (Lesepfade ohne Zusatzabfrage)
+	private function noteLevelFor(string $uid, Note $note, bool $write): int {
 		// Vorlagen/Abgaben ab M6, bis dahin deny by default
 		if ($note->getRole() !== 'note' || $note->getWorkspaceId() === null) {
 			return self::NONE;
@@ -242,7 +250,132 @@ class AccessService {
 		} catch (DoesNotExistException) {
 			return self::NONE;
 		}
-		return min($this->workspaceLevel($uid, $ws), self::WRITE);
+		$level = min($this->workspaceLevel($uid, $ws), self::WRITE);
+		// Material: Lesen bleibt workspaceweit, Schreiben nur Lehrkraft (Plan M6 §2.1)
+		if ($write && $level === self::WRITE && $this->isMaterialNote($ws, $note) && !$this->canManageTeam($uid, $ws)) {
+			return self::READ;
+		}
+		return $level;
+	}
+
+	// ---------- Material-Ordner (M6a, Plan M6 §2.1) ----------
+
+	/**
+	 * Ordner im Material-Zweig (eigene und geerbte); wirkt nur in Team-Workspaces kind=normal; eine Abfrage je Workspace und Request
+	 * @return array<int, true>
+	 */
+	public function materialFolderIds(Workspace $ws): array {
+		if ($ws->getOwnerType() !== 'team' || $ws->getKind() !== 'normal') {
+			return [];
+		}
+		$wsId = (int)$ws->getId();
+		if (isset($this->material[$wsId])) {
+			return $this->material[$wsId];
+		}
+		$tree = $this->folders->materialTree($wsId);
+		$children = [];
+		$queue = [];
+		foreach ($tree as $id => [$parent, $flag]) {
+			if ($parent !== null) {
+				$children[$parent][] = $id;
+			}
+			if ($flag) {
+				$queue[] = $id;
+			}
+		}
+		$out = [];
+		while ($queue !== []) {
+			$id = array_pop($queue);
+			if (isset($out[$id])) {
+				continue;
+			}
+			$out[$id] = true;
+			array_push($queue, ...($children[$id] ?? []));
+		}
+		return $this->material[$wsId] = $out;
+	}
+
+	// Nach Verschieben/Löschen/Wiederherstellen von Ordnern oder Ändern des Kennzeichens (unter der Workspace-Sperre, H2)
+	public function resetMaterialCache(?int $wsId = null): void {
+		if ($wsId === null) {
+			$this->material = [];
+		} else {
+			unset($this->material[$wsId]);
+		}
+	}
+
+	private function isMaterialNote(Workspace $ws, Note $note): bool {
+		if ($ws->getOwnerType() !== 'team' || $ws->getKind() !== 'normal') {
+			return false;
+		}
+		if ((int)$note->getTrashMaterial() === 1) {
+			return true;
+		}
+		return $note->getFolderId() !== null && isset($this->materialFolderIds($ws)[(int)$note->getFolderId()]);
+	}
+
+	/** Mitglied mit Schreibrecht, aber ohne Lehrkraft-Recht, und Notiz im Material-Zweig (Q1: Duplikat in den privaten Workspace) */
+	public function isMaterialReadOnly(string $uid, Note $note): bool {
+		if ($note->getRole() !== 'note' || $note->getWorkspaceId() === null) {
+			return false;
+		}
+		try {
+			$ws = $this->workspaces->find((int)$note->getWorkspaceId());
+		} catch (DoesNotExistException) {
+			return false;
+		}
+		return $this->workspaceLevel($uid, $ws) === self::WRITE && $this->isMaterialNote($ws, $note) && !$this->canManageTeam($uid, $ws);
+	}
+
+	/** Schreibschutz für Material greift (Team-Workspace kind=normal, aktives Mitglied ohne Lehrkraft-Recht) */
+	public function materialRestricted(string $uid, Workspace $ws): bool {
+		return $ws->getOwnerType() === 'team' && $ws->getKind() === 'normal'
+			&& $this->workspaceLevel($uid, $ws) === self::WRITE && !$this->canManageTeam($uid, $ws);
+	}
+
+	/**
+	 * Sammel-/Nebenschreiber: Notizen ohne Material-Schutz für den Akteur (Workspace-Schreibrecht prüft der Aufrufer)
+	 * @param Note[] $notes
+	 * @return Note[]
+	 */
+	public function filterWritable(string $uid, array $notes): array {
+		$candidates = [];
+		$wsCache = [];
+		foreach ($notes as $n) {
+			$wsId = (int)$n->getWorkspaceId();
+			if (!array_key_exists($wsId, $wsCache)) {
+				try {
+					$wsCache[$wsId] = $this->workspaces->find($wsId);
+				} catch (DoesNotExistException) {
+					$wsCache[$wsId] = null;
+				}
+			}
+			if ($wsCache[$wsId] !== null && $this->isMaterialNote($wsCache[$wsId], $n)) {
+				$candidates[(int)$n->getId()] = $wsId;
+			}
+		}
+		if ($candidates === []) {
+			return array_values($notes);
+		}
+		$blocked = [];
+		foreach (array_unique($candidates) as $wsId) {
+			$blocked[$wsId] = !$this->canManageTeam($uid, $wsCache[$wsId]);
+		}
+		return array_values(array_filter($notes, static fn (Note $n) => !isset($candidates[(int)$n->getId()]) || !$blocked[$candidates[(int)$n->getId()]]));
+	}
+
+	/**
+	 * Ordnerzweig (Löschen, Verschieben, Archivieren, Ordner-Tags, Duplizieren) enthält Material → nur Lehrkraft
+	 * @param int[] $folderIds
+	 */
+	public function requireNoMaterial(string $uid, Workspace $ws, array $folderIds): void {
+		$material = $this->materialFolderIds($ws);
+		if ($material === [] || array_filter($folderIds, static fn (int $id) => isset($material[$id])) === []) {
+			return;
+		}
+		if (!$this->canManageTeam($uid, $ws)) {
+			throw new ForbiddenException('Only teachers can change material folders');
+		}
 	}
 
 	/**
@@ -283,7 +416,7 @@ class AccessService {
 		} catch (DoesNotExistException) {
 			throw new NotFoundException('Note not found');
 		}
-		$level = $this->noteLevel($uid, $note);
+		$level = $this->noteLevelFor($uid, $note, $perm !== 'read');
 		$this->check($level, $perm === 'manage' ? 'write' : $perm, 'Note not found');
 		if ($trashed === false && $note->getTrashedAt() !== null) {
 			throw new NotFoundException('Note not found');
@@ -311,7 +444,7 @@ class AccessService {
 
 	public function canRead(string $uid, int $noteId): bool {
 		try {
-			return $this->noteLevel($uid, $this->notes->find($noteId)) >= self::READ;
+			return $this->noteLevelFor($uid, $this->notes->find($noteId), false) >= self::READ;
 		} catch (DoesNotExistException) {
 			return false;
 		}
@@ -329,6 +462,10 @@ class AccessService {
 		$this->check($level, $perm === 'manage' ? 'write' : $perm, 'Folder not found');
 		if ($perm === 'manage' && $folder->getAssignmentId() !== null) {
 			throw new ForbiddenException('This folder is managed by the system');
+		}
+		// Material-Zweig: schreiben und verwalten nur Lehrkraft (Plan M6 §2.1)
+		if ($perm !== 'read' && isset($this->materialFolderIds($ws)[$id]) && !$this->canManageTeam($uid, $ws)) {
+			throw new ForbiddenException('Only teachers can change material folders');
 		}
 		return $folder;
 	}

@@ -18,6 +18,7 @@ use OCA\NextNotes\Db\Workspace;
 use OCA\NextNotes\Db\WorkspaceMapper;
 use OCA\NextNotes\Service\Exception\BadRequestException;
 use OCA\NextNotes\Service\Exception\ConflictException;
+use OCA\NextNotes\Service\Exception\ForbiddenException;
 use OCA\NextNotes\Service\Exception\NotFoundException;
 use OCP\AppFramework\Utility\ITimeFactory;
 
@@ -119,9 +120,38 @@ class FolderService {
 		$f->setIconColor($extra['icon_color'] ?? null);
 		$f->setColor($extra['color'] ?? null);
 		$f->setSortSetting($extra['sort_setting'] ?? null);
+		$f->setMaterial((int)($extra['material'] ?? 0));
 		$f->setCreatedAt($now);
 		$f->setUpdatedAt($now);
 		return $this->folders->insert($f);
+	}
+
+	/**
+	 * Material-Zweig aus schon geladenen Ordnern (Anzeige, ohne Abfrage)
+	 * @param array<int, Folder> $byId
+	 * @return array<int, true>
+	 */
+	public static function materialSet(array $byId): array {
+		$out = [];
+		foreach ($byId as $id => $f) {
+			for ($cur = $f, $d = 0; $cur !== null && $d < 50; $d++) {
+				if ((int)$cur->getMaterial() === 1) {
+					$out[$id] = true;
+					break;
+				}
+				$cur = $cur->getParentId() !== null ? ($byId[$cur->getParentId()] ?? null) : null;
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * @param array<int, true> $material
+	 * @return array{material: bool, material_inherited: bool}
+	 */
+	private static function materialView(Folder $f, array $material): array {
+		$own = (int)$f->getMaterial() === 1;
+		return ['material' => $own, 'material_inherited' => !$own && isset($material[(int)$f->getId()])];
 	}
 
 	private function folderView(string $uid, Folder $f): array {
@@ -146,11 +176,11 @@ class FolderService {
 		return $folder;
 	}
 
-	// Pfad → Ordner-ID wie resolveFolderPathToId inkl. refuseAmbiguousFolderName (409)
-	public function resolvePath(Workspace $ws, string $path, bool $create): ?int {
+	// Pfad → Ordner-ID wie resolveFolderPathToId inkl. refuseAmbiguousFolderName (409); Ergebnis bzw. Elternordner neuer Ordner mit Schreibrecht (Material, M6a)
+	public function resolvePath(string $uid, Workspace $ws, string $path, bool $create): ?int {
 		// B64: Sperre wirkt nur in einer Transaktion; ohne offene selbst eine öffnen
 		if ($create && !$this->tx->active()) {
-			return $this->tx->run(fn () => $this->resolvePath($ws, $path, true));
+			return $this->tx->run(fn () => $this->resolvePath($uid, $ws, $path, true));
 		}
 		$path = trim($path);
 		if ($path === '' || strtolower($path) === 'default') {
@@ -164,12 +194,12 @@ class FolderService {
 		if (count($segments) === 1) {
 			$root = $this->folders->findSibling($wsId, null, $segments[0]);
 			if ($root !== null) {
-				return (int)$root->getId();
+				return (int)$this->access->requireFolder($uid, (int)$root->getId(), 'write')->getId();
 			}
 			$byId = $this->byId($wsId);
 			$matches = array_values(array_filter($byId, static fn (Folder $f) => $f->getName() === $segments[0]));
 			if (count($matches) === 1) {
-				return (int)$matches[0]->getId();
+				return (int)$this->access->requireFolder($uid, (int)$matches[0]->getId(), 'write')->getId();
 			}
 			if (count($matches) > 1) {
 				$candidates = array_map(static fn (Folder $f) => ['id' => (int)$f->getId(), 'path' => self::pathOf((int)$f->getId(), $byId)], $matches);
@@ -182,6 +212,7 @@ class FolderService {
 		}
 		$parentId = null;
 		$locked = false;
+		$inserted = false;
 		foreach ($segments as $seg) {
 			$found = $this->folders->findSibling($wsId, $parentId, $seg);
 			if ($found === null && $create && !$locked) {
@@ -193,10 +224,19 @@ class FolderService {
 			if ($found !== null) {
 				$parentId = (int)$found->getId();
 			} elseif ($create) {
+				// Schreibrecht am tiefsten vorhandenen Ordner unter der Sperre, bevor angelegt wird (H2)
+				if (!$inserted && $parentId !== null) {
+					$this->access->resetMaterialCache($wsId);
+					$this->access->requireFolder($uid, $parentId, 'write');
+				}
+				$inserted = true;
 				$parentId = (int)$this->insertFolder($wsId, $parentId, $this->validator->folderName($seg))->getId();
 			} else {
 				return null;
 			}
+		}
+		if (!$inserted && $parentId !== null) {
+			$this->access->requireFolder($uid, $parentId, 'write');
 		}
 		return $parentId;
 	}
@@ -209,15 +249,37 @@ class FolderService {
 		}
 	}
 
+	/**
+	 * Einfügen vor/nach dem Ziel; feste Einträge (Material ohne Schreibrecht) behalten ihren Platz, nur bewegliche rücken
+	 * @param int[] $sorted Geschwister ohne das bewegte Element, sortiert
+	 * @param array<int, mixed> $fixed
+	 * @return int[] neue Reihenfolge (Index + 1 = Position)
+	 */
+	public static function placeAround(array $sorted, array $fixed, int $movingId, int $targetId, string $position): array {
+		$movable = array_values(array_filter($sorted, static fn (int $id) => !isset($fixed[$id])));
+		$index = array_search($targetId, $movable, true);
+		if ($index === false) {
+			throw new NotFoundException('Target is not available in the destination order');
+		}
+		array_splice($movable, $position === 'before' ? $index : $index + 1, 0, [$movingId]);
+		$out = [];
+		foreach ($sorted as $id) {
+			$out[] = isset($fixed[$id]) ? $id : array_shift($movable);
+		}
+		array_push($out, ...$movable);
+		return $out;
+	}
+
 	// ---------- Routen ----------
 
 	/** @return array<string, mixed> */
 	public function index(string $uid, mixed $wsKey, bool $hierarchical): array {
 		$ws = $this->workspaces->resolveOptional($uid, $wsKey) ?? $this->workspaces->defaultWorkspace($uid);
 		$byId = $this->byId((int)$ws->getId());
+		$material = self::materialSet($byId);
 		$items = [];
 		foreach ($byId as $id => $f) {
-			$item = $this->folderView($uid, $f) + ['is_diary' => (int)$f->getIsDiary() === 1];
+			$item = $this->folderView($uid, $f) + ['is_diary' => (int)$f->getIsDiary() === 1] + self::materialView($f, $material);
 			if ($hierarchical) {
 				$item['created'] = NoteSerializer::date($f->getCreatedAt());
 			}
@@ -252,7 +314,7 @@ class FolderService {
 			'workspace' => $this->workspaces->keyFor($uid, (int)$folder->getWorkspaceId()),
 			'path' => self::pathOf($id, $byId),
 			'created' => NoteSerializer::date($folder->getCreatedAt()),
-		];
+		] + self::materialView($folder, self::materialSet($byId));
 	}
 
 	// Optionaler ?workspace= muss zum Ordner passen
@@ -277,6 +339,7 @@ class FolderService {
 		}
 		return $this->tx->run(function () use ($uid, $data, $ws, $wsId, $wsKey, $folderPath, $createParents, $folderName, $isDiary) {
 			$this->lockWorkspace($wsId);
+			$this->access->resetMaterialCache($wsId);
 			if ($folderPath !== '') {
 				$segments = array_values(array_filter(array_map('trim', explode('/', trim($folderPath, "/ \t\n\r\0\x0B"))), static fn ($s) => $s !== ''));
 				if ($segments === []) {
@@ -302,6 +365,9 @@ class FolderService {
 					}
 					if (!$createParents && !$last) {
 						throw new NotFoundException('Parent folder does not exist', ['missing_segment' => $seg]);
+					}
+					if ($parentId !== null && $created === []) {
+						$this->access->requireFolder($uid, $parentId, 'write');
 					}
 					$new = $this->insertFolder($wsId, $parentId, $seg, ['is_diary' => ($isDiary && $last) ? 1 : 0]);
 					if ($last) {
@@ -333,7 +399,7 @@ class FolderService {
 			} elseif ($parentRaw !== null && (int)$parentRaw > 0) {
 				$parentId = (int)$this->requireIn($uid, (int)$parentRaw, $ws, 'write', 'Parent folder not found')->getId();
 			} elseif ($parentFolder !== '') {
-				$parentId = $this->resolvePath($ws, $parentFolder, false);
+				$parentId = $this->resolvePath($uid, $ws, $parentFolder, false);
 				if ($parentId === null) {
 					throw new NotFoundException('Parent folder not found');
 				}
@@ -341,6 +407,7 @@ class FolderService {
 			$existing = $this->folders->findSibling($wsId, $parentId, $folderName);
 			if ($existing !== null) {
 				if ($isDiary && (int)$existing->getIsDiary() !== 1) {
+					$this->access->requireFolder($uid, (int)$existing->getId(), 'write');
 					$existing->setIsDiary(1);
 					$this->folders->update($existing);
 					return [[
@@ -392,8 +459,10 @@ class FolderService {
 		$folder = $this->access->requireFolder($uid, $id, 'manage');
 		$this->checkWorkspaceParam($uid, $folder, $wsKey);
 		$wsId = (int)$folder->getWorkspaceId();
+		$ws = $this->access->requireWorkspace($uid, $wsId, 'write');
 		$byId = $this->byId($wsId);
 		$ids = self::subtree($id, $byId);
+		$this->access->requireNoMaterial($uid, $ws, $ids);
 		$notes = $this->notes->findList([$wsId], ['folder_ids' => $ids]);
 		$snapshot = [
 			'workspace' => $this->workspaces->keyFor($uid, $wsId),
@@ -410,16 +479,27 @@ class FolderService {
 				'favorite' => (int)$byId[$fid]->getFavorite(),
 				'kanban_enabled' => (int)$byId[$fid]->getKanbanEnabled(),
 				'sort_setting' => $byId[$fid]->getSortSetting(),
+				'material' => (int)$byId[$fid]->getMaterial(),
 			], $ids),
 			'notes' => array_map(static fn (Note $n) => ['id' => (int)$n->getId(), 'folder_id' => (int)$n->getFolderId()], $notes),
 		];
-		$this->tx->run(function () use ($wsId, $ids, $uid) {
+		$this->tx->run(function () use ($ws, $wsId, $ids, $uid) {
+			// H2: unter der Workspace-Sperre neu prüfen; Notizen aus dem Material-Zweig behalten im Papierkorb den Schutz
+			$this->lockWorkspace($wsId);
+			$this->access->resetMaterialCache($wsId);
+			$this->access->requireNoMaterial($uid, $ws, $ids);
+			$branch = $this->access->materialFolderIds($ws);
+			$material = array_values(array_filter($ids, static fn (int $fid) => isset($branch[$fid])));
 			$now = $this->time->getTime();
 			foreach ($this->notes->findList([$wsId], ['folder_ids' => $ids, 'trashed' => null]) as $note) {
 				$note->setTrashedAt($now);
 				$this->notes->update($note);
 			}
+			if ($material !== []) {
+				$this->notes->markTrashMaterial($wsId, $material);
+			}
 			$this->folders->deleteByIds($ids);
+			$this->access->resetMaterialCache($wsId);
 		});
 		return ['message' => 'Folder and all subfolders deleted successfully', 'restore_snapshot' => $snapshot];
 	}
@@ -448,6 +528,7 @@ class FolderService {
 				'favorite' => !empty($row['favorite']) ? 1 : 0,
 				'kanban_enabled' => !empty($row['kanban_enabled']) ? 1 : 0,
 				'sort_setting' => isset($row['sort_setting']) && is_string($row['sort_setting']) && preg_match('/^[a-z_]{1,32}$/', $row['sort_setting']) ? $row['sort_setting'] : null,
+				'material' => !empty($row['material']) ? 1 : 0,
 			];
 		}
 		if ($rows === []) {
@@ -477,11 +558,16 @@ class FolderService {
 			}
 		}
 		$notes = is_array($data['notes'] ?? null) ? $data['notes'] : [];
-		[$idMap, $restored] = $this->tx->run(function () use ($ordered, $wsId, $notes) {
+		[$idMap, $restored] = $this->tx->run(function () use ($uid, $ws, $ordered, $wsId, $notes) {
 			// B64: Workspace vor Prüfen/Anlegen sperren (Reihenfolge Workspace → Notiz)
 			$this->lockWorkspace($wsId);
+			$this->access->resetMaterialCache($wsId);
+			// Material aus dem Snapshot nur für Lehrkräfte im Team-Workspace (Client-Daten setzen nie Material)
+			$teacher = $this->access->canManageTeam($uid, $ws);
 			$idMap = [];
+			$reused = [];
 			foreach ($ordered as $row) {
+				$row['material'] = $teacher ? $row['material'] : 0;
 				$parent = null;
 				if ($row['parent_id'] !== null) {
 					if (isset($idMap[$row['parent_id']])) {
@@ -497,11 +583,22 @@ class FolderService {
 							throw new NotFoundException('Parent folder not found');
 						}
 						$parent = $p?->getId();
+						if ($parent !== null) {
+							$reused[] = (int)$parent;
+						}
 					}
 				}
 				$existing = $this->folders->findSibling($wsId, $parent, $row['name']);
+				if ($existing !== null) {
+					$reused[] = (int)$existing->getId();
+				}
 				$idMap[$row['id']] = $existing !== null ? (int)$existing->getId() : (int)$this->insertFolder($wsId, $parent, $row['name'], $row)->getId();
 			}
+			// Vorhandene Ordner als Ziel oder Eltern: Schreibrecht (Material)
+			foreach (array_unique($reused) as $fid) {
+				$this->access->requireFolder($uid, $fid, 'write');
+			}
+			$this->access->resetMaterialCache($wsId);
 			$restored = 0;
 			$noteIds = [];
 			foreach ($notes as $n) {
@@ -517,7 +614,12 @@ class FolderService {
 				if ($note->getTrashedAt() === null) {
 					continue;
 				}
+				// Material (trash_material oder bestehende Ordnerkette): Wiederherstellen nur Lehrkraft (Review M6a-r1 Blocker)
+				if ($this->access->noteLevel($uid, $note) < AccessService::WRITE) {
+					throw new ForbiddenException('Only teachers can restore material');
+				}
 				$note->setTrashedAt(null);
+				$note->setTrashMaterial(0);
 				$note->setFolderId($noteIds[(int)$note->getId()]);
 				$this->notes->update($note);
 				$restored++;
@@ -551,7 +653,7 @@ class FolderService {
 			}
 			$targetParent = (int)$p->getId();
 		} elseif ($newParentRaw === null && $newParentPath !== '') {
-			$targetParent = $this->resolvePath($target, $newParentPath, false);
+			$targetParent = $this->resolvePath($uid, $target, $newParentPath, false);
 			if ($targetParent === null) {
 				throw new NotFoundException('New parent folder not found');
 			}
@@ -563,6 +665,8 @@ class FolderService {
 		if ($targetParent !== null && $target->getId() === $source->getId() && in_array($targetParent, self::subtree($id, $byId), true)) {
 			throw new ConflictException('Invalid move: would create a cycle');
 		}
+		// Zweig mit Material verschieben: nur Lehrkraft
+		$this->access->requireNoMaterial($uid, $source, self::subtree($id, $byId));
 		if ($this->folders->findSibling((int)$target->getId(), $targetParent, $folder->getName(), $id) !== null) {
 			throw new ConflictException('A folder with this name already exists in the destination');
 		}
@@ -574,6 +678,16 @@ class FolderService {
 				if ($leave !== null && $this->wsRows->lockRows([(int)$source->getId(), (int)$target->getId()]) < 2) {
 					throw new NotFoundException('Workspace not found');
 				}
+				if ($leave === null) {
+					$this->lockWorkspace((int)$source->getId());
+				}
+				// H2: Material unter der Sperre neu lesen und erneut prüfen
+				$this->access->resetMaterialCache((int)$source->getId());
+				$this->access->resetMaterialCache((int)$target->getId());
+				$this->access->requireNoMaterial($uid, $source, self::subtree($id, $byId));
+				if ($targetParent !== null) {
+					$this->access->requireFolder($uid, $targetParent, 'write');
+				}
 				$folder->setParentId($targetParent);
 				$folder->setDisplayOrder(0);
 				$folder->setUpdatedAt($now);
@@ -584,7 +698,14 @@ class FolderService {
 						$this->folders->moveToWorkspace($ids, (int)$target->getId(), $now);
 						$this->notes->moveFolderNotesToWorkspace($ids, (int)$target->getId());
 					});
+					// Kennzeichen wirkt nur in Team-Workspaces: beim Verlassen entfernen
+					if ($target->getOwnerType() !== 'team' || $target->getKind() !== 'normal') {
+						$this->folders->clearMaterial((int)$target->getId(), $ids);
+						$this->notes->clearTrashMaterial((int)$target->getId(), $ids);
+					}
 				}
+				$this->access->resetMaterialCache((int)$source->getId());
+				$this->access->resetMaterialCache((int)$target->getId());
 			});
 		}
 		$after = $this->byId((int)$target->getId());
@@ -630,15 +751,28 @@ class FolderService {
 		if ($this->folders->findSibling($wsId, $parent, $folder->getName(), $folderId) !== null) {
 			throw new ConflictException('A folder with this name already exists in the destination');
 		}
+		$ws = $this->access->requireWorkspace($uid, $wsId, 'write');
+		$moves = $folder->getParentId() !== $parent;
+		if ($moves) {
+			$this->access->requireNoMaterial($uid, $ws, self::subtree($folderId, $byId));
+		}
 		$mode = $this->settings->noteListSort($uid);
 		$siblings = array_filter($byId, static fn (Folder $f) => $f->getParentId() === $parent && (int)$f->getId() !== $folderId);
 		uasort($siblings, static fn (Folder $a, Folder $b) => self::compare($mode, $a, $b));
-		$order = array_keys($siblings);
-		$index = array_search($targetId, $order, true);
-		$insert = $position === 'before' ? $index : $index + 1;
-		array_splice($order, $insert, 0, [$folderId]);
-		$this->tx->run(function () use ($order, $byId, $folder, $folderId, $parent) {
+		// Material-Geschwister ohne Schreibrecht behalten ihre Position (Plan M6 §2.1)
+		$fixed = $this->access->materialRestricted($uid, $ws) ? array_intersect_key($this->access->materialFolderIds($ws), $siblings) : [];
+		$order = self::placeAround(array_keys($siblings), $fixed, $folderId, $targetId, $position);
+		$this->tx->run(function () use ($uid, $ws, $wsId, $moves, $order, $fixed, $byId, $folder, $folderId, $parent) {
+			if ($moves) {
+				// H2: Elternwechsel unter der Workspace-Sperre erneut prüfen
+				$this->lockWorkspace($wsId);
+				$this->access->resetMaterialCache($wsId);
+				$this->access->requireNoMaterial($uid, $ws, self::subtree($folderId, $byId));
+			}
 			foreach ($order as $i => $fid) {
+				if (isset($fixed[$fid])) {
+					continue;
+				}
 				$f = $fid === $folderId ? $folder : $byId[$fid];
 				$f->setDisplayOrder($i + 1);
 				if ($fid === $folderId) {
@@ -646,6 +780,7 @@ class FolderService {
 				}
 				$this->folders->update($f);
 			}
+			$this->access->resetMaterialCache($wsId);
 		});
 		$this->settings->set($uid, 'note_list_sort', 'manual');
 		return ['message' => 'Folder reordered successfully', 'folder' => [
@@ -656,6 +791,39 @@ class FolderService {
 			'position' => $position,
 			'target_folder_id' => $targetId,
 		]];
+	}
+
+	/** @return array<string, mixed> PUT /folders/{id}/material: nur Lehrkraft im Team-Workspace (Plan M6 §2.1, H6) */
+	public function setMaterial(string $uid, int $id, bool $material): array {
+		$folder = $this->access->requireFolder($uid, $id, 'read');
+		$ws = $this->access->requireWorkspace($uid, (int)$folder->getWorkspaceId(), 'read');
+		if ($ws->getOwnerType() !== 'team' || $ws->getKind() !== 'normal') {
+			throw new BadRequestException('Material can only be set in team workspaces', ['code' => 'not_a_team_workspace']);
+		}
+		$this->access->requireWorkspace($uid, $ws, 'manage');
+		$wsId = (int)$ws->getId();
+		$folder = $this->tx->run(function () use ($uid, $ws, $wsId, $id, $material) {
+			// Reihenfolge Workspace → Ordner; gegen gleichzeitiges Verschieben
+			$this->lockWorkspace($wsId);
+			$this->access->resetMaterialCache($wsId);
+			$folder = $this->access->requireFolder($uid, $id, 'manage');
+			if ($folder->getWorkspaceId() !== $wsId || $folder->getTrashedAt() !== null) {
+				throw new NotFoundException('Folder not found');
+			}
+			$own = (int)$folder->getMaterial() === 1;
+			if ($material && !$own && isset($this->access->materialFolderIds($ws)[$id])) {
+				throw new ConflictException('A parent folder is already material', ['code' => 'already_material']);
+			}
+			if ($material !== $own) {
+				$folder->setMaterial($material ? 1 : 0);
+				$folder->setUpdatedAt($this->time->getTime());
+				$this->folders->update($folder);
+			}
+			$this->access->resetMaterialCache($wsId);
+			return $folder;
+		});
+		$byId = $this->byId($wsId);
+		return ['folder' => $this->folderView($uid, $folder) + ['workspace' => $this->workspaces->keyFor($uid, $wsId)] + self::materialView($folder, self::materialSet($byId))];
 	}
 
 	public function empty(string $uid, int $id, mixed $wsKey): int {
@@ -857,7 +1025,8 @@ class FolderService {
 		$include = !empty($data['include_subfolders']) && filter_var($data['include_subfolders'], FILTER_VALIDATE_BOOLEAN);
 		$wsId = (int)$folder->getWorkspaceId();
 		$ids = $include ? self::subtree($id, $this->byId($wsId)) : [$id];
-		$notes = $this->notes->findList([$wsId], ['folder_ids' => $ids]);
+		// Unterordner im Material-Zweig ohne Schreibrecht auslassen
+		$notes = $this->access->filterWritable($uid, $this->notes->findList([$wsId], ['folder_ids' => $ids]));
 		$noteIds = array_map(static fn (Note $n) => (int)$n->getId(), $notes);
 		$lower = array_map('mb_strtolower', $tags);
 		[$updated, $versions] = $this->tx->run(function () use ($noteIds, $tags, $lower, $add, $uid) {
@@ -925,6 +1094,7 @@ class FolderService {
 		}
 		$byId = $this->byId((int)$source->getId());
 		$branch = self::subtree($id, $byId);
+		$this->access->requireNoMaterial($uid, $source, $branch);
 		$noteIds = array_map(static fn (Note $n) => (int)$n->getId(), $this->notes->findList([(int)$source->getId()], ['folder_ids' => $branch]));
 		$parentPath = $this->ancestry($folder->getParentId(), $byId);
 		return $this->tx->run(function () use ($uid, $folder, $id, $source, $sourceKey, $byId, $parentPath, $noteIds) {
@@ -935,7 +1105,11 @@ class FolderService {
 			$parentId = $this->mirrorPath($archive, $parentPath, $created);
 			$conflicts = [];
 			$emptied = [];
-			$targetId = $this->mergeInto($id, $parentId, $archive, $byId, $conflicts, $emptied);
+			$merged = [];
+			$targetId = $this->mergeInto($id, $parentId, $archive, $byId, $conflicts, $emptied, $merged);
+			// Zusammenführen in vorhandene Material-Ordner des Archivs: nur Lehrkraft
+			$this->access->resetMaterialCache((int)$archive->getId());
+			$this->access->requireNoMaterial($uid, $archive, $parentId !== null ? [...$merged, $parentId] : $merged);
 			if ($conflicts !== []) {
 				throw new ConflictException('Some notes have the same title as a note already archived in the same folder', ['conflicts' => $conflicts]);
 			}
@@ -1004,8 +1178,9 @@ class FolderService {
 	 * @param array<int, Folder> $byId
 	 * @param string[] $conflicts
 	 * @param int[] $emptied
+	 * @param int[] $merged vorhandene Archiv-Ordner, in die zusammengeführt wurde
 	 */
-	private function mergeInto(int $sourceId, ?int $archiveParent, Workspace $archive, array $byId, array &$conflicts, array &$emptied): int {
+	private function mergeInto(int $sourceId, ?int $archiveParent, Workspace $archive, array $byId, array &$conflicts, array &$emptied, array &$merged): int {
 		$archiveId = (int)$archive->getId();
 		$now = $this->time->getTime();
 		$folder = $byId[$sourceId];
@@ -1020,6 +1195,7 @@ class FolderService {
 			return $sourceId;
 		}
 		$targetId = (int)$existing->getId();
+		$merged[] = $targetId;
 		foreach ($this->notes->findList([(int)$folder->getWorkspaceId()], ['folder_id' => $sourceId, 'trashed' => null]) as $note) {
 			if ($note->getTrashedAt() === null && $this->notes->headingExists($archiveId, $targetId, (string)$note->getHeading())) {
 				$conflicts[] = (string)$note->getHeading();
@@ -1030,7 +1206,7 @@ class FolderService {
 		}
 		foreach ($byId as $cid => $child) {
 			if ($child->getParentId() === $sourceId) {
-				$this->mergeInto($cid, $targetId, $archive, $byId, $conflicts, $emptied);
+				$this->mergeInto($cid, $targetId, $archive, $byId, $conflicts, $emptied, $merged);
 			}
 		}
 		$emptied[] = $sourceId;

@@ -64,6 +64,15 @@ class TagService {
 		return array_values($list);
 	}
 
+	/**
+	 * Notizen im Material-Zweig ohne Schreibrecht auslassen (M6a)
+	 * @param int[] $noteIds
+	 * @return int[]
+	 */
+	private function writable(string $uid, array $noteIds): array {
+		return array_map(static fn ($n) => (int)$n->getId(), $this->access->filterWritable($uid, $this->notes->findListByIds($noteIds)));
+	}
+
 	// Wirkt auf Notizen in Workspaces mit Schreibrecht (Plan O13)
 	/** @return int[] */
 	private function scope(string $uid, mixed $workspaceKey): array {
@@ -91,6 +100,7 @@ class TagService {
 		if ($newName === $tag) {
 			return 0;
 		}
+		$noteIds = $this->writable($uid, $noteIds);
 		$this->tx->run(function () use ($noteIds, $tag, $newName, $uid) {
 			$current = $this->tags->tagsFor($noteIds);
 			foreach ($noteIds as $id) {
@@ -111,6 +121,7 @@ class TagService {
 		if ($noteIds === []) {
 			throw new NotFoundException('Tag not found: ' . $tag);
 		}
+		$noteIds = $this->writable($uid, $noteIds);
 		$this->tx->run(function () use ($noteIds, $tag, $uid) {
 			foreach ($noteIds as $id) {
 				$this->tags->remove($id, $tag);

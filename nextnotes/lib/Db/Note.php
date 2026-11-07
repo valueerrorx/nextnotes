@@ -60,6 +60,8 @@ use OCP\DB\Schema\ColumnType;
  * @method void setKanbanOrder(?int $v)
  * @method ?int getKanbanCompleted()
  * @method void setKanbanCompleted(?int $v)
+ * @method ?int getTrashMaterial()
+ * @method void setTrashMaterial(?int $v)
  * @method ?int getTrashedAt()
  * @method void setTrashedAt(?int $v)
  * @method ?string getClientStateHash()
@@ -100,6 +102,7 @@ class Note extends Entity {
 	protected $kanbanOrder;
 	protected $kanbanCompleted;
 	protected $trashedAt;
+	protected $trashMaterial;
 	protected $clientStateHash;
 	protected $clientStateVersion;
 	protected $createdBy;
@@ -132,6 +135,7 @@ class Note extends Entity {
 		$this->addType('kanbanOrder', ColumnType::Integer);
 		$this->addType('kanbanCompleted', ColumnType::Integer);
 		$this->addType('trashedAt', ColumnType::Integer);
+		$this->addType('trashMaterial', ColumnType::Integer);
 		$this->addType('clientStateHash', ColumnType::String);
 		$this->addType('clientStateVersion', ColumnType::String);
 		$this->addType('createdBy', ColumnType::String);

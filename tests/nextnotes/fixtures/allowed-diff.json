@@ -30,6 +30,36 @@
 			"kind": "extra",
 			"path": "versions",
 			"reason": "M4g-fix (SPEC §11.1 P27, B52-Rest): Antwort liefert je geänderter Notiz versions{id:{from,to}}, damit eine offene Notiz die neue Version nur bei passender Basis übernimmt (kein Lost Update)"
+		},
+		{
+			"route": "GET /folders",
+			"kind": "extra",
+			"path": "folders[].material",
+			"reason": "M6a (SPEC §3 Material-Ordner, §4.2): Kennzeichen material und geerbtes material_inherited für die Ordner-Ansicht"
+		},
+		{
+			"route": "GET /folders",
+			"kind": "extra",
+			"path": "folders[].material_inherited",
+			"reason": "M6a (SPEC §3 Material-Ordner, §4.2): Kennzeichen material und geerbtes material_inherited für die Ordner-Ansicht"
+		},
+		{
+			"route": "GET /folders/{id}",
+			"kind": "extra",
+			"path": "folder.material",
+			"reason": "M6a (SPEC §3 Material-Ordner, §4.2): Kennzeichen material und geerbtes material_inherited für die Ordner-Ansicht"
+		},
+		{
+			"route": "GET /folders/{id}",
+			"kind": "extra",
+			"path": "folder.material_inherited",
+			"reason": "M6a (SPEC §3 Material-Ordner, §4.2): Kennzeichen material und geerbtes material_inherited für die Ordner-Ansicht"
+		},
+		{
+			"route": "DELETE /folders/{id}",
+			"kind": "extra",
+			"path": "restore_snapshot.folders[].material",
+			"reason": "M6a: Wiederherstellungs-Snapshot merkt das Material-Kennzeichen (nur Lehrkraft stellt es wieder her)"
 		}
 	]
 }

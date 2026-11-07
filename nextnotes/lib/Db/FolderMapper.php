@@ -112,12 +112,72 @@ class FolderMapper extends QBMapper {
 		}
 	}
 
-	public function clearFavorites(int $workspaceId): int {
+	/** @param int[] $excludeIds Ordner ohne Schreibrecht (Material, M6a) */
+	public function clearFavorites(int $workspaceId, array $excludeIds = []): int {
 		$qb = $this->db->getQueryBuilder();
-		return $qb->update(self::TABLE)
+		$qb->update(self::TABLE)
 			->set('favorite', $qb->createNamedParameter(0, IQueryBuilder::PARAM_INT))
 			->where($qb->expr()->eq('workspace_id', $qb->createNamedParameter($workspaceId, IQueryBuilder::PARAM_INT)))
-			->andWhere($qb->expr()->eq('favorite', $qb->createNamedParameter(1, IQueryBuilder::PARAM_INT)))
-			->executeStatement();
+			->andWhere($qb->expr()->eq('favorite', $qb->createNamedParameter(1, IQueryBuilder::PARAM_INT)));
+		if ($excludeIds !== []) {
+			$qb->andWhere($qb->expr()->notIn('id', $qb->createNamedParameter(array_values($excludeIds), IQueryBuilder::PARAM_INT_ARRAY)));
+		}
+		return $qb->executeStatement();
+	}
+
+	/**
+	 * Baum mit Material-Kennzeichen eines Workspace (eine Abfrage, M6a)
+	 * @return array<int, array{0: ?int, 1: bool}> id → [parent_id, material]
+	 */
+	public function materialTree(int $workspaceId): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('id', 'parent_id', 'material')->from(self::TABLE)
+			->where($qb->expr()->eq('workspace_id', $qb->createNamedParameter($workspaceId, IQueryBuilder::PARAM_INT)));
+		$res = $qb->executeQuery();
+		$out = [];
+		while ($row = $res->fetch()) {
+			$out[(int)$row['id']] = [$row['parent_id'] === null ? null : (int)$row['parent_id'], (int)$row['material'] === 1];
+		}
+		$res->closeCursor();
+		return $out;
+	}
+
+	/**
+	 * Workspaces mit mindestens einem Material-Ordner
+	 * @param int[] $workspaceIds
+	 * @return int[]
+	 */
+	public function workspacesWithMaterial(array $workspaceIds): array {
+		$out = [];
+		foreach (array_chunk(array_values(array_unique($workspaceIds)), 1000) as $chunk) {
+			$qb = $this->db->getQueryBuilder();
+			$qb->selectDistinct('workspace_id')->from(self::TABLE)
+				->where($qb->expr()->in('workspace_id', $qb->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY)))
+				->andWhere($qb->expr()->eq('material', $qb->createNamedParameter(1, IQueryBuilder::PARAM_INT)));
+			$res = $qb->executeQuery();
+			while ($row = $res->fetch()) {
+				$out[] = (int)$row['workspace_id'];
+			}
+			$res->closeCursor();
+		}
+		return $out;
+	}
+
+	/**
+	 * Kennzeichen entfernen (Verlassen des Teams, make_private)
+	 * @param int[]|null $ids null = ganzer Workspace
+	 */
+	public function clearMaterial(int $workspaceId, ?array $ids = null): void {
+		foreach ($ids === null ? [null] : array_chunk(array_values(array_unique($ids)), 1000) as $chunk) {
+			$qb = $this->db->getQueryBuilder();
+			$qb->update(self::TABLE)
+				->set('material', $qb->createNamedParameter(0, IQueryBuilder::PARAM_INT))
+				->where($qb->expr()->eq('workspace_id', $qb->createNamedParameter($workspaceId, IQueryBuilder::PARAM_INT)))
+				->andWhere($qb->expr()->eq('material', $qb->createNamedParameter(1, IQueryBuilder::PARAM_INT)));
+			if ($chunk !== null) {
+				$qb->andWhere($qb->expr()->in('id', $qb->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY)));
+			}
+			$qb->executeStatement();
+		}
 	}
 }

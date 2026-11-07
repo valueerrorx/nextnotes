@@ -20,7 +20,7 @@ final class RouteDiffTest extends TestCase {
 	// Umfang M2a + M2b + M2c laut Plan §0 (Gegenkontrolle der Rechnung)
 	private const DONE = '2,3,21-23,32-41,43-45,69-83,85-91,93-95,100-109,1,4-7,20,24,28-31,46,50-54,84,110-114,8-19,47-49,55-64,115-117,124,126-130,142,160';
 	// Port-eigene Routen ohne Upstream-Gegenstück (SPEC §4.2)
-	private const PORT_ONLY = ['GET /teams', 'POST /workspaces/{}/make-private', 'GET /users/search'];
+	private const PORT_ONLY = ['GET /teams', 'POST /workspaces/{}/make-private', 'GET /users/search', 'PUT /folders/{}/material'];
 
 	private static function numbers(string $spec): array {
 		$out = [];

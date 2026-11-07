@@ -74,7 +74,8 @@ class QuotaService {
 
 	/**
 	 * Erste Anweisung der Transaktion: Workspace-Zeilen der Besitzer sperren (SQLite: Schreibsperre vor jedem Lesen), dann unter Sperre erneut prüfen.
-	 * Feste Reihenfolge über alle Besitzer (Typ, ID), damit gegenläufiges Verschieben nicht verklemmt (M5a-r2 H1); Aufrufer sperren danach nur noch Zeilen dieser Besitzer
+	 * Feste Reihenfolge über alle Besitzer (Typ, ID), damit gegenläufiges Verschieben nicht verklemmt (M5a-r2 H1); Aufrufer sperren danach nur noch Zeilen dieser Besitzer.
+	 * Mehrere Besitzer mit Team-Zeilen (ab M6d): erst alle Team-Zeilen in dieser Reihenfolge, danach alle lockOwner, nie abwechselnd je Besitzer (Review M6-Plan r2 Hinweis 6).
 	 * @param array{type: string, id: string, ws: int, bytes: int, leave?: LeaveRequest}|null $quota
 	 */
 	public function enforce(?array $quota): void {

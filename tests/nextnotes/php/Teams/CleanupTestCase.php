@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OCA\NextNotes\Tests\Teams;
 
 use OCA\NextNotes\Db\AttachmentMapper;
+use OCA\NextNotes\Db\FolderMapper;
 use OCA\NextNotes\Db\LockMapper;
 use OCA\NextNotes\Db\MentionHandledMapper;
 use OCA\NextNotes\Db\NoteMapper;
@@ -115,7 +116,7 @@ abstract class CleanupTestCase extends TeamTestCase {
 		$tx = Server::get(Transaction::class);
 		$lifecycle = new TeamLifecycleService(
 			$teams, $state, Server::get(TeamMapper::class), Server::get(WorkspaceMapper::class), Server::get(NoteMapper::class),
-			Server::get(ReminderMapper::class), Server::get(MentionHandledMapper::class), Server::get(LockMapper::class), Server::get(WsShareMapper::class),
+			Server::get(FolderMapper::class), Server::get(ReminderMapper::class), Server::get(MentionHandledMapper::class), Server::get(LockMapper::class), Server::get(WsShareMapper::class),
 			Server::get(BackgroundFiles::class), Server::get(WorkspaceService::class), $tx, Server::get(INotificationManager::class), $time,
 			Server::get(LoggerInterface::class),
 		);

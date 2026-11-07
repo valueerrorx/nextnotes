@@ -408,8 +408,18 @@ class WorkspaceService {
 				$this->folders->update($folder);
 			}
 		}
-		$this->folders->moveToWorkspace(array_map(static fn (Folder $f) => (int)$f->getId(), $folders), (int)$target->getId(), $this->time->getTime());
-		return $this->notes->moveWorkspaceNotes((int)$ws->getId(), (int)$target->getId());
+		$ids = array_map(static fn (Folder $f) => (int)$f->getId(), $folders);
+		$this->folders->moveToWorkspace($ids, (int)$target->getId(), $this->time->getTime());
+		// Material wirkt nur in Team-Workspaces: beim Verlassen entfernen (M6a)
+		if ($target->getOwnerType() !== 'team' || $target->getKind() !== 'normal') {
+			$this->folders->clearMaterial((int)$target->getId(), $ids);
+		}
+		$this->access->resetMaterialCache();
+		$moved = $this->notes->moveWorkspaceNotes((int)$ws->getId(), (int)$target->getId());
+		if ($target->getOwnerType() !== 'team' || $target->getKind() !== 'normal') {
+			$this->notes->clearTrashMaterial((int)$target->getId());
+		}
+		return $moved;
 	}
 
 	// workspaces.php move_notes: Quelle verwalten, Ziel schreiben, Verlassen-Regel (B17, Plan M5 §2.3); Quote beim Ziel-Besitzer; Quelle bleibt bestehen

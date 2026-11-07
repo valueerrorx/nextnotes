@@ -38,6 +38,8 @@ use OCP\DB\Schema\ColumnType;
  * @method void setColor(?string $v)
  * @method ?string getSortSetting()
  * @method void setSortSetting(?string $v)
+ * @method ?int getMaterial()
+ * @method void setMaterial(?int $v)
  * @method ?int getAssignmentId()
  * @method void setAssignmentId(?int $v)
  * @method ?int getTrashedAt()
@@ -60,6 +62,7 @@ class Folder extends Entity {
 	protected $iconColor;
 	protected $color;
 	protected $sortSetting;
+	protected $material;
 	protected $assignmentId;
 	protected $trashedAt;
 	protected $createdAt;
@@ -78,6 +81,7 @@ class Folder extends Entity {
 		$this->addType('iconColor', ColumnType::String);
 		$this->addType('color', ColumnType::String);
 		$this->addType('sortSetting', ColumnType::String);
+		$this->addType('material', ColumnType::Integer);
 		$this->addType('assignmentId', ColumnType::Integer);
 		$this->addType('trashedAt', ColumnType::Integer);
 		$this->addType('createdAt', ColumnType::Integer);

@@ -11,7 +11,7 @@
 	<description><![CDATA[Next Notes is a native Nextcloud app for notes, folders, tags and shared workspaces.
 
 Based on Poznote by Timothé Poznanski (MIT).]]></description>
-	<version>0.2.1</version>
+	<version>0.3.0</version>
 	<licence>AGPL-3.0-or-later</licence>
 	<author>Thomas Weissel</author>
 	<namespace>NextNotes</namespace>

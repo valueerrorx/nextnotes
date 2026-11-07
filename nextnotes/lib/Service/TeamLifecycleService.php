@@ -12,6 +12,7 @@ namespace OCA\NextNotes\Service;
 use OCA\NextNotes\AppInfo\Application;
 use OCA\NextNotes\Db\LockMapper;
 use OCA\NextNotes\Db\MentionHandledMapper;
+use OCA\NextNotes\Db\FolderMapper;
 use OCA\NextNotes\Db\NoteMapper;
 use OCA\NextNotes\Db\ReminderMapper;
 use OCA\NextNotes\Db\TeamMapper;
@@ -34,6 +35,7 @@ class TeamLifecycleService {
 		private TeamMapper $teamRows,
 		private WorkspaceMapper $workspaces,
 		private NoteMapper $notes,
+		private FolderMapper $folders,
 		private ReminderMapper $reminders,
 		private MentionHandledMapper $mentions,
 		private LockMapper $locks,
@@ -161,6 +163,9 @@ class TeamLifecycleService {
 			$this->workspaces->update($ws);
 			// Altbestand-Freigaben würden jetzt wirken; Spuren anderer Konten gehören nicht in einen privaten Workspace
 			$this->shares->deleteForWorkspace($id);
+			// Material wirkt nur in Team-Workspaces (M6a)
+			$this->folders->clearMaterial($id);
+			$this->notes->clearTrashMaterial($id);
 			$noteIds = $this->notes->idsInWorkspace($id);
 			$this->reminders->deleteForNotesExcept($noteIds, $uid);
 			$this->mentions->deleteForNotesExcept($noteIds, $uid);
