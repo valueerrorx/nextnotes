@@ -720,13 +720,13 @@ $jsonAttr = static fn (mixed $v): string => json_encode($v, JSON_UNESCAPED_UNICO
 					<span class="home-card-title"><?php p($t('settings.cards.documentation', 'Documentation GitHub')); ?></span>
 				</div>
 			</a>
-			<a href="https://poznote.com" target="_blank" rel="noopener noreferrer" class="home-card" id="website-card">
-				<span class="setting-help" data-tooltip="<?php p($t('settings.card_help.website', 'Open the official Poznote website.')); ?>"><i class="lucide lucide-help-circle"></i></span>
+			<a href="https://github.com/valueerrorx/nextnotes" target="_blank" rel="noopener noreferrer" class="home-card" id="website-card">
+				<span class="setting-help" data-tooltip="<?php p($l->t('Open the Next Notes project on GitHub.')); ?>"><i class="lucide lucide-help-circle"></i></span>
 				<div class="home-card-icon">
 					<i class="lucide lucide-globe"></i>
 				</div>
 				<div class="home-card-content">
-					<span class="home-card-title"><?php p($t('settings.cards.website', 'Poznote Website')); ?></span>
+					<span class="home-card-title"><?php p($l->t('Next Notes Website')); ?></span>
 				</div>
 			</a>
 		</div>

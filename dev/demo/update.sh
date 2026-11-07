@@ -9,7 +9,12 @@ repo="$(cd "$here/../.." && pwd)"
 dc() { docker compose -f "$here/compose.yaml" "$@"; }
 occ() { dc exec -T -u www-data nc php occ "$@"; }
 
-make -C "$repo/nextnotes" build >/dev/null
+# Nur den committeten Stand (HEAD) einspielen, nie halbfertige Änderungen aus dem Arbeitsbaum.
+src="$(mktemp -d)"
+trap 'git -C "$repo" worktree remove --force "$src" >/dev/null 2>&1 || rm -rf "$src"' EXIT
+git -C "$repo" worktree add --detach --force "$src" HEAD >/dev/null 2>&1
+[[ -d "$repo/nextnotes/build/node_modules" ]] && ln -s "$repo/nextnotes/build/node_modules" "$src/nextnotes/build/node_modules"
+make -C "$src/nextnotes" build >/dev/null
 dc up -d
 for i in $(seq 1 150); do
 	occ status --output=json 2>/dev/null | grep -q '"installed":true' && break
@@ -17,7 +22,7 @@ for i in $(seq 1 150); do
 	sleep 2
 done
 dest=/var/www/html/custom_apps/nextnotes
-tar -C "$repo/nextnotes" --exclude=.gitignore --exclude=./build --exclude=./Makefile --exclude=./js-src --exclude=./css-src -cf - . \
+tar -C "$src/nextnotes" --exclude=.gitignore --exclude=./build/node_modules --exclude=./build --exclude=./Makefile --exclude=./js-src --exclude=./css-src -cf - . \
 	| dc exec -T -u root nc sh -c "rm -rf '$dest' && mkdir -p '$dest' && tar -xf - -C '$dest' && chown -R www-data:www-data '$dest'"
 occ app:enable nextnotes >/dev/null || true
 occ upgrade >/dev/null || true
