@@ -127,4 +127,16 @@ class AttachmentMapper extends QBMapper {
 				->executeStatement();
 		}
 	}
+
+	/** @return Attachment[] Anhänge einer Herkunft nach ID, älter als $createdBefore (CleanupJob, Index nn_att_origin) */
+	public function findByOriginAfter(string $origin, int $afterId, int $createdBefore, int $limit): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')->from(self::TABLE)
+			->where($qb->expr()->eq('origin', $qb->createNamedParameter($origin)))
+			->andWhere($qb->expr()->gt('id', $qb->createNamedParameter($afterId, IQueryBuilder::PARAM_INT)))
+			->andWhere($qb->expr()->lte('created_at', $qb->createNamedParameter($createdBefore, IQueryBuilder::PARAM_INT)))
+			->orderBy('id', 'ASC')
+			->setMaxResults($limit);
+		return $this->findEntities($qb);
+	}
 }

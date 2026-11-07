@@ -26,6 +26,8 @@ use OCP\DB\Schema\ColumnType;
  * @method void setCreatedBy(?string $v)
  * @method ?int getCreatedAt()
  * @method void setCreatedAt(?int $v)
+ * @method ?string getOrigin()
+ * @method void setOrigin(?string $v)
  */
 class Attachment extends Entity {
 	protected $noteId;
@@ -34,6 +36,7 @@ class Attachment extends Entity {
 	protected $size;
 	protected $createdBy;
 	protected $createdAt;
+	protected $origin;
 
 	public function __construct() {
 		$this->addType('noteId', ColumnType::Integer);
@@ -42,5 +45,6 @@ class Attachment extends Entity {
 		$this->addType('size', ColumnType::Integer);
 		$this->addType('createdBy', ColumnType::String);
 		$this->addType('createdAt', ColumnType::Integer);
+		$this->addType('origin', ColumnType::String);
 	}
 }

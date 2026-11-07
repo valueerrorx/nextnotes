@@ -149,11 +149,13 @@
         "mime": ["string", true, null, 255, false],
         "size": ["bigint", true, null, null, false],
         "created_by": ["string", false, null, 64, false],
-        "created_at": ["bigint", true, null, null, false]
+        "created_at": ["bigint", true, null, null, false],
+        "origin": ["string", false, null, 16, false]
       },
       "indexes": {
         "nn_att_note": [false, ["note_id"]],
-        "nn_att_cby": [false, ["created_by"]]
+        "nn_att_cby": [false, ["created_by"]],
+        "nn_att_origin": [false, ["origin", "id"]]
       }
     },
     "nextnotes_snapshots": {

@@ -58,6 +58,16 @@ class TeamLifecycleService {
 		}
 		$this->workspaceService->reset();
 		$this->logger->info('nextnotes: team deleted, team workspaces orphaned', ['team' => $teamId]);
+		$this->notifyCreators($teamId, $wsList, 'team_orphaned', $name);
+	}
+
+	// Hinweis vor der Löschung (CleanupJob Schritt 2) an created_by der Team-Workspaces
+	public function deletionSoon(string $teamId): void {
+		$this->notifyCreators($teamId, $this->workspaces->findForTeam($teamId), 'team_deletion_soon', null);
+	}
+
+	/** @param Workspace[] $wsList */
+	private function notifyCreators(string $teamId, array $wsList, string $subject, ?string $name): void {
 		$label = $name ?? $this->teamState->snapshotName($teamId) ?? '';
 		$recipients = array_unique(array_filter(array_map(static fn (Workspace $w) => $w->getCreatedBy(), $wsList), static fn ($u) => $u !== null && $u !== ''));
 		foreach ($recipients as $uid) {
@@ -68,10 +78,10 @@ class TeamLifecycleService {
 					->setUser((string)$uid)
 					->setDateTime((new \DateTime())->setTimestamp($this->time->getTime()))
 					->setObject('team', $teamId)
-					->setSubject('team_orphaned', ['team' => $label, 'assignments' => 0]);
+					->setSubject($subject, ['team' => $label, 'assignments' => 0]);
 				$this->notifications->notify($n);
 			} catch (\Throwable $e) {
-				$this->logger->error('nextnotes: team_orphaned notification failed', ['team' => $teamId, 'exception' => $e]);
+				$this->logger->error('nextnotes: ' . $subject . ' notification failed', ['team' => $teamId, 'exception' => $e]);
 			}
 		}
 	}
@@ -130,7 +140,8 @@ class TeamLifecycleService {
 		}
 		$id = (int)$ws->getId();
 		$name = $this->tx->run(function () use ($uid, $id, $teamId): string {
-			// Sperrreihenfolge wie QuotaService::enforce (Team vor Benutzer); erste Anweisung schreibt (SQLite)
+			// Sperrreihenfolge: Team-Zeile, Workspace-Zeilen (wie Purge), dann Benutzer (wie QuotaService::enforce); erste Anweisung schreibt (SQLite)
+			$this->teamRows->lockRow($teamId);
 			if ($this->workspaces->lockRows([$id]) < 1) {
 				throw new NotFoundException('Workspace not found');
 			}

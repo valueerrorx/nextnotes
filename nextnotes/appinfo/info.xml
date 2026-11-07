@@ -11,7 +11,7 @@
 	<description><![CDATA[Next Notes is a native Nextcloud app for notes, folders, tags and shared workspaces.
 
 Based on Poznote by Timothé Poznanski (MIT).]]></description>
-	<version>0.2.0</version>
+	<version>0.2.1</version>
 	<licence>AGPL-3.0-or-later</licence>
 	<author>Thomas Weissel</author>
 	<namespace>NextNotes</namespace>
@@ -29,7 +29,11 @@ Based on Poznote by Timothé Poznanski (MIT).]]></description>
 		<job>OCA\NextNotes\BackgroundJob\ReminderJob</job>
 		<job>OCA\NextNotes\BackgroundJob\DeletedWorkspaceSweepJob</job>
 		<job>OCA\NextNotes\BackgroundJob\ExportTempCleanupJob</job>
+		<job>OCA\NextNotes\BackgroundJob\CleanupJob</job>
 	</background-jobs>
+	<commands>
+		<command>OCA\NextNotes\Command\TeamOrphanCheck</command>
+	</commands>
 	<settings>
 		<admin>OCA\NextNotes\Settings\AdminSettings</admin>
 		<admin-section>OCA\NextNotes\Settings\AdminSection</admin-section>

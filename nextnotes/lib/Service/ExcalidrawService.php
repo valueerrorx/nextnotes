@@ -187,7 +187,7 @@ class ExcalidrawService {
 			$this->attachments->enforceQuota($quota);
 			$this->notes->lockRow($id);
 			$note = $this->notes->find($id);
-			$created = $preview !== null ? $this->attachments->createFromString($id, $previewName, 'image/svg+xml', $preview, $uid) : null;
+			$created = $preview !== null ? $this->attachments->createFromString($id, $previewName, 'image/svg+xml', $preview, $uid, AttachmentService::ORIGIN_EXCALIDRAW) : null;
 			[$content, $replaced] = $place((string)($note->getContent() ?? ''), (string)($note->getType() ?: 'note'), $created !== null ? (int)$created->getId() : null);
 			// Revision des alten Stands zuerst, damit eine dort sichtbare Vorschau erhalten bleibt
 			$this->snapshots->autoBefore($note, $uid);

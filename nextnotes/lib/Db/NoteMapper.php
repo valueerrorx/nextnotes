@@ -548,4 +548,16 @@ class NoteMapper extends QBMapper {
 				->executeStatement();
 		}
 	}
+
+	// Irgendein Notiz (jede Rolle, auch Papierkorb) enthält $needle (CleanupJob: Verweis auf eine Vorschau, im Zweifel behalten)
+	public function anyContentLike(string $needle): bool {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('id')->from(self::TABLE)
+			->where($qb->expr()->like('content', $qb->createNamedParameter('%' . $this->db->escapeLikeParameter($needle) . '%')))
+			->setMaxResults(1);
+		$result = $qb->executeQuery();
+		$found = $result->fetchOne() !== false;
+		$result->closeCursor();
+		return $found;
+	}
 }

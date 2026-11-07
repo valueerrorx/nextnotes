@@ -55,7 +55,11 @@
   "The team {team} was deleted. Its workspaces will be deleted on {date}.": "Das Team {team} wurde gelöscht. Seine Workspaces werden am {date} gelöscht.",
   "Workspaces of the deleted team {team} will be deleted on {date}.": "Die Workspaces des gelöschten Teams {team} werden am {date} gelöscht.",
   "Export them or convert them into a private workspace to keep the notes.": "Exportiere sie oder wandle sie in einen privaten Workspace um, um die Notizen zu behalten.",
-  "Team": "Team"
+  "Team": "Team",
+  "{missing} of {checked} teams were not found. No team was marked as deleted.": "{missing} von {checked} Teams wurden nicht gefunden. Kein Team wurde als gelöscht markiert.",
+  "Check the Teams app with \"occ circles:check\" and \"occ nextnotes:team:orphan-check --dry-run\". If the teams really were deleted, run \"occ nextnotes:team:orphan-check --force\".": "Prüfe die Teams-App mit „occ circles:check“ und „occ nextnotes:team:orphan-check --dry-run“. Wurden die Teams wirklich gelöscht, führe „occ nextnotes:team:orphan-check --force“ aus.",
+  "The team {team} could not be checked in {runs} cleanup runs in a row.": "Das Team {team} konnte in {runs} Aufräumläufen hintereinander nicht geprüft werden.",
+  "Next Notes skips this team in the automatic team cleanup. Check \"occ circles:check\" and \"occ nextnotes:team:orphan-check --dry-run\".": "Next Notes überspringt dieses Team beim automatischen Aufräumen. Prüfe „occ circles:check“ und „occ nextnotes:team:orphan-check --dry-run“."
  },
  "pluralForm": "nplurals=2; plural=(n != 1);"
 }

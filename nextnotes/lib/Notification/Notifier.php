@@ -15,8 +15,10 @@ use OCA\NextNotes\Db\TeamMapper;
 use OCA\NextNotes\Db\Workspace;
 use OCA\NextNotes\Db\WorkspaceMapper;
 use OCA\NextNotes\Service\AccessService;
+use OCA\NextNotes\Service\TeamCleanupService;
 use OCA\NextNotes\Service\WorkspaceService;
 use OCP\AppFramework\Db\DoesNotExistException;
+use OCP\IGroupManager;
 use OCP\IURLGenerator;
 use OCP\IUserManager;
 use OCP\L10N\IFactory;
@@ -36,6 +38,7 @@ class Notifier implements INotifier {
 		private IUserManager $users,
 		private TeamMapper $teams,
 		private WorkspaceMapper $workspaceRows,
+		private IGroupManager $groups,
 	) {
 	}
 
@@ -47,10 +50,13 @@ class Notifier implements INotifier {
 		return $this->l10nFactory->get(Application::APP_ID)->t('Next Notes');
 	}
 
-	// Löschfrist verwaister Team-Workspaces (SPEC §8)
-	public const ORPHAN_DAYS = 30;
-
 	public function prepare(INotification $notification, string $languageCode): INotification {
+		if ($notification->getApp() === Application::APP_ID && $notification->getObjectType() === 'cleanup' && $notification->getSubject() === 'cleanup_suspicious') {
+			return $this->prepareSuspicious($notification, $languageCode);
+		}
+		if ($notification->getApp() === Application::APP_ID && $notification->getObjectType() === 'cleanup' && $notification->getSubject() === 'cleanup_team_error') {
+			return $this->prepareTeamError($notification, $languageCode);
+		}
 		if ($notification->getApp() === Application::APP_ID && $notification->getObjectType() === 'team'
 			&& in_array($notification->getSubject(), ['team_orphaned', 'team_deletion_soon'], true)) {
 			return $this->prepareTeam($notification, $languageCode);
@@ -130,7 +136,7 @@ class Notifier implements INotifier {
 		}
 		$l = $this->l10nFactory->get(Application::APP_ID, $languageCode);
 		$name = trim((string)($notification->getSubjectParameters()['team'] ?? '')) ?: trim((string)$team->getTeamNameSnapshot());
-		$date = (string)$l->l('date', (int)$team->getOrphanedAt() + self::ORPHAN_DAYS * 86400);
+		$date = (string)$l->l('date', TeamCleanupService::deletionDate((int)$team->getOrphanedAt(), $team->getDeletionNotifiedAt()));
 		$subject = $notification->getSubject() === 'team_orphaned'
 			? $l->t('The team {team} was deleted. Its workspaces will be deleted on {date}.')
 			: $l->t('Workspaces of the deleted team {team} will be deleted on {date}.');
@@ -143,6 +149,46 @@ class Notifier implements INotifier {
 			->setRichSubject($subject, ['team' => $teamParam, 'date' => $dateParam])
 			->setParsedMessage($message)
 			->setLink($link)
+			->setIcon($this->urls->getAbsoluteURL($this->urls->imagePath(Application::APP_ID, 'app-dark.svg')));
+	}
+
+	// Massenschutz des CleanupJob (Plan M5 §2.5): nur für Admins
+	private function prepareSuspicious(INotification $notification, string $languageCode): INotification {
+		if (!$this->groups->isAdmin($notification->getUser())) {
+			throw new AlreadyProcessedException();
+		}
+		$l = $this->l10nFactory->get(Application::APP_ID, $languageCode);
+		$params = $notification->getSubjectParameters();
+		$missing = (string)(int)($params['missing'] ?? 0);
+		$checked = (string)(int)($params['checked'] ?? 0);
+		$subject = $l->t('{missing} of {checked} teams were not found. No team was marked as deleted.');
+		return $notification->setParsedSubject(str_replace(['{missing}', '{checked}'], [$missing, $checked], $subject))
+			->setRichSubject($subject, [
+				'missing' => ['type' => 'highlight', 'id' => 'missing', 'name' => $missing],
+				'checked' => ['type' => 'highlight', 'id' => 'checked', 'name' => $checked],
+			])
+			->setParsedMessage($l->t('Check the Teams app with "occ circles:check" and "occ nextnotes:team:orphan-check --dry-run". If the teams really were deleted, run "occ nextnotes:team:orphan-check --force".'))
+			->setIcon($this->urls->getAbsoluteURL($this->urls->imagePath(Application::APP_ID, 'app-dark.svg')));
+	}
+
+	// Team wiederholt nicht prüfbar (H1): nur für Admins
+	private function prepareTeamError(INotification $notification, string $languageCode): INotification {
+		if (!$this->groups->isAdmin($notification->getUser())) {
+			throw new AlreadyProcessedException();
+		}
+		$l = $this->l10nFactory->get(Application::APP_ID, $languageCode);
+		$params = $notification->getSubjectParameters();
+		$id = (string)($params['team'] ?? '');
+		$name = trim((string)($params['name'] ?? ''));
+		$label = $name !== '' ? $name . ' (' . $id . ')' : $id;
+		$runs = (string)(int)($params['runs'] ?? 0);
+		$subject = $l->t('The team {team} could not be checked in {runs} cleanup runs in a row.');
+		return $notification->setParsedSubject(str_replace(['{team}', '{runs}'], [$label, $runs], $subject))
+			->setRichSubject($subject, [
+				'team' => ['type' => 'highlight', 'id' => $id !== '' ? $id : 'team', 'name' => $label],
+				'runs' => ['type' => 'highlight', 'id' => 'runs', 'name' => $runs],
+			])
+			->setParsedMessage($l->t('Next Notes skips this team in the automatic team cleanup. Check "occ circles:check" and "occ nextnotes:team:orphan-check --dry-run".'))
 			->setIcon($this->urls->getAbsoluteURL($this->urls->imagePath(Application::APP_ID, 'app-dark.svg')));
 	}
 }

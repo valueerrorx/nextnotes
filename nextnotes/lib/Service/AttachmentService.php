@@ -34,6 +34,8 @@ class AttachmentService {
 	// Grenzen ab Werk; Admin ändert sie in der NC-Verwaltung (AdminSettingsController)
 	public const DEFAULT_MAX_FILE_MB = 20;
 	public const DEFAULT_QUOTA_MB = 500;
+	// Herkunft erzeugter Anhänge (Spalte origin, M5c)
+	public const ORIGIN_EXCALIDRAW = 'excalidraw';
 	// Upstream lib/attachments.php: ausführbare Typen (Server und Client) werden abgelehnt
 	private const BLOCKED_EXT = ['asp', 'aspx', 'cgi', 'fcgi', 'jsp', 'jspx', 'phar', 'pht', 'phtml', 'shtml',
 		'bash', 'bat', 'cmd', 'com', 'dll', 'dylib', 'exe', 'fish', 'jar', 'ksh', 'pl', 'ps1', 'psm1', 'py', 'rb', 'sh', 'so', 'zsh'];
@@ -210,8 +212,9 @@ class AttachmentService {
 		return $detected !== '' ? $detected : 'application/octet-stream';
 	}
 
-	private function newRow(int $noteId, string $name, string $mime, int $size, string $uid): Attachment {
+	private function newRow(int $noteId, string $name, string $mime, int $size, string $uid, ?string $origin = null): Attachment {
 		$a = new Attachment();
+		$a->setOrigin($origin);
 		$a->setNoteId($noteId);
 		$a->setOriginalName($name);
 		$a->setMime($mime);
@@ -234,9 +237,9 @@ class AttachmentService {
 		}
 	}
 
-	/** Erzeugte Datei (Excalidraw-Vorschau, Base64-Bild) als Anhang; Aufrufer hält die Transaktion (enforceQuota zuerst) */
-	public function createFromString(int $noteId, string $name, string $mime, string $data, string $uid): Attachment {
-		$a = $this->newRow($noteId, $name, $mime, strlen($data), $uid);
+	/** Erzeugte Datei (Excalidraw-Vorschau, Base64-Bild) als Anhang; Aufrufer hält die Transaktion (enforceQuota zuerst); $origin markiert für den CleanupJob */
+	public function createFromString(int $noteId, string $name, string $mime, string $data, string $uid, ?string $origin = null): Attachment {
+		$a = $this->newRow($noteId, $name, $mime, strlen($data), $uid, $origin);
 		$this->removeOnRollback($noteId, (int)$a->getId());
 		$this->noteFolder($noteId)->newFile((string)$a->getId(), $data);
 		return $a;
@@ -481,7 +484,8 @@ class AttachmentService {
 			} catch (NotFoundException) {
 				continue;
 			}
-			$new = $this->newRow($toNoteId, (string)$a->getOriginalName(), (string)$a->getMime(), (int)$a->getSize(), $uid);
+			// Herkunft bleibt: Verweise im kopierten Inhalt werden umgeschrieben
+			$new = $this->newRow($toNoteId, (string)$a->getOriginalName(), (string)$a->getMime(), (int)$a->getSize(), $uid, $a->getOrigin());
 			$this->noteFolder($toNoteId)->newFile((string)$new->getId(), $src->read());
 			$map[(int)$a->getId()] = (int)$new->getId();
 		}
