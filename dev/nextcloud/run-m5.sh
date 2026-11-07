@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: 2026 Thomas Weissel
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# run-m4.sh [env…]: einzige volle Matrix (Done M1–M4; Standard: sqlite mariadb pgsql nginx).
+# run-m5.sh [env…]: einzige volle Matrix (Done M1–M5; Standard: sqlite mariadb pgsql nginx).
 # Vorab: Build zweimal (zweiter ohne Netz) mit Prüfsummenvergleich, check-upstream, info.xml, SQL-Prüfung.
 # Phase 1 je Umgebung parallel (PARALLEL=0: nacheinander): Lebenszyklus M1 (frisch, Seite, Spike/CSP je Webserver, Schema),
-# danach frisch: App, mysql.utf8mb4 (mariadb), PHPUnit (Apache), Großanhang-Probe (mariadb, pgsql).
+# danach frisch: App, Circles-Loopback (up.sh, circles:check), mysql.utf8mb4 (mariadb), PHPUnit (Apache), Großanhang-Probe (mariadb, pgsql),
+# Circles-Aus-Lauf über HTTP (M5 Krit. 3, alle Umgebungen).
 # Phase 2 nacheinander, ohne Parallel-Last (Zeitmessungen): Playwright Hell+Dunkel (sqlite, nginx); E2E_PARALLEL=1 gleichzeitig.
-# Logs je Umgebung in NN_LOG_DIR (Standard dev/nextcloud/.cache/run-m4-<Zeit>). KEEP=1 lässt rote Umgebungen stehen.
+# Logs je Umgebung in NN_LOG_DIR (Standard dev/nextcloud/.cache/run-m5-<Zeit>). KEEP=1 lässt rote Umgebungen stehen.
 set -euo pipefail
 dir="$(dirname "${BASH_SOURCE[0]}")"
 source "$dir/env.sh"
@@ -16,7 +17,7 @@ for env in "${envs[@]}"; do check_env "$env"; done
 trap '"$dir/down.sh" all >/dev/null 2>&1 || true; exit 130' INT TERM
 app="$NN_REPO_ROOT/nextnotes"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
-logs="${NN_LOG_DIR:-$NN_CACHE/run-m4-$(date +%Y%m%d-%H%M%S)}"
+logs="${NN_LOG_DIR:-$NN_CACHE/run-m5-$(date +%Y%m%d-%H%M%S)}"
 mkdir -p "$logs"
 start=$SECONDS
 
@@ -52,6 +53,7 @@ phase1() {
 	fi
 	case "$env" in sqlite|mariadb|pgsql) "$dir/run-phpunit.sh" "$env" ;; esac
 	case "$env" in mariadb|pgsql) "$dir/scripts/probe-grenzen.sh" "$env" ;; esac
+	"$dir/scripts/probe-circles-off.sh" "$env"
 }
 
 declare -A rc=()
@@ -124,7 +126,7 @@ echo "Dauer gesamt: $(( (SECONDS - start) / 60 )) min; Logs: $logs"
 # Netz des Projekts entfernen, sofern nichts stehen bleiben soll
 [[ "${KEEP:-0}" == 1 ]] || "$dir/down.sh" all >/dev/null 2>&1 || true
 if [[ ${#failed[@]} -gt 0 ]]; then
-	echo "run-m4: rot in ${failed[*]} (grün: $(( ${#envs[@]} - ${#failed[@]} ))/${#envs[@]})" >&2
+	echo "run-m5: rot in ${failed[*]} (grün: $(( ${#envs[@]} - ${#failed[@]} ))/${#envs[@]})" >&2
 	exit 1
 fi
-echo "run-m4: alle Umgebungen grün (${envs[*]})"
+echo "run-m5: alle Umgebungen grün (${envs[*]})"

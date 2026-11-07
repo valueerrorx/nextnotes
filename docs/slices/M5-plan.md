@@ -172,6 +172,8 @@ Reihenfolge = Tabelle. M5b braucht M5a (Zustand, Adapter); M5c braucht M5b (Zust
 - `run-m5.sh` = `run-m4.sh` + Circles-Setup je Umgebung (Loopback, `circles:check`) + Circles-Aus-Lauf (Krit. 3 über HTTP); volle Matrix einmal (≈ 2 h wie M4).
 - Budget: Hauptansicht mit 20 Teams/100 Team-Workspaces: API-Requests unverändert, TTFB ≤ +30 ms.
 
+**Umsetzung M5e** (Architekt): `Teams/TeamIsolationTest` (Seiten, Exporte, Kompatibilitätsrouten, Schreibwege und die Pfade aus `IndirectReadTest` über einen Team-Workspace für Ex-Mitglied, Eingeladenen und Mitglied bei eingefrorenem Team; Positivkontrolle als Mitglied); `smoke-m5.mjs`; `budget.mjs` misst zusätzlich 20 Teams/100 Team-Workspaces (Median aus 15); `run-m4.sh` → `run-m5.sh` mit `scripts/probe-circles-off.sh` (Krit. 3 über HTTP in allen vier Umgebungen, auch nginx). Testisolation `UserDeletionTest`: Testfehler, kein Produktfehler – `IJobList::getJobsIterator` liefert je Zeile dieselbe geteilte Job-Instanz (Auto-Wiring im App-Container ist shared), Reihenfolge auf SQLite nach `argument_hash`; mit Rest-Jobs anderer Tests lief nur ein zufälliger Löschjob. Helfer merkt jetzt ID und Argument je Zeile.
+
 ## 4. SPEC-/ADR-Änderungen (mit dem jeweiligen Slice)
 | Stelle | Änderung | Slice |
 |---|---|---|

@@ -92,3 +92,53 @@ export function orphanTeam(base, owner, teamId) {
 		try { $cm->destroyCircle($argv[2]); } finally { $cm->stopSession(); }
 		\\OCP\\Server::get(\\OCA\\NextNotes\\Service\\TeamStateService::class)->markOrphaned($argv[2], null);`, owner, teamId);
 }
+
+// Mitglied <uid> aus Team entfernen (als Owner; M5e smoke)
+export function removeTeamMember(base, owner, teamId, uid) {
+	ncPhp(base, `$cm = \\OCP\\Server::get(\\OCA\\Circles\\CirclesManager::class);
+		$cm->startSession($cm->getLocalFederatedUser($argv[1]));
+		try {
+			$single = $cm->getLocalFederatedUser($argv[3])->getSingleId();
+			foreach ($cm->getCircle($argv[2])->getMembers() as $m) {
+				if ($m->getSingleId() === $single) { $cm->removeMember($m->getId()); }
+			}
+		} finally { $cm->stopSession(); }`, owner, teamId, uid);
+}
+
+// Budget M5e: <n> Teams (Owner nn-budget-owner, <member> Level 1) mit je <per> Team-Workspaces; liefert die Team-IDs
+export function seedBudgetTeams(base, member, n, per) {
+	return JSON.parse(ncPhp(base, `$um = \\OCP\\Server::get(\\OCP\\IUserManager::class);
+		$owner = 'nn-budget-owner';
+		$um->get($owner) ?? $um->createUser($owner, bin2hex(random_bytes(16)) . 'Aa1!');
+		$cm = \\OCP\\Server::get(\\OCA\\Circles\\CirclesManager::class);
+		$ws = \\OCP\\Server::get(\\OCA\\NextNotes\\Service\\WorkspaceService::class);
+		$ids = [];
+		for ($i = 0; $i < (int)$argv[2]; $i++) {
+			$cm->startSession($cm->getLocalFederatedUser($owner));
+			try {
+				$c = $cm->createCircle('Budget ' . $i . ' ' . bin2hex(random_bytes(3)), $cm->getLocalFederatedUser($owner), false, false, false);
+				$cm->addMember($c->getSingleId(), $cm->getLocalFederatedUser($argv[1]));
+				$ids[] = $c->getSingleId();
+			} finally { $cm->stopSession(); }
+			\\OCP\\Server::get(\\OCA\\NextNotes\\Service\\AccessService::class)->resetCache();
+			for ($j = 0; $j < (int)$argv[3]; $j++) { $ws->create($owner, 'BW ' . $i . '-' . $j, [], false, null, end($ids)); }
+		}
+		echo json_encode($ids);`, member, String(n), String(per)));
+}
+
+// Teams entfernen (als <owner>): Team zerstören, Team-Workspaces und Team-Zeile löschen
+export function dropTeams(base, owner, ids) {
+	ncPhp(base, `$cm = \\OCP\\Server::get(\\OCA\\Circles\\CirclesManager::class);
+		$db = \\OCP\\Server::get(\\OCP\\IDBConnection::class);
+		$del = \\OCP\\Server::get(\\OCA\\NextNotes\\Service\\WorkspaceDeletion::class);
+		foreach (json_decode($argv[1], true) as $id) {
+			$cm->startSession($cm->getLocalFederatedUser($argv[2]));
+			try { $cm->destroyCircle($id); } catch (\\Throwable $e) {} finally { $cm->stopSession(); }
+			$qb = $db->getQueryBuilder();
+			$qb->select('id')->from('nextnotes_workspaces')->where($qb->expr()->eq('owner_type', $qb->createNamedParameter('team')))
+				->andWhere($qb->expr()->eq('owner_id', $qb->createNamedParameter($id)));
+			foreach ($qb->executeQuery()->fetchFirstColumn() as $w) { $del->purge((int)$w); }
+			$qb = $db->getQueryBuilder();
+			$qb->delete('nextnotes_teams')->where($qb->expr()->eq('team_id', $qb->createNamedParameter($id)))->executeStatement();
+		}`, JSON.stringify(ids), owner);
+}

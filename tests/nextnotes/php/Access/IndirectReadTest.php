@@ -24,7 +24,7 @@ use OCP\Server;
  */
 final class IndirectReadTest extends ApiTestCase {
 	/** @return string[] Lecks */
-	private static function leaks(ApiClient $b, array $fx): array {
+	public static function leaks(ApiClient $b, array $fx): array {
 		$m = $fx['mark'];
 		$errors = [];
 		$noMark = static function (string $what, $r) use ($m, &$errors): void {
@@ -171,7 +171,7 @@ final class IndirectReadTest extends ApiTestCase {
 	 * M4-Lesepfade von B; $secrets dürfen nirgends erscheinen
 	 * @return array<string, string> Pfad → Antworttext (für die Positivkontrolle)
 	 */
-	private static function m4Views(ApiClient $b, array $fx): array {
+	public static function m4Views(ApiClient $b, array $fx): array {
 		$wq = 'workspace=' . self::enc($fx['wsB']);
 		$out = [];
 		foreach ([

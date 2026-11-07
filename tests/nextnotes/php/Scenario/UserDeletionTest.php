@@ -18,7 +18,6 @@ use OCA\NextNotes\Tests\Support\ApiTestCase;
 use OCP\App\IAppManager;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\Authentication\Token\IToken;
-use OCP\BackgroundJob\IJob;
 use OCP\BackgroundJob\IJobList;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IConfig;
@@ -77,18 +76,26 @@ final class UserDeletionTest extends ApiTestCase {
 		return $this->clientFor($uid);
 	}
 
-	/** @return list<array{IJob, mixed}> */
+	/**
+	 * Job-ID → Argument. Der Iterator liefert für jede Zeile dieselbe (geteilte) Job-Instanz, Reihenfolge nach argument_hash
+	 * (SQLite-Index job_argument_hash): nur ID und Argument merken, nie die Instanz
+	 * @return array<string, mixed>
+	 */
 	private static function deletionJobs(): array {
 		$out = [];
 		foreach (Server::get(IJobList::class)->getJobsIterator(UserDataDeletionJob::class, null, 0) as $job) {
-			$out[] = [$job, $job->getArgument()];
+			$out[(string)$job->getId()] = $job->getArgument();
 		}
 		return $out;
 	}
 
+	// alle eingereihten Löschjobs wie Cron, je Zeile mit eigener ID und eigenem Argument
 	private function runDeletionJobs(): int {
 		$n = 0;
-		foreach (self::deletionJobs() as [$job]) {
+		foreach (self::deletionJobs() as $id => $arg) {
+			$job = Server::get(UserDataDeletionJob::class);
+			$job->setId((string)$id);
+			$job->setArgument($arg);
 			$job->start(Server::get(IJobList::class));
 			$n++;
 		}
@@ -229,7 +236,7 @@ final class UserDeletionTest extends ApiTestCase {
 		self::assertContains($wsCId, $oldWs);
 		self::assertContains($nC, $oldNotes);
 		$aExpected = self::expectedAfter(self::dump($a->uid), $cUid);
-		$jobsBefore = count(self::deletionJobs());
+		$jobsBefore = self::deletionJobs();
 
 		// Kontolöschung über IUserManager → UserDeletedEvent
 		self::assertTrue(Server::get(IUserManager::class)->get($cUid)->delete(), 'Kontolöschung');
@@ -240,9 +247,9 @@ final class UserDeletionTest extends ApiTestCase {
 			self::assertSame('deleted', $row['owner_type'], 'owner_type nach Löschung');
 			self::assertMatchesRegularExpression('/^#[0-9a-f]{16}$/', (string)$row['owner_id'], 'Löschkennung §2.1');
 		}
-		$jobsNow = self::deletionJobs();
-		self::assertCount($jobsBefore + 1, $jobsNow, 'UserDataDeletionJob nicht eingereiht');
-		$jobArg = end($jobsNow)[1];
+		$jobsNew = array_diff_key(self::deletionJobs(), $jobsBefore);
+		self::assertCount(1, $jobsNew, 'UserDataDeletionJob nicht eingereiht');
+		$jobArg = reset($jobsNew);
 		self::assertStringNotContainsString($cUid, json_encode($jobArg), 'Job-Argument enthält UID');
 		self::assertSame(0, self::countIn('nextnotes_ws_shares', 'workspace_id', [$wsCId]), 'Freigabe von C an B');
 		self::assertStringNotContainsString($mk, $b->call('GET', '/workspaces')->body, 'B sieht C-Workspace');
@@ -343,7 +350,7 @@ final class UserDeletionTest extends ApiTestCase {
 		self::assertCount(1, $tokens, 'eine Löschkennung je Konto');
 		$token = $tokens[0];
 		// Queued Job entfernen: simuliert, dass NC ihn vor dem (abgebrochenen) Lauf aus der Liste genommen hat
-		foreach (self::deletionJobs() as [$job, $arg]) {
+		foreach (self::deletionJobs() as $arg) {
 			if (($arg['token'] ?? null) === $token) {
 				Server::get(IJobList::class)->remove(UserDataDeletionJob::class, $arg);
 			}
@@ -413,7 +420,7 @@ final class UserDeletionTest extends ApiTestCase {
 			self::assertTrue(Server::get(IUserManager::class)->get($uid)->delete(), "Kontolöschung $uid");
 		}
 		// Queued Jobs entfernen: nur der Nachlauf soll löschen
-		foreach (self::deletionJobs() as [$job, $arg]) {
+		foreach (self::deletionJobs() as $arg) {
 			Server::get(IJobList::class)->remove(UserDataDeletionJob::class, $arg);
 		}
 		$tok = [];
