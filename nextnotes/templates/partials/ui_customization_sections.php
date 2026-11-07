@@ -57,8 +57,7 @@
 		<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:note-virtual-space-card" checked><span><?php p($t('display.cards.note_virtual_space', 'Space below the note')); ?></span></label>
 		<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:default-image-border-card" checked><span><?php p($t('display.cards.default_image_border_no_padding', 'Default image border (no padding)')); ?></span></label>
 		<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:check-updates-card" checked><span><?php p($t('settings.cards.version', 'Version')); ?></span></label>
-		<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:github-card" checked><span><?php p($t('settings.cards.documentation', 'Documentation GitHub')); ?></span></label>
-		<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:website-card" checked><span><?php p($l->t('Next Notes Website')); ?></span></label>
+		<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:nextnotes-website-card" checked><span><?php p($l->t('Next Notes Website')); ?></span></label>
 </div>
 </div>
 

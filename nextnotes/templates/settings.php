@@ -711,16 +711,7 @@ $jsonAttr = static fn (mixed $v): string => json_encode($v, JSON_UNESCAPED_UNICO
 					<span class="setting-status enabled"><?php p($_['appVersion']); ?></span>
 				</div>
 			</div>
-			<a href="https://github.com/timothepoznanski/poznote" target="_blank" rel="noopener noreferrer" class="home-card" id="github-card">
-				<span class="setting-help" data-tooltip="<?php p($t('settings.card_help.github', 'Open the Poznote source code on GitHub.')); ?>"><i class="lucide lucide-help-circle"></i></span>
-				<div class="home-card-icon">
-					<i class="lucide lucide-github"></i>
-				</div>
-				<div class="home-card-content">
-					<span class="home-card-title"><?php p($t('settings.cards.documentation', 'Documentation GitHub')); ?></span>
-				</div>
-			</a>
-			<a href="https://github.com/valueerrorx/nextnotes" target="_blank" rel="noopener noreferrer" class="home-card" id="website-card">
+			<a href="https://github.com/valueerrorx/nextnotes" target="_blank" rel="noopener noreferrer" class="home-card" id="nextnotes-website-card">
 				<span class="setting-help" data-tooltip="<?php p($l->t('Open the Next Notes project on GitHub.')); ?>"><i class="lucide lucide-help-circle"></i></span>
 				<div class="home-card-icon">
 					<i class="lucide lucide-globe"></i>
