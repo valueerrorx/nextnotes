@@ -10,8 +10,9 @@
 /** @var \OCA\NextNotes\Service\View\PageTranslator $tr */
 
 // Drei-Punkte-Schalter je Ordner (generateFolderActions)
-$renderFolderActions = static function (array $folder) use ($tr): void {
-	?><div class="folder-actions-toggle" data-action="toggle-folder-actions-menu" data-folder-id="<?php p((string)$folder['id']); ?>" data-folder-name="<?php p($folder['name']); ?>" data-note-count="<?php p((string)$folder['count']); ?>" data-shared="0" data-favorite="<?php p($folder['favorite'] ? '1' : '0'); ?>" data-offline="0" title="<?php p($tr->t('notes_list.folder_actions.menu', [], 'Folder actions')); ?>"><i class="lucide lucide-more-vertical"></i></div><?php
+// data-nn-*: Schreibrecht/Material für nextnotes-teams.js (Menüeinträge, Plan M6 §2.6)
+$renderFolderActions = static function (array $folder, bool $canMark = false) use ($tr): void {
+	?><div class="folder-actions-toggle" data-action="toggle-folder-actions-menu" data-folder-id="<?php p((string)$folder['id']); ?>" data-folder-name="<?php p($folder['name']); ?>" data-note-count="<?php p((string)$folder['count']); ?>" data-shared="0" data-favorite="<?php p($folder['favorite'] ? '1' : '0'); ?>" data-offline="0" data-nn-write="<?php p($folder['writable'] ? '1' : '0'); ?>" data-nn-material="<?php p($folder['material']); ?>"<?php if ($canMark): ?> data-nn-can-mark="1"<?php endif; ?> title="<?php p($tr->t('notes_list.folder_actions.menu', [], 'Folder actions')); ?>"><i class="lucide lucide-more-vertical"></i></div><?php
 };
 
 // Schnellknöpfe je Ordnerzeile (M3-ui1): Kanban und „Hier erstellen“, gleiche data-action wie die Menüpunkte
@@ -27,7 +28,7 @@ $renderFolderQuick = static function (array $folder, bool $canWrite) use ($tr): 
 // Drei-Punkte-Schalter je Notiz (generateNoteActions)
 $renderNoteActions = static function (array $note) use ($tr): void {
 	$label = $tr->t('notes_list.note_actions.menu', [], 'Note actions');
-	?><div class="note-actions"><button type="button" class="note-actions-toggle" data-action="toggle-note-actions-menu" data-note-id="<?php p((string)$note['id']); ?>" data-note-title="<?php p($note['title']); ?>" data-note-type="<?php p($note['type']); ?>" data-folder-id="<?php p((string)$note['folderId']); ?>" data-folder="<?php p($note['folderName']); ?>" data-favorite="<?php p($note['favorite'] ? '1' : '0'); ?>" data-offline="0" data-shared="0" data-speed-dial="<?php p($note['speedDial'] ? '1' : '0'); ?>" title="<?php p($label); ?>" aria-label="<?php p($label); ?>"><i class="lucide lucide-more-vertical"></i></button></div><?php
+	?><div class="note-actions"><button type="button" class="note-actions-toggle" data-action="toggle-note-actions-menu" data-note-id="<?php p((string)$note['id']); ?>" data-note-title="<?php p($note['title']); ?>" data-note-type="<?php p($note['type']); ?>" data-folder-id="<?php p((string)$note['folderId']); ?>" data-folder="<?php p($note['folderName']); ?>" data-favorite="<?php p($note['favorite'] ? '1' : '0'); ?>" data-offline="0" data-shared="0" data-speed-dial="<?php p($note['speedDial'] ? '1' : '0'); ?>" data-nn-write="<?php p($note['writable'] ? '1' : '0'); ?>"<?php if ($note['materialCopy']): ?> data-nn-material-copy="1"<?php endif; ?> title="<?php p($label); ?>" aria-label="<?php p($label); ?>"><i class="lucide lucide-more-vertical"></i></button></div><?php
 };
 
 // Ein Menüeintrag; $extra: zusätzliche feste Klassen

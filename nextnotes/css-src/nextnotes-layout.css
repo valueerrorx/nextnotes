@@ -735,3 +735,70 @@ html[data-theme='dark'] #nextnotes-root.graph-page {
 	width: 100%;
 	margin-bottom: 8px;
 }
+
+/* Material-Ordner (M6b): Buch-Symbol hinter dem Ordnernamen, geerbt gedimmt; Farbe aus dem Text (Hell/Dunkel) */
+.nn-material-mark {
+	flex: 0 0 auto;
+	margin-left: 6px;
+	color: currentColor;
+	font-size: 1.05em;
+}
+
+.nn-material-mark.nn-material-inherited {
+	opacity: 0.45;
+}
+
+/* Tasklist ohne Schreibrecht: kein Eingabefeld, keine Zieh-/Aktionsknöpfe (Kästchen sperrt nextnotes-teams.js) */
+.noteentry[data-nextnotes-readonly] .task-input-container,
+.noteentry[data-nextnotes-readonly] .task-drag-handle,
+.noteentry[data-nextnotes-readonly] .task-subtask-btn,
+.noteentry[data-nextnotes-readonly] .task-due-btn,
+.noteentry[data-nextnotes-readonly] .task-move-btn,
+.noteentry[data-nextnotes-readonly] .task-menu-btn,
+.noteentry[data-nextnotes-readonly] .task-delete-btn {
+	display: none !important;
+}
+
+.noteentry[data-nextnotes-readonly] .tasks-list button,
+.noteentry[data-nextnotes-readonly] .tasks-list input {
+	pointer-events: none;
+}
+
+/* Menüeinträge ohne Schreibrecht (nextnotes-teams.js), Vorrang vor den Inline-Stilen der Upstream-Menüs */
+.nn-write-hidden {
+	display: none !important;
+}
+
+/* Hinweis nach dem Duplizieren von Material (Q1): unten mittig, NC-Farben */
+.nn-copy-notice {
+	position: fixed;
+	left: 50%;
+	bottom: 24px;
+	transform: translateX(-50%);
+	z-index: 10050;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	max-width: min(560px, calc(100vw - 32px));
+	padding: 10px 14px;
+	border-radius: var(--border-radius-large, 10px);
+	background: var(--color-main-background);
+	color: var(--color-main-text);
+	border: 1px solid var(--color-border);
+	box-shadow: 0 2px 12px var(--color-box-shadow, rgba(0, 0, 0, 0.2));
+}
+
+.nn-copy-notice a {
+	color: var(--color-primary-element);
+	font-weight: bold;
+	white-space: nowrap;
+}
+
+.nn-copy-notice button {
+	background: none;
+	border: none;
+	color: var(--color-text-maxcontrast);
+	cursor: pointer;
+	padding: 2px;
+	min-height: 0;
+}

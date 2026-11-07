@@ -47,12 +47,14 @@ class TaskService {
 		);
 		usort($list, static fn (Note $a, Note $b) => [(int)$b->getUpdatedAt(), (int)$b->getId()] <=> [(int)$a->getUpdatedAt(), (int)$a->getId()]);
 		$paths = [];
+		$rights = [];
 		$notes = [];
 		$checklists = [];
 		foreach ($list as $n) {
 			$type = (string)$n->getType();
 			$wsId = (int)$n->getWorkspaceId();
 			$paths[$wsId] ??= $this->folders->byId($wsId);
+			$rights[$wsId] ??= $this->writeRights($uid, $wsId, $paths[$wsId]);
 			$folderId = $n->getFolderId();
 			$folder = $folderId !== null && isset($paths[$wsId][$folderId]) ? $paths[$wsId][$folderId] : null;
 			$row = [
@@ -64,6 +66,8 @@ class TaskService {
 				'workspace' => (string)$this->workspaces->keyFor($uid, $wsId),
 				'updated' => NoteSerializer::date($n->getUpdatedAt()),
 				'favorite' => (int)$n->getFavorite() === 1,
+				// ohne Schreibrecht (Lesefreigabe, Material) Kästchen deaktiviert (P34)
+				'readonly' => !$rights[$wsId]['write'] || ($folderId !== null && isset($rights[$wsId]['material'][(int)$folderId])),
 			];
 			if ($type === 'tasklist') {
 				$notes[] = $row + ['tasks' => self::cleanTasks((string)$n->getContent())];
@@ -77,6 +81,18 @@ class TaskService {
 			}
 		}
 		return ['notes' => $notes, 'checklists' => $checklists];
+	}
+
+	/**
+	 * Schreibrecht je Workspace der Übersicht; Material-Zweig nur für Mitglieder ohne Lehrkraft-Recht (aus den geladenen Ordnern)
+	 * @param array<int, \OCA\NextNotes\Db\Folder> $byId
+	 * @return array{write: bool, material: array<int, true>}
+	 */
+	private function writeRights(string $uid, int $wsId, array $byId): array {
+		$ws = $this->access->requireWorkspace($uid, $wsId, 'read');
+		$write = $this->access->workspaceLevel($uid, $ws) >= AccessService::WRITE;
+		$material = $write && $this->access->materialRestricted($uid, $ws) ? FolderService::materialSet($byId) : [];
+		return ['write' => $write, 'material' => $material];
 	}
 
 	/** @return array<string, mixed> GET /notes/{id}/tasks */

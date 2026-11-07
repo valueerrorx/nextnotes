@@ -435,6 +435,46 @@
 			"file": "js/workspaces-page.js",
 			"text": "document.addEventListener('click', handleDeleteButtonClick)",
 			"by": "nextnotes-teams.js"
+		},
+		{
+			"file": "js/utils-menus.js",
+			"text": "function populateFolderActionsMenu(menu, toggle)",
+			"by": "nextnotes-teams.js"
+		},
+		{
+			"file": "js/utils-menus.js",
+			"text": "function populateNoteActionsMenu(menu, toggle)",
+			"by": "nextnotes-teams.js"
+		},
+		{
+			"file": "js/utils-menus.js",
+			"text": "function syncActionsMenuSeparators(menu)",
+			"by": "nextnotes-teams.js"
+		},
+		{
+			"file": "js/utils-menus.js",
+			"text": "function closeFolderActionsMenu(folderId)",
+			"by": "nextnotes-teams.js"
+		},
+		{
+			"file": "js/utils-note-create.js",
+			"text": "function duplicateNote(noteId)",
+			"by": "nextnotes-teams.js"
+		},
+		{
+			"file": "js/share.js",
+			"text": "function refreshNotesListAfterFolderAction(folderIdToOpen, options)",
+			"by": "nextnotes-teams.js"
+		},
+		{
+			"file": "js/tasklist-render.js",
+			"text": "function renderTaskList(noteId, tasks)",
+			"by": "nextnotes-teams.js"
+		},
+		{
+			"file": "js/list_folders.js",
+			"text": "if (action === 'open-folder-actions-modal') {",
+			"by": "nextnotes-teams.js"
 		}
 	],
 	"cssPageGroups": {

@@ -775,6 +775,8 @@
         checkbox.type = 'checkbox';
         checkbox.className = 'tasks-task-checkbox';
         checkbox.checked = !!task.completed;
+        // Next Notes P34: no write right (read-only share, material folder)
+        checkbox.disabled = note.readonly === true;
         checkbox.addEventListener('change', function () {
             toggleTask(note, task, checkbox);
         });
@@ -870,6 +872,7 @@
             checkbox.type = 'checkbox';
             checkbox.className = 'tasks-subtask-checkbox';
             checkbox.checked = !!subtask.completed;
+            checkbox.disabled = note.readonly === true;
             checkbox.addEventListener('change', function () {
                 toggleSubtask(note, task, subtask, index, checkbox.checked);
             });

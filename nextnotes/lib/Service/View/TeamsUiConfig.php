@@ -59,6 +59,16 @@ class TeamsUiConfig {
 				'convertFailed' => $l->t('The workspace could not be converted.'),
 				'deleteMoveTo' => $l->t('Its notes and folders are moved to this workspace of the team:'),
 				'deleteLast' => $l->t('This is the last workspace of the team. All its notes, folders and attachments are deleted permanently.'),
+				'markMaterial' => $l->t('Mark as material'),
+				'unmarkMaterial' => $l->t('Remove material mark'),
+				'materialTitle' => $l->t('Material – only teachers can edit'),
+				'materialInherited' => $l->t('In a material folder – only teachers can edit'),
+				'alreadyMaterial' => $l->t('A parent folder is already material.'),
+				'materialFailed' => $l->t('The material mark could not be changed.'),
+				'materialReadOnly' => $l->t('Only teachers can change material.'),
+				'copiedToPrivate' => $l->t('Copy created in your private workspace "{workspace}".'),
+				'openCopy' => $l->t('Open copy'),
+				'copyFailed' => $l->t('The note could not be copied.'),
 			],
 		];
 	}

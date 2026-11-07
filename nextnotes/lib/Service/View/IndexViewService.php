@@ -176,13 +176,15 @@ class IndexViewService {
 		// verknüpfte Notiz zeigt das Ziel (B42, Upstream note_loader.php), Auswahl im Baum bleibt die Verknüpfung
 		$shown = $note !== null ? $this->access->resolveLinked($uid, $note) : null;
 
-		$tree = $this->tree($uid, $baseUrl, $key, $byId, $notes, $tagMap, $sort, $favSort, $note, $folderFilter, $openFolder, $search);
+		$rights = $this->rights($uid, $ws, $canWrite, $byId);
+		$tree = $this->tree($uid, $baseUrl, $key, $byId, $notes, $tagMap, $sort, $favSort, $note, $folderFilter, $openFolder, $search, $rights);
 		$titleColor = $this->palette->hex($ws->getColor(), NotePalette::ownerOf($ws));
 
 		return [
 			'workspaceKey' => $key,
 			'workspaceColor' => $titleColor,
 			'canWrite' => $canWrite,
+			'material' => ['canMark' => $rights['teacher'], 'title' => $this->l->t('Material – only teachers can edit'), 'inherited' => $this->l->t('In a material folder – only teachers can edit')],
 			'teamBanner' => $this->teamBanner($uid, $ws, $baseUrl, $key),
 			'replaceWorkspace' => $requested !== $key ? $key : null,
 			'noteId' => $shown !== null ? (int)$shown->getId() : null,
@@ -204,7 +206,7 @@ class IndexViewService {
 			'globals' => $this->globals($uid, $key, $ws),
 			'hiddenUiElements' => $this->hiddenUi($uid),
 			'prefetchedSettings' => ['tasklist_insert_order' => $this->value($uid, 'tasklist_insert_order') === 'top' ? 'top' : 'bottom'],
-			'note' => $shown !== null ? $this->shownView($uid, $shown, $wsId, $key, $canWrite, $byId) : null,
+			'note' => $shown !== null ? $this->shownView($uid, $shown, $wsId, $key, $rights, $byId) : null,
 			'iconPalette' => self::iconPalette(),
 		];
 	}
@@ -224,17 +226,19 @@ class IndexViewService {
 			throw new NotFoundException('Note not found');
 		}
 		$note = $this->access->resolveLinked($uid, $this->access->requireNote($uid, (int)$rawNote, 'read'));
-		return ['note' => $this->shownView($uid, $note, null, '', false, [])];
+		return ['note' => $this->shownView($uid, $note, null, '', null, [])];
 	}
 
 	/**
 	 * Angezeigte Notiz; liegt sie nicht im Seiten-Workspace (Ziel einer Verknüpfung), Schlüssel/Rechte/Ordner aus ihrem Workspace
 	 * @param array<int, Folder> $byId Ordner des Seiten-Workspace
+	 * @param ?array{canWrite: bool, teacher: bool, restricted: bool, material: array<int, true>} $pageRights
 	 * @throws NotFoundException Workspace für uid nicht erreichbar
 	 */
-	private function shownView(string $uid, Note $note, ?int $pageWsId, string $pageKey, bool $pageCanWrite, array $byId): array {
-		if ($pageWsId !== null && (int)$note->getWorkspaceId() === $pageWsId) {
-			return $this->noteView($uid, $note, $pageKey, $pageCanWrite, $byId);
+	private function shownView(string $uid, Note $note, ?int $pageWsId, string $pageKey, ?array $pageRights, array $byId): array {
+		if ($pageWsId !== null && $pageRights !== null && (int)$note->getWorkspaceId() === $pageWsId) {
+			$copy = self::materialCopy($pageRights, $note);
+			return $this->noteView($uid, $note, $pageKey, $pageRights['canWrite'] && !$copy, $byId) + ['materialCopy' => $copy];
 		}
 		// kein Schlüssel = Workspace für uid nicht erreichbar, kein Rückfall auf den Standard-Workspace
 		$key = $this->workspaces->keyFor($uid, (int)$note->getWorkspaceId());
@@ -242,8 +246,44 @@ class IndexViewService {
 			throw new NotFoundException('Note not found');
 		}
 		$ws = $this->workspaces->resolveKey($uid, $key);
-		$canWrite = $this->access->workspaceLevel($uid, $ws) >= AccessService::WRITE;
-		return $this->noteView($uid, $note, $key, $canWrite, $this->folders->byId((int)$ws->getId()));
+		// Notiz außerhalb der Seite: Schreibrecht je Notiz (Material, Plan M6 §2.6)
+		$canWrite = $this->access->noteLevel($uid, $note) >= AccessService::WRITE;
+		$copy = !$canWrite && $this->access->isMaterialReadOnly($uid, $note);
+		return $this->noteView($uid, $note, $key, $canWrite, $this->folders->byId((int)$ws->getId())) + ['materialCopy' => $copy];
+	}
+
+	/**
+	 * Rechte der Seite je Ordner ohne Zusatzabfrage (Material aus den geladenen Ordnern, Plan M6 §2.6)
+	 * @param array<int, Folder> $byId
+	 * @return array{canWrite: bool, teacher: bool, restricted: bool, material: array<int, true>}
+	 */
+	private function rights(string $uid, Workspace $ws, bool $canWrite, array $byId): array {
+		// ohne Ordner kein Ordner-Menü: Lehrkraft-Abfrage (Circles) entfällt
+		$team = $ws->getOwnerType() === 'team' && $ws->getKind() === 'normal' && $byId !== [];
+		$teacher = $team && $canWrite && $this->access->canManageTeam($uid, $ws);
+		return [
+			'canWrite' => $canWrite,
+			'teacher' => $teacher,
+			'restricted' => $team && $canWrite && !$teacher,
+			'material' => $team ? FolderService::materialSet($byId) : [],
+		];
+	}
+
+	/**
+	 * Mitglied ohne Lehrkraft-Recht, Notiz im Material-Zweig: nur lesen, Duplikat in den privaten Workspace (Q1)
+	 * @param array{restricted: bool, material: array<int, true>} $rights
+	 */
+	private static function materialCopy(array $rights, Note $note): bool {
+		return $rights['restricted'] && ((int)$note->getTrashMaterial() === 1
+			|| ($note->getFolderId() !== null && isset($rights['material'][(int)$note->getFolderId()])));
+	}
+
+	/**
+	 * Darf der Benutzer im Ordner schreiben (Material: nur Lehrkraft)
+	 * @param array{canWrite: bool, restricted: bool, material: array<int, true>} $rights
+	 */
+	private static function folderWritable(array $rights, ?int $folderId): bool {
+		return $rights['canWrite'] && !($rights['restricted'] && $folderId !== null && isset($rights['material'][$folderId]));
 	}
 
 	/**
@@ -421,7 +461,7 @@ class IndexViewService {
 	 * @param array<int, string[]> $tags Tags je Notiz-ID
 	 * @return array<string, mixed>
 	 */
-	private function tree(string $uid, string $baseUrl, string $key, array $byId, array $notes, array $tags, string $sort, string $favSort, ?Note $selected, string $folderFilter, string $openFolder, array $search): array {
+	private function tree(string $uid, string $baseUrl, string $key, array $byId, array $notes, array $tags, string $sort, string $favSort, ?Note $selected, string $folderFilter, string $openFolder, array $search, array $rights): array {
 		$byNoteId = [];
 		foreach ($notes as $n) {
 			$byNoteId[(int)$n->getId()] = $n;
@@ -438,7 +478,7 @@ class IndexViewService {
 				'search_combined' => $search['combined'] ? '1' : ''], static fn (string $v) => $v !== '');
 		}
 
-		$item = function (Note $n) use ($uid, $baseUrl, $linkBase, $tags, $byNoteId, $byId, $selectedId): array {
+		$item = function (Note $n) use ($uid, $baseUrl, $linkBase, $tags, $byNoteId, $byId, $selectedId, $rights): array {
 			$id = (int)$n->getId();
 			$type = $n->getType() ?: 'note';
 			$icon = (string)($n->getIcon() ?? '');
@@ -479,6 +519,8 @@ class IndexViewService {
 				'iconColor' => self::iconColor($iconColor),
 				'titleColor' => self::iconColor($titleColor),
 				'selected' => $id === $selectedId,
+				'writable' => self::folderWritable($rights, $folder !== null ? (int)$folderId : null),
+				'materialCopy' => self::materialCopy($rights, $n),
 				'url' => $baseUrl . 'index.php?' . http_build_query($linkBase + ['note' => $id]),
 			];
 		};
@@ -524,7 +566,7 @@ class IndexViewService {
 		}
 		$highlight = $this->bool($uid, 'highlight_current_folder_tree');
 
-		$build = function (?int $parent, int $depth) use (&$build, $byId, $inFolder, $sort, $sortNotes, $item, $open, $total, $activeId, $branch, $highlight, $searching): array {
+		$build = function (?int $parent, int $depth) use (&$build, $byId, $inFolder, $sort, $sortNotes, $item, $open, $total, $activeId, $branch, $highlight, $searching, $rights): array {
 			$children = array_filter($byId, static fn (Folder $f) => $f->getParentId() === $parent);
 			uasort($children, static fn (Folder $a, Folder $b) => FolderService::compare($sort, $a, $b));
 			$out = [];
@@ -550,6 +592,8 @@ class IndexViewService {
 					'iconColorRaw' => self::iconColor((string)($f->getIconColor() ?? '')) !== '' ? (string)$f->getIconColor() : '',
 					'iconColor' => self::iconColor((string)($f->getIconColor() ?? '')),
 					'active' => $id === $activeId,
+					'material' => !isset($rights['material'][(int)$id]) ? '' : ((int)$f->getMaterial() === 1 ? 'own' : 'inherited'),
+					'writable' => self::folderWritable($rights, (int)$id),
 					'treeClass' => !$highlight ? '' : ($id === $activeId ? ' folder-tree-active' : (isset($branch[$id]) ? ' folder-tree-branch' : '')),
 					'notes' => $own,
 					'children' => $sub,

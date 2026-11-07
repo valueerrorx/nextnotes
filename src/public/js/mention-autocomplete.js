@@ -24,8 +24,10 @@
     var matches = [];
     var selectedIndex = 0;
     var suppressInput = false;
-    // { type:'dom', root, node, start, end } or { type:'cm', editor, start, end }
+    // { type:'dom', root, node, start, end }, { type:'cm', editor, start, end } or { type:'input', el, start, end }
     var ctx = null;
+    // Task fields (new task, inline/modal edit, subtasks, embedded lists) (P33)
+    var INPUT_SELECTOR = '.task-list-container input[type="text"], .tasklist-embed input[type="text"], #taskEditTextarea';
 
     function getMembers() {
         return Array.isArray(window.PoznoteMentionMembers) ? window.PoznoteMentionMembers : [];
@@ -100,6 +102,12 @@
                 api.replaceRange(ctx.editor, ctx.start, ctx.end, mention);
                 suppressInput = false;
             }
+        } else if (ctx.type === 'input') {
+            // input event lets field listeners (autosize, error reset) react (P33)
+            suppressInput = true;
+            ctx.el.setRangeText(mention, ctx.start, ctx.end, 'end');
+            ctx.el.dispatchEvent(new Event('input', { bubbles: true }));
+            suppressInput = false;
         } else {
             replaceInTextNode(ctx.root, ctx.node, ctx.start, ctx.end, mention);
         }
@@ -216,10 +224,29 @@
         showMenu(coords || editor.getBoundingClientRect());
     }
 
+    // Menu under the field, no caret measurement (P33)
+    function handleFieldInput(el) {
+        var pos = el.selectionStart;
+        if (typeof pos !== 'number' || pos !== el.selectionEnd) { hideMenu(); return; }
+        var m = el.value.slice(0, pos).match(QUERY_RE);
+        if (!m) { hideMenu(); return; }
+        matches = findMatches(m[2]);
+        if (!matches.length) { hideMenu(); return; }
+
+        selectedIndex = 0;
+        ctx = { type: 'input', el: el, start: pos - m[2].length - 1, end: pos };
+        showMenu(el.getBoundingClientRect());
+    }
+
     function handleInput(e) {
         if (suppressInput || !getMembers().length) return;
         var target = e.target;
         if (!target || !target.closest) return;
+
+        if (target.matches && target.matches(INPUT_SELECTOR)) {
+            handleFieldInput(target);
+            return;
+        }
 
         var cmHost = target.closest('.markdown-codemirror-host');
         var api = getCmApi();
@@ -282,7 +309,8 @@
             if (menuEl && !menuEl.contains(e.target)) hideMenu();
         }, true);
         document.addEventListener('scroll', function (e) {
-            if (menuEl && !menuEl.contains(e.target)) hideMenu();
+            // a narrow task field scrolls its own text while typing (P33)
+            if (menuEl && !menuEl.contains(e.target) && !(ctx && ctx.type === 'input' && e.target === ctx.el)) hideMenu();
         }, true);
         window.addEventListener('blur', hideMenu);
     }

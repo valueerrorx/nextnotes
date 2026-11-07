@@ -85,7 +85,17 @@
   "The Teams app is not available. This workspace is read-only.": "Die Teams-App ist nicht verfügbar. Dieser Arbeitsbereich ist nur lesbar.",
   "The team was deleted. This workspace will be deleted on %s.": "Das Team wurde gelöscht. Dieser Arbeitsbereich wird am %s gelöscht.",
   "The team was deleted. This workspace will be deleted soon.": "Das Team wurde gelöscht. Dieser Arbeitsbereich wird bald gelöscht.",
-  "Export": "Exportieren"
+  "Export": "Exportieren",
+  "Material – only teachers can edit": "Material – nur Lehrkräfte bearbeiten",
+  "In a material folder – only teachers can edit": "In einem Material-Ordner – nur Lehrkräfte bearbeiten",
+  "Mark as material": "Als Material kennzeichnen",
+  "Remove material mark": "Material-Kennzeichen entfernen",
+  "A parent folder is already material.": "Ein übergeordneter Ordner ist bereits Material.",
+  "The material mark could not be changed.": "Das Material-Kennzeichen konnte nicht geändert werden.",
+  "Only teachers can change material.": "Nur Lehrkräfte können Material ändern.",
+  "Copy created in your private workspace \"{workspace}\".": "Kopie in deinem privaten Arbeitsbereich „{workspace}“ angelegt.",
+  "Open copy": "Kopie öffnen",
+  "The note could not be copied.": "Die Notiz konnte nicht kopiert werden."
  },
  "pluralForm": "nplurals=2; plural=(n != 1);"
 }

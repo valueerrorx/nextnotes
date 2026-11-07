@@ -69,6 +69,16 @@ class KanbanViewService {
 		$this->paletteOwner = NotePalette::ownerOf($ws);
 		$byId = $this->folders->byId($wsId);
 		$ids = FolderService::subtree((int)$root->getId(), $byId);
+		// Material im Zweig: Mitglieder ohne Lehrkraft-Recht sehen das ganze Board nur lesend (Plan M6 §2.6)
+		if ($canWrite && $this->access->materialRestricted($uid, $ws)) {
+			$material = FolderService::materialSet($byId);
+			foreach ($ids as $fid) {
+				if (isset($material[$fid])) {
+					$canWrite = false;
+					break;
+				}
+			}
+		}
 		$notes = $this->notes->findList([$wsId], ['folder_ids' => $ids], true);
 		$noteIds = array_map(static fn (Note $n) => (int)$n->getId(), $notes);
 
