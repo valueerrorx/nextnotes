@@ -124,8 +124,8 @@ class FoldersApiController extends ApiController {
 
 	#[NoAdminRequired]
 	public function updateColor(int $id): JSONResponse {
-		$color = $this->folders->setColor($this->uid(), $id, $this->param('color'));
-		return $this->ok(['message' => 'Folder color updated successfully', 'color' => $color, 'color_hex' => $this->validator->colorHex($color)]);
+		[$color, $hex] = $this->folders->setColor($this->uid(), $id, $this->param('color'));
+		return $this->ok(['message' => 'Folder color updated successfully', 'color' => $color, 'color_hex' => $hex]);
 	}
 
 	#[NoAdminRequired]

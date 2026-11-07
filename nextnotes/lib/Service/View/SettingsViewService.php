@@ -12,6 +12,7 @@ namespace OCA\NextNotes\Service\View;
 use OCA\NextNotes\Db\FolderMapper;
 use OCA\NextNotes\Db\NoteMapper;
 use OCA\NextNotes\Db\Workspace;
+use OCA\NextNotes\Service\AccessService;
 use OCA\NextNotes\Service\AttachmentService;
 use OCA\NextNotes\Service\InputValidator;
 use OCA\NextNotes\Service\NotePalette;
@@ -40,31 +41,52 @@ class SettingsViewService {
 		private SettingsService $settings,
 		private InputValidator $validator,
 		private NotePalette $palette,
+		private AccessService $access,
 	) {
 	}
 
 	/**
-	 * Workspace-Liste (nur eigene, wie Upstream), Standard-Workspace-Auswahl (alle sichtbaren), Seiten-Einstellungen
-	 * @return array{rows: list<array<string, mixed>>, names: list<string>, defaultOptions: list<string>, settings: array<string, string>, palette: list<array<string, string>>, defaultPalette: list<array<string, string>>, localizedNames: array<string, string>, knownNames: array<string, list<string>>}
+	 * Workspace-Liste (eigene wie Upstream, dazu Team-Workspaces mit Kennzeichen, M5d), Standard-Workspace-Auswahl (alle sichtbaren), Seiten-Einstellungen
+	 * @return array{rows: list<array<string, mixed>>, names: list<string>, ownCount: int, defaultOptions: list<string>, settings: array<string, string>, palette: list<array<string, string>>, defaultPalette: list<array<string, string>>, localizedNames: array<string, string>, knownNames: array<string, list<string>>}
 	 */
 	public function build(string $uid): array {
 		$keys = $this->workspaces->keys($uid);
-		$own = array_values(array_filter($this->workspaces->listVisible($uid), static fn (Workspace $ws) => $ws->getOwnerType() === 'user'
-			&& $ws->getOwnerId() === $uid && $ws->getKind() === 'normal'));
-		$ids = array_map(static fn (Workspace $ws) => (int)$ws->getId(), $own);
+		$listed = array_values(array_filter($this->workspaces->listVisible($uid), static fn (Workspace $ws) => $ws->getKind() === 'normal'
+			&& (($ws->getOwnerType() === 'user' && $ws->getOwnerId() === $uid) || $ws->getOwnerType() === 'team')));
+		$ids = array_map(static fn (Workspace $ws) => (int)$ws->getId(), $listed);
 		$noteCounts = $ids === [] ? [] : $this->notes->countByWorkspace($ids);
 		$folderCounts = $ids === [] ? [] : $this->folders->countByWorkspace($ids);
+		$own = array_values(array_filter($listed, static fn (Workspace $ws) => $ws->getOwnerType() === 'user'));
+		$shares = $this->workspaces->shareStates(array_map(static fn (Workspace $ws) => (int)$ws->getId(), $own));
+		// Löschziele je Team: andere Workspaces desselben Teams, kleinste ID zuerst (Standard des Servers, Q2)
+		$byTeam = [];
+		foreach ($listed as $ws) {
+			if ($ws->getOwnerType() === 'team') {
+				$byTeam[(string)$ws->getOwnerId()][(int)$ws->getId()] = $keys[(int)$ws->getId()] ?? (string)$ws->getName();
+			}
+		}
 		$rows = [];
-		foreach ($own as $ws) {
+		foreach ($listed as $ws) {
 			$id = (int)$ws->getId();
 			$color = (string)($ws->getColor() ?? '');
+			$team = $ws->getOwnerType() === 'team';
+			$targets = [];
+			if ($team) {
+				$targets = $byTeam[(string)$ws->getOwnerId()];
+				ksort($targets);
+				unset($targets[$id]);
+			}
 			$rows[] = [
 				'name' => $keys[$id] ?? (string)$ws->getName(),
 				'tags' => $this->validator->workspaceTags((string)($ws->getTags() ?? '')),
 				'color' => $color,
-				'colorHex' => $this->palette->hex($color, $uid),
+				'colorHex' => $this->palette->hex($color, NotePalette::ownerOf($ws)),
 				'notes' => $noteCounts[$id]['active'] ?? 0,
 				'folders' => $folderCounts[$id] ?? 0,
+				'team' => $team ? $this->workspaces->teamName($uid, $ws) : null,
+				'manage' => !$team || $this->access->canManageTeam($uid, $ws),
+				'share' => $shares[$id] ?? null,
+				'teamTargets' => array_values($targets),
 			];
 		}
 		$settings = [];
@@ -74,6 +96,7 @@ class SettingsViewService {
 		return [
 			'rows' => $rows,
 			'names' => array_column($rows, 'name'),
+			'ownCount' => count($own),
 			'defaultOptions' => array_values($keys),
 			'settings' => $settings,
 			'palette' => $this->palette->entries($uid),

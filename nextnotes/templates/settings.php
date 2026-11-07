@@ -7,7 +7,7 @@
 // Persönliche Einstellungen: nur Karten mit Funktion im Port, IDs wie Upstream (settings-page.js, Anheften, Elementsichtbarkeit).
 // Gestrichen: Konto/Passwort/2FA/App-Passwörter/Konto löschen, Sprache/Zeitzone (→ Hinweis auf NC-Einstellungen), Backup/Restore/Import,
 // Git, Offline, Integrationen, Apps, Admin-Werkzeuge, Schriften, Login-Titel, Icon-Leisten-Reihenfolge/-Größe, What's new,
-// Diskussionen/Discord/Tipps/Spenden, Update-Prüfung, Teilen (M5), Kontext-Anpassungspanel. Daten: PageController::settings.
+// Diskussionen/Discord/Tipps/Spenden, Update-Prüfung, Kontext-Anpassungspanel. Daten: PageController::settings.
 /** @var array $_ */
 /** @var \OCP\IL10N $l */
 /** @var \OCA\NextNotes\Service\View\PageTranslator $tr */
@@ -21,6 +21,8 @@ $wsQuery = http_build_query(['workspace' => $wsKey]);
 $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR;
 $t = static fn (string $key, ?string $default = null, array $vars = []) => $tr->t($key, $vars, $default);
 $several = count($page['rows']) > 1;
+// eigene Workspaces löschen nur, wenn ein weiterer eigener bleibt (B18); Team-Workspaces nach Q2
+$severalOwn = $page['ownCount'] > 1;
 $sections = [
 	['key' => 'settings-pinned-section-grid', 'icon' => 'lucide-pin', 'label' => $t('settings.categories.pinned', 'Pinned')],
 	['key' => 'settings-account-section-grid', 'icon' => 'lucide-user', 'label' => $t('settings.categories.account', 'My Account')],
@@ -40,7 +42,11 @@ $islands = [
 			'workspace' => $wsKey,
 			'workspaces' => json_encode($page['names'], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
 			'current-user-id' => $_['uid'],
-			'can-share' => '0',
+			'can-share' => '1',
+			'txt-workspace-share-enable-btn' => $t('workspaces.share.actions.enable', 'Share'),
+			'txt-workspace-share-edit-btn' => $t('workspaces.share.actions.edit', 'Edit share'),
+			'txt-workspace-share-disable-btn' => $t('workspaces.share.actions.disable', 'Unshare'),
+			'txt-workspace-share-cancel' => $t('common.cancel', 'Cancel'),
 			'txt-enabled' => $t('common.enabled'),
 			'txt-disabled' => $t('common.disabled'),
 			'txt-not-defined' => $t('common.not_defined'),
@@ -74,7 +80,11 @@ $rowLabels = [
 	'info' => $t('common.information', 'Information'),
 	'menu' => $t('workspaces.actions.menu', 'Workspace actions'),
 	'select' => $t('workspaces.actions.select', 'Select'),
+	'share' => $t('workspaces.share.actions.enable', 'Share'),
+	'shareEdit' => $t('workspaces.share.actions.edit', 'Edit share'),
+	'team' => $l->t('Team workspace'),
 ];
+$jsonAttr = static fn (mixed $v): string => json_encode($v, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 ?>
 <div id="app-content">
 <div id="nextnotes-root" class="nextnotes-listpage">
@@ -162,12 +172,15 @@ $rowLabels = [
 			</div>
 		</div>
 
-		<!-- Workspaces: eigene Workspaces (Upstream workspaces_section.php), Teilen folgt mit M5 -->
+		<!-- Workspaces: eigene (Upstream workspaces_section.php, Teilen M5d) und Team-Workspaces mit Kennzeichen; Verwalten nur mit manage -->
 		<h2 class="settings-category-title" id="settings-workspaces-section-title"><?php p($t('settings.categories.workspaces', 'Workspaces')); ?></h2>
 		<div class="home-grid settings-grouped" id="settings-workspaces-section-grid">
 			<div class="settings-group">
 				<div class="settings-workspaces-list workspace-list" id="settings-workspaces-list">
 					<div id="topAlert" class="initially-hidden alert-with-margin"></div>
+					<?php if ($_['contactsUrl'] !== null): ?>
+					<p class="nn-manage-teams"><a href="<?php p($_['contactsUrl']); ?>"><i class="lucide lucide-users"></i> <?php p($l->t('Manage teams')); ?></a></p>
+					<?php endif; ?>
 					<?php if ($several): ?>
 					<div class="home-search-wrapper ws-filter">
 						<i class="lucide lucide-search home-search-icon"></i>
@@ -182,7 +195,8 @@ $rowLabels = [
 					<?php else: ?>
 					<ul>
 						<?php foreach ($page['rows'] as $row): ?>
-						<li class="ws-row" data-ws="<?php p($row['name']); ?>">
+						<?php $shared = $row['share'] !== null && $row['share']['shared']; ?>
+						<li class="ws-row<?php if ($row['team'] !== null): ?> nn-team-row<?php endif; ?>" data-ws="<?php p($row['name']); ?>">
 							<?php if ($several): ?>
 							<div class="ws-col ws-col-order">
 								<button type="button" class="ws-drag-handle" title="<?php p($rowLabels['drag']); ?>" aria-label="<?php p($rowLabels['drag']); ?>">
@@ -197,6 +211,9 @@ $rowLabels = [
 										<span class="ws-color-dot" style="background-color: <?php p($row['colorHex']); ?>" title="<?php p($rowLabels['color']); ?>"></span>
 										<?php endif; ?>
 										<a class="workspace-name-item workspace-name-link" href="<?php p($baseUrl . 'index.php?' . http_build_query(['workspace' => $row['name']])); ?>" data-ws="<?php p($row['name']); ?>" title="<?php p($rowLabels['select']); ?>"><?php p($row['name']); ?></a>
+										<?php if ($row['team'] !== null): ?>
+										<span class="nn-team-badge" title="<?php p($rowLabels['team']); ?>"><i class="lucide lucide-users" aria-hidden="true"></i><span><?php p($row['team']); ?></span></span>
+										<?php endif; ?>
 										<?php if ($row['tags'] !== []): ?>
 										<div class="ws-tags-row">
 											<?php foreach ($row['tags'] as $tag): ?>
@@ -213,6 +230,14 @@ $rowLabels = [
 									<i class="lucide lucide-more-horizontal"></i>
 								</button>
 								<div class="ws-actions-menu">
+									<?php if ($row['share'] !== null): ?>
+									<button type="button" class="ws-icon-btn btn-share-toggle<?php if ($shared): ?> is-shared<?php endif; ?>" data-ws="<?php p($row['name']); ?>"
+										data-shared="<?php p($shared ? '1' : '0'); ?>" data-allowed-users="<?php p($jsonAttr($row['share']['allowed_users'])); ?>" data-shared-with="<?php p($jsonAttr($row['share']['shared_with'])); ?>"
+										title="<?php p($shared ? $rowLabels['shareEdit'] : $rowLabels['share']); ?>" aria-label="<?php p($shared ? $rowLabels['shareEdit'] : $rowLabels['share']); ?>">
+										<i class="lucide lucide-share-2"></i><span class="ws-icon-btn-text"><?php p($shared ? $rowLabels['shareEdit'] : $rowLabels['share']); ?></span>
+									</button>
+									<?php endif; ?>
+									<?php if ($row['manage']): ?>
 									<button type="button" class="ws-icon-btn workspace-rename-action" data-ws="<?php p($row['name']); ?>" title="<?php p($rowLabels['rename']); ?>" aria-label="<?php p($rowLabels['rename']); ?>">
 										<i class="lucide lucide-pencil"></i><span class="ws-icon-btn-text"><?php p($rowLabels['rename']); ?></span>
 									</button>
@@ -222,20 +247,23 @@ $rowLabels = [
 									<button type="button" class="ws-icon-btn workspace-color-action" data-ws="<?php p($row['name']); ?>" data-color="<?php p($row['color']); ?>" title="<?php p($rowLabels['color']); ?>" aria-label="<?php p($rowLabels['color']); ?>">
 										<i class="lucide lucide-palette"></i><span class="ws-icon-btn-text"><?php p($rowLabels['color']); ?></span>
 									</button>
+									<?php endif; ?>
 									<button type="button" class="ws-icon-btn workspace-background-action" data-ws="<?php p($row['name']); ?>" title="<?php p($rowLabels['background']); ?>" aria-label="<?php p($rowLabels['background']); ?>">
 										<i class="lucide lucide-image"></i><span class="ws-icon-btn-text"><?php p($rowLabels['background']); ?></span>
 									</button>
+									<?php if ($row['manage']): ?>
 									<button type="button" class="ws-icon-btn btn-move" data-ws="<?php p($row['name']); ?>" title="<?php p($rowLabels['move']); ?>" aria-label="<?php p($rowLabels['move']); ?>"<?php if ($row['notes'] === 0 || !$several): ?> disabled<?php endif; ?>>
 										<i class="lucide lucide-folder-output"></i><span class="ws-icon-btn-text"><?php p($rowLabels['move']); ?></span>
 									</button>
+									<?php endif; ?>
 									<button type="button" class="ws-icon-btn workspace-info-action" data-ws="<?php p($row['name']); ?>"
 										data-notes-count="<?php p((string)$row['notes']); ?>" data-folders-count="<?php p((string)$row['folders']); ?>"
-										data-tags="<?php p(json_encode($row['tags'], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)); ?>" data-shared="0" data-shared-with="[]"
+										data-tags="<?php p(json_encode($row['tags'], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)); ?>" data-shared="<?php p($shared ? '1' : '0'); ?>" data-shared-with="<?php p($jsonAttr($row['share']['shared_with'] ?? [])); ?>"
 										title="<?php p($rowLabels['info']); ?>" aria-label="<?php p($rowLabels['info']); ?>">
 										<i class="lucide lucide-info"></i><span class="ws-icon-btn-text"><?php p($rowLabels['info']); ?></span>
 									</button>
-									<?php if ($several): ?>
-									<button type="button" class="ws-icon-btn ws-icon-btn-danger btn-delete" data-ws="<?php p($row['name']); ?>" title="<?php p($rowLabels['delete']); ?>" aria-label="<?php p($rowLabels['delete']); ?>">
+									<?php if ($row['team'] !== null ? $row['manage'] : $severalOwn): ?>
+									<button type="button" class="ws-icon-btn ws-icon-btn-danger btn-delete" data-ws="<?php p($row['name']); ?>"<?php if ($row['team'] !== null): ?> data-team-targets="<?php p($jsonAttr($row['teamTargets'])); ?>"<?php endif; ?> title="<?php p($rowLabels['delete']); ?>" aria-label="<?php p($rowLabels['delete']); ?>">
 										<i class="lucide lucide-trash-2"></i><span class="ws-icon-btn-text"><?php p($rowLabels['delete']); ?></span>
 									</button>
 									<?php endif; ?>

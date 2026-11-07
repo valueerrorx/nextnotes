@@ -245,6 +245,8 @@ final class IsolationTest extends ApiTestCase {
 			// Benutzer: {username} ist ein Name; Sichtbarkeit nach NC-Freigaberegeln
 			'GET /users/me' => ['scoped', 'path' => '/users/me', 'sees' => null],
 			'GET /users/lookup/{}' => ['scoped', 'path' => '/users/lookup/admin', 'sees' => null],
+			// M5d: Personensuche (kein Objekt; Richtlinie prüft Teams/ShareDialogTest)
+			'GET /users/search' => ['scoped', 'path' => '/users/search', 'query' => ['q' => 'Iso'], 'sees' => null],
 		];
 	}
 
@@ -444,7 +446,7 @@ final class IsolationTest extends ApiTestCase {
 			}
 		}
 		self::assertSame([], $errors);
-		self::assertCount(120, $table);
+		self::assertCount(121, $table);
 	}
 
 	public function testDetectorsObject(): void {

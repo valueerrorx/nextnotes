@@ -790,12 +790,13 @@ class NoteService {
 		return [$iconValue ?? NoteSerializer::DEFAULT_ICON, $colorValue];
 	}
 
-	public function setColor(string $uid, int $id, mixed $color): ?string {
+	/** @return array{0: ?string, 1: ?string} gespeicherte Farbe, Hex nach Besitzer-Palette (R16) */
+	public function setColor(string $uid, int $id, mixed $color): array {
 		$value = $this->validator->color($color);
 		$note = $this->access->requireNote($uid, $id, 'write');
 		$note->setColor($value);
 		$this->notes->update($note);
-		return $value;
+		return [$value, $this->validator->colorHex($value, $this->workspaces->paletteOwner($uid, (int)$note->getWorkspaceId()))];
 	}
 
 	public function setPinned(string $uid, int $id, bool $pinned): void {

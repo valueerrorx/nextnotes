@@ -8,10 +8,23 @@ import { execFileSync } from 'node:child_process';
 const dk = (...a) => execFileSync('docker', a, { encoding: 'utf8' }).trim();
 const hasOcc = (c) => { try { dk('exec', c, 'php', '-r', "exit(is_file('/var/www/html/occ') ? 0 : 1);"); return true; } catch { return false; } };
 
+// Gesperrte Instanzen (Demo von Thomas, fremde Testinstanz): nie per docker exec ansprechen
+const BLOCKED = ['nextnotes-demo', 'nc35-gftest'];
+const blocked = (s) => BLOCKED.some((b) => String(s).includes(b));
+function guard(port, name) {
+	const project = name ? dk('inspect', '-f', '{{index .Config.Labels "com.docker.compose.project"}}', name) : '';
+	if (port === '8090' || blocked(name) || blocked(project)) {
+		throw new Error(`docker.mjs: gesperrte Instanz (Port ${port}, Container ${name || '-'}, Projekt ${project || '-'})`);
+	}
+	return name;
+}
+
 export function ncContainer(base) {
 	const port = new URL(base).port;
+	guard(port, '');
 	const web = dk('ps', '--filter', `publish=${port}`, '--format', '{{.Names}}').split('\n').filter(Boolean);
 	if (web.length !== 1) throw new Error(`ncContainer: ${web.length} Container auf Port ${port}`);
+	guard(port, web[0]);
 	if (hasOcc(web[0])) return web[0];
 	const label = (k) => dk('inspect', '-f', `{{index .Config.Labels "${k}"}}`, web[0]);
 	const project = label('com.docker.compose.project');
@@ -19,7 +32,7 @@ export function ncContainer(base) {
 	const deps = label('com.docker.compose.depends_on').split(',').map((d) => d.split(':')[0]).filter(Boolean);
 	for (const svc of deps) {
 		const c = dk('ps', '--filter', `label=com.docker.compose.project=${project}`, '--filter', `label=com.docker.compose.service=${svc}`, '--format', '{{.Names}}').split('\n')[0];
-		if (c && hasOcc(c)) return c;
+		if (c && hasOcc(guard(port, c))) return c;
 	}
 	throw new Error(`ncContainer: kein Nextcloud-Container für Port ${port}`);
 }
@@ -39,4 +52,43 @@ export function share(base, owner, wsName, target, perm) {
 		\\OCP\\Server::get(\\OCA\\NextNotes\\Service\\WorkspaceService::class)->share($argv[1], $id, $argv[3], $argv[4]);
 		echo $id;`;
 	return dk('exec', '-u', 'www-data', ncContainer(base), 'php', '-r', php, '--', owner, wsName, target, perm);
+}
+
+// occ im Nextcloud-Container (www-data); Ausgabe als Text
+export function occ(base, ...args) {
+	return dk('exec', '-u', 'www-data', ncContainer(base), 'php', 'occ', ...args);
+}
+
+// PHP mit geladenem Nextcloud (lib/base.php); $argv[1…] = args
+function ncPhp(base, code, ...args) {
+	return dk('exec', '-u', 'www-data', ncContainer(base), 'php', '-r', `require '/var/www/html/lib/base.php';\n${code}`, '--', ...args);
+}
+
+// Konto anlegen, falls es fehlt; Anzeigename setzen (M5d)
+export function ensureUser(base, uid, displayName, pass) {
+	ncPhp(base, `$um = \\OCP\\Server::get(\\OCP\\IUserManager::class);
+		$u = $um->get($argv[1]) ?? $um->createUser($argv[1], $argv[3]);
+		$u->setDisplayName($argv[2]);`, uid, displayName, pass);
+}
+
+// Team über CirclesManager: Owner + Mitglieder (uid=level, 1 Mitglied, 4 Moderator); liefert die Team-ID (M5d)
+export function createTeam(base, owner, name, members = {}) {
+	return ncPhp(base, `$cm = \\OCP\\Server::get(\\OCA\\Circles\\CirclesManager::class);
+		$cm->startSession($cm->getLocalFederatedUser($argv[1]));
+		try {
+			$circle = $cm->createCircle($argv[2], $cm->getLocalFederatedUser($argv[1]), false, false, false);
+			foreach (json_decode($argv[3], true) as $uid => $level) {
+				$m = $cm->addMember($circle->getSingleId(), $cm->getLocalFederatedUser((string)$uid));
+				if ((int)$level !== 1) { $cm->levelMember($m->getId(), (int)$level); }
+			}
+			echo $circle->getSingleId();
+		} finally { $cm->stopSession(); }`, owner, name, JSON.stringify(members));
+}
+
+// Team zerstören (Team-Workspaces bleiben) und Zustand verwaist setzen, wie nach dem Lösch-Event (M5d)
+export function orphanTeam(base, owner, teamId) {
+	ncPhp(base, `$cm = \\OCP\\Server::get(\\OCA\\Circles\\CirclesManager::class);
+		$cm->startSession($cm->getLocalFederatedUser($argv[1]));
+		try { $cm->destroyCircle($argv[2]); } finally { $cm->stopSession(); }
+		\\OCP\\Server::get(\\OCA\\NextNotes\\Service\\TeamStateService::class)->markOrphaned($argv[2], null);`, owner, teamId);
 }

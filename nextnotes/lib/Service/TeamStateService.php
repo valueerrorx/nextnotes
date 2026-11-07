@@ -60,6 +60,15 @@ class TeamStateService {
 		return $this->teams->markOrphaned($teamId, $now);
 	}
 
+	// Löschtermin eines verwaisten Teams (Banner, Benachrichtigung), sonst null
+	public function deletionDate(string $teamId): ?int {
+		$team = $this->teams->findByTeamId($teamId);
+		if ($team === null || $team->getState() !== self::ORPHANED) {
+			return null;
+		}
+		return TeamCleanupService::deletionDate((int)$team->getOrphanedAt(), $team->getDeletionNotifiedAt());
+	}
+
 	public function resetCache(): void {
 		$this->stored = [];
 	}

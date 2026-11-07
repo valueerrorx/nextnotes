@@ -164,6 +164,7 @@ Reihenfolge = Tabelle. M5b braucht M5a (Zustand, Adapter); M5c braucht M5b (Zust
 5. R16: A setzt Farb-ID in geteiltem Workspace → C sieht dieselbe Farbe (Palette des Besitzers); Team-Workspace → Standardfarbe für alle.
 6. Erstellen-Menü schließt per Escape und per Klick außerhalb direkt nach dem Öffnen.
 7. 0 CSP/Konsolenfehler, `menu-501` ohne 501 (Teilen nicht mehr 501), `check-upstream` grün mit P30/P31.
+**Umsetzung (Architekt M5d)**: Dialog als Adapter-Override (`nextnotes-teams.js`) statt `src/`-Patch; `src/` nur P30 (Erstellen-Menü, B65) und P31 (Team-Auswahl). Einstellungen listen auch Team-Workspaces (Kennzeichen, Verwalten nur Level ≥ 4). `GET /mentions` liefert `owner_path` (Team-ID bzw. Besitzer). E2E heißt `teams-m5d`. R16 vorläufig: Palette des Besitzers.
 **Testart**: PHPUnit Share/UsersSearch/Mention gefiltert sqlite; E2E neu `teams-share` Hell+Dunkel nginx; `menu-501`, `settings-m4h`, `workspace-create` Hell.
 
 ### M5e – Abschluss

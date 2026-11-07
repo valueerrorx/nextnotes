@@ -59,7 +59,10 @@ function submitCreateWorkspaceModal() {
         showCreateWorkspaceError(wsTr('workspaces.validation.invalid_name', {}, 'Invalid name: use letters, numbers, spaces, dash or underscore only'));
         return;
     }
-    if (knownWorkspaceNames.indexOf(name) !== -1) {
+    // Next Notes (P31): Team-Workspace (Auswahl im Dialog); Namen gelten je Team, nicht gegen die eigenen prüfen
+    var teamSelect = document.getElementById('createWorkspaceTeamSelect');
+    var team = teamSelect ? teamSelect.value : '';
+    if (!team && knownWorkspaceNames.indexOf(name) !== -1) {
         showCreateWorkspaceError(wsTr('workspaces.errors.already_exists', {}, 'A workspace with this name already exists'));
         return;
     }
@@ -71,6 +74,7 @@ function submitCreateWorkspaceModal() {
     // string as it is and drops the empty and repeated ones
     var tagsInput = document.getElementById('createWorkspaceTagsInput');
     var payload = { name: name };
+    if (team) payload.team = team;
     if (tagsInput && tagsInput.value.trim() !== '') {
         payload.tags = tagsInput.value.trim();
     }

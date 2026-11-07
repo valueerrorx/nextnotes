@@ -19,7 +19,6 @@ use OCA\NextNotes\Service\AttachmentService;
 use OCA\NextNotes\Service\BackgroundService;
 use OCA\NextNotes\Service\Exception\BadRequestException;
 use OCA\NextNotes\Service\Exception\LockedException;
-use OCA\NextNotes\Service\Exception\NotImplementedException;
 use OCA\NextNotes\Service\Exception\NotFoundException;
 use OCA\NextNotes\Service\Exception\TooLargeException;
 use OCA\NextNotes\Service\ExcalidrawService;
@@ -262,7 +261,7 @@ class CompatController extends ApiController {
 
 	/**
 	 * Upstream workspaces.php (POST-Aktionen der Workspace-Liste); Schlüssel wie SPEC §4.4, nur Besitzer (manage).
-	 * Abweichungen: Fehler mit HTTP-Status statt 200; delete verschiebt Inhalte wie DELETE /workspaces (B18, Team: target/confirm); Teilen bis M5d → 501.
+	 * Abweichungen: Fehler mit HTTP-Status statt 200; delete verschiebt Inhalte wie DELETE /workspaces (B18, Team: target/confirm); Teilen: allowed_users mit Recht je Empfänger, NC-Freigaberegeln (M5d).
 	 */
 	#[NoAdminRequired]
 	public function workspaces(): JSONResponse {
@@ -312,11 +311,38 @@ class CompatController extends ApiController {
 				}
 				$moved = $this->workspaces->moveNotes($uid, $name, $target);
 				return $this->ok(['moved' => $moved, 'target' => $target, 'message' => $text('workspaces.messages.notes_moved_to', 'Notes moved to {{target}}', ['target' => $target])]);
+			case 'share_workspace':
+				$ws = $this->workspaces->requireByKey($uid, $name, 'manage');
+				$r = $this->workspaces->setShares($uid, (int)$ws->getId(), self::shareList($this->param('allowed_users')));
+				return $this->ok(['message' => $text('workspaces.share.messages.saved', 'Workspace sharing updated'), 'name' => $name] + $r);
 			default:
-				// Teilen mit NC-Benutzern kommt mit der Freigabe-Oberfläche (M5); Rechte vorher prüfen
-				$this->workspaces->requireByKey($uid, $name, 'manage');
-				throw new NotImplementedException('not_implemented');
+				// unshare_workspace: alle Empfänger entziehen (Upstream-Knopf „Freigabe aufheben“)
+				$ws = $this->workspaces->requireByKey($uid, $name, 'manage');
+				$r = $this->workspaces->setShares($uid, (int)$ws->getId(), []);
+				return $this->ok(['message' => $text('workspaces.share.messages.disabled', 'Workspace is no longer shared'), 'name' => $name] + $r);
 		}
+	}
+
+	/**
+	 * allowed_users (JSON, Pflicht): Liste aus UIDs (Upstream: bearbeiten) oder {uid, permission}; höchstens 200; [] = alle entfernen
+	 * @return array<string, string> uid → read|write
+	 */
+	private static function shareList(mixed $raw): array {
+		// fehlender Parameter darf nicht still alle Empfänger entziehen
+		$list = is_string($raw) ? json_decode($raw, true) : $raw;
+		if (!is_array($list) || count($list) > 200) {
+			throw new BadRequestException('Invalid share list');
+		}
+		$out = [];
+		foreach ($list as $item) {
+			$uid = is_array($item) ? ($item['uid'] ?? null) : $item;
+			$permission = is_array($item) ? ($item['permission'] ?? 'write') : 'write';
+			if (!is_string($uid) || $uid === '' || strlen($uid) > 64 || !in_array($permission, ['read', 'write'], true)) {
+				throw new BadRequestException('Invalid share list');
+			}
+			$out[$uid] = $permission;
+		}
+		return $out;
 	}
 
 	// Upstream api_import_dropped_notes.php (Dateien auf die Seitenleiste ziehen, M4b); workspace Pflicht (B44), kein ZIP (ADR 0009)

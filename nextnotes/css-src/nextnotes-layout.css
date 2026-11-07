@@ -559,3 +559,179 @@ html[data-theme='dark'] #nextnotes-root.graph-page {
 	grid-row: 1;
 	justify-self: start;
 }
+
+/* Teams-Oberfläche (M5d): Kennzeichen, Banner, Freigabe-Dialog, Team-Auswahl; Farben nur über NC-Tokens (Hell/Dunkel) */
+.nn-team-badge,
+.workspace-menu-item .nn-team-mark {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	color: var(--pz-text-muted);
+	font-size: 0.85em;
+}
+
+.nn-team-badge {
+	margin-left: 8px;
+	padding: 1px 8px;
+	border: 1px solid var(--pz-border);
+	border-radius: var(--border-radius-pill, 999px);
+}
+
+.nn-team-badge .lucide,
+.workspace-menu-item .nn-team-mark .lucide {
+	font-size: 0.95em;
+}
+
+#left_col .nn-team-banner {
+	margin: 6px 8px;
+	padding: 8px 10px;
+	border-radius: var(--border-radius-large, 8px);
+	background: var(--pz-warning-soft);
+	border: 1px solid var(--pz-warning);
+	color: var(--pz-text);
+	font-size: 0.9em;
+}
+
+#left_col .nn-team-banner-text {
+	display: flex;
+	gap: 6px;
+	align-items: flex-start;
+}
+
+#left_col .nn-team-banner-text .lucide {
+	color: var(--pz-warning-strong);
+	flex: 0 0 auto;
+	margin-top: 2px;
+}
+
+#left_col .nn-team-banner-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-top: 8px;
+}
+
+#left_col .nn-team-banner-actions .btn {
+	text-decoration: none;
+	padding: 4px 10px;
+	min-height: 0;
+	font-size: 0.95em;
+}
+
+.nn-manage-teams {
+	margin: 0 0 8px;
+}
+
+.nn-manage-teams a,
+.nn-manage-teams-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	color: var(--pz-accent);
+}
+
+.nn-create-team label {
+	display: block;
+	margin-bottom: 4px;
+}
+
+.nn-create-team select {
+	width: 100%;
+}
+
+.nn-create-team .nn-manage-teams-link {
+	margin-top: 6px;
+}
+
+.nn-share-modal .nn-share-search {
+	width: 100%;
+	margin-top: 4px;
+}
+
+.nn-share-modal .nn-share-results,
+.nn-share-modal .nn-share-recipients {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.nn-share-modal .nn-share-results {
+	max-height: 200px;
+	overflow-y: auto;
+	border-radius: var(--border-radius, 4px);
+}
+
+.nn-share-modal .nn-share-result {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 8px;
+	cursor: pointer;
+}
+
+.nn-share-modal .nn-share-result:hover,
+.nn-share-modal .nn-share-result:focus {
+	background: var(--pz-surface);
+	outline: none;
+}
+
+.nn-share-modal .nn-share-status {
+	min-height: 1.4em;
+	margin: 4px 0 10px;
+	color: var(--pz-text-muted);
+	font-size: 0.9em;
+}
+
+.nn-share-modal .nn-share-recipients {
+	border-top: 1px solid var(--pz-border);
+	padding-top: 8px;
+	max-height: 260px;
+	overflow-y: auto;
+}
+
+.nn-share-modal .nn-share-recipient {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 4px 0;
+}
+
+.nn-share-modal .nn-share-name {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.nn-share-modal .nn-share-permission {
+	flex: 0 0 auto;
+	width: auto;
+	height: auto;
+	min-height: 34px;
+	margin: 0;
+	padding: 4px 28px 4px 8px;
+}
+
+.nn-share-modal .nn-share-remove {
+	background: none;
+	border: none;
+	color: var(--pz-text-muted);
+	cursor: pointer;
+	padding: 4px;
+}
+
+.nn-share-modal .nn-share-empty {
+	color: var(--pz-text-muted);
+	font-size: 0.9em;
+	padding: 4px 0;
+}
+
+.nn-share-modal .nn-share-error {
+	display: none;
+}
+
+.nn-delete-team-info select {
+	width: 100%;
+	margin-bottom: 8px;
+}

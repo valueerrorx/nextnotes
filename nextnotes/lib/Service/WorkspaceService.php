@@ -56,6 +56,7 @@ class WorkspaceService {
 		private TeamService $teams,
 		private TeamStateService $teamState,
 		private QuotaService $quota,
+		private ShareTargetPolicy $sharePolicy,
 	) {
 	}
 
@@ -172,6 +173,13 @@ class WorkspaceService {
 		return $this->keys($uid)[$workspaceId] ?? null;
 	}
 
+	// R16: Paletten-Besitzer eines sichtbaren Workspace (nicht sichtbar → Aufrufer)
+	public function paletteOwner(string $uid, int $workspaceId): string {
+		$this->listVisible($uid);
+		$ws = $this->visible[$uid][$workspaceId] ?? null;
+		return $ws === null ? $uid : NotePalette::ownerOf($ws);
+	}
+
 	// Schlüssel → Workspace; Langform „Name (…, #id)“ immer akzeptiert, unbekannt → 404
 	public function resolveKey(string $uid, string $key): Workspace {
 		$keys = $this->keys($uid);
@@ -226,10 +234,17 @@ class WorkspaceService {
 				'created' => gmdate('Y-m-d H:i:s', (int)$ws->getCreatedAt()),
 				'tags' => $this->validator->workspaceTags((string)($ws->getTags() ?? '')),
 				'color' => $color,
-				'color_hex' => $this->validator->colorHex($color),
+				'color_hex' => $this->validator->colorHex($color, NotePalette::ownerOf($ws)),
+				// Team-Kennzeichen im Workspace-Menü (M5d); null = kein Team-Workspace
+				'team' => $this->teamName($uid, $ws),
 			];
 		}
 		return $out;
+	}
+
+	// Anzeigename des Teams eines Team-Workspace (Mitgliedschaft, sonst Snapshot), sonst null
+	public function teamName(string $uid, Workspace $ws): ?string {
+		return $ws->getOwnerType() === 'team' ? $this->ownerName($uid, $ws) : null;
 	}
 
 	/**
@@ -448,30 +463,96 @@ class WorkspaceService {
 	}
 
 	// Freigabe nur über Service (UI-Weg M3/M4); nur Besitzer
+	// Neuer Empfänger nur nach NC-Freigaberegeln; bestehender: Rechtewechsel per Update, nie an der Richtlinie gescheitert (Plan M5 §2.7)
 	public function share(string $ownerUid, int $workspaceId, string $targetUid, string $permission = 'write'): void {
-		$ws = $this->access->requireWorkspace($ownerUid, $workspaceId, 'manage');
-		// Teilen nur für Benutzer-Workspaces (ADR 0014, Plan M5 §2.2)
-		if ($ws->getOwnerType() !== 'user') {
-			throw new ForbiddenException('Team workspaces cannot be shared');
-		}
-		if ($targetUid === $ownerUid || !$this->userManager->userExists($targetUid)) {
-			throw new BadRequestException('Invalid share target');
-		}
-		$this->shares->insertIgnore((int)$ws->getId(), $targetUid, $permission === 'read' ? 'read' : 'write', $ownerUid, $this->time->getTime());
-		$this->reset();
+		$ws = $this->requireShareable($ownerUid, $workspaceId);
+		$current = $this->shares->permissionsFor([(int)$ws->getId()])[(int)$ws->getId()] ?? [];
+		$wanted = $current;
+		$wanted[$targetUid] = $permission;
+		$this->applyShares($ws, $ownerUid, $wanted, $current);
 	}
 
 	// Entzug löscht Erinnerungen, Mention-Status und Hintergrundbilder des Empfängers in diesem Workspace (SPEC §6, §8)
 	public function unshare(string $ownerUid, int $workspaceId, string $targetUid): void {
 		$ws = $this->access->requireWorkspace($ownerUid, $workspaceId, 'manage');
-		$this->tx->run(function () use ($ws, $targetUid) {
-			$this->shares->deleteUserShare((int)$ws->getId(), $targetUid);
-			$noteIds = $this->notes->idsInWorkspace((int)$ws->getId());
-			$this->reminders->deleteForNotes($noteIds, $targetUid);
-			$this->mentions->deleteForNotes($noteIds, $targetUid);
-			$this->backgrounds->queueUser([(int)$ws->getId()], $targetUid);
+		$this->tx->run(fn () => $this->removeRecipient($ws, $targetUid));
+		$this->reset();
+	}
+
+	/**
+	 * Freigabe-Dialog: Soll-Liste uid → read|write; neue nach Richtlinie, bestehende per Update, fehlende entzogen; alles oder nichts
+	 * @param array<string, string> $wanted
+	 * @return array{shared: bool, allowed_users: list<array{uid: string, displayName: string, permission: string}>, shared_with: list<string>}
+	 */
+	public function setShares(string $ownerUid, int $workspaceId, array $wanted): array {
+		$ws = $this->requireShareable($ownerUid, $workspaceId);
+		$id = (int)$ws->getId();
+		$this->applyShares($ws, $ownerUid, $wanted, $this->shares->permissionsFor([$id])[$id] ?? []);
+		return $this->shareStates([$id])[$id];
+	}
+
+	/**
+	 * Freigabezustand je Workspace (Einstellungen, Antwort des Dialogs); Anzeigenamen nur der eigenen Empfänger
+	 * @param int[] $workspaceIds
+	 * @return array<int, array{shared: bool, allowed_users: list<array{uid: string, displayName: string, permission: string}>, shared_with: list<string>}>
+	 */
+	public function shareStates(array $workspaceIds): array {
+		$all = $workspaceIds === [] ? [] : $this->shares->permissionsFor($workspaceIds);
+		$out = [];
+		foreach ($workspaceIds as $id) {
+			$users = [];
+			foreach ($all[$id] ?? [] as $uid => $permission) {
+				$users[] = ['uid' => (string)$uid, 'displayName' => $this->userManager->getDisplayName((string)$uid) ?? (string)$uid, 'permission' => $permission === 'read' ? 'read' : 'write'];
+			}
+			$out[$id] = ['shared' => $users !== [], 'allowed_users' => $users, 'shared_with' => array_column($users, 'displayName')];
+		}
+		return $out;
+	}
+
+	// Teilen nur für eigene Benutzer-Workspaces (ADR 0014, Plan M5 §2.2)
+	private function requireShareable(string $ownerUid, int $workspaceId): Workspace {
+		$ws = $this->access->requireWorkspace($ownerUid, $workspaceId, 'manage');
+		if ($ws->getOwnerType() !== 'user') {
+			throw new ForbiddenException('Team workspaces cannot be shared');
+		}
+		return $ws;
+	}
+
+	/**
+	 * @param array<string, string> $wanted uid → read|write
+	 * @param array<string, string> $current bestehende Empfänger
+	 */
+	private function applyShares(Workspace $ws, string $ownerUid, array $wanted, array $current): void {
+		$wanted = array_map(static fn ($p) => $p === 'read' ? 'read' : 'write', $wanted);
+		// Einheitliche Antwort für unbekannt, deaktiviert, sich selbst und nicht erlaubt; geprüft vor jeder Änderung
+		foreach (array_keys($wanted) as $uid) {
+			if (!isset($current[(string)$uid]) && !$this->sharePolicy->allowed($ownerUid, (string)$uid)) {
+				throw new BadRequestException('Invalid share target');
+			}
+		}
+		$id = (int)$ws->getId();
+		$this->tx->run(function () use ($ws, $id, $ownerUid, $wanted, $current) {
+			foreach ($wanted as $uid => $permission) {
+				$uid = (string)$uid;
+				if (!isset($current[$uid])) {
+					$this->shares->insertIgnore($id, $uid, $permission, $ownerUid, $this->time->getTime());
+				} elseif ($current[$uid] !== $permission) {
+					$this->shares->updatePermission($id, $uid, $permission);
+				}
+			}
+			foreach (array_keys(array_diff_key($current, $wanted)) as $uid) {
+				$this->removeRecipient($ws, (string)$uid);
+			}
 		});
 		$this->reset();
+	}
+
+	private function removeRecipient(Workspace $ws, string $targetUid): void {
+		$this->shares->deleteUserShare((int)$ws->getId(), $targetUid);
+		$noteIds = $this->notes->idsInWorkspace((int)$ws->getId());
+		$this->reminders->deleteForNotes($noteIds, $targetUid);
+		$this->mentions->deleteForNotes($noteIds, $targetUid);
+		$this->backgrounds->queueUser([(int)$ws->getId()], $targetUid);
 	}
 
 	// „Archives“ beim Besitzer der Quelle, bei Bedarf angelegt (Plan O6); Team-Quelle: Archiv desselben Teams, anlegen nur mit verwalten (Plan M5 §2.2)

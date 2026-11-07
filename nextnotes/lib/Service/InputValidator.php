@@ -57,9 +57,9 @@ class InputValidator {
 		throw new BadRequestException('Invalid color: expected a palette id or a #rrggbb value');
 	}
 
-	// Palette des angemeldeten Benutzers (M4h, Farben verwalten); unbekannte ID → null
-	public function colorHex(?string $stored): ?string {
-		$hex = $this->palette->hex($stored);
+	// Palette des angemeldeten Benutzers (M4h, Farben verwalten) bzw. von $paletteUid (R16); unbekannte ID → null
+	public function colorHex(?string $stored, ?string $paletteUid = null): ?string {
+		$hex = $this->palette->hex($stored, $paletteUid);
 		return $hex === '' ? null : $hex;
 	}
 

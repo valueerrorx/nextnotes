@@ -36,3 +36,5 @@ src/public/js/calendar.js
 src/public/js/diary-page.js
 src/public/js/dashboard-page.js
 src/public/js/settings-page.js
+src/public/js/utils-export-create.js
+src/public/js/workspaces-create.js

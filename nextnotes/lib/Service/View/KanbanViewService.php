@@ -48,6 +48,9 @@ class KanbanViewService {
 	) {
 	}
 
+	// R16: Palette des Workspace-Besitzers (Team: Standard)
+	private string $paletteOwner = '';
+
 	/**
 	 * @return array<string, mixed>
 	 * @throws NotFoundException fremder/unbekannter Ordner oder Workspace-Schlüssel passt nicht
@@ -61,7 +64,9 @@ class KanbanViewService {
 		if (is_string($wsKey) && $wsKey !== '' && $this->workspaces->resolveOptional($uid, $wsKey)?->getId() !== $wsId) {
 			throw new NotFoundException('Folder not found');
 		}
-		$canWrite = $this->access->workspaceLevel($uid, $this->access->requireWorkspace($uid, $wsId, 'read')) >= AccessService::WRITE;
+		$ws = $this->access->requireWorkspace($uid, $wsId, 'read');
+		$canWrite = $this->access->workspaceLevel($uid, $ws) >= AccessService::WRITE;
+		$this->paletteOwner = NotePalette::ownerOf($ws);
 		$byId = $this->folders->byId($wsId);
 		$ids = FolderService::subtree((int)$root->getId(), $byId);
 		$notes = $this->notes->findList([$wsId], ['folder_ids' => $ids], true);
@@ -212,7 +217,7 @@ class KanbanViewService {
 			'title' => (string)($n->getHeading() ?? ''),
 			'completed' => (int)$n->getKanbanCompleted() > 0,
 			'colorRaw' => $ownColor,
-			'colorHex' => $this->palette->hex($color),
+			'colorHex' => $this->palette->hex($color, $this->paletteOwner),
 			'tags' => $tags,
 			'tagColors' => $colors,
 			'updated' => $n->getUpdatedAt() !== null ? $this->local((int)$n->getUpdatedAt(), 'd/m H:i') : '',

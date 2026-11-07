@@ -2,6 +2,12 @@
 	"description": "Bewusste Abweichungen der JSON-Schlüssel von tests/nextnotes/fixtures/upstream (Plan M2 §3.4). Eintrag: {route, kind: missing|extra|status, path (bei status: Upstream-Status), reason}. Ungenutzte Einträge lassen CoreScenarioTest scheitern.",
 	"entries": [
 		{
+			"route": "GET /workspaces",
+			"kind": "extra",
+			"path": "workspaces[].team",
+			"reason": "M5d (SPEC §3): Teamname bei Team-Workspaces (Kennzeichen im Workspace-Menü), sonst null"
+		},
+		{
 			"route": "PUT /notes/{id}/tags",
 			"kind": "extra",
 			"path": "note.version",

@@ -98,7 +98,7 @@ class NoteSerializer {
 				'title_size' => $n->getTitleSize(),
 				'display_order' => (int)$n->getDisplayOrder(),
 				'dashboard_order' => (int)$n->getDashboardOrder(),
-				'color_hex' => $this->validator->colorHex($n->getColor()),
+				'color_hex' => $this->validator->colorHex($n->getColor(), $this->workspaces->paletteOwner($uid, (int)$n->getWorkspaceId())),
 			];
 		}
 		return $out;
@@ -120,7 +120,7 @@ class NoteSerializer {
 			'icon' => $n->getIcon() ?: self::DEFAULT_ICON,
 			'icon_color' => $n->getIconColor(),
 			'color' => $n->getColor(),
-			'color_hex' => $this->validator->colorHex($n->getColor()),
+			'color_hex' => $this->validator->colorHex($n->getColor(), $this->workspaces->paletteOwner($uid, (int)$n->getWorkspaceId())),
 			'created' => self::date($n->getCreatedAt()),
 			'updated' => self::date($n->getUpdatedAt()),
 			'version' => $version,

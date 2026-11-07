@@ -405,6 +405,36 @@
 			"file": "js/note-loader.js",
 			"text": "xhr.setRequestHeader('X-Poznote-Fragment', 'right_col')",
 			"by": "PageController::fragment"
+		},
+		{
+			"file": "js/workspaces-share.js",
+			"text": "function showWorkspaceShareOptionsModal(button)",
+			"by": "nextnotes-teams.js"
+		},
+		{
+			"file": "js/workspaces-share.js",
+			"text": "function updateWorkspaceShareToggleButton(button, shareState)",
+			"by": "nextnotes-teams.js"
+		},
+		{
+			"file": "js/workspaces-core.js",
+			"text": "function displayWorkspaceMenu(menu, workspaces, username, actingAs)",
+			"by": "nextnotes-teams.js"
+		},
+		{
+			"file": "js/workspaces-create.js",
+			"text": "function openCreateWorkspaceModal()",
+			"by": "nextnotes-teams.js"
+		},
+		{
+			"file": "js/workspaces-actions.js",
+			"text": "function handleDeleteButtonClick(e)",
+			"by": "nextnotes-teams.js"
+		},
+		{
+			"file": "js/workspaces-page.js",
+			"text": "document.addEventListener('click', handleDeleteButtonClick)",
+			"by": "nextnotes-teams.js"
 		}
 	],
 	"cssPageGroups": {

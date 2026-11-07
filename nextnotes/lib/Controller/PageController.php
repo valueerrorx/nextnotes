@@ -32,6 +32,7 @@ use OCA\NextNotes\Service\View\SettingsViewService;
 use OCA\NextNotes\Service\View\SpeedDialViewService;
 use OCA\NextNotes\Service\TeamService;
 use OCA\NextNotes\Service\View\TagListViewService;
+use OCA\NextNotes\Service\View\TeamsUiConfig;
 use OCA\NextNotes\Service\View\TrashViewService;
 use OCP\App\IAppManager;
 use OCP\AppFramework\Controller;
@@ -74,6 +75,7 @@ class PageController extends Controller {
 		private MentionService $mentions,
 		private SettingsViewService $settingsView,
 		private TeamService $teams,
+		private TeamsUiConfig $teamsUi,
 	) {
 		parent::__construct(Application::APP_ID, $request);
 	}
@@ -147,6 +149,7 @@ class PageController extends Controller {
 			'displayName' => $this->userSession->getUser()?->getDisplayName() ?? '',
 			'lang' => $lang,
 			'teamsAvailable' => $this->teams->isAvailable(),
+			'teams' => $this->teamsUi->config(),
 			'excalidrawAssetPath' => $assetBase . '/js/vendor/excalidraw-dist/',
 			'allowedIframeDomains' => $this->embedDomains->domains(),
 		] + $extra);
@@ -515,6 +518,7 @@ class PageController extends Controller {
 				'ncLanguageUrl' => $this->urls->linkToRoute('settings.PersonalSettings.index', ['section' => 'language-locale']),
 				'ncProfileUrl' => $this->urls->linkToRoute('settings.PersonalSettings.index', ['section' => 'profile-contact']),
 				'railAbout' => $this->request->getParam('open') === 'about',
+				'contactsUrl' => $this->teamsUi->contactsUrl(),
 			];
 		});
 	}

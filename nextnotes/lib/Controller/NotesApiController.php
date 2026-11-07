@@ -183,8 +183,8 @@ class NotesApiController extends ApiController {
 
 	#[NoAdminRequired]
 	public function updateColor(int $id): JSONResponse {
-		$color = $this->notes->setColor($this->uid(), $id, $this->param('color'));
-		return $this->ok(['message' => 'Note color updated successfully', 'color' => $color, 'color_hex' => $this->validator->colorHex($color)]);
+		[$color, $hex] = $this->notes->setColor($this->uid(), $id, $this->param('color'));
+		return $this->ok(['message' => 'Note color updated successfully', 'color' => $color, 'color_hex' => $hex]);
 	}
 
 	#[NoAdminRequired]

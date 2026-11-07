@@ -21,3 +21,9 @@ Option 2 in v1, Option 3 vorbereitet (Spalte `share_type`), aber nicht freigesch
 ## Konsequenzen
 - Upstream-Endpunkte in `workspaces.php` (POST JSON) werden als Kompatibilitätsroute mit gleichem Format nachgebaut.
 - Rechteprüfung kennt drei Wege: Besitzer, Freigabe, Team (SPEC §3).
+
+## Nachtrag M5d
+- Freigaben nur für Benutzer-Workspaces; Team-Workspaces erhalten Zugriff ausschließlich über das Team (403).
+- `share_workspace` setzt die vollständige Liste; `allowed_users` ist Pflicht (fehlend → 400, `[]` entfernt alle), damit ein fehlender Parameter nicht still alle Empfänger entzieht.
+- Neue Empfänger prüft der Server gegen die NC-Freigaberegeln (`ShareTargetPolicy`, SPEC §3), einheitlich 400 `Invalid share target`. Bestehende Empfänger bleiben änderbar und entfernbar.
+- Der Dialog sucht Personen (`GET /users/search`, 30/min, nur UID und Anzeigename) statt alle Konten zu listen und bietet „bearbeiten“ (Standard) oder „nur lesen“.

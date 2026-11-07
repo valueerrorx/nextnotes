@@ -23,7 +23,7 @@ class PageAssets {
 		'nextnotes-bootstrap', 'nextnotes-head',
 		'vendor/codemirror-dist/markdown-codemirror.iife', 'lazy-libs',
 		'vendor/highlight/highlight.min', 'vendor/highlight/powershell.min', 'syntax-highlight',
-		'nextnotes-app', 'nextnotes-late',
+		'nextnotes-app', 'nextnotes-late', 'nextnotes-teams',
 	];
 
 	/** Hauptansicht; $lang = Upstream-Sprachcode mit Wörterbuch (PageTranslator::languageFor) */
@@ -48,12 +48,12 @@ class PageAssets {
 	}
 
 	/**
-	 * Eigene Seite aus bundles.json pages (revisions, attachments, excalidraw_editor): Adapter, Vendor, Seitenbündel, Late-Adapter
+	 * Eigene Seite aus bundles.json pages (revisions, attachments, excalidraw_editor): Adapter, Vendor, Seitenbündel, Late-Adapter, Teams-Oberfläche
 	 * @param string[] $vendor unveränderte Vendor-Skripte (js/vendor/…), vor dem Seitenbündel
 	 */
 	public function page(string $page, string $lang, array $vendor = []): void {
 		Util::addScript(Application::APP_ID, 'i18n/nextnotes-i18n-' . $lang);
-		foreach (['nextnotes-bootstrap', ...$vendor, 'nextnotes-page-' . $page, 'nextnotes-late'] as $script) {
+		foreach (['nextnotes-bootstrap', ...$vendor, 'nextnotes-page-' . $page, 'nextnotes-late', 'nextnotes-teams'] as $script) {
 			Util::addScript(Application::APP_ID, $script);
 		}
 		foreach (['nextnotes-page-' . $page, 'nextnotes-tokens', 'nextnotes-layout'] as $style) {

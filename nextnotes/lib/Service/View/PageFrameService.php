@@ -59,7 +59,7 @@ class PageFrameService {
 			'workspace' => $ws,
 			'wsId' => (int)$ws->getId(),
 			'workspaceKey' => $key,
-			'workspaceColor' => $this->palette->hex($ws->getColor()),
+			'workspaceColor' => $this->palette->hex($ws->getColor(), NotePalette::ownerOf($ws)),
 			'canWrite' => $this->access->workspaceLevel($uid, $ws) >= AccessService::WRITE,
 			'replaceWorkspace' => $requested !== $key ? $key : null,
 			'dateTimeFormat' => preg_match('/^[A-Za-z0-9_:.-]{1,40}$/', $format) ? $format : 'default',

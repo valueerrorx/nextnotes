@@ -149,11 +149,12 @@ function openCreateMenu(options) {
 
     createMenuAnchor = options.anchor || null;
 
-    // Registered on the next tick so the click that opened the menu does not
-    // immediately close it again.
-    setTimeout(function () {
-        document.addEventListener('click', closeCreateMenuOnOutsideClick);
-    }, 0);
+    // Next Notes (P30, B65): registered at once; the click that opened the menu
+    // is older than createMenuOpenedAt and ignored, so a click right after
+    // opening closes it. Escape closes it too.
+    createMenuOpenedAt = performance.now();
+    document.addEventListener('click', closeCreateMenuOnOutsideClick);
+    document.addEventListener('keydown', closeCreateMenuOnEscape);
 
     return true;
 }
@@ -164,12 +165,18 @@ function openCreateMenu(options) {
 // is otherwise a matter of registration order, and getting it wrong would
 // reopen the menu the button just closed.
 var createMenuAnchor = null;
+var createMenuOpenedAt = 0;
+
+function closeCreateMenuOnEscape(event) {
+    if (event.key === 'Escape') closeCreateMenu();
+}
 
 function closeCreateMenu() {
     var menu = document.getElementById('create-menu');
     if (menu) menu.classList.remove('show');
     createMenuAnchor = null;
     document.removeEventListener('click', closeCreateMenuOnOutsideClick);
+    document.removeEventListener('keydown', closeCreateMenuOnEscape);
 }
 
 function closeCreateMenuOnOutsideClick(event) {
@@ -180,6 +187,7 @@ function closeCreateMenuOnOutsideClick(event) {
     }
     // A click on an entry is handled by selectCreateType, which closes the menu
     // itself; anything else outside it just dismisses.
+    if (event.timeStamp < createMenuOpenedAt) return;
     if (!event.target.closest) return;
     if (createMenuAnchor && createMenuAnchor.contains(event.target)) {
         return;

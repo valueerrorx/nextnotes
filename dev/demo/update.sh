@@ -22,7 +22,47 @@ tar -C "$repo/nextnotes" --exclude=.gitignore --exclude=./build --exclude=./Make
 occ app:enable nextnotes >/dev/null || true
 occ upgrade >/dev/null || true
 occ maintenance:repair >/dev/null 2>&1 || true
-if ! occ user:info thomas >/dev/null 2>&1; then
-	dc exec -T -u www-data -e OC_PASS=thomas-demo-2026 nc php occ user:add --password-from-env --display-name "Thomas" thomas >/dev/null
+# Demo-Konten (nur anlegen, wenn sie fehlen)
+add_user() {
+	occ user:info "$1" >/dev/null 2>&1 && return 0
+	dc exec -T -u www-data -e OC_PASS="$3" nc php occ user:add --password-from-env --display-name "$2" "$1" >/dev/null
+}
+add_user thomas "Thomas" thomas-demo-2026
+add_user schueler1 "Schüler Eins" schueler-demo-2026
+add_user schueler2 "Schülerin Zwei" schueler-demo-2026
+
+# Beispiel-Teams (M5d) über CirclesManager; idempotent: Team je Owner und Name einmal, fehlende Mitglieder ergänzen (Level 1 Mitglied, 4 Moderator)
+seed_team='require "/var/www/html/lib/base.php";
+[, $owner, $name, $members] = $argv;
+$cm = \OCP\Server::get(\OCA\Circles\CirclesManager::class);
+$cm->startSession($cm->getLocalFederatedUser($owner));
+try {
+	$probe = new \OCA\Circles\Model\Probes\CircleProbe();
+	$probe->mustBeOwner();
+	$circle = null;
+	foreach ($cm->getCircles($probe) as $c) {
+		if ($c->getDisplayName() === $name) { $circle = $c; break; }
+	}
+	$circle ??= $cm->createCircle($name, null, false, false, false);
+	foreach (json_decode($members, true) as $uid => $level) {
+		$fed = $cm->getLocalFederatedUser((string)$uid);
+		try {
+			$cm->getLink($circle->getSingleId(), $fed->getSingleId());
+		} catch (\Throwable) {
+			$m = $cm->addMember($circle->getSingleId(), $fed);
+			if ((int)$level > 1) { $cm->levelMember($m->getId(), (int)$level); }
+		}
+	}
+} finally {
+	$cm->stopSession();
+}'
+# Ausgabe erst sammeln: grep -q unter pipefail kann per SIGPIPE falsch-negativ sein
+apps=$(occ app:list --enabled --output=json 2>/dev/null || true)
+if [[ $apps == *'"circles"'* ]]; then
+	dc exec -T -u www-data nc php -r "$seed_team" -- thomas "Klasse 4a" '{"schueler1":1,"schueler2":1}'
+	dc exec -T -u www-data nc php -r "$seed_team" -- admin "Fachgruppe Mathe" '{"thomas":4}'
+else
+	echo "Hinweis: Teams-App (circles) nicht aktiv, Beispiel-Teams übersprungen" >&2
 fi
-echo "Demo bereit: http://localhost:8090  (admin/admin, thomas/thomas-demo-2026), Stand $(git -C "$repo" log --oneline -1)"
+echo "Demo bereit: http://localhost:8090  (admin/admin, thomas/thomas-demo-2026, schueler1 und schueler2/schueler-demo-2026), Stand $(git -C "$repo" log --oneline -1)"
+echo "Teams: „Klasse 4a“ (Owner thomas, Mitglieder schueler1, schueler2), „Fachgruppe Mathe“ (Owner admin, thomas Moderator)"

@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 // abgeleitet von src/public/index.php @ 7e2e0b6aa501ba95ac1e9789fd2bb477c281a001
-// #left_col der Hauptansicht; eingebunden von index.php und fragment_left.php (P18). Erwartet $tr, $view, $_['baseUrl'].
+// #left_col der Hauptansicht; eingebunden von index.php und fragment_left.php (P18). Erwartet $tr, $view, $l, $_['baseUrl'].
+// Team-Banner (M5d) liegt hier, damit der Workspace-Wechsel ohne Reload (Neuaufbau von #left_col) ihn mitnimmt.
 ?>
 <div id="left_col">
 	<div class="sidebar-header">
@@ -30,6 +31,18 @@
 			<div class="workspace-menu" id="workspaceMenu"></div>
 		</div>
 	</div>
+
+	<?php if ($view['teamBanner'] !== null): $nnBanner = $view['teamBanner']; ?>
+	<div class="nn-team-banner nn-team-banner-<?php p($nnBanner['state']); ?>" role="status">
+		<div class="nn-team-banner-text"><i class="lucide lucide-alert-triangle" aria-hidden="true"></i><span><?php p($nnBanner['text']); ?></span></div>
+		<div class="nn-team-banner-actions">
+			<?php if ($nnBanner['canConvert']): ?>
+			<button type="button" class="btn btn-primary nn-team-convert" data-ws="<?php p($view['workspaceKey']); ?>"><?php p($l->t('Convert to a private workspace')); ?></button>
+			<?php endif; ?>
+			<a class="btn btn-secondary nn-team-export" href="<?php p($nnBanner['exportUrl']); ?>"><?php p($l->t('Export')); ?></a>
+		</div>
+	</div>
+	<?php endif; ?>
 
 	<?php include __DIR__ . '/notes_list.php'; ?>
 </div>

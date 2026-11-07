@@ -134,7 +134,7 @@ class DiaryViewService {
 				'icon' => (string)($n->getIcon() ?? '') !== '' ? IndexViewService::iconClass((string)$n->getIcon(), 'lucide-file') : '',
 				'iconColor' => IndexViewService::iconColor((string)($n->getIconColor() ?? '')),
 				'color' => $color,
-				'colorHex' => $this->palette->hex($color),
+				'colorHex' => $this->palette->hex($color, NotePalette::ownerOf($frame['workspace'])),
 				'_created' => (int)$n->getCreatedAt(),
 			];
 		}
@@ -147,7 +147,7 @@ class DiaryViewService {
 
 		$folderPath = $rootName . '/' . $now->format('Y') . '/' . $now->format('m');
 		$t = fn (string $k, string $d) => $this->tr->t($k, [], $d);
-		$palette = $this->palette->entries($uid);
+		$palette = $this->palette->entries(NotePalette::ownerOf($frame['workspace']));
 		$data = [
 			'notes' => $cards,
 			'todayNoteId' => $todayId,

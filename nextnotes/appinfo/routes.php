@@ -181,6 +181,7 @@ return [
 		['name' => 'system_api#sharedWithMe', 'url' => '/api/v1/shared/with-me', 'verb' => 'GET'],
 		['name' => 'system_api#shared', 'url' => '/api/v1/shared', 'verb' => 'GET'],
 		['name' => 'users_api#me', 'url' => '/api/v1/users/me', 'verb' => 'GET'],
+		['name' => 'users_api#search', 'url' => '/api/v1/users/search', 'verb' => 'GET'],
 		['name' => 'users_api#lookup', 'url' => '/api/v1/users/lookup/{username}', 'verb' => 'GET', 'requirements' => ['username' => '[^/]+']],
 	],
 ];

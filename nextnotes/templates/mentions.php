@@ -67,7 +67,7 @@ $toggleQuery = ['workspace' => $frame['workspaceKey']] + ($showHandled ? [] : ['
 							$meta[] = $m['updatedDisplay'];
 						}
 					?>
-					<li class="mentions-item<?php if ($m['handled']): ?> handled<?php endif; ?>" data-owner-id="<?php p($m['owner_user_id']); ?>" data-note-id="<?php p((string)$m['note_id']); ?>" data-handled="<?php p($m['handled'] ? '1' : '0'); ?>">
+					<li class="mentions-item<?php if ($m['handled']): ?> handled<?php endif; ?>" data-owner-id="<?php p($m['owner_path']); ?>" data-note-id="<?php p((string)$m['note_id']); ?>" data-handled="<?php p($m['handled'] ? '1' : '0'); ?>">
 						<div class="mentions-item-body">
 							<a class="mentions-item-title" href="<?php p($_['baseUrl'] . 'index.php?' . http_build_query(['note' => $m['note_id'], 'workspace' => $m['workspace']])); ?>"><?php p($title); ?></a>
 							<?php if ($m['excerpt'] !== ''): ?>

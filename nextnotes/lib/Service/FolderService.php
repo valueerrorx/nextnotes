@@ -124,7 +124,7 @@ class FolderService {
 		return $this->folders->insert($f);
 	}
 
-	private function folderView(Folder $f): array {
+	private function folderView(string $uid, Folder $f): array {
 		return [
 			'id' => (int)$f->getId(),
 			'name' => $f->getName(),
@@ -132,7 +132,7 @@ class FolderService {
 			'icon' => $f->getIcon(),
 			'icon_color' => $f->getIconColor(),
 			'color' => $f->getColor(),
-			'color_hex' => $this->validator->colorHex($f->getColor()),
+			'color_hex' => $this->validator->colorHex($f->getColor(), $this->workspaces->paletteOwner($uid, (int)$f->getWorkspaceId())),
 			'display_order' => (int)$f->getDisplayOrder(),
 		];
 	}
@@ -217,7 +217,7 @@ class FolderService {
 		$byId = $this->byId((int)$ws->getId());
 		$items = [];
 		foreach ($byId as $id => $f) {
-			$item = $this->folderView($f) + ['is_diary' => (int)$f->getIsDiary() === 1];
+			$item = $this->folderView($uid, $f) + ['is_diary' => (int)$f->getIsDiary() === 1];
 			if ($hierarchical) {
 				$item['created'] = NoteSerializer::date($f->getCreatedAt());
 			}
@@ -248,7 +248,7 @@ class FolderService {
 		$folder = $this->access->requireFolder($uid, $id, 'read');
 		$this->checkWorkspaceParam($uid, $folder, $wsKey);
 		$byId = $this->byId((int)$folder->getWorkspaceId());
-		return $this->folderView($folder) + [
+		return $this->folderView($uid, $folder) + [
 			'workspace' => $this->workspaces->keyFor($uid, (int)$folder->getWorkspaceId()),
 			'path' => self::pathOf($id, $byId),
 			'created' => NoteSerializer::date($folder->getCreatedAt()),
@@ -680,12 +680,13 @@ class FolderService {
 		return [$folder->getIcon(), $folder->getIconColor()];
 	}
 
-	public function setColor(string $uid, int $id, mixed $color): ?string {
+	/** @return array{0: ?string, 1: ?string} gespeicherte Farbe, Hex nach Besitzer-Palette (R16) */
+	public function setColor(string $uid, int $id, mixed $color): array {
 		$value = $this->validator->color($color);
 		$folder = $this->access->requireFolder($uid, $id, 'write');
 		$folder->setColor($value);
 		$this->folders->update($folder);
-		return $value;
+		return [$value, $this->validator->colorHex($value, $this->workspaces->paletteOwner($uid, (int)$folder->getWorkspaceId()))];
 	}
 
 	public function setFlag(string $uid, int $id, string $field, bool $value): void {

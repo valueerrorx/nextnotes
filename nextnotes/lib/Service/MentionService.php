@@ -13,6 +13,7 @@ use OCA\NextNotes\Db\MentionHandledMapper;
 use OCA\NextNotes\Db\Note;
 use OCA\NextNotes\Db\NoteMapper;
 use OCA\NextNotes\Db\Workspace;
+use OCA\NextNotes\Db\WorkspaceMapper;
 use OCA\NextNotes\Db\WsShareMapper;
 use OCA\NextNotes\Service\Exception\BadRequestException;
 use OCA\NextNotes\Service\Exception\NotFoundException;
@@ -32,6 +33,8 @@ class MentionService {
 	public const MAX_NOTIFY = 20;
 	// Zähler der Icon-Leiste je Benutzer (Sekunden); Speichern mit geänderter Erwähnung und die Erwähnungsseite leeren ihn
 	public const RAIL_TTL = 60;
+	// Erwähnbare Mitglieder eines Team-Workspace (Vorschlagsliste, Plan M5 §2.7)
+	public const MAX_TEAM_MEMBERS = 500;
 
 	private ICache $cache;
 
@@ -47,6 +50,9 @@ class MentionService {
 		private IUserManager $users,
 		private IDateTimeFormatter $dates,
 		private LoggerInterface $logger,
+		private WorkspaceMapper $workspaceMapper,
+		private TeamService $teams,
+		private TeamStateService $teamState,
 		ICacheFactory $cacheFactory,
 	) {
 		$this->cache = $cacheFactory->createDistributed(Application::APP_ID . '-mentions');
@@ -59,17 +65,41 @@ class MentionService {
 		return ['open' => $open, 'mentions' => $mentions];
 	}
 
-	/** @return string[] Besitzer zuerst, dann Freigabeempfänger; leer ohne Freigabe */
+	/** @return string[] Besitzer zuerst, dann Freigabeempfänger; Team-Workspace: Mitglieder (erst nach read-Prüfung); leer ohne Freigabe */
 	public function members(string $uid, mixed $wsKey): array {
 		if (!is_string($wsKey) || trim($wsKey) === '') {
 			throw new BadRequestException('workspace is required');
 		}
 		$ws = $this->workspaces->requireByKey($uid, trim($wsKey), 'read');
+		return array_slice($this->memberUids($ws), 0, self::MAX_TEAM_MEMBERS);
+	}
+
+	/** @return string[] Erwähnbare eines Workspace: Besitzer + Empfänger bei Freigabe, Mitglieder eines aktiven Teams; sonst leer */
+	private function memberUids(Workspace $ws): array {
+		if ($ws->getOwnerType() === 'team') {
+			$teamId = (string)$ws->getOwnerId();
+			if ($this->teamState->stateOf($teamId) !== TeamStateService::ACTIVE) {
+				return [];
+			}
+			return array_map('strval', array_keys($this->teams->members($teamId)));
+		}
 		$recipients = $this->shares->recipients((int)$ws->getId());
 		if ($recipients === [] || $ws->getOwnerType() !== 'user') {
 			return [];
 		}
 		return array_values(array_unique(array_merge([(string)$ws->getOwnerId()], $recipients)));
+	}
+
+	/**
+	 * Workspaces mit Erwähnungen: geteilte und Team-Workspaces unter den sichtbaren
+	 * @param int[] $visible
+	 * @return int[]
+	 */
+	private function mentionWorkspaceIds(array $visible): array {
+		if ($visible === []) {
+			return [];
+		}
+		return array_values(array_unique(array_merge($this->shares->sharedWorkspaceIds($visible), $this->workspaceMapper->teamIdsAmong($visible))));
 	}
 
 	/** @return array{handled: bool, open: int} POST/DELETE /mentions/{ownerId}/{noteId}/handled */
@@ -103,7 +133,7 @@ class MentionService {
 		if ($onlyWs !== null) {
 			$visible = array_values(array_intersect($visible, $onlyWs));
 		}
-		$wsIds = $this->shares->sharedWorkspaceIds($visible);
+		$wsIds = $this->mentionWorkspaceIds($visible);
 		if ($wsIds === []) {
 			return [];
 		}
@@ -138,7 +168,11 @@ class MentionService {
 			}
 			$ws = $byWs[(int)$n->getWorkspaceId()] ?? null;
 			$owner = $ws instanceof Workspace && $ws->getOwnerType() === 'user' ? (string)$ws->getOwnerId() : '';
+			$team = $ws instanceof Workspace ? $this->workspaces->teamName($uid, $ws) : null;
 			$out[] = [
+				// Pfadsegment der Erledigt-Route (Wert wird dort nicht ausgewertet); Team: Team-ID
+				'owner_path' => $owner !== '' ? $owner : ($ws instanceof Workspace ? (string)$ws->getOwnerId() : '-'),
+				'team' => $team,
 				'owner_user_id' => $owner,
 				'owner_username' => $owner,
 				'workspace' => (string)$this->workspaces->keyFor($uid, (int)$n->getWorkspaceId()),
@@ -177,7 +211,7 @@ class MentionService {
 
 	// Wie collect(…, false), aber ohne Inhalt über dem Render-Budget: solche Treffer zählen ohne Erledigt-Eintrag als offen
 	private function countOpen(string $uid): ?int {
-		$wsIds = $this->shares->sharedWorkspaceIds($this->access->visibleWorkspaceIds($uid));
+		$wsIds = $this->mentionWorkspaceIds($this->access->visibleWorkspaceIds($uid));
 		if ($wsIds === []) {
 			return null;
 		}
@@ -209,7 +243,7 @@ class MentionService {
 	 * @return array{groups: list<array<string, mixed>>, hasShared: bool}
 	 */
 	public function page(string $uid, bool $showHandled): array {
-		$hasShared = $this->shares->sharedWorkspaceIds($this->access->visibleWorkspaceIds($uid)) !== [];
+		$hasShared = $this->mentionWorkspaceIds($this->access->visibleWorkspaceIds($uid)) !== [];
 		$all = $hasShared ? $this->collect($uid, $showHandled, null, false) : [];
 		// Seite zählt genau: Zähler der Icon-Leiste neu setzen
 		$this->cache->set(self::cacheKey($uid), $hasShared ? count(array_filter($all, static fn (array $m) => !$m['handled'])) : -1, self::RAIL_TTL);
@@ -219,7 +253,7 @@ class MentionService {
 			$owner = $m['owner_user_id'];
 			$groups[$key] ??= [
 				'workspace' => $m['workspace'],
-				'ownerName' => $owner !== '' && $owner !== $uid ? ($this->users->getDisplayName($owner) ?? $owner) : '',
+				'ownerName' => $m['team'] ?? ($owner !== '' && $owner !== $uid ? ($this->users->getDisplayName($owner) ?? $owner) : ''),
 				'mentions' => [],
 			];
 			$by = $m['updated_by'] !== '' ? ($this->users->getDisplayName($m['updated_by']) ?? $m['updated_by']) : '';
@@ -244,15 +278,19 @@ class MentionService {
 				return;
 			}
 			$ws = $this->access->requireWorkspace($uid, (int)$note->getWorkspaceId(), 'read');
-			$recipients = $this->shares->recipients((int)$ws->getId());
-			if ($recipients === [] || $ws->getOwnerType() !== 'user') {
+			$members = $this->memberUids($ws);
+			if ($members === []) {
 				return;
 			}
 			$type = (string)($note->getType() ?: 'note');
 			$newText = str_contains($new, '@') ? self::plainText($new, $type) : '';
 			$oldText = $hadAt ? self::plainText($oldContent, $type) : '';
 			$found = [];
-			foreach (array_unique(array_merge([(string)$ws->getOwnerId()], $recipients)) as $member) {
+			foreach ($members as $member) {
+				// große Teams: Regex nur für Namen, die im alten oder neuen Text vorkommen
+				if (mb_stripos($newText, '@' . $member) === false && mb_stripos($oldText, '@' . $member) === false) {
+					continue;
+				}
 				$before = self::count($oldText, $member);
 				if ($before !== self::count($newText, $member)) {
 					$this->forget($member);

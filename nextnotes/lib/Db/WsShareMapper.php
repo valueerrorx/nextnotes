@@ -43,6 +43,39 @@ class WsShareMapper extends QBMapper {
 		]);
 	}
 
+	// Rechtewechsel eines bestehenden Empfängers (Plan M5 §2.7: Update statt insertIgnore)
+	public function updatePermission(int $workspaceId, string $uid, string $permission): int {
+		$qb = $this->db->getQueryBuilder();
+		return $qb->update(self::TABLE)
+			->set('permission', $qb->createNamedParameter($permission))
+			->where($qb->expr()->eq('workspace_id', $qb->createNamedParameter($workspaceId, IQueryBuilder::PARAM_INT)))
+			->andWhere($qb->expr()->eq('share_type', $qb->createNamedParameter('user')))
+			->andWhere($qb->expr()->eq('share_with', $qb->createNamedParameter($uid)))
+			->executeStatement();
+	}
+
+	/**
+	 * Benutzerfreigaben mehrerer Workspaces (Einstellungen, Freigabe-Dialog)
+	 * @param int[] $workspaceIds
+	 * @return array<int, array<string, string>> workspace_id → [uid → permission], Reihenfolge der Anlage
+	 */
+	public function permissionsFor(array $workspaceIds): array {
+		$out = [];
+		foreach (array_chunk(array_values(array_unique($workspaceIds)), 1000) as $chunk) {
+			$qb = $this->db->getQueryBuilder();
+			$qb->select('workspace_id', 'share_with', 'permission')->from(self::TABLE)
+				->where($qb->expr()->in('workspace_id', $qb->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY)))
+				->andWhere($qb->expr()->eq('share_type', $qb->createNamedParameter('user')))
+				->orderBy('id', 'ASC');
+			$res = $qb->executeQuery();
+			while ($row = $res->fetch()) {
+				$out[(int)$row['workspace_id']][(string)$row['share_with']] = (string)$row['permission'];
+			}
+			$res->closeCursor();
+		}
+		return $out;
+	}
+
 	public function deleteUserShare(int $workspaceId, string $uid): int {
 		$qb = $this->db->getQueryBuilder();
 		return $qb->delete(self::TABLE)

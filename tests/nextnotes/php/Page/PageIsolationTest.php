@@ -418,7 +418,9 @@ final class PageIsolationTest extends ApiTestCase {
 		// workspaces.php: Besitzer
 		$r = self::wsPost($a, ['action' => 'set_color', 'name' => $x['ws2'], 'color' => '#00ff00']);
 		self::assertSame(200, $r->status, 'A set_color: ' . $r->describe());
-		self::assertSame(501, self::wsPost($a, ['action' => 'share_workspace', 'name' => $x['ws2']])->status, 'A share → 501 (M5)');
+		self::assertSame(200, self::wsPost($a, ['action' => 'share_workspace', 'name' => $x['ws2'], 'allowed_users' => '[]'])->status, 'A share mit leerer Liste → 200 (M5d)');
+		self::assertSame(400, self::wsPost($a, ['action' => 'share_workspace', 'name' => $x['ws2']])->status, 'A share ohne allowed_users → 400');
+		self::assertSame(400, self::wsPost($a, ['action' => 'share_workspace', 'name' => $x['ws2'], 'allowed_users' => ''])->status, 'A share mit leerem allowed_users → 400');
 		self::assertSame(400, self::wsPost($a, ['action' => 'frobnicate', 'name' => $x['ws2']])->status);
 		self::assertSame(404, self::wsPost($a, ['action' => 'delete', 'name' => 'Gibtsnicht ' . $mark])->status);
 		// CSRF: ohne OCS-APIRequest/Token → 412 (Anmeldung per Passwort statt App-Token, damit der CSRF-Check greift)

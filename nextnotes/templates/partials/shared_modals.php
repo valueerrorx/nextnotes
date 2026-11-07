@@ -54,6 +54,14 @@
             <input id="createWorkspaceTagsInput" type="text" autocomplete="off" placeholder="<?php p($tr->t('workspaces.tags.placeholder', [], 'Tags, comma separated (optional, e.g. school, psycho)')); ?>" aria-describedby="createWorkspaceTagsHelp" />
             <small id="createWorkspaceTagsHelp" class="create-workspace-tags-help"><?php p($tr->t('workspaces.tags.help', [], 'Use tags to group workspaces on the dashboard.')); ?></small>
         </div>
+        <?php // Team-Auswahl (M5d): nextnotes-teams.js füllt sie beim Öffnen (GET api/v1/teams), nur mit Teams-App und Team mit Level ≥ 4 ?>
+        <div class="form-group nn-create-team" id="createWorkspaceTeamGroup" hidden>
+            <label for="createWorkspaceTeamSelect"><?php p($l->t('Workspace for')); ?></label>
+            <select id="createWorkspaceTeamSelect">
+                <option value=""><?php p($l->t('Only me (private)')); ?></option>
+            </select>
+            <a class="nn-manage-teams-link" id="createWorkspaceManageTeams" hidden><i class="lucide lucide-users" aria-hidden="true"></i> <?php p($l->t('Manage teams')); ?></a>
+        </div>
         <div class="modal-buttons">
             <button type="button" class="btn-cancel" data-action="close-modal" data-modal="createWorkspaceModal"><?php p($tr->t('common.cancel')); ?></button>
             <button type="button" class="btn-primary" id="confirmCreateWorkspaceBtn"><?php p($tr->t('common.create', [], 'Create')); ?></button>

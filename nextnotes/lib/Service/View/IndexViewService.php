@@ -28,6 +28,7 @@ use OCA\NextNotes\Service\NoteService;
 use OCA\NextNotes\Service\SearchService;
 use OCA\NextNotes\Service\SettingsService;
 use OCA\NextNotes\Service\TagService;
+use OCA\NextNotes\Service\TeamStateService;
 use OCA\NextNotes\Service\WorkspaceService;
 use OCP\IDateTimeFormatter;
 use OCP\IL10N;
@@ -125,6 +126,7 @@ class IndexViewService {
 		private PageFrameService $frame,
 		private NotePalette $palette,
 		private IL10N $l,
+		private TeamStateService $teamState,
 	) {
 	}
 
@@ -175,12 +177,13 @@ class IndexViewService {
 		$shown = $note !== null ? $this->access->resolveLinked($uid, $note) : null;
 
 		$tree = $this->tree($uid, $baseUrl, $key, $byId, $notes, $tagMap, $sort, $favSort, $note, $folderFilter, $openFolder, $search);
-		$titleColor = $this->palette->hex($ws->getColor());
+		$titleColor = $this->palette->hex($ws->getColor(), NotePalette::ownerOf($ws));
 
 		return [
 			'workspaceKey' => $key,
 			'workspaceColor' => $titleColor,
 			'canWrite' => $canWrite,
+			'teamBanner' => $this->teamBanner($uid, $ws, $baseUrl, $key),
 			'replaceWorkspace' => $requested !== $key ? $key : null,
 			'noteId' => $shown !== null ? (int)$shown->getId() : null,
 			'sort' => $sort,
@@ -198,7 +201,7 @@ class IndexViewService {
 			'workspaceMap' => $this->workspaceMap($uid),
 			'pageConfig' => $this->pageConfig($uid, $key, $noteFolderId !== null ? ($byId[$noteFolderId] ?? null)?->getName() : null, $canWrite, $search['active']),
 			'search' => $search,
-			'globals' => $this->globals($uid, $key),
+			'globals' => $this->globals($uid, $key, $ws),
 			'hiddenUiElements' => $this->hiddenUi($uid),
 			'prefetchedSettings' => ['tasklist_insert_order' => $this->value($uid, 'tasklist_insert_order') === 'top' ? 'top' : 'bottom'],
 			'note' => $shown !== null ? $this->shownView($uid, $shown, $wsId, $key, $canWrite, $byId) : null,
@@ -374,6 +377,30 @@ class IndexViewService {
 			'manual' => ['sort.hints.custom', [], 'The order you set by dragging notes and folders'],
 			default => ['sort.hints.date_modified', [], 'Most recently modified notes first'],
 		};
+	}
+
+	/**
+	 * Banner eingefroren/verwaist (Plan M5 §2.7); sehen kann solche Workspaces nur created_by
+	 * @return array{state: string, text: string, canConvert: bool, exportUrl: string}|null
+	 */
+	private function teamBanner(string $uid, Workspace $ws, string $baseUrl, string $key): ?array {
+		if ($ws->getOwnerType() !== 'team') {
+			return null;
+		}
+		$teamId = (string)$ws->getOwnerId();
+		$state = $this->teamState->stateOf($teamId);
+		if ($state === TeamStateService::ACTIVE) {
+			return null;
+		}
+		$exportUrl = $baseUrl . 'api_export_structured.php?' . http_build_query(['workspace' => $key]);
+		if ($state === TeamStateService::FROZEN) {
+			return ['state' => $state, 'text' => $this->l->t('The Teams app is not available. This workspace is read-only.'), 'canConvert' => false, 'exportUrl' => $exportUrl];
+		}
+		$date = $this->teamState->deletionDate($teamId);
+		$text = $date !== null
+			? $this->l->t('The team was deleted. This workspace will be deleted on %s.', [(string)$this->l->l('date', $date)])
+			: $this->l->t('The team was deleted. This workspace will be deleted soon.');
+		return ['state' => $state, 'text' => $text, 'canConvert' => $ws->getCreatedBy() === $uid, 'exportUrl' => $exportUrl];
 	}
 
 	// Upstream index.php:107-160 und getWorkspaceFilter(); ohne Speichern (GET ohne Seiteneffekt, JS speichert per API)
@@ -773,7 +800,7 @@ class IndexViewService {
 	}
 
 	/** @return array<string, mixed> window-Globals der Upstream-Inline-Skripte (index.php:1107-1180, icon_sidebar.php:446-455) */
-	private function globals(string $uid, string $key): array {
+	private function globals(string $uid, string $key, Workspace $ws): array {
 		$t = fn (string $k, string $d = '') => $this->tr->t($k, [], $d === '' ? null : $d);
 		$months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
 		$days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -783,7 +810,8 @@ class IndexViewService {
 			$members = [];
 		}
 		$tagColors = json_decode($this->value($uid, 'tag_colors'), true);
-		$palette = $this->palette->entries($uid);
+		// R16: Farbwahl und Auflösung in fremden Workspaces mit der Palette des Besitzers, Team: Standard
+		$palette = $this->palette->entries(NotePalette::ownerOf($ws));
 		return [
 			'DEFAULT_NOTE_TITLES' => $this->tr->defaultNoteTitles(),
 			'PoznoteMentionMembers' => $members,

@@ -81,7 +81,8 @@ class DashboardViewService {
 			'colors' => (object)$scope['colors'],
 		];
 		$tagColors = json_decode($this->settings->get($uid, 'tag_colors', ''), true);
-		$palette = $this->palette->entries($uid);
+		// R16: Farbwahl eines einzelnen fremden Workspace mit dessen Palette
+		$palette = $this->palette->entries($scope['mode'] === 'single' ? NotePalette::ownerOf($frame['workspace']) : $uid);
 		return [
 			'globals' => ['TAG_COLORS' => is_array($tagColors) ? (object)$tagColors : new \stdClass(), 'NOTE_COLOR_PALETTE' => $palette],
 			'data' => $data,
@@ -106,7 +107,7 @@ class DashboardViewService {
 			$key = $keys[(int)$ws->getId()];
 			$ids[$key] = (int)$ws->getId();
 			$tags[$key] = $this->validator->workspaceTags((string)($ws->getTags() ?? ''));
-			$hex = $this->palette->hex($ws->getColor());
+			$hex = $this->palette->hex($ws->getColor(), NotePalette::ownerOf($ws));
 			if ($hex !== '') {
 				$colors[$key] = $hex;
 			}
@@ -165,6 +166,7 @@ class DashboardViewService {
 	/** @return array{folders: list<array<string, mixed>>, notes: list<array<string, mixed>>} Ordnerbaum und lose Notizen eines Workspace */
 	private function board(string $uid, int $wsId, string $key, bool $favoritesOnly): array {
 		$folders = [];
+		$paletteOwner = NotePalette::ownerOf($this->workspaces->resolveKey($uid, $key));
 		$rows = array_values(array_filter($this->folders->findInWorkspace($wsId), static fn (Folder $f) => $f->getTrashedAt() === null));
 		usort($rows, static fn (Folder $a, Folder $b) => [(int)$a->getDisplayOrder() > 0 ? 0 : 1, (int)$a->getDisplayOrder(), mb_strtolower((string)$a->getName())]
 			<=> [(int)$b->getDisplayOrder() > 0 ? 0 : 1, (int)$b->getDisplayOrder(), mb_strtolower((string)$b->getName())]);
@@ -179,7 +181,7 @@ class DashboardViewService {
 				'icon' => IndexViewService::iconClass((string)($f->getIcon() ?? ''), 'lucide-folder'),
 				'color' => IndexViewService::iconColor((string)($f->getIconColor() ?? '')) ?: null,
 				'cardColor' => (string)($f->getColor() ?? ''),
-				'cardColorHex' => $this->palette->hex($f->getColor()),
+				'cardColorHex' => $this->palette->hex($f->getColor(), $paletteOwner),
 				'pinned' => (int)$f->getPinned() > 0,
 				'favorite' => $favoritesOnly && (int)$f->getFavorite() > 0,
 				'notes' => [],
@@ -198,7 +200,7 @@ class DashboardViewService {
 				|| ($n->getFolderId() !== null && ($folders[(int)$n->getFolderId()]['favorite'] ?? false))));
 		}
 		usort($notes, static fn (Note $a, Note $b) => [(int)$b->getUpdatedAt(), (int)$b->getId()] <=> [(int)$a->getUpdatedAt(), (int)$a->getId()]);
-		$cards = $this->cards($uid, $notes, $key);
+		$cards = $this->cards($uid, $notes, $key, $paletteOwner);
 		$loose = [];
 		foreach ($notes as $rank => $n) {
 			$card = $cards[(int)$n->getId()] + ['globalOrder' => $rank, 'dashboardOrder' => (int)$n->getDashboardOrder()];
@@ -312,7 +314,7 @@ class DashboardViewService {
 	 * @param Note[] $notes
 	 * @return array<int, array<string, mixed>>
 	 */
-	private function cards(string $uid, array $notes, string $key): array {
+	private function cards(string $uid, array $notes, string $key, string $paletteOwner): array {
 		$ids = array_map(static fn (Note $n) => (int)$n->getId(), $notes);
 		$tasklists = array_map(static fn (Note $n) => (int)$n->getId(), array_filter($notes, static fn (Note $n) => $n->getType() === 'tasklist'));
 		$heads = $this->notes->contentPrefixes(array_diff($ids, $tasklists), self::PREVIEW_BYTES) + $this->notes->contentPrefixes($tasklists, self::TASKLIST_BYTES);
@@ -341,7 +343,7 @@ class DashboardViewService {
 				'icon' => trim((string)($n->getIcon() ?? '')) !== '' ? IndexViewService::iconClass((string)$n->getIcon(), 'lucide-file-text') : '',
 				'iconColor' => IndexViewService::iconColor((string)($n->getIconColor() ?? '')),
 				'color' => (string)($n->getColor() ?? ''),
-				'colorHex' => $this->palette->hex($n->getColor()),
+				'colorHex' => $this->palette->hex($n->getColor(), $paletteOwner),
 				'pinned' => (int)$n->getPinned() > 0,
 			];
 		}

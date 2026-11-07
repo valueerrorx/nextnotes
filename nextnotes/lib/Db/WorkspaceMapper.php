@@ -184,6 +184,23 @@ class WorkspaceMapper extends QBMapper {
 		return array_values(array_unique($ids));
 	}
 
+	/**
+	 * Team-Workspaces unter diesen IDs (Erwähnungen, M5d)
+	 * @param int[] $ids
+	 * @return int[]
+	 */
+	public function teamIdsAmong(array $ids): array {
+		$out = [];
+		foreach (array_chunk(array_values(array_unique($ids)), 1000) as $chunk) {
+			$qb = $this->db->getQueryBuilder();
+			$qb->select('id')->from(self::TABLE)
+				->where($qb->expr()->in('id', $qb->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY)))
+				->andWhere($qb->expr()->eq('owner_type', $qb->createNamedParameter('team')));
+			array_push($out, ...array_map('intval', $qb->executeQuery()->fetchFirstColumn()));
+		}
+		return $out;
+	}
+
 	public function deleteById(int $id): void {
 		$qb = $this->db->getQueryBuilder();
 		$qb->delete(self::TABLE)

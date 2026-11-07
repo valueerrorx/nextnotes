@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Service;
 
+use OCA\NextNotes\Db\Workspace;
 use OCA\NextNotes\Service\View\PageTranslator;
 use OCP\IUserSession;
 
@@ -116,6 +117,11 @@ class NotePalette {
 			$out[$id] = $this->tr->t('note_color.names.' . $id, [], $english);
 		}
 		return $out;
+	}
+
+	// R16: Farb-IDs in fremden Workspaces mit der Palette des Besitzers, in Team-Workspaces mit der Standardpalette ('')
+	public static function ownerOf(Workspace $ws): string {
+		return $ws->getOwnerType() === 'user' ? (string)$ws->getOwnerId() : '';
 	}
 
 	// Upstream resolveNoteColorHex: Hex direkt, Paletten-ID über die Palette von $uid (Standard: angemeldeter Benutzer), unbekannt → ''
