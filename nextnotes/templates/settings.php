@@ -67,6 +67,7 @@ $islands = [
 ];
 $titleIcon = 'lucide-settings';
 $titleText = $t('settings.title', 'Settings');
+$titleWorkspace = false; // UI-ws: Einstellungen gelten überwiegend für alle Workspaces, keine Auswahl im Titel
 $filterLabel = $t('workspaces.filter.placeholder', 'Filter by name or tag...');
 $rowLabels = [
 	'drag' => $t('workspaces.order.handle', 'Drag to reorder'),

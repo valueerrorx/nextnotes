@@ -36,7 +36,10 @@ $toggleQuery = ['workspace' => $frame['workspaceKey']] + ($showHandled ? [] : ['
 	<?php include __DIR__ . '/partials/icon_sidebar.php'; ?>
 	<main class="nn-page-main" inert>
 	<div class="tasks-container">
-		<h1 class="poznote-page-title"><span class="poznote-page-title-name"><i class="lucide lucide-at-sign"></i> <?php p($t('mentions.title', 'Mentions')); ?></span></h1>
+		<h1 class="poznote-page-title"><span class="poznote-page-title-name"><i class="lucide lucide-at-sign"></i> <?php p($t('mentions.title', 'Mentions')); ?></span>
+			<?php // UI-ws: Erwähnungen gelten workspaceübergreifend, Bereich statt Auswahl ?>
+			<span class="poznote-page-title-workspace poznote-page-title-workspace-static nn-ws-scope"><i class="lucide lucide-layers poznote-page-title-workspace-icon" aria-hidden="true"></i><span class="poznote-page-title-workspace-name"><?php p($t('dashboard.scope.all', 'All workspaces')); ?></span></span>
+		</h1>
 
 		<div class="mentions-toolbar">
 			<p class="mentions-intro"><?php p($t('mentions.intro', 'Notes of shared workspaces that mention you with @{{username}}.', ['username' => $_['uid']])); ?></p>

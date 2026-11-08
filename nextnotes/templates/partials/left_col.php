@@ -5,17 +5,19 @@
  */
 // abgeleitet von src/public/index.php @ 7e2e0b6aa501ba95ac1e9789fd2bb477c281a001
 // #left_col der Hauptansicht; eingebunden von index.php und fragment_left.php (P18). Erwartet $tr, $view, $l, $_['baseUrl'].
-// Team-Banner (M5d) liegt hier, damit der Workspace-Wechsel ohne Reload (Neuaufbau von #left_col) ihn mitnimmt.
+// Workspace-Auswahl als NC-Auswahlknopf (UI-ws, Optik wie der Workspace-Chip der Unterseiten). Team-Banner (M5d) liegt hier, damit der Workspace-Wechsel ohne Reload (Neuaufbau von #left_col) ihn mitnimmt.
 ?>
 <div id="left_col">
 	<div class="sidebar-header">
 		<div class="sidebar-title-row">
-			<div class="sidebar-title" role="button" tabindex="0" data-action="toggle-workspace-menu">
+			<div class="sidebar-title" role="button" tabindex="0" aria-haspopup="menu" data-action="toggle-workspace-menu">
 				<?php if ($view['workspaceColor'] !== ''): ?>
 				<span class="workspace-title-dot" style="background-color: <?php p($view['workspaceColor']); ?>" aria-hidden="true"></span>
+				<?php else: ?>
+				<i class="lucide lucide-layers workspace-title-icon" aria-hidden="true"></i>
 				<?php endif; ?>
 				<span class="workspace-title-text" title="<?php p($view['workspaceKey']); ?>"><?php p($view['workspaceKey']); ?></span>
-				<i class="lucide lucide-caret-down workspace-dropdown-icon"></i>
+				<i class="lucide lucide-chevron-down workspace-dropdown-icon" aria-hidden="true"></i>
 			</div>
 			<div class="sidebar-title-actions">
 				<?php // Erinnerungen zeigt die NC-Glocke (SPEC §6); Platzhalter für notifications-modal.js ?>
