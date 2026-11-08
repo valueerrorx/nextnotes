@@ -34,7 +34,6 @@ $item = static function (string $action, string $icon, string $label, array $dat
 <div class="innernote"<?php if ($type === 'markdown'): ?> data-markdown-note="true"<?php endif; ?><?php if ($type === 'tasklist'): ?> data-tasklist-note="true"<?php endif; ?>>
 <div class="note-header">
 <div class="note-edit-toolbar">
-	<button type="button" id="note-history-back" class="toolbar-btn btn-history-nav btn-history-back history-disabled" title="<?php p($tr->t('editor.toolbar.go_back', [], 'Go back')); ?>" disabled><i class="lucide lucide-circle-chevron-left"></i></button>
 	<?php $btn('btn-home mobile-home-btn', 'scroll-to-left-column', 'lucide-home', $tr->t('editor.toolbar.back_to_notes'), false); ?>
 	<?php $btn('btn-bold text-format-btn', 'exec-bold', 'lucide-bold', $tr->t('editor.toolbar.bold'), false); ?>
 	<?php $btn('btn-italic text-format-btn', 'exec-italic', 'lucide-italic', $tr->t('editor.toolbar.italic'), false); ?>
@@ -75,7 +74,6 @@ $item = static function (string $action, string $icon, string $label, array $dat
 	<?php if ($prose && $note['canWrite']): ?><button type="button" class="toolbar-btn btn-convert note-action-btn" data-action="show-convert-modal" data-note-id="<?php p($id); ?>" data-convert-to="<?php p($type === 'markdown' ? 'html' : 'markdown'); ?>" title="<?php p($type === 'markdown' ? $tr->t('index.toolbar.convert_to_html', [], 'Convert to rich text') : $tr->t('index.toolbar.convert_to_markdown', [], 'Convert to Markdown')); ?>"><i class="lucide lucide-refresh-cw-alt"></i></button><?php endif; ?>
 	<?php if ($prose): ?><?php $btn('btn-search-replace note-action-btn', 'open-search-replace-modal', 'lucide-search', $tr->t('editor.toolbar.search_replace', [], 'Search and replace')); ?><?php endif; ?>
 	<?php $btn('btn-snapshot note-action-btn', 'show-snapshot', 'lucide-history', $tr->t('snapshot.menu_item', [], 'Revisions')); ?>
-	<button type="button" id="note-history-forward" class="toolbar-btn btn-history-nav btn-history-forward history-disabled" title="<?php p($tr->t('editor.toolbar.go_forward', [], 'Go forward')); ?>" disabled><i class="lucide lucide-circle-chevron-right"></i></button>
 	<?php $btn('btn-trash note-action-btn', 'delete-note', 'lucide-trash-2', $tr->t('common.delete', [], 'Delete')); ?>
 	<div class="toolbar-menu-anchor">
 		<button type="button" class="toolbar-btn mobile-more-btn note-action-btn" title="<?php p($tr->t('common.menu', [], 'Menu')); ?>" data-action="toggle-mobile-toolbar-menu" aria-haspopup="true" aria-expanded="false"><i class="lucide lucide-more-vertical"></i></button>
