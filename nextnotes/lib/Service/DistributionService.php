@@ -54,6 +54,7 @@ class DistributionService {
 		private ITimeFactory $time,
 		private IUserManager $users,
 		private IFactory $l10nFactory,
+		private AssignmentNotifications $notify,
 	) {
 	}
 
@@ -160,6 +161,7 @@ class DistributionService {
 			$left--;
 			if ($result === self::CREATED) {
 				$out['created']++;
+				$this->notify->assigned((int)$a->getId(), (string)$uid);
 			}
 		}
 		$out['pending'] = $left;

@@ -117,4 +117,42 @@ class AssignmentMapper extends QBMapper {
 		}
 		return $out;
 	}
+
+	/**
+	 * Frist abgelaufen, ausgeteilt, Sammelmeldung noch offen (AssignmentDeadlineJob)
+	 * @return Assignment[]
+	 */
+	public function findDeadlinePassed(int $now, int $limit): array {
+		$qb = $this->db->getQueryBuilder();
+		$expr = $qb->expr();
+		$qb->select('*')->from(self::TABLE)
+			->where($expr->eq('status', $qb->createNamedParameter('distributed')))
+			->andWhere($expr->lt('due_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT)))
+			->andWhere($expr->isNull('deadline_notified_at'))
+			->orderBy('id', 'ASC')
+			->setMaxResults($limit);
+		return $this->findEntities($qb);
+	}
+
+	// Bedingt: genau ein Lauf sendet die Sammelmeldung (true = dieser Aufruf hat markiert)
+	public function markDeadlineNotified(int $id, int $now): bool {
+		$qb = $this->db->getQueryBuilder();
+		$expr = $qb->expr();
+		$qb->update(self::TABLE)
+			->set('deadline_notified_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT))
+			->where($expr->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT)))
+			->andWhere($expr->eq('status', $qb->createNamedParameter('distributed')))
+			->andWhere($expr->isNull('deadline_notified_at'));
+		return $qb->executeStatement() === 1;
+	}
+
+	/** @return int[] ausgeteilt mit offener Frist, alle Teams (Nachzügler im Job) */
+	public function idsOpenDistributed(int $now): array {
+		$qb = $this->db->getQueryBuilder();
+		$expr = $qb->expr();
+		$qb->select('id')->from(self::TABLE)
+			->where($expr->eq('status', $qb->createNamedParameter('distributed')))
+			->andWhere($expr->gte('due_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT)));
+		return array_map('intval', $qb->executeQuery()->fetchFirstColumn());
+	}
 }

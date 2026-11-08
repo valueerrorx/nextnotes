@@ -299,6 +299,8 @@ final class CoreScenarioTest extends ApiTestCase {
 		self::assertNull(self::ok($a->call('GET', "/notes/$m1/reminder"), 'reminder weg')['reminder_at']);
 		$t2 = TaskService::idString(self::ok($a->call('GET', "/notes/$tl/tasks"), 'tasks')['tasks'][0]['id']);
 		$this->rec('POST /notes/{id}/task-reminder', $a->call('POST', "/notes/$tl/task-reminder", ['task_id' => $t2, 'reminder_at' => '2030-01-01T08:00:00Z']));
+		// Port-eigen (M6e2): eigene Erinnerung lesen, Gegenstück zu POST
+		self::assertSame('2030-01-01 08:00:00', $this->rec('GET /notes/{id}/task-reminder', $a->call('GET', "/notes/$tl/task-reminder" . self::q(['task_id' => $t2])))['reminder_at']);
 		$this->rec('DELETE /notes/{id}/task-reminder', $a->call('DELETE', "/notes/$tl/task-reminder" . self::q(['task_id' => $t2])));
 
 		$this->rec('GET /mentions', $a->call('GET', '/mentions'));
@@ -383,7 +385,7 @@ final class CoreScenarioTest extends ApiTestCase {
 			}
 		}
 		// Port-eigene Routen ohne Upstream-Gegenstück (RouteDiffTest::PORT_ONLY)
-		self::assertSame([], array_values(array_diff($missing, ['GET /teams', 'POST /workspaces/{}/make-private', 'GET /users/search', 'PUT /folders/{}/material', 'GET /assignments', 'POST /assignments', 'GET /assignments/{}', 'PATCH /assignments/{}', 'DELETE /assignments/{}', 'GET /assignments/{}/submissions', 'GET /submissions/{}', 'POST /assignments/{}/distribute', 'POST /assignments/{}/close', 'POST /submissions/{}/submit', 'POST /submissions/{}/return', 'POST /submissions/{}/reopen', 'PUT /submissions/{}/feedback'])), 'Routen ohne Upstream-Fixture');
+		self::assertSame([], array_values(array_diff($missing, ['GET /teams', 'POST /workspaces/{}/make-private', 'GET /users/search', 'PUT /folders/{}/material', 'GET /assignments', 'POST /assignments', 'GET /assignments/{}', 'PATCH /assignments/{}', 'DELETE /assignments/{}', 'GET /assignments/{}/submissions', 'GET /submissions/{}', 'POST /assignments/{}/distribute', 'POST /assignments/{}/close', 'POST /submissions/{}/submit', 'POST /submissions/{}/return', 'POST /submissions/{}/reopen', 'PUT /submissions/{}/feedback', 'GET /notes/{}/task-reminder'])), 'Routen ohne Upstream-Fixture');
 	}
 
 	// Detektor-Selbsttest: fehlende/zusätzliche Schlüssel werden erkannt, Zahlen-Schlüssel ignoriert

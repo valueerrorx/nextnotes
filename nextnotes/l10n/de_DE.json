@@ -94,7 +94,21 @@
   "Only teachers can change material.": "Nur Lehrkräfte können Material ändern.",
   "Copy created in your private workspace \"{workspace}\".": "Kopie in deinem privaten Arbeitsbereich „{workspace}“ angelegt.",
   "Open copy": "Kopie öffnen",
-  "The note could not be copied.": "Die Notiz konnte nicht kopiert werden."
+  "The note could not be copied.": "Die Notiz konnte nicht kopiert werden.",
+  "New assignment: {assignment}": "Neue Aufgabe: {assignment}",
+  "Due on %s": "Fällig am %s",
+  "The deadline of {assignment} has passed": "Die Frist von {assignment} ist abgelaufen",
+  "%1$s submitted, %2$s missed.": "%1$s abgegeben, %2$s verpasst.",
+  "_%n team member did not receive the assignment._::_%n team members did not receive the assignment._": [
+   "%n Teammitglied hat die Aufgabe nicht erhalten.",
+   "%n Teammitglieder haben die Aufgabe nicht erhalten."
+  ],
+  "Assignment": "Aufgabe",
+  "No deadline": "Ohne Frist",
+  "New deadline: %s": "Neue Frist: %s",
+  "{user} returned your submission for {assignment}": "{user} hat Ihre Abgabe zu {assignment} zurückgegeben",
+  "Your submission for {assignment} was returned": "Ihre Abgabe zu {assignment} wurde zurückgegeben",
+  "Your submission for {assignment} was reopened": "Ihre Abgabe zu {assignment} wurde wieder geöffnet"
  },
  "pluralForm": "nplurals=2; plural=(n != 1);"
 }

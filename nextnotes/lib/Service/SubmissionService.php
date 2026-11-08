@@ -34,6 +34,7 @@ class SubmissionService {
 		private AssignmentService $assignmentService,
 		private Transaction $tx,
 		private IUserManager $users,
+		private AssignmentNotifications $notify,
 	) {
 	}
 
@@ -61,6 +62,9 @@ class SubmissionService {
 		[$s, $a] = $this->teacherAction($uid, $id, 'return');
 		$values = $this->feedbackValues($uid, $a, $in, false) + ['returned_at' => $this->states->now()];
 		$s = $this->locked($s, fn (Submission $s) => $this->states->transition($s, 'return', $values), true);
+		if ($s->getStudentUid() !== null) {
+			$this->notify->returned((int)$s->getId(), (string)$s->getStudentUid(), (string)$values['feedback_by_name']);
+		}
 		return ['submission' => $this->assignmentService->submissionView($s, true)];
 	}
 
@@ -73,6 +77,9 @@ class SubmissionService {
 		$raw = $in['due_override_at'] ?? null;
 		$due = $raw === null || $raw === '' ? null : $this->assignmentService->dueAt($raw);
 		$s = $this->locked($s, fn (Submission $s) => $this->states->transition($s, 'reopen', ['due_override_at' => $due]));
+		if ($s->getStudentUid() !== null) {
+			$this->notify->reopened((int)$s->getId(), (string)$s->getStudentUid(), $due);
+		}
 		return ['submission' => $this->assignmentService->submissionView($s, true)];
 	}
 

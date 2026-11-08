@@ -29,18 +29,31 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	const writes = (since) => ctx.requests.slice(since.q).filter((r) => r.method !== 'GET' && r.url.includes(`/notes/${tl}`) && !/task-reminder|beacon/.test(r.url));
 	const modal = pb.locator('#taskDueModal');
 
+	// M6e2: Adapter öffnet den Dialog erst nach GET /task-reminder (eigener Wert), daher auf Sichtbarkeit warten
 	const check = async (where) => {
+		await modal.waitFor({ state: 'visible', timeout: 8000 });
 		ctx.ok(await modal.isVisible(), `${where}: Fälligkeits-Dialog offen`);
 		ctx.ok(await modal.evaluate((m) => m.classList.contains('nn-reminder-only')), `${where}: nur Erinnerung`);
 		for (const id of ['taskDueDateBtn', 'taskDueTimeBtn', 'taskDueRepeatSelect']) ctx.ok(await pb.locator(`#${id}`).isDisabled(), `${where}: #${id} gesperrt`);
 		ctx.ok(!(await pb.locator('#taskDueRemoveBtn').isVisible()), `${where}: „Termin entfernen“ verborgen`);
 	};
 	const setRemind = async (on) => {
+		await modal.waitFor({ state: 'visible', timeout: 8000 });
 		const box = pb.locator('#taskDueRemindInput');
 		if ((await box.isChecked()) !== on) await pb.locator('#taskDueRemindOption .toggle-switch').click();
 		const resp = pb.waitForResponse((r) => r.url().includes(`/notes/${tl}/task-reminder`) && r.request().method() === (on ? 'POST' : 'DELETE'));
 		await pb.locator('#taskDueSaveBtn').click();
 		return (await resp).status();
+	};
+	// Schalter zeigt die eigene Erinnerung (GET /task-reminder), nicht die anderer Nutzer
+	const remindShown = async (on, where, opener) => {
+		const got = pb.waitForResponse((r) => r.url().includes(`/notes/${tl}/task-reminder`) && r.request().method() === 'GET');
+		await opener.click();
+		ctx.ok((await got).status() === 200, `${where}: GET /task-reminder → 200`);
+		await modal.waitFor({ state: 'visible', timeout: 8000 });
+		ctx.ok(await pb.locator('#taskDueRemindInput').isChecked() === on, `${where}: Schalter zeigt eigenen Wert ${on ? 'an' : 'aus'}`);
+		await modal.locator('[data-action="close-modal"]').click();
+		await modal.waitFor({ state: 'hidden', timeout: 8000 });
 	};
 
 	// Notiz-Ansicht
@@ -52,12 +65,17 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	const chipLook = await chip.evaluate((c) => { let op = 1; for (let e = c; e && e.id !== 'note' + c.dataset.noteId; e = e.parentElement) op *= Number(getComputedStyle(e).opacity); return { op, pe: getComputedStyle(c).pointerEvents }; });
 	ctx.ok(chipLook.op === 1 && chipLook.pe !== 'none', 'S: Termin-Chip sieht normal aus (keine Opazität)', JSON.stringify(chipLook));
 	ctx.ok(await pb.locator(`#entry${tl} .task-due-btn:visible, #entry${tl} .task-delete-btn:visible, #entry${tl} .task-menu-btn:visible`).count() === 0, 'S: übrige Aufgaben-Knöpfe verborgen');
+	await remindShown(false, 'Notiz vorher', chip);
 	await chip.click();
 	await check('Notiz');
 	ctx.ok(await setRemind(true) === 200, 'Notiz: Erinnerung gesetzt → 200');
+	await modal.waitFor({ state: 'hidden', timeout: 8000 }).catch(() => {});
 	ctx.ok(!(await modal.isVisible()), 'Notiz: Dialog geschlossen');
+	await remindShown(true, 'Notiz nach Setzen', chip);
 	await chip.click();
 	ctx.ok(await setRemind(false) === 200, 'Notiz: Erinnerung gelöscht → 200');
+	await modal.waitFor({ state: 'hidden', timeout: 8000 }).catch(() => {});
+	await remindShown(false, 'Notiz nach Löschen', chip);
 	ctx.ok(writes(m1).length === 0, 'Notiz: kein Schreib-Request an die Aufgabe', writes(m1).map((r) => `${r.method} ${r.url}`).join(' '));
 	await ctx.screenshot(pb, 'student-note');
 	ctx.assertClean('Notiz', m1);
@@ -71,6 +89,8 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	await chip2.click();
 	await check('Übersicht');
 	ctx.ok(await setRemind(true) === 200, 'Übersicht: Erinnerung gesetzt → 200');
+	await modal.waitFor({ state: 'hidden', timeout: 8000 }).catch(() => {});
+	await remindShown(true, 'Übersicht nach Setzen', chip2);
 	ctx.ok(writes(m2).length === 0, 'Übersicht: kein Schreib-Request an die Aufgabe', writes(m2).map((r) => `${r.method} ${r.url}`).join(' '));
 	await ctx.screenshot(pb, 'student-tasks');
 	ctx.assertClean('Übersicht', m2);

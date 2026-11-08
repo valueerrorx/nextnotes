@@ -44,6 +44,7 @@ class AssignmentService {
 		private DistributionService $distribution,
 		private SubmissionStateService $states,
 		private WorkspaceMapper $workspaceRows,
+		private AssignmentNotifications $notify,
 	) {
 	}
 
@@ -321,7 +322,8 @@ class AssignmentService {
 		$hasPoints = array_key_exists('max_points', $in);
 		$maxPoints = $hasPoints ? self::maxPoints($in['max_points']) : null;
 		$due = array_key_exists('due_at', $in) ? $this->dueAt($in['due_at']) : null;
-		$a = $this->tx->run(function () use ($uid, $id, $title, $hasPoints, $maxPoints, $due): Assignment {
+		$extended = false;
+		$a = $this->tx->run(function () use ($uid, $id, $title, $hasPoints, $maxPoints, $due, &$extended): Assignment {
 			if ($this->assignments->lockRow($id) === 0) {
 				throw new NotFoundException('Assignment not found');
 			}
@@ -337,6 +339,9 @@ class AssignmentService {
 				}
 				if ($status === 'distributed') {
 					$this->submissions->resetMissed($id, $now);
+					// neue Frist → neue Sammelmeldung (M6e2)
+					$a->setDeadlineNotifiedAt(null);
+					$extended = true;
 				}
 				$a->setDueAt($due);
 			}
@@ -351,6 +356,9 @@ class AssignmentService {
 		});
 		// Verlängerung: Nachzügler gleich austeilen (§9.2), Rest beim nächsten Zugriff
 		if ($due !== null && $a->getStatus() === 'distributed') {
+			if ($extended) {
+				$this->notify->clearDeadline($id);
+			}
 			$this->distribution->reconcile($a, null, $this->time->getTime() + DistributionService::BUDGET_SECONDS);
 		}
 		return ['assignment' => $this->viewOne($uid, $a)];

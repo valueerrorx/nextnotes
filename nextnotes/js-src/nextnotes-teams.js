@@ -610,7 +610,21 @@
 					if (c) c.disabled = reminderOnly;
 				});
 			}
-			return openDue.call(this, reminderOnly ? Object.assign({}, opts, { onSave: null }) : opts);
+			if (!reminderOnly) return openDue.call(this, opts);
+			// Schalter zeigt die eigene Erinnerung, nicht die Einstellung der Aufgabe (M6e2); Dialog öffnet nach der Antwort
+			var self = this;
+			var taskId = String(opts.taskId !== undefined ? opts.taskId : opts.task.id);
+			var open = function (own) {
+				var task = own === null ? opts.task : Object.assign({}, opts.task, { dueReminder: own });
+				openDue.call(self, Object.assign({}, opts, { task: task, onSave: null }));
+			};
+			fetch('api/v1/notes/' + encodeURIComponent(opts.noteId) + '/task-reminder?' + new URLSearchParams({ task_id: taskId }).toString(), {
+				credentials: 'same-origin',
+				headers: { 'Accept': 'application/json' }
+			})
+				.then(readJson)
+				.then(function (r) { open(r.status === 200 ? !!r.data.reminder_at : null); })
+				.catch(function () { open(null); });
 		};
 	}
 

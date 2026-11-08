@@ -261,4 +261,42 @@ class SubmissionMapper extends QBMapper {
 			->where($qb->expr()->eq('feedback_by', $qb->createNamedParameter($uid)))
 			->executeStatement();
 	}
+
+	/** @return int[] Aufgaben mit offener Abgabe nach Frist (assigned nach Aufgabenfrist, reopened nach eigener Frist) */
+	public function assignmentIdsOverdue(int $now): array {
+		$qb = $this->db->getQueryBuilder();
+		$expr = $qb->expr();
+		$qb->selectDistinct('s.assignment_id')->from(self::TABLE, 's')
+			->innerJoin('s', AssignmentMapper::TABLE, 'a', $expr->eq('a.id', 's.assignment_id'))
+			->where($expr->orX(
+				$expr->andX($expr->eq('s.status', $qb->createNamedParameter('assigned')), $expr->lt('a.due_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT))),
+				$expr->andX($expr->eq('s.status', $qb->createNamedParameter('reopened')), $expr->isNotNull('s.due_override_at'),
+					$expr->lt('s.due_override_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT))),
+			));
+		return array_map('intval', $qb->executeQuery()->fetchFirstColumn());
+	}
+
+	/** @return int[] Aufgaben mit Austrittsmarke (reconcile Schritt a im Job) */
+	public function assignmentIdsWithLeft(): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->selectDistinct('assignment_id')->from(self::TABLE)
+			->where($qb->expr()->isNotNull('left_team_at'))
+			->andWhere($qb->expr()->isNotNull('student_uid'));
+		return array_map('intval', $qb->executeQuery()->fetchFirstColumn());
+	}
+
+	/** @return array<string, int> Status → Anzahl einer Aufgabe (Sammelmeldung) */
+	public function statusCounts(int $assignmentId): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('status')->selectAlias($qb->func()->count('id'), 'n')->from(self::TABLE)
+			->where($qb->expr()->eq('assignment_id', $qb->createNamedParameter($assignmentId, IQueryBuilder::PARAM_INT)))
+			->groupBy('status');
+		$out = [];
+		$res = $qb->executeQuery();
+		while ($row = $res->fetch()) {
+			$out[(string)$row['status']] = (int)$row['n'];
+		}
+		$res->closeCursor();
+		return $out;
+	}
 }

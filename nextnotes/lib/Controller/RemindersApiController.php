@@ -33,6 +33,11 @@ class RemindersApiController extends ApiController {
 	}
 
 	#[NoAdminRequired]
+	public function showTask(int $id): JSONResponse {
+		return $this->ok($this->reminders->getTask($this->uid(), $id, $this->param('task_id')));
+	}
+
+	#[NoAdminRequired]
 	public function storeTask(int $id): JSONResponse {
 		return $this->ok($this->reminders->set($this->uid(), $id, $this->input(), true));
 	}

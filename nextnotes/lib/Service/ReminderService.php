@@ -48,6 +48,23 @@ class ReminderService {
 		];
 	}
 
+	/** @return array<string, mixed> GET /notes/{id}/task-reminder?task_id=: nur die eigene offene Erinnerung des Aufrufers (Leserecht, sonst 404) */
+	public function getTask(string $uid, int $noteId, mixed $taskId): array {
+		$this->access->requireNote($uid, $noteId, 'read');
+		$taskId = is_scalar($taskId) ? trim((string)$taskId) : '';
+		if ($taskId === '') {
+			throw new BadRequestException('task_id is required');
+		}
+		$r = strlen($taskId) > self::TASK_ID_MAX ? null : $this->reminders->findPending($uid, $noteId, $taskId);
+		return [
+			'note_id' => $noteId,
+			'task_id' => $taskId,
+			'reminder_at' => $r === null ? null : NoteSerializer::date($r->getTriggerAt()),
+			'email_enabled' => false,
+			'recurrence' => $r?->getRecurrence(),
+		];
+	}
+
 	/** @return array<string, mixed> POST /notes/{id}/reminder bzw. /task-reminder */
 	public function set(string $uid, int $noteId, array $in, bool $task): array {
 		$taskId = null;

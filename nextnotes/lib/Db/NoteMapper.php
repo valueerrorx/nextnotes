@@ -17,11 +17,11 @@ use OCP\IDBConnection;
 /** @extends QBMapper<Note> */
 class NoteMapper extends QBMapper {
 	public const TABLE = 'nextnotes_notes';
-	// Spalten für Listen (ohne Inhalt)
+	// Spalten für Listen (ohne Inhalt; assignment_id/submission_id für filterReadable)
 	public const LIST_COLUMNS = ['id', 'workspace_id', 'folder_id', 'heading', 'type', 'role', 'linked_note_id',
 		'favorite', 'pinned', 'icon', 'icon_color', 'color', 'title_color', 'title_size', 'content_width',
 		'display_order', 'dashboard_order', 'speed_dial_order', 'kanban_order', 'kanban_completed', 'trashed_at', 'trash_material',
-		'created_by', 'updated_by', 'created_at', 'updated_at'];
+		'assignment_id', 'submission_id', 'created_by', 'updated_by', 'created_at', 'updated_at'];
 
 	public function __construct(IDBConnection $db) {
 		parent::__construct($db, self::TABLE, Note::class);
@@ -58,8 +58,8 @@ class NoteMapper extends QBMapper {
 	}
 
 	/**
-	 * Notizen (role=note) in den Workspaces, ohne Inhalt.
-	 * Filter: folder_id (int|null für Wurzel), favorite, trashed (bool), search (normalisiert), created_from/created_to, updated_from/updated_to (Unix), linked_note_id, folder_ids (int[]), types (string[]), content_any (Teilzeichenketten, ODER)
+	 * Notizen (role=note, mit roles auch andere Rollen) in den Workspaces, ohne Inhalt.
+	 * Filter: roles (string[]), folder_id (int|null für Wurzel), favorite, trashed (bool), search (normalisiert), created_from/created_to, updated_from/updated_to (Unix), linked_note_id, folder_ids (int[]), types (string[]), content_any (Teilzeichenketten, ODER)
 	 * @param int[] $workspaceIds
 	 * @param array<string, mixed> $filter
 	 * @return Note[]
@@ -73,8 +73,12 @@ class NoteMapper extends QBMapper {
 			$qb = $this->db->getQueryBuilder();
 			$qb->select(...($withContent ? ['*'] : self::LIST_COLUMNS))->from(self::TABLE)
 				->where($qb->expr()->in('workspace_id', $qb->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY)))
-				->andWhere($qb->expr()->eq('role', $qb->createNamedParameter('note')))
 				->orderBy('id', 'ASC');
+			// roles: nur Suche mit eigenen Abgaben (Aufrufer filtert mit filterReadable), sonst role=note
+			$roles = $filter['roles'] ?? ['note'];
+			$qb->andWhere(count($roles) === 1
+				? $qb->expr()->eq('role', $qb->createNamedParameter((string)$roles[0]))
+				: $qb->expr()->in('role', $qb->createNamedParameter(array_values($roles), IQueryBuilder::PARAM_STR_ARRAY)));
 			$this->applyFilter($qb, $filter);
 			array_push($result, ...$this->findEntities($qb));
 		}

@@ -239,6 +239,8 @@ final class IsolationTest extends ApiTestCase {
 			// Erinnerungen
 			'GET /notes/{}/reminder' => ['owned', 'cases' => [['path' => '/notes/{n1}/reminder']]],
 			'POST /notes/{}/reminder' => ['owned', 'cases' => [['path' => '/notes/{n1}/reminder', 'body' => ['reminder_at' => '2030-01-01T10:00:00Z']]]],
+			// task_id kein Objekt-Slot: liefert nur die eigene Erinnerung des Aufrufers an der Notiz {tl} (M6e2)
+			'GET /notes/{}/task-reminder' => ['owned', 'cases' => [['path' => '/notes/{tl}/task-reminder', 'query' => ['task_id' => '1']]]],
 			'POST /notes/{}/task-reminder' => ['owned', 'cases' => [['path' => '/notes/{tl}/task-reminder', 'body' => ['task_id' => '{task}', 'reminder_at' => '2030-01-01T10:00:00Z']]]],
 			// task_id kein Objekt-Slot: Löschen ist idempotent und wirkt nur auf Erinnerungen des Aufrufers an der Notiz {tl}
 			'DELETE /notes/{}/task-reminder' => ['owned', 'cases' => [['path' => '/notes/{tl}/task-reminder', 'query' => ['task_id' => '1'], 'body' => []]]],
@@ -463,7 +465,7 @@ final class IsolationTest extends ApiTestCase {
 			}
 		}
 		self::assertSame([], $errors);
-		self::assertCount(135, $table);
+		self::assertCount(136, $table);
 	}
 
 	public function testDetectorsObject(): void {

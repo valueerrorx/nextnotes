@@ -120,6 +120,7 @@ return [
 		['name' => 'snapshots_api#restore', 'url' => '/api/v1/notes/{id}/snapshot/restore', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 		['name' => 'reminders_api#show', 'url' => '/api/v1/notes/{id}/reminder', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
 		['name' => 'reminders_api#store', 'url' => '/api/v1/notes/{id}/reminder', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+		['name' => 'reminders_api#showTask', 'url' => '/api/v1/notes/{id}/task-reminder', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
 		['name' => 'reminders_api#storeTask', 'url' => '/api/v1/notes/{id}/task-reminder', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 		['name' => 'reminders_api#destroyTask', 'url' => '/api/v1/notes/{id}/task-reminder', 'verb' => 'DELETE', 'requirements' => ['id' => '\d+']],
 		['name' => 'reminders_api#destroy', 'url' => '/api/v1/notes/{id}/reminder', 'verb' => 'DELETE', 'requirements' => ['id' => '\d+']],

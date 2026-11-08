@@ -10,15 +10,22 @@ declare(strict_types=1);
 namespace OCA\NextNotes\Notification;
 
 use OCA\NextNotes\AppInfo\Application;
+use OCA\NextNotes\Db\Assignment;
+use OCA\NextNotes\Db\AssignmentMapper;
 use OCA\NextNotes\Db\NoteMapper;
+use OCA\NextNotes\Db\SubmissionMapper;
 use OCA\NextNotes\Db\TeamMapper;
 use OCA\NextNotes\Db\Workspace;
 use OCA\NextNotes\Db\WorkspaceMapper;
 use OCA\NextNotes\Service\AccessService;
+use OCA\NextNotes\Service\AssignmentNotifications;
+use OCA\NextNotes\Service\SubmissionStateService;
 use OCA\NextNotes\Service\TeamCleanupService;
 use OCA\NextNotes\Service\WorkspaceService;
 use OCP\AppFramework\Db\DoesNotExistException;
+use OCP\IDateTimeZone;
 use OCP\IGroupManager;
+use OCP\IL10N;
 use OCP\IURLGenerator;
 use OCP\IUserManager;
 use OCP\L10N\IFactory;
@@ -27,7 +34,7 @@ use OCP\Notification\INotification;
 use OCP\Notification\INotifier;
 use OCP\Notification\UnknownNotificationException;
 
-// Erinnerungen, Erwähnungen und Team-Lebenszyklus in der NC-Glocke (SPEC §6); ohne Leserecht oder Objekt verschwindet die Benachrichtigung
+// Erinnerungen, Erwähnungen, Aufgaben und Team-Lebenszyklus in der NC-Glocke (SPEC §6); ohne Leserecht oder Objekt verschwindet die Benachrichtigung
 class Notifier implements INotifier {
 	public function __construct(
 		private IFactory $l10nFactory,
@@ -39,6 +46,10 @@ class Notifier implements INotifier {
 		private TeamMapper $teams,
 		private WorkspaceMapper $workspaceRows,
 		private IGroupManager $groups,
+		private AssignmentMapper $assignments,
+		private SubmissionMapper $submissions,
+		private SubmissionStateService $states,
+		private IDateTimeZone $timeZone,
 	) {
 	}
 
@@ -60,6 +71,9 @@ class Notifier implements INotifier {
 		if ($notification->getApp() === Application::APP_ID && $notification->getObjectType() === 'team'
 			&& in_array($notification->getSubject(), ['team_orphaned', 'team_deletion_soon'], true)) {
 			return $this->prepareTeam($notification, $languageCode);
+		}
+		if ($notification->getApp() === Application::APP_ID && in_array($notification->getObjectType(), ['assignment', 'submission'], true)) {
+			return $this->prepareAssignment($notification, $languageCode);
 		}
 		if ($notification->getApp() !== Application::APP_ID || $notification->getObjectType() !== 'note'
 			|| !in_array($notification->getSubject(), ['reminder', 'task_reminder', 'mention'], true)) {
@@ -190,5 +204,125 @@ class Notifier implements INotifier {
 			])
 			->setParsedMessage($l->t('Next Notes skips this team in the automatic team cleanup. Check "occ circles:check" and "occ nextnotes:team:orphan-check --dry-run".'))
 			->setIcon($this->urls->getAbsoluteURL($this->urls->imagePath(Application::APP_ID, 'app-dark.svg')));
+	}
+
+	// Aufgaben (SPEC §6, Plan M6 §2.4): Schüler nur zur eigenen Abgabe, Sammelmeldung nur mit review; Objekt gelöscht oder kein Recht → weg
+	private function prepareAssignment(INotification $notification, string $languageCode): INotification {
+		$uid = $notification->getUser();
+		$subject = $notification->getSubject();
+		$id = (int)$notification->getObjectId();
+		$this->access->resetCache();
+		$student = [AssignmentNotifications::ASSIGNED => 'assignment', AssignmentNotifications::RETURNED => 'submission', AssignmentNotifications::REOPENED => 'submission'];
+		if (isset($student[$subject]) && $student[$subject] === $notification->getObjectType()) {
+			if ($notification->getObjectType() === 'assignment') {
+				$sub = $this->submissions->findOwn($uid, [$id])[$id] ?? null;
+			} else {
+				try {
+					$sub = $this->submissions->find($id);
+				} catch (DoesNotExistException) {
+					$sub = null;
+				}
+			}
+			$a = $sub === null ? null : $this->assignmentOrNull((int)$sub->getAssignmentId());
+			// nur eigene Abgabe: kein Weg über review oder die Aufgabe (Invariante SPEC §3)
+			if ($sub === null || $a === null || $sub->getStudentUid() !== $uid || $a->getStatus() === 'draft') {
+				throw new AlreadyProcessedException();
+			}
+			return $this->studentNotice($notification, $languageCode, $a, $sub->getNoteId() === null ? null : (int)$sub->getNoteId(), (int)$sub->getId());
+		}
+		if ($subject === AssignmentNotifications::DEADLINE_PASSED && $notification->getObjectType() === 'assignment') {
+			$a = $this->assignmentOrNull($id);
+			if ($a === null || !$this->access->assignmentAllows($uid, $a, 'review')) {
+				throw new AlreadyProcessedException();
+			}
+			return $this->deadlineNotice($notification, $languageCode, $a);
+		}
+		throw new UnknownNotificationException();
+	}
+
+	private function studentNotice(INotification $notification, string $languageCode, Assignment $a, ?int $noteId, int $submissionId): INotification {
+		$uid = $notification->getUser();
+		$l = $this->l10nFactory->get(Application::APP_ID, $languageCode);
+		$params = $notification->getSubjectParameters();
+		$link = $this->urls->linkToRouteAbsolute('nextnotes.page.indexphp');
+		if ($noteId !== null) {
+			try {
+				$note = $this->notes->find($noteId);
+				$key = $note->getWorkspaceId() === null ? null : $this->workspaces->keyFor($uid, (int)$note->getWorkspaceId());
+				$link .= '?' . http_build_query(($key !== null ? ['workspace' => $key] : []) + ['note' => $noteId]);
+			} catch (DoesNotExistException) {
+			}
+		}
+		$title = $this->title($a, $l);
+		$rich = ['assignment' => ['type' => 'highlight', 'id' => (string)$a->getId(), 'name' => $title, 'link' => $link]];
+		$replace = ['{assignment}' => $title];
+		$message = null;
+		switch ($notification->getSubject()) {
+			case AssignmentNotifications::ASSIGNED:
+				$text = $l->t('New assignment: {assignment}');
+				$message = $l->t('Due on %s', [$this->dateTime($l, (int)$a->getDueAt(), $uid)]);
+				break;
+			case AssignmentNotifications::RETURNED:
+				// Q5: Name der Lehrkraft als Snapshot beim Senden, nie die UID
+				$by = trim((string)($params['byName'] ?? ''));
+				if ($by !== '') {
+					$text = $l->t('{user} returned your submission for {assignment}');
+					$rich['user'] = ['type' => 'highlight', 'id' => 'teacher-' . $submissionId, 'name' => $by];
+					$replace['{user}'] = $by;
+				} else {
+					$text = $l->t('Your submission for {assignment} was returned');
+				}
+				break;
+			default:
+				$text = $l->t('Your submission for {assignment} was reopened');
+				$due = $params['due'] ?? null;
+				$message = $due === null ? $l->t('No deadline') : $l->t('New deadline: %s', [$this->dateTime($l, (int)$due, $uid)]);
+		}
+		$notification->setParsedSubject(strtr($text, $replace))
+			->setRichSubject($text, $rich)
+			->setLink($link)
+			->setIcon($this->urls->getAbsoluteURL($this->urls->imagePath(Application::APP_ID, 'app-dark.svg')));
+		if ($message !== null) {
+			$notification->setParsedMessage($message);
+		}
+		return $notification;
+	}
+
+	// Q4: einzige Meldung an Lehrkräfte zu Abgaben; Zahlen vom Fristende
+	private function deadlineNotice(INotification $notification, string $languageCode, Assignment $a): INotification {
+		$l = $this->l10nFactory->get(Application::APP_ID, $languageCode);
+		$params = $notification->getSubjectParameters();
+		$title = $this->title($a, $l);
+		$link = $this->urls->linkToRouteAbsolute('nextnotes.page.indexphp');
+		$text = $l->t('The deadline of {assignment} has passed');
+		$message = $l->t('%1$s submitted, %2$s missed.', [(string)(int)($params['submitted'] ?? 0), (string)(int)($params['missed'] ?? 0)]);
+		$missing = (int)($params['not_distributed'] ?? 0);
+		if ($missing > 0) {
+			$message .= ' ' . $l->n('%n team member did not receive the assignment.', '%n team members did not receive the assignment.', $missing);
+		}
+		return $notification->setParsedSubject(str_replace('{assignment}', $title, $text))
+			->setRichSubject($text, ['assignment' => ['type' => 'highlight', 'id' => (string)$a->getId(), 'name' => $title, 'link' => $link]])
+			->setParsedMessage($message)
+			->setLink($link)
+			->setIcon($this->urls->getAbsoluteURL($this->urls->imagePath(Application::APP_ID, 'app-dark.svg')));
+	}
+
+	private function assignmentOrNull(int $id): ?Assignment {
+		try {
+			return $this->assignments->find($id);
+		} catch (DoesNotExistException) {
+			return null;
+		}
+	}
+
+	private function title(Assignment $a, IL10N $l): string {
+		$title = trim((string)$a->getTitle());
+		return $title !== '' ? $title : $l->t('Assignment');
+	}
+
+	// Datum und Uhrzeit in der Zeitzone des Empfängers
+	private function dateTime(IL10N $l, int $ts, string $uid): string {
+		$dt = (new \DateTime('@' . $ts))->setTimezone($this->timeZone->getTimeZone(false, $uid));
+		return $l->l('date', $dt, ['width' => 'medium']) . ', ' . $l->l('time', $dt, ['width' => 'short']);
 	}
 }

@@ -56,15 +56,25 @@ class SearchService {
 	 * @param array<string, int> $dates
 	 * @return Note[]
 	 */
-	private function matches(array $wsIds, string $query, array $dates = []): array {
+	private function matches(string $uid, array $wsIds, string $query, array $dates = []): array {
 		$folded = $this->normalizer->fold(trim($query));
-		$found = $this->notes->findList($wsIds, ['search' => $folded] + $dates);
+		$found = $this->readable($uid, $wsIds, ['search' => $folded] + $dates);
 		usort($found, function (Note $a, Note $b) use ($folded) {
 			$ha = str_contains($this->normalizer->fold((string)$a->getHeading()), $folded) ? 0 : 1;
 			$hb = str_contains($this->normalizer->fold((string)$b->getHeading()), $folded) ? 0 : 1;
 			return ($ha <=> $hb) ?: ((int)$b->getUpdatedAt() <=> (int)$a->getUpdatedAt()) ?: ((int)$b->getId() <=> (int)$a->getId());
 		});
 		return $found;
+	}
+
+	/**
+	 * Treffer mit eigenen Abgaben (Plan M6 §2.4): Vorlagen nie, fremde Abgaben nie (Invariante filterReadable, SPEC §3)
+	 * @param int[] $wsIds
+	 * @param array<string, mixed> $filter
+	 * @return Note[]
+	 */
+	private function readable(string $uid, array $wsIds, array $filter): array {
+		return $this->access->filterReadable($uid, $this->notes->findList($wsIds, ['roles' => ['note', 'submission']] + $filter));
 	}
 
 	private function excerpt(Note $n): string {
@@ -85,7 +95,7 @@ class SearchService {
 			throw new BadRequestException('created_from must be before or equal to created_to');
 		}
 		$dates = array_filter(['created_from' => $from, 'created_to' => $to], static fn ($v) => $v !== null);
-		$page = array_slice($this->matches($this->scope($uid, $q['workspace'] ?? null), $query, $dates), 0, $limit);
+		$page = array_slice($this->matches($uid, $this->scope($uid, $q['workspace'] ?? null), $query, $dates), 0, $limit);
 		$full = [];
 		foreach ($this->notes->findByIds(array_map(static fn (Note $n) => (int)$n->getId(), $page)) as $n) {
 			$full[(int)$n->getId()] = $n;
@@ -254,7 +264,7 @@ class SearchService {
 		if ($folded === '') {
 			return [[], $offset];
 		}
-		$found = $this->notes->findList($this->access->visibleWorkspaceIds($uid), ['search' => $folded]);
+		$found = $this->readable($uid, $this->access->visibleWorkspaceIds($uid), ['search' => $folded]);
 		usort($found, static fn (Note $a, Note $b) => ((int)$b->getUpdatedAt() <=> (int)$a->getUpdatedAt()) ?: ((int)$b->getId() <=> (int)$a->getId()));
 		$page = array_slice($found, $offset, $limit);
 		$full = [];
