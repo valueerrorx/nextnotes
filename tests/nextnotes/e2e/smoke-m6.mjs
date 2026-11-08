@@ -62,7 +62,7 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	// 3. Q2: Aufgabe aus Material (L), Austeilen in der Oberfläche
 	m = ctx.mark();
 	const a = (await api.must('POST', '/assignments', { team: teamId, title: `Aufgabe ${RUN}`, due_at: Math.floor(Date.now() / 1000) + 7200, source_note_id: src, max_points: 10 })).assignment;
-	await page.goto(ctx.appUrl(`assignments.php?assignment=${a.id}`), { waitUntil: 'networkidle' });
+	await page.goto(ctx.appUrl(`assignments.php?workspace=${encodeURIComponent(TW)}&assignment=${a.id}`), { waitUntil: 'networkidle' });
 	await page.getByRole('button', { name: /^(Austeilen|Hand out)$/ }).first().click();
 	const dist = page.waitForResponse((r) => r.url().includes(`/assignments/${a.id}/distribute`));
 	await page.locator('#nnAsgDistributeOk').click();
@@ -76,7 +76,7 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 
 	// 4. S: Meine Aufgaben → Kopie → schreiben → abgeben; Q3 Aufgaben-Workspace nicht in der Liste
 	m = ctx.mark();
-	await pb.goto(ctx.appUrl('assignments.php'), { waitUntil: 'networkidle' });
+	await pb.goto(ctx.appUrl(`assignments.php?workspace=${encodeURIComponent(TW)}`), { waitUntil: 'networkidle' });
 	const row = pb.locator(`.nn-asg-item[data-assignment-id="${a.id}"]`);
 	await row.waitFor({ timeout: 10000 });
 	await row.locator('.nn-asg-item-main').click();
@@ -96,7 +96,7 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	m = ctx.mark();
 	await api.must('POST', `/submissions/${sub.id}/return`, { feedback: `Gut ${RUN}`, points: 9 });
 	const lName = (await ocs(page, A, process.env.NN_PASS, 'cloud/user'))?.displayname ?? A;
-	await pb.goto(ctx.appUrl(`assignments.php?assignment=${a.id}`), { waitUntil: 'networkidle' });
+	await pb.goto(ctx.appUrl(`assignments.php?workspace=${encodeURIComponent(TW)}&assignment=${a.id}`), { waitUntil: 'networkidle' });
 	const fb = pb.locator('.nn-asg-student-feedback');
 	await fb.waitFor({ state: 'visible', timeout: 10000 });
 	const text = await fb.innerText();

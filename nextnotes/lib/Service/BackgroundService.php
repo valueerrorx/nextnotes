@@ -23,11 +23,11 @@ use OCP\IURLGenerator;
 // Hintergrundbilder (Upstream api_upload_background.php, B43): IAppData backgrounds/<workspaceId>/<uid>/<scope>.<ext>, je Benutzer
 class BackgroundService {
 	public const MAX_BYTES = 5 * 1024 * 1024;
-	// Upstream-Scope → Dateiname
-	private const SCOPES = ['background' => 'background', 'speed_dial' => 'speed-dial'];
+	// Upstream-Scope → Dateiname; speed_dial entfällt mit dem Speed Dial (M6z), Altdateien gehen mit dem Workspace
+	private const SCOPES = ['background' => 'background'];
 	private const TYPES = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp'];
 	// Upstream-Einstellung je Workspace-Name → intern je Workspace-ID (Umbenennen behält die Deckkraft)
-	private const OPACITY = ['background_opacity_' => ['bg_opacity_', 5, 25], 'speed_dial_background_opacity_' => ['sd_bg_opacity_', 5, 100]];
+	private const OPACITY = ['background_opacity_' => ['bg_opacity_', 5, 25]];
 
 	public function __construct(
 		private BackgroundFiles $files,
@@ -39,8 +39,10 @@ class BackgroundService {
 	) {
 	}
 
+	// ohne Angabe Hauptansicht, unbekannter Bereich 400 (nach der Workspace-Prüfung: Fremde sehen 404)
 	private static function scope(mixed $raw): string {
-		return $raw === 'speed_dial' ? 'speed_dial' : 'background';
+		$scope = $raw === null || $raw === '' ? 'background' : $raw;
+		return is_string($scope) && isset(self::SCOPES[$scope]) ? $scope : throw new BadRequestException('Unknown scope');
 	}
 
 	/** @return array{0: Workspace, 1: string} Workspace mit Recht, Schlüssel */
@@ -71,7 +73,7 @@ class BackgroundService {
 		return $this->urls->linkToRoute('nextnotes.compat.background') . '?' . http_build_query(['image' => 1, 'workspace' => $key, 'scope' => $scope, 'v' => $mtime]);
 	}
 
-	/** Bild-URL für die Seite (Hauptansicht, Speed Dial) oder null; Leserecht hat der Aufrufer */
+	/** Bild-URL der Hauptansicht oder null; Leserecht hat der Aufrufer */
 	public function urlFor(string $uid, Workspace $ws, string $scope): ?string {
 		$file = $this->file((int)$ws->getId(), $uid, self::scope($scope));
 		return $file !== null ? $this->imageUrl((string)$this->workspaces->keyFor($uid, (int)$ws->getId()), self::scope($scope), $file->getMTime()) : null;
@@ -142,9 +144,10 @@ class BackgroundService {
 	/** @return array<string, mixed> DELETE: Schreibrecht */
 	public function delete(string $uid, mixed $wsKey, mixed $rawScope): array {
 		[$ws, $key] = $this->workspace($uid, $wsKey, 'write');
+		$scope = self::scope($rawScope);
 		$folder = $this->files->folder((int)$ws->getId(), $uid, false);
 		if ($folder !== null) {
-			$this->removeFiles($folder, self::scope($rawScope), null);
+			$this->removeFiles($folder, $scope, null);
 		}
 		return ['workspace' => $key];
 	}

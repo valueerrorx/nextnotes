@@ -11,18 +11,10 @@
 	color: var(--color-main-text);
 }
 
-#content #nextnotes-root .nn-asg-scope {
-	cursor: default;
-}
-
-#content #nextnotes-root .nn-asg-team-select {
-	min-height: 0;
-	margin: 0;
-	padding: 0 calc(var(--default-grid-baseline) * 1);
-	border: 0;
-	background: transparent;
-	color: inherit;
-	font: inherit;
+/* Aufgeklappte Liste: Browser nimmt sonst helle Systemfarben (transparenter Select), Thomas 2026-11-08 */
+#content #nextnotes-root :is(.nn-asg-team-select, .nn-asg-field select) option {
+	background-color: var(--color-main-background);
+	color: var(--color-main-text);
 }
 
 #content #nextnotes-root .nn-asg-toolbar,
@@ -165,6 +157,14 @@
 #content #nextnotes-root .nn-asg-empty {
 	margin: calc(var(--default-grid-baseline) * 4) 0;
 	text-align: start;
+}
+
+/* M6i: Aufgaben ohne lesbaren Team-Workspace (nur außerhalb von Team-Workspaces) */
+#content #nextnotes-root .nn-asg-section-title {
+	margin: calc(var(--default-grid-baseline) * 2) 0;
+	font-size: 1em;
+	font-weight: bold;
+	color: var(--color-main-text);
 }
 
 /* Status-Chips (Zugewiesen, Abgegeben, Zurückgegeben, Verpasst, …) */

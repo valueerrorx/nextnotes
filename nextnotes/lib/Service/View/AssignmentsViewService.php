@@ -12,27 +12,24 @@ namespace OCA\NextNotes\Service\View;
 use OCA\NextNotes\Db\AssignmentMapper;
 use OCA\NextNotes\Db\Note;
 use OCA\NextNotes\Db\SubmissionMapper;
+use OCA\NextNotes\Db\Workspace;
 use OCA\NextNotes\Service\AccessService;
 use OCA\NextNotes\Service\Exception\ApiException;
 use OCA\NextNotes\Service\QuotaService;
 use OCA\NextNotes\Service\SubmissionStateService;
 use OCA\NextNotes\Service\TeamService;
 use OCA\NextNotes\Service\TeamStateService;
+use OCA\NextNotes\Service\WorkspaceService;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IDateTimeFormatter;
 use OCP\IL10N;
 
-/** Seite „Aufgaben“ (assignments.php, SPEC §9.6): Icon-Leiste, Teams zum Anlegen mit Belegung, Texte für nextnotes-assignments.js; Liste lädt die API */
+/** Seite „Aufgaben“ (assignments.php, SPEC §9.6): folgt dem Team-Workspace (M6i), Team zum Anlegen mit Belegung, Texte für nextnotes-assignments.js; Liste lädt die API */
 class AssignmentsViewService {
 	private const TEACHER_LEVEL = 4;
 	private const STUDENT_LEVEL = 1;
 	// Hinweis im Erstellen-Dialog ab dieser Anhang-Größe der Vorlage (Plan M6 §5 R4)
 	public const HINT_BYTES = 10485760;
-
-	/** @var array<string, bool> */
-	private array $rail = [];
-	/** @var array<string, bool> */
-	private array $teaches = [];
 
 	public function __construct(
 		private TeamService $teams,
@@ -44,65 +41,68 @@ class AssignmentsViewService {
 		private AccessService $access,
 		private SubmissionStateService $states,
 		private IDateTimeFormatter $dates,
+		private WorkspaceService $workspaces,
 	) {
 	}
 
-	// Eintrag der Icon-Leiste (Text) oder null
-	public function railLabel(string $uid): ?string {
-		return $this->railVisible($uid) ? $this->l->t('Assignments') : null;
+	// Team-Workspace kind=normal: Bereich der Aufgaben-Seite (M6i), sonst null
+	public static function teamOf(Workspace $ws): ?string {
+		return $ws->getOwnerType() === 'team' && $ws->getKind() === 'normal' ? (string)$ws->getOwnerId() : null;
 	}
 
-	// Icon-Leiste: Mitglied eines Teams (ohne Level-Abfrage je Seite) oder eigene Abgabe bzw. Aufgabe eines verwaisten/eingefrorenen Teams
-	public function railVisible(string $uid): bool {
-		return $this->rail[$uid] ??= $this->teams->memberTeams($uid) !== []
-			|| $this->submissions->assignmentIdsOf($uid) !== []
-			|| $this->assignments->idsOwnedInactive($uid, !$this->teams->isAvailable()) !== [];
-	}
-
-	// Notiz-Menü „Als Aufgabe austeilen…“: Lehrkraft in mindestens einem aktiven Team (Abbruch beim ersten Treffer)
-	public function teachesAny(string $uid): bool {
-		return $this->teaches[$uid] ??= (function () use ($uid): bool {
-			foreach (array_keys($this->teams->memberTeams($uid)) as $id) {
-				$id = (string)$id;
-				if ($this->teams->getLevel($id, $uid) >= self::TEACHER_LEVEL && $this->teamState->stateOf($id) === TeamStateService::ACTIVE) {
-					return true;
-				}
-			}
-			return false;
-		})();
+	// Eintrag der Icon-Leiste nur in Team-Workspaces (M6i, Thomas 2026-11-08); keine Abfrage
+	public function railLabel(Workspace $ws): ?string {
+		return self::teamOf($ws) !== null ? $this->l->t('Assignments') : null;
 	}
 
 	/**
-	 * Teams, in denen uid Aufgaben anlegen darf (aktiv, Level ≥ 4), mit Schülerzahl und Team-Belegung (Erstellen-Dialog, Plan M6 §2.3a)
-	 * @return list<array{id: string, name: string, students: int, used: int, limit: int}>
+	 * Daten der Seite (M6i): Team des Frame-Workspace oder kein Bereich (leerer Zustand, nur Aufgaben ohne lesbaren Team-Workspace)
+	 * @return array{team: ?string, teacher: ?array{id: string, name: string, students: int, used: int, limit: int}, teamWorkspaces: list<string>, homeTeams: list<string>, createSource: ?int}
 	 */
-	public function teacherTeams(string $uid): array {
-		$out = [];
-		foreach ($this->teams->memberTeams($uid) as $id => $name) {
-			$id = (string)$id;
-			if ($this->teamState->stateOf($id) !== TeamStateService::ACTIVE || $this->teams->getLevel($id, $uid) < self::TEACHER_LEVEL) {
-				continue;
-			}
-			$out[] = ['id' => $id, 'name' => (string)$name, 'students' => count($this->teams->members($id, self::STUDENT_LEVEL)),
-				'used' => $this->quota->used('team', $id), 'limit' => $this->quota->limit()];
-		}
-		usort($out, static fn (array $a, array $b) => strnatcasecmp($a['name'], $b['name']) ?: strcmp($a['id'], $b['id']));
-		return $out;
+	public function page(string $uid, Workspace $ws, mixed $create): array {
+		$team = self::teamOf($ws);
+		$keys = $this->workspaces->teamWorkspaceKeys($uid);
+		$teacher = $team !== null ? $this->teacherTeam($uid, $team) : null;
+		return [
+			'team' => $team,
+			'teacher' => $teacher,
+			'teamWorkspaces' => $team !== null ? ($keys[$team] ?? []) : [],
+			'homeTeams' => $team === null ? array_map('strval', array_keys($keys)) : [],
+			'createSource' => $teacher !== null ? $this->createSource($uid, $create, $team) : null,
+		];
 	}
 
-	// ?create=<Notiz>: Team des Notiz-Workspace vorauswählen, wenn uid dort Aufgaben anlegen darf (sonst null, kein Hinweis auf fremde Notizen)
-	/** @param list<array{id: string}> $teacherTeams */
-	public function createTeam(string $uid, mixed $noteId, array $teacherTeams): ?string {
+	/**
+	 * Team zum Anlegen (aktiv, Level ≥ 4) mit Schülerzahl und Team-Belegung (Erstellen-Dialog, Plan M6 §2.3a), sonst null
+	 * @return ?array{id: string, name: string, students: int, used: int, limit: int}
+	 */
+	public function teacherTeam(string $uid, string $teamId): ?array {
+		$name = $this->teams->memberTeams($uid)[$teamId] ?? null;
+		if ($name === null || $this->teamState->stateOf($teamId) !== TeamStateService::ACTIVE || $this->teams->getLevel($teamId, $uid) < self::TEACHER_LEVEL) {
+			return null;
+		}
+		return ['id' => $teamId, 'name' => (string)$name, 'students' => count($this->teams->members($teamId, self::STUDENT_LEVEL)),
+			'used' => $this->quota->used('team', $teamId), 'limit' => $this->quota->limit()];
+	}
+
+	// ?create=<Notiz>: nur eine lesbare Notiz aus einem Workspace dieses Teams (inkl. Material), sonst null (kein Hinweis auf fremde Notizen)
+	public function createSource(string $uid, mixed $noteId, string $teamId): ?int {
 		if (!is_string($noteId) || !ctype_digit($noteId)) {
 			return null;
 		}
 		try {
-			$ws = $this->access->requireWorkspace($uid, (int)$this->access->requireNote($uid, (int)$noteId, 'read')->getWorkspaceId(), 'read');
+			$note = $this->access->requireNote($uid, (int)$noteId, 'read');
+			$ws = $this->access->requireWorkspace($uid, (int)$note->getWorkspaceId(), 'read');
 		} catch (ApiException) {
 			return null;
 		}
-		$team = $ws->getOwnerType() === 'team' ? (string)$ws->getOwnerId() : null;
-		return $team !== null && in_array($team, array_column($teacherTeams, 'id'), true) ? $team : null;
+		return self::teamOf($ws) === $teamId ? (int)$note->getId() : null;
+	}
+
+	// Link auf die Aufgabe im Team-Workspace (Banner; Benachrichtigungen bauen ihn absolut im Notifier)
+	public function assignmentUrl(string $uid, string $teamId, int $assignmentId): string {
+		$key = $this->workspaces->assignmentsKey($uid, $teamId);
+		return 'assignments.php?' . http_build_query(($key !== null ? ['workspace' => $key] : []) + ['assignment' => $assignmentId]);
 	}
 
 	/**
@@ -121,7 +121,7 @@ class AssignmentsViewService {
 			return null;
 		}
 		$l = $this->l;
-		$base = ['title' => (string)$a->getTitle(), 'url' => 'assignments.php?' . http_build_query(['assignment' => (int)$a->getId()]),
+		$base = ['title' => (string)$a->getTitle(), 'url' => $this->assignmentUrl($uid, (string)$a->getTeamId(), (int)$a->getId()),
 			'submissionId' => null, 'canSubmit' => false, 'canUnsubmit' => false, 'linkLabel' => $l->t('Open assignment')];
 		if ($role === 'template') {
 			if ((int)$a->getTemplateNoteId() !== (int)$note->getId()) {
@@ -186,9 +186,10 @@ class AssignmentsViewService {
 		$l = $this->l;
 		return [
 			'title' => $l->t('Assignments'),
-			'allTeams' => $l->t('All teams'),
 			'newAssignment' => $l->t('New assignment'),
 			'empty' => $l->t('No assignments yet.'),
+			'noTeamWorkspace' => $l->t('Assignments are available in team workspaces.'),
+			'withoutWorkspace' => $l->t('Assignments of teams without a team workspace you can open'),
 			'emptyTeacher' => $l->t('No assignments yet. Create one from a note: "Hand out as assignment…" in the note menu, or with "New assignment".'),
 			'loadFailed' => $l->t('The assignments could not be loaded.'),
 			'actionFailed' => $l->t('The action failed.'),
@@ -210,19 +211,18 @@ class AssignmentsViewService {
 			'orphaned' => $l->t('Team deleted – deleted on {date}'),
 			'frozen' => $l->t('Teams app unavailable – read only'),
 			'owner' => $l->t('Responsible: {name}'),
-			'team' => $l->t('Team'),
 			'titleLabel' => $l->t('Title'),
 			'points' => $l->t('Points'),
 			'maxPoints' => $l->t('Maximum points (optional)'),
 			'source' => $l->t('Note'),
-			'sourceSearch' => $l->t('Search notes of this team or your own notes'),
+			'sourceSearch' => $l->t('Search notes of this team'),
 			'sourceNone' => $l->t('No matching notes'),
 			'sourceHint' => $l->t('The assignment gets a frozen copy of the note, including attachments.'),
 			'storage' => $l->t('Team storage: {used} of {limit} used'),
 			'storageNeed' => $l->t('Handing out needs about {need} ({size} × {students} students).'),
 			'storageLarge' => $l->t('The note has large attachments; every student gets a copy.'),
 			'storageTooSmall' => $l->t('The storage of the team is not sufficient for all copies.'),
-			'noTeams' => $l->t('You are not a teacher (admin or owner) of any team.'),
+			'noTeams' => $l->t('You are not a teacher (admin or owner) of this team.'),
 			'create' => $l->t('Create'),
 			'cancel' => $l->t('Cancel'),
 			'close' => $l->t('Close'),

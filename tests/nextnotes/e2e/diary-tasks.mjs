@@ -114,6 +114,9 @@ await runSpec(import.meta.url, async (ctx, page) => {
 	const box = page.locator(`xpath=//span[contains(@class,"tasks-task-text") and contains(., "Aufgabe ${RUN}")]/preceding-sibling::input[contains(@class,"tasks-task-checkbox")]`);
 	await box.waitFor({ state: 'visible', timeout: 15000 });
 	ctx.ok(!(await box.isChecked()), 'Aufgabe: offen');
+	// UI-namen: Seite heißt „To-dos“ (de), „Tasks“ (en)
+	const tasksTitle = await page.locator('.poznote-page-title-name').innerText().catch(() => '');
+	ctx.ok(/To-dos|Tasks/.test(tasksTitle) && !/Aufgaben/.test(tasksTitle), 'Seitentitel „To-dos“', tasksTitle);
 	await ctx.screenshot(page, 'tasks');
 	if (ctx.theme === 'light') {
 		const saved = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes(`/notes/${tl}`));

@@ -69,7 +69,7 @@
 </div>
 </div>
 
-<div class="ui-custom-section" data-ui-pages="notes dashboard settings speed-dial" data-ui-section-id="icon-rail">
+<div class="ui-custom-section" data-ui-pages="notes dashboard settings" data-ui-section-id="icon-rail">
 <h4 class="ui-custom-section-title"><span><?php p($t('modals.ui_customization.sections.icon_sidebar', 'Icon rail')); ?></span><button type="button" class="ui-custom-toggle-all" data-label-check="<?php p($t('modals.ui_customization.check_all', 'Check all')); ?>" data-label-uncheck="<?php p($t('modals.ui_customization.uncheck_all', 'Uncheck all')); ?>"></button></h4>
 <p class="ui-custom-section-hint"><?php p($t('modals.ui_customization.icon_rail_hint', 'Narrow column of icons on the far left of every page.')); ?></p>
 <div class="ui-custom-items">

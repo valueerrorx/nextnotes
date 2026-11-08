@@ -104,7 +104,6 @@ class IndexViewService {
 	];
 	// Bis zur Portierung erzwungen ausgeblendet (ui-customization.js, __POZNOTE_GLOBAL_HIDDEN_UI_ELEMENTS__); seit M4h leer
 	public const FORCED_HIDDEN = [];
-	private const SPEED_DIAL_TAG = 'speed-dial';
 
 	/** @var array<string, string> */
 	private array $values = [];
@@ -178,7 +177,7 @@ class IndexViewService {
 		$shown = $note !== null ? $this->access->resolveLinked($uid, $note) : null;
 
 		$rights = $this->rights($uid, $ws, $canWrite, $byId);
-		$tree = $this->tree($uid, $baseUrl, $key, $byId, $notes, $tagMap, $sort, $favSort, $note, $folderFilter, $openFolder, $search, $rights);
+		$tree = $this->tree($uid, $baseUrl, $key, $byId, $notes, $sort, $favSort, $note, $folderFilter, $openFolder, $search, $rights);
 		$titleColor = $this->palette->hex($ws->getColor(), NotePalette::ownerOf($ws));
 
 		return [
@@ -199,7 +198,7 @@ class IndexViewService {
 			'showNoteIcons' => $this->bool($uid, 'show_note_icons'),
 			'tree' => $tree,
 			'exitFolderUrl' => $baseUrl . 'index.php?' . http_build_query(['workspace' => $key]),
-			// M6g: „Als Aufgabe austeilen…“ nur, wo der Server die Quelle annimmt: eigener Workspace (Lehrkraft irgendwo) oder Team-Workspace als Lehrkraft (§9.6)
+			// „Als Aufgabe austeilen…“ nur im Team-Workspace als Lehrkraft (M6i, §9.1); Icon-Leiste „Aufgaben“ nur im Team-Workspace
 			'body' => array_merge_recursive($this->body($uid, $key, $note === null), ['data' => ['nn-teacher' => $this->canAssignFrom($uid, $ws, $rights['teacher']) ? '1' : '0']]),
 			'poznoteConfig' => $this->poznoteConfig($uid),
 			'workspaceMap' => $this->workspaceMap($uid),
@@ -210,6 +209,7 @@ class IndexViewService {
 			'prefetchedSettings' => ['tasklist_insert_order' => $this->value($uid, 'tasklist_insert_order') === 'top' ? 'top' : 'bottom'],
 			'note' => $shown !== null ? $this->shownView($uid, $shown, $wsId, $key, $rights, $byId) : null,
 			'iconPalette' => self::iconPalette(),
+			'railAssignments' => $this->assignmentsView->railLabel($ws),
 		];
 	}
 
@@ -269,14 +269,9 @@ class IndexViewService {
 	 * @param array<int, Folder> $byId
 	 * @return array{canWrite: bool, teacher: bool, restricted: bool, material: array<int, true>}
 	 */
+	// M6i: nur im Team-Workspace als Lehrkraft (Team fest); private Quellen nimmt nur noch die API an
 	private function canAssignFrom(string $uid, Workspace $ws, bool $teacher): bool {
-		if ($ws->getKind() !== 'normal') {
-			return false;
-		}
-		if ($ws->getOwnerType() === 'user') {
-			return $ws->getOwnerId() === $uid && $this->assignmentsView->teachesAny($uid);
-		}
-		return $teacher || $this->access->canManageTeam($uid, $ws);
+		return AssignmentsViewService::teamOf($ws) !== null && ($teacher || $this->access->canManageTeam($uid, $ws));
 	}
 
 	private function rights(string $uid, Workspace $ws, bool $canWrite, array $byId): array {
@@ -480,10 +475,9 @@ class IndexViewService {
 	 * Ordnerbaum mit Notizen (Upstream organizeNotesByFolder, handleFavorites, buildFolderHierarchy, shouldFolderBeOpen)
 	 * @param array<int, Folder> $byId
 	 * @param Note[] $notes
-	 * @param array<int, string[]> $tags Tags je Notiz-ID
 	 * @return array<string, mixed>
 	 */
-	private function tree(string $uid, string $baseUrl, string $key, array $byId, array $notes, array $tags, string $sort, string $favSort, ?Note $selected, string $folderFilter, string $openFolder, array $search, array $rights): array {
+	private function tree(string $uid, string $baseUrl, string $key, array $byId, array $notes, string $sort, string $favSort, ?Note $selected, string $folderFilter, string $openFolder, array $search, array $rights): array {
 		$byNoteId = [];
 		foreach ($notes as $n) {
 			$byNoteId[(int)$n->getId()] = $n;
@@ -500,7 +494,7 @@ class IndexViewService {
 				'search_combined' => $search['combined'] ? '1' : ''], static fn (string $v) => $v !== '');
 		}
 
-		$item = function (Note $n) use ($uid, $baseUrl, $linkBase, $tags, $byNoteId, $byId, $selectedId, $rights): array {
+		$item = function (Note $n) use ($uid, $baseUrl, $linkBase, $byNoteId, $byId, $selectedId, $rights): array {
 			$id = (int)$n->getId();
 			$type = $n->getType() ?: 'note';
 			$icon = (string)($n->getIcon() ?? '');
@@ -533,7 +527,6 @@ class IndexViewService {
 				'created' => (string)NoteSerializer::date($n->getCreatedAt()),
 				'updated' => (string)NoteSerializer::date($n->getUpdatedAt()),
 				'favorite' => (int)$n->getFavorite() === 1,
-				'speedDial' => in_array(self::SPEED_DIAL_TAG, array_map(static fn ($t) => mb_strtolower(trim((string)$t)), $tags[$id] ?? []), true),
 				'iconClass' => self::iconClass($icon, $default),
 				'iconCustom' => $icon !== '',
 				'iconDefault' => $default,

@@ -170,9 +170,10 @@ class Notifier implements INotifier {
 			$message = trim($message . ' ' . $l->n('%n of your assignments has submissions; export them before that date.', '%n of your assignments have submissions; export them before that date.', $withSubmissions));
 		}
 		$key = $own === [] ? null : $this->workspaces->keyFor($uid, (int)$own[0]->getId());
-		// nur Aufgaben: Aufgaben-Seite des Teams (Export in der Frist, M6g)
+		// nur Aufgaben: Aufgaben-Seite (Export in der Frist, M6g); ohne lesbaren Team-Workspace im eigenen unter „ohne Team-Workspace“ (M6i)
+		$asgKey = $this->workspaces->assignmentsKey($uid, $teamId);
 		$link = $key !== null ? $this->urls->linkToRouteAbsolute('nextnotes.page.indexphp') . '?' . http_build_query(['workspace' => $key])
-			: $this->urls->linkToRouteAbsolute('nextnotes.page.assignments') . '?' . http_build_query(['team' => $teamId]);
+			: $this->urls->linkToRouteAbsolute('nextnotes.page.assignments') . ($asgKey !== null ? '?' . http_build_query(['workspace' => $asgKey]) : '');
 		$teamParam = ['type' => 'highlight', 'id' => $teamId, 'name' => $name !== '' ? $name : $l->t('Team')];
 		$dateParam = ['type' => 'highlight', 'id' => 'deletion-date', 'name' => $date];
 		$notification->setParsedSubject(str_replace(['{team}', '{date}'], [$teamParam['name'], $date], $subject))
@@ -322,7 +323,7 @@ class Notifier implements INotifier {
 		$l = $this->l10nFactory->get(Application::APP_ID, $languageCode);
 		$params = $notification->getSubjectParameters();
 		$title = $this->title($a, $l);
-		$link = $this->assignmentLink($a);
+		$link = $this->assignmentLink($notification->getUser(), $a);
 		$text = $l->t('The deadline of {assignment} has passed');
 		$message = $l->t('%1$s submitted, %2$s missed.', [(string)(int)($params['submitted'] ?? 0), (string)(int)($params['missed'] ?? 0)]);
 		$missing = (int)($params['not_distributed'] ?? 0);
@@ -340,7 +341,7 @@ class Notifier implements INotifier {
 	private function transferNotice(INotification $notification, string $languageCode, Assignment $a): INotification {
 		$l = $this->l10nFactory->get(Application::APP_ID, $languageCode);
 		$title = $this->title($a, $l);
-		$link = $this->assignmentLink($a);
+		$link = $this->assignmentLink($notification->getUser(), $a);
 		$text = $l->t('You are now responsible for the assignment {assignment}');
 		$reason = (string)($notification->getSubjectParameters()['reason'] ?? '');
 		$message = match ($reason) {
@@ -357,8 +358,10 @@ class Notifier implements INotifier {
 	}
 
 	// Lehrkraft-Meldungen öffnen die Aufgabe auf der Aufgaben-Seite (M6g)
-	private function assignmentLink(Assignment $a): string {
-		return $this->urls->linkToRouteAbsolute('nextnotes.page.assignments') . '?' . http_build_query(['assignment' => (int)$a->getId()]);
+	// Aufgaben-Seite im ersten Team-Workspace des Teams, sonst im eigenen Workspace (M6i, WorkspaceService::assignmentsKey)
+	private function assignmentLink(string $uid, Assignment $a): string {
+		$key = $this->workspaces->assignmentsKey($uid, (string)$a->getTeamId());
+		return $this->urls->linkToRouteAbsolute('nextnotes.page.assignments') . '?' . http_build_query(($key !== null ? ['workspace' => $key] : []) + ['assignment' => (int)$a->getId()]);
 	}
 
 	private function assignmentOrNull(int $id): ?Assignment {

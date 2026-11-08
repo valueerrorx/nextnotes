@@ -64,13 +64,13 @@ final class MaterialIsolationTest extends MaterialTestCase {
 		self::assertSame('1', self::note($n1)['favorite'], 'n1 behält Favorit');
 		self::assertSame('1', self::folderRow($m)['favorite'], 'M behält Favorit');
 
-		// Reihenfolge speed_dial: Material-Position fest; andere Bereiche mit n1 → 403
+		// Reihenfolge speed_dial: Bereich entfernt (M6z) → 400, Altwerte unverändert; andere Bereiche mit n1 → 403
 		self::setColumn('nextnotes_notes', $sN, 'speed_dial_order', 1);
 		self::setColumn('nextnotes_notes', $n1, 'speed_dial_order', 2);
 		self::setColumn('nextnotes_notes', $sN2, 'speed_dial_order', 3);
-		self::ok($s->call('POST', '/notes/reorder', ['note_id' => $sN2, 'target_note_id' => $sN, 'position' => 'before', 'scope' => 'speed_dial', 'workspace' => $ws]), 'S speed_dial');
-		self::assertSame('2', self::note($n1)['speed_dial_order'], 'n1 behält speed_dial_order');
-		self::assertSame(['1', '3'], [self::note($sN2)['speed_dial_order'], self::note($sN)['speed_dial_order']]);
+		$r = $s->call('POST', '/notes/reorder', ['note_id' => $sN2, 'target_note_id' => $sN, 'position' => 'before', 'scope' => 'speed_dial', 'workspace' => $ws]);
+		self::assertSame(400, $r->status, 'S speed_dial: ' . $r->describe());
+		self::assertSame(['1', '2', '3'], [self::note($sN)['speed_dial_order'], self::note($n1)['speed_dial_order'], self::note($sN2)['speed_dial_order']], 'speed_dial_order unverändert');
 		foreach (['sidebar', 'dashboard', 'kanban'] as $scope) {
 			self::denied($s->call('POST', '/notes/reorder', ['note_id' => $n1, 'target_note_id' => $sN, 'position' => 'before', 'scope' => $scope]), "S $scope n1 als Notiz");
 			self::denied($s->call('POST', '/notes/reorder', ['note_id' => $sN, 'target_note_id' => $n1, 'position' => 'before', 'scope' => $scope]), "S $scope n1 als Ziel");

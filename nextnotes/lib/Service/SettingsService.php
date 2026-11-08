@@ -28,7 +28,7 @@ class SettingsService {
 		'whats_new_seen_version', 'schema_version', 'user_profile_username', 'language_source', 'snapshots_expiry_sweep_at',
 		WorkspaceService::FOREIGN_ORDER_KEY];
 	private const BLOCKED_PREFIXES = ['git_', 'github_', 'ai_', 'stt_', 'smtp_', 'mcp_', 'admin_', 'offline_', 'tenant_',
-		'user_max_', 'import_max_', 'login_', 'two_factor', 'webhook', 'push_', 'backup', ...BackgroundFiles::OPACITY_PREFIXES];
+		'user_max_', 'import_max_', 'login_', 'two_factor', 'webhook', 'push_', 'backup', 'speed_dial_', ...BackgroundFiles::OPACITY_PREFIXES];
 	// Werte aus Nextcloud bzw. vom Server geführt, über die API nur lesbar
 	private const READ_ONLY = ['language', 'timezone', self::OPENED_KEY];
 	private const BOOLS = ['whats_new_popup', 'attachment_previews_in_note', 'emoji_icons_enabled', 'show_note_icons',
@@ -52,8 +52,7 @@ class SettingsService {
 		'note_age_filter_days' => [0, 36500],
 	];
 	private const JSON_LISTS = ['hidden_ui_elements', 'settings_pinned_cards', 'icon_sidebar_order', 'tasks_page_hidden_notes'];
-	private const JSON_OBJECTS = ['tag_colors', 'icon_sidebar_colors', 'toolbar_icon_colors', 'speed_dial_label_colors',
-		'markdown_colored_custom', 'diary_templates'];
+	private const JSON_OBJECTS = ['tag_colors', 'icon_sidebar_colors', 'toolbar_icon_colors', 'markdown_colored_custom', 'diary_templates'];
 
 	public function __construct(
 		private IUserConfig $config,

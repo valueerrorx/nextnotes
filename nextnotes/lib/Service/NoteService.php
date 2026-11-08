@@ -1088,8 +1088,9 @@ class NoteService {
 		if ($noteId === $targetId) {
 			throw new BadRequestException('Note cannot be reordered relative to itself');
 		}
-		if (!in_array($scope, ['sidebar', 'dashboard', 'kanban', 'speed_dial'], true)) {
-			throw new BadRequestException('scope must be sidebar, dashboard, kanban or speed_dial');
+		// speed_dial entfällt mit dem Speed Dial (M6z): wie jeder unbekannte Bereich 400
+		if (!in_array($scope, ['sidebar', 'dashboard', 'kanban'], true)) {
+			throw new BadRequestException('scope must be sidebar, dashboard or kanban');
 		}
 		$note = $this->access->requireNote($uid, $noteId, 'write');
 		$target = $this->access->requireNote($uid, $targetId, 'write');
@@ -1105,21 +1106,11 @@ class NoteService {
 		$folderId = $target->getFolderId();
 		$changes = $note->getFolderId() !== $folderId;
 		if ($scope !== 'sidebar') {
-			$column = ['kanban' => 'KanbanOrder', 'dashboard' => 'DashboardOrder', 'speed_dial' => 'SpeedDialOrder'][$scope];
-			if ($scope === 'speed_dial') {
-				$tags = $this->tagRows->tagsFor([$noteId, $targetId]);
-				$has = static fn (int $nid) => in_array('speed-dial', array_map('mb_strtolower', $tags[$nid] ?? []), true);
-				if (!$has($noteId) || !$has($targetId)) {
-					throw new BadRequestException('Speed dial reordering needs two notes of the speed dial');
-				}
-				$ids = $this->tagRows->findInWorkspaces([$wsId], 'speed-dial');
-				$siblings = array_values(array_filter($this->notes->findByIds($ids), static fn (Note $n) => (int)$n->getId() !== $noteId && $n->getTrashedAt() === null));
-			} else {
-				if ($changes) {
-					throw new BadRequestException(ucfirst($scope) . ' reordering keeps the note in its folder: target_note_id must be a sibling');
-				}
-				$siblings = $this->notes->findList([$wsId], ['folder_id' => $folderId, 'exclude_id' => $noteId]);
+			$column = ['kanban' => 'KanbanOrder', 'dashboard' => 'DashboardOrder'][$scope];
+			if ($changes) {
+				throw new BadRequestException(ucfirst($scope) . ' reordering keeps the note in its folder: target_note_id must be a sibling');
 			}
+			$siblings = $this->notes->findList([$wsId], ['folder_id' => $folderId, 'exclude_id' => $noteId]);
 			$getter = 'get' . $column;
 			usort($siblings, static function (Note $a, Note $b) use ($getter, $scope) {
 				if ($scope === 'dashboard' && ($pin = (int)$b->getPinned() <=> (int)$a->getPinned()) !== 0) {
@@ -1137,7 +1128,7 @@ class NoteService {
 			foreach ($siblings as $s) {
 				$byId[(int)$s->getId()] = $s;
 			}
-			// speed_dial ist workspaceweit: Material ohne Schreibrecht behält seine Position (M6a); andere Bereiche liegen im Ordner des Ziels
+			// Material ohne Schreibrecht im Ordner behält seine Position (M6a)
 			$writable = array_flip(array_map(static fn (Note $n) => (int)$n->getId(), $this->access->filterWritable($uid, $siblings)));
 			$fixed = array_diff_key(array_flip($order), $writable);
 			if ($fixed === []) {
@@ -1160,7 +1151,7 @@ class NoteService {
 				'id' => $noteId, 'workspace' => $key, 'folder_id' => $folderId,
 				'folder' => $this->serializer->folderName($note->getFolderId()), 'position' => $position,
 				'target_note_id' => $targetId, 'scope' => $scope,
-				['kanban' => 'kanban_order', 'dashboard' => 'dashboard_order', 'speed_dial' => 'speed_dial_order'][$scope] => $index + 1,
+				['kanban' => 'kanban_order', 'dashboard' => 'dashboard_order'][$scope] => $index + 1,
 			], 'share_delta' => 0];
 		}
 		// Seitenleiste mit Ordnerwechsel – Vorlage/Abgabe: nie in einen anderen Ordner (SPEC §9.3); Zielordner wie beim Verschieben prüfen (System-/Material-Ordner)

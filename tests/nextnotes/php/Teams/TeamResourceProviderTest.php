@@ -51,19 +51,31 @@ final class TeamResourceProviderTest extends TeamTestCase {
 		// Mitglied (Level 1), Moderator, Owner: genau die normalen Workspaces des Teams, mit App-Icon und auflösbarem Link
 		foreach ([$a, $b, $m] as $c) {
 			$res = self::resources($c, $t);
-			self::assertSame([(string)$id1, (string)$id2], array_column($res, 'id'), "{$c->uid}: Workspaces des Teams");
+			self::assertSame([(string)$id1, (string)$id2, "assignments:$t"], array_column($res, 'id'), "{$c->uid}: Workspaces des Teams und Aufgaben (M6i)");
 			self::assertNotEmpty($res[0]['iconSvg'] ?? null, 'Icon am Workspace');
 			self::assertStringContainsString('currentColor', (string)$res[0]['provider']['icon'], 'Icon in Textfarbe');
 			parse_str((string)parse_url((string)$res[0]['url'], PHP_URL_QUERY), $q);
 			self::assertSame("$key1 ($teamName, #$id1)", $q['workspace'] ?? null, 'Link mit Langform-Schlüssel');
+			// M6i: „Aufgaben“ mit Doktorhut, Link auf assignments.php im ersten Team-Workspace
+			self::assertMatchesRegularExpression('/^(Aufgaben|Assignments)$/', (string)($res[2]['label'] ?? ''), 'Ressource Aufgaben');
+			self::assertStringContainsString('currentColor', (string)($res[2]['iconSvg'] ?? ''), 'Doktorhut in Textfarbe');
+			self::assertStringContainsString('/apps/nextnotes/assignments.php?', (string)$res[2]['url']);
+			parse_str((string)parse_url((string)$res[2]['url'], PHP_URL_QUERY), $q);
+			self::assertSame("$key1 ($teamName, #$id1)", $q['workspace'] ?? null, 'Aufgaben im ersten Team-Workspace');
 		}
+		$page = $b->absolute('GET', '/index.php/apps/nextnotes/assignments.php?workspace=' . rawurlencode("$key1 ($teamName, #$id1)"));
+		self::assertSame(200, $page->status, 'Aufgaben-Link öffnet für Mitglied');
+		self::assertStringContainsString('"team":"' . $t . '"', $page->body, 'Aufgaben-Seite im Team-Bereich');
 		$page = $b->absolute('GET', '/index.php/apps/nextnotes/index.php?workspace=' . rawurlencode("$key1 ($teamName, #$id1)"));
 		self::assertSame(200, $page->status, 'Link öffnet für Mitglied');
 		self::assertStringContainsString('"selectedWorkspace":' . json_encode($key1), $page->body, 'Link wählt den Workspace');
 
 		// Nicht-Mitglied: nichts (Kern prüft Mitgliedschaft); anderes Team liefert nur seine eigenen
 		self::assertSame([], self::resources($x, $t), 'Nicht-Mitglied sieht nichts');
-		self::assertSame([(string)$idOther], array_column(self::resources($x, $t2), 'id'), 'anderes Team');
+		self::assertSame([(string)$idOther, "assignments:$t2"], array_column(self::resources($x, $t2), 'id'), 'anderes Team');
+		// Team ohne Team-Workspace: weder Workspaces noch Aufgaben (O6)
+		$t3 = $this->teams->create($x->uid, 'Leer ' . bin2hex(random_bytes(3)));
+		self::assertSame([], self::resources($x, $t3), 'ohne Team-Workspace keine Ressource');
 		self::assertSame([], self::resources($a, $t2), 'A ist nicht im anderen Team');
 
 		// getTeamsForResource: Team-Workspace → Team (nur für Mitglieder), privat/archiv → keins
@@ -79,6 +91,11 @@ final class TeamResourceProviderTest extends TeamTestCase {
 		self::assertTrue($p->isSharedWithTeam($t, (string)$id1));
 		self::assertFalse($p->isSharedWithTeam($t2, (string)$id1));
 		self::assertFalse($p->isSharedWithTeam($t, (string)$own));
+		self::assertSame([$t], $p->getTeamsForResource("assignments:$t"));
+		self::assertSame([], $p->getTeamsForResource("assignments:$t3"), 'Aufgaben ohne Team-Workspace');
+		self::assertSame([], $p->getTeamsForResource('assignments:'));
+		self::assertTrue($p->isSharedWithTeam($t, "assignments:$t"));
+		self::assertFalse($p->isSharedWithTeam($t2, "assignments:$t"));
 
 		// verwaistes Team: keine Ressourcen mehr
 		self::setTeamState($t, 'orphaned');

@@ -7,6 +7,7 @@
 // Schüler (M6g2): eigene Aufgaben mit Status, Frist, Öffnen der Kopie, Abgeben/Zurückziehen, Feedback ab Rückgabe, eigener Download.
 // Löschen mit Zahl der Abgaben und „Erst exportieren“, verwaiste Teams mit Löschdatum (M6g2).
 // Daten nur über die Aufgaben-API (Rechte serverseitig); Texte aus der Insel nextnotes-assignments (NC-l10n).
+// M6i: Bereich = Team des Workspace (island.team); ohne Team-Workspace nur Aufgaben von Teams ohne lesbaren Team-Workspace (island.homeTeams).
 (function () {
 	'use strict';
 
@@ -23,13 +24,15 @@
 	var baseUrl = String(config.baseUrl || '');
 	var apiBase = String(config.apiBase || 'api/v1').replace(/\/$/, '');
 	var txt = island.txt || {};
-	var teacherTeams = Array.isArray(island.teams) ? island.teams : [];
+	var scopeTeam = typeof island.team === 'string' ? island.team : null;
+	var teacher = island.teacher && island.teacher.id === scopeTeam ? island.teacher : null;
+	var teamKeys = Array.isArray(island.teamWorkspaces) ? island.teamWorkspaces : [];
+	var homeTeams = Array.isArray(island.homeTeams) ? island.homeTeams : [];
 	var listEl = document.getElementById('nnAsgList');
 	var detailEl = document.getElementById('nnAsgDetail');
 	var statusEl = document.getElementById('nnAsgStatus');
-	var teamSelect = document.getElementById('nnAsgTeam');
 	var params = new URLSearchParams(window.location.search);
-	var state = { list: [], team: params.get('team') || '', current: null, subs: [], pending: null };
+	var state = { list: [], current: null, subs: [], pending: null };
 	var dateFmt = new Intl.DateTimeFormat(document.documentElement.lang || undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
 	function t(key, vars) {
@@ -235,23 +238,14 @@
 				say(t('loadFailed'), true);
 				return;
 			}
-			state.list = Array.isArray(r.data.assignments) ? r.data.assignments : [];
-			fillTeams();
+			state.list = (Array.isArray(r.data.assignments) ? r.data.assignments : []).filter(inScope);
 			renderList();
 		});
 	}
 
-	function fillTeams() {
-		var names = {};
-		teacherTeams.forEach(function (tm) { names[tm.id] = tm.name; });
-		state.list.forEach(function (a) { names[a.team] = names[a.team] || a.team_name || a.team; });
-		while (teamSelect.options.length > 1) teamSelect.remove(1);
-		Object.keys(names).sort(function (x, y) { return names[x].localeCompare(names[y]); }).forEach(function (id) {
-			var o = el('option', '', names[id]);
-			o.value = id;
-			teamSelect.appendChild(o);
-		});
-		teamSelect.value = names[state.team] ? state.team : '';
+	// Team-Workspace: nur dieses Team; sonst nur Teams ohne lesbaren Team-Workspace (Austritt, verwaist, eingefroren, Team ohne Workspace)
+	function inScope(a) {
+		return scopeTeam !== null ? a.team === scopeTeam : homeTeams.indexOf(String(a.team)) === -1;
 	}
 
 	function rank(a) {
@@ -261,16 +255,18 @@
 
 	function renderList() {
 		listEl.textContent = '';
-		var items = state.list.filter(function (a) { return !state.team || a.team === state.team; });
+		var items = state.list.slice();
 		items.sort(function (x, y) {
 			var dx = dueOf(x) === null ? Infinity : dueOf(x);
 			var dy = dueOf(y) === null ? Infinity : dueOf(y);
 			return rank(x) - rank(y) || (rank(x) === 2 ? (dy > dx ? 1 : (dy < dx ? -1 : 0)) : (dx > dy ? 1 : (dx < dy ? -1 : 0))) || x.title.localeCompare(y.title);
 		});
 		if (!items.length) {
-			listEl.appendChild(el('p', 'empty-message nn-asg-empty', teacherTeams.length ? t('emptyTeacher') : t('empty')));
+			// ohne Team-Workspace steht der Hinweis schon in der Seite
+			if (scopeTeam !== null) listEl.appendChild(el('p', 'empty-message nn-asg-empty', teacher ? t('emptyTeacher') : t('empty')));
 			return;
 		}
+		if (scopeTeam === null) listEl.appendChild(el('h2', 'nn-asg-section-title', t('withoutWorkspace')));
 		var ul = el('ul', 'nn-asg-items');
 		items.forEach(function (a) { ul.appendChild(row(a)); });
 		listEl.appendChild(ul);
@@ -312,16 +308,6 @@
 		if (value) p.set(key, value);
 		window.history.replaceState(window.history.state, '', window.location.pathname + '?' + p.toString());
 	}
-
-	teamSelect.addEventListener('change', function () {
-		state.team = teamSelect.value;
-		var p = new URLSearchParams(window.location.search);
-		if (state.team) p.set('team', state.team);
-		else p.delete('team');
-		window.history.replaceState(window.history.state, '', window.location.pathname + '?' + p.toString());
-		if (!detailEl.hidden) closeDetail();
-		renderList();
-	});
 
 	// ---------- Lehrkraft: Aufgabe mit Abgaben ----------
 
@@ -560,8 +546,7 @@
 	}
 
 	function distribute(a) {
-		var team = teacherTeams.filter(function (tm) { return tm.id === a.team; })[0];
-		var body = el('p', '', t('distributeConfirm', { title: a.title, team: team ? team.name : a.team_name }));
+		var body = el('p', '', t('distributeConfirm', { title: a.title, team: teacher && teacher.id === a.team ? teacher.name : a.team_name }));
 		modal(t('distribute'), body, [{ label: t('distribute'), id: 'nnAsgDistributeOk', run: function () {
 			return api('POST', 'assignments/' + a.id + '/distribute').then(function (r) {
 				if (!r.ok) return errorText(r);
@@ -698,22 +683,12 @@
 	// ---------- Erstellen ----------
 
 	function openCreate(noteId) {
-		if (!teacherTeams.length) {
+		// Team fest = Team des Workspace (M6i); Anlegen nur als Lehrkraft dieses Teams
+		if (!teacher) {
 			say(t('noTeams'), true);
 			return;
 		}
 		var body = el('div', 'nn-asg-create');
-		var team = el('select', 'nn-asg-create-team');
-		team.id = 'nnAsgCreateTeam';
-		teacherTeams.forEach(function (tm) {
-			var o = el('option', '', tm.name);
-			o.value = tm.id;
-			team.appendChild(o);
-		});
-		if (state.team && teacherTeams.some(function (tm) { return tm.id === state.team; })) team.value = state.team;
-		// aus dem Notiz-Menü: Team des Notiz-Workspace (serverseitig geprüft)
-		if (noteId && island.createTeam && teacherTeams.some(function (tm) { return tm.id === island.createTeam; })) team.value = island.createTeam;
-		body.appendChild(field(t('team'), team));
 		var title = input('text', '', { id: 'nnAsgCreateTitle', maxlength: '255' });
 		body.appendChild(field(t('titleLabel'), title));
 		var due = input('datetime-local', toLocalInput(defaultDue()), { id: 'nnAsgCreateDue' });
@@ -736,8 +711,7 @@
 		body.appendChild(storage);
 
 		var updateStorage = function () {
-			var tm = teacherTeams.filter(function (x) { return x.id === team.value; })[0];
-			if (!tm) return;
+			var tm = teacher;
 			var lines = [t('storage', { used: fmtBytes(tm.used), limit: fmtBytes(tm.limit) })];
 			if (source.bytes > 0) {
 				var need = source.bytes * tm.students;
@@ -775,10 +749,15 @@
 			}
 			timer = setTimeout(function () {
 				var mine = ++seq;
-				api('GET', 'notes/search?limit=20&q=' + encodeURIComponent(q)).then(function (r) {
+				// nur Notizen aus den Workspaces dieses Teams (inkl. Material), je Workspace eine Suche
+				Promise.all(teamKeys.map(function (key) {
+					return api('GET', 'notes/search?limit=20&workspace=' + encodeURIComponent(key) + '&q=' + encodeURIComponent(q));
+				})).then(function (rs) {
 					if (mine !== seq) return;
 					results.textContent = '';
-					var list = r.ok ? (r.data.results || []) : [];
+					var list = [];
+					rs.forEach(function (r) { if (r.ok) list = list.concat(r.data.results || []); });
+					list = list.slice(0, 20);
 					if (!list.length) results.appendChild(el('li', 'nn-asg-muted', t('sourceNone')));
 					list.forEach(function (n) {
 						var li = el('li', 'nn-asg-source-result');
@@ -794,7 +773,6 @@
 				});
 			}, 250);
 		});
-		team.addEventListener('change', updateStorage);
 		if (source.id) {
 			api('GET', 'notes/' + source.id).then(function (r) {
 				if (r.ok && r.data.note) choose(source.id, r.data.note.heading || '');
@@ -806,7 +784,7 @@
 			var ts = fromLocalInput(due.value);
 			if (!title.value.trim() || !source.id) return t('titleRequired');
 			if (ts === null || ts <= now()) return t('invalidDue');
-			var payload = { team: team.value, title: title.value.trim(), due_at: ts, source_note_id: source.id };
+			var payload = { team: teacher.id, title: title.value.trim(), due_at: ts, source_note_id: source.id };
 			if (points.value !== '') {
 				var p = Number(points.value);
 				if (!Number.isInteger(p) || p < 0) return t('invalidPoints', { max: '∞' });
@@ -826,13 +804,13 @@
 	if (newBtn) newBtn.addEventListener('click', function () { openCreate(null); });
 
 	load().then(function () {
-		var create = params.get('create');
 		var id = params.get('assignment');
-		if (create && /^\d+$/.test(create)) openCreate(create);
+		// ?create=: Quelle nur, wenn der Server sie diesem Team zugeordnet hat (island.createSource)
+		if (params.has('create') && scopeTeam !== null) openCreate(island.createSource ? String(island.createSource) : null);
 		else if (id && /^\d+$/.test(id)) {
+			// nur Aufgaben dieses Bereichs öffnen (Links tragen den passenden Workspace, M6i)
 			var known = state.list.filter(function (x) { return String(x.id) === id; })[0];
 			if (known) openItem(known, false);
-			else openDetail(Number(id), false);
 		}
 	});
 })();

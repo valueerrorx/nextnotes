@@ -499,9 +499,9 @@
 
 	// Schreibaktionen der Upstream-Menüs (folders_display.php, list_folders.php); Lesen, Kanban, Herunterladen bleiben
 	var FOLDER_WRITE = ['create-note-in-folder', 'move-folder-files', 'move-entire-folder', 'duplicate-folder', 'copy-folder', 'cut-folder',
-		'paste-into-folder', 'tag-folder-notes', 'toggle-folder-speed-dial', 'favorite-folder', 'change-folder-icon', 'rename-folder',
+		'paste-into-folder', 'tag-folder-notes', 'favorite-folder', 'change-folder-icon', 'rename-folder',
 		'archive-folder', 'delete-folder'];
-	var NOTE_WRITE = ['rename-note', 'toggle-favorite', 'toggle-speed-dial', 'create-note-shortcut', 'show-move-folder-dialog', 'copy-note',
+	var NOTE_WRITE = ['rename-note', 'toggle-favorite', 'create-note-shortcut', 'show-move-folder-dialog', 'copy-note',
 		'cut-note', 'paste-into-note-folder', 'archive-note', 'delete-note', 'duplicate-note'];
 
 	function alertError(message) {

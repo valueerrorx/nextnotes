@@ -33,25 +33,26 @@ body {
 
 /* Gegen Flackern: nur der Inhalt wartet bis zum Adapter-Start, Icon-Leiste und Seitenleiste stehen sofort (UI-nav); Seiten ohne Leiste
    ganz. Die Inhaltsfläche selbst bleibt deckend stehen (Seitenwechsel blendet nicht ins Milchglas), nur ihr Inhalt wartet.
-   Rückfall nach 2 s (inert steht im Template, der Adapter nimmt es ab). opacity statt visibility: ui-customization.js prüft visibility */
+   Rückfall nach 2 s (inert steht im Template, der Adapter nimmt es ab). opacity statt visibility: ui-customization.js prüft visibility.
+   Später eingefügte Kinder (#app-tab-bar) starten die Animation neu: dafür setzt der Bootstrap nach 2 s html.nextnotes-released (M6z) */
 #nextnotes-root > :is(#right_pane, .nn-page-main, #outline-panel) {
 	pointer-events: none;
 	animation: nextnotes-reveal 0s linear 2s forwards;
 }
 
-html:not(.nextnotes-ready) #nextnotes-root > :is(#right_pane, .nn-page-main, #outline-panel) > *,
+html:not(.nextnotes-ready, .nextnotes-released) #nextnotes-root > :is(#right_pane, .nn-page-main, #outline-panel) > *,
 #nextnotes-root:is(.nextnotes-subpage, .nextnotes-excalidraw) {
 	opacity: 0;
 	pointer-events: none;
 	animation: nextnotes-reveal 0s linear 2s forwards;
 }
 
-html.nextnotes-ready #nextnotes-root > :is(#right_pane, .nn-page-main, #outline-panel) {
+html:is(.nextnotes-ready, .nextnotes-released) #nextnotes-root > :is(#right_pane, .nn-page-main, #outline-panel) {
 	pointer-events: auto;
 	animation: none;
 }
 
-html.nextnotes-ready #nextnotes-root > :is(#right_pane, .nn-page-main, #outline-panel) > * {
+html.nextnotes-ready:not(.nextnotes-released) #nextnotes-root > :is(#right_pane, .nn-page-main, #outline-panel) > * {
 	animation: nextnotes-fade-in 120ms ease-out;
 }
 

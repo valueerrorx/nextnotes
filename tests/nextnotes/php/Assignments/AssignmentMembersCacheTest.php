@@ -58,7 +58,7 @@ final class AssignmentMembersCacheTest extends AssignmentTestCase {
 			$mine = array_values(array_filter($list, static fn ($a) => $a['team'] === $t));
 			self::assertCount(3, $mine, 'drei ausgeteilte Aufgaben');
 			self::assertSame([0, 0, 0], array_column($mine, 'not_distributed'), 'alle ausgeteilt');
-			(clone Server::get(AssignmentsViewService::class))->teacherTeams($l->uid);
+			(clone Server::get(AssignmentsViewService::class))->teacherTeam($l->uid, $t);
 			self::assertSame(1, $spy->members, 'ein members-Aufruf je Team und Request');
 			$teams->resetCache();
 			Server::get(AssignmentService::class)->index($l->uid);

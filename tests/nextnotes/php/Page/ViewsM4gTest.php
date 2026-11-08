@@ -340,7 +340,8 @@ final class ViewsM4gTest extends ApiTestCase {
 		self::assertSame(403, self::upload($b, $kb, $png)->status, 'Leser: POST');
 		self::assertSame(403, $b->absolute('DELETE', self::APP . 'api_upload_background.php?workspace=' . self::enc($kb))->status, 'Leser: DELETE');
 		self::assertSame(404, $b->absolute('GET', self::APP . 'api_upload_background.php?image=1&workspace=' . self::enc($kb))->status, 'Leser ohne eigenes Bild');
-		self::assertSame(200, self::upload($w, self::keyFor($w, $ws), $png, 'w.png', 'speed_dial')->status, 'Schreib-Empfänger');
+		self::assertSame(400, self::upload($w, self::keyFor($w, $ws), $png, 'w.png', 'speed_dial')->status, 'Scope speed_dial entfernt (M6z)');
+		self::assertSame(200, self::upload($w, self::keyFor($w, $ws), $png, 'w.png')->status, 'Schreib-Empfänger');
 		self::assertSame(1, self::backgroundFiles($wsId, $a->uid));
 		self::assertSame(1, self::backgroundFiles($wsId, $w->uid));
 		// Deckkraft unter dem Upstream-Schlüssel, gespeichert je Workspace-ID

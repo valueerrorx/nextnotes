@@ -369,10 +369,10 @@ class NoteMapper extends QBMapper {
 	}
 
 	/**
-	 * Notizen je Ordner eines Workspace (ohne Papierkorb, ohne Wurzel); mit $tag nur Notizen mit diesem Tag
+	 * Notizen je Ordner eines Workspace (ohne Papierkorb, ohne Wurzel)
 	 * @return array<int, int> folder_id => Anzahl
 	 */
-	public function countByFolder(int $workspaceId, ?string $tag = null): array {
+	public function countByFolder(int $workspaceId): array {
 		$qb = $this->db->getQueryBuilder();
 		$qb->select('n.folder_id')->selectAlias($qb->func()->count('n.id'), 'cnt')->from(self::TABLE, 'n')
 			->where($qb->expr()->eq('n.workspace_id', $qb->createNamedParameter($workspaceId, IQueryBuilder::PARAM_INT)))
@@ -380,12 +380,6 @@ class NoteMapper extends QBMapper {
 			->andWhere($qb->expr()->isNull('n.trashed_at'))
 			->andWhere($qb->expr()->isNotNull('n.folder_id'))
 			->groupBy('n.folder_id');
-		if ($tag !== null) {
-			$qb->innerJoin('n', NoteTagMapper::TABLE, 't', $qb->expr()->andX(
-				$qb->expr()->eq('t.note_id', 'n.id'),
-				$qb->expr()->eq('t.tag', $qb->createNamedParameter($tag)),
-			));
-		}
 		$out = [];
 		$res = $qb->executeQuery();
 		while ($row = $res->fetch()) {

@@ -17,9 +17,8 @@ use OCA\NextNotes\Service\SettingsService;
 use OCA\NextNotes\Service\WorkspaceService;
 use OCP\IL10N;
 
-/** Daten der Ordner-Seite (Upstream list_folders.php): Ordnerbaum des Workspace mit Anzahl, Favorit, Speed Dial */
+/** Daten der Ordner-Seite (Upstream list_folders.php): Ordnerbaum des Workspace mit Anzahl, Favorit */
 class FolderListViewService {
-	private const SPEED_DIAL_TAG = 'speed-dial';
 
 	public function __construct(
 		private FolderService $folders,
@@ -38,7 +37,6 @@ class FolderListViewService {
 	public function build(string $uid, array $frame): array {
 		$byId = $this->folders->byId($frame['wsId']);
 		$direct = $byId === [] ? [] : $this->notes->countByFolder($frame['wsId']);
-		$speedDial = $byId === [] ? [] : $this->notes->countByFolder($frame['wsId'], self::SPEED_DIAL_TAG);
 		$sort = $this->settings->noteListSort($uid);
 		// Material (Plan M6 §2.6): Kennzeichen für alle, Schreiben im Zweig nur Lehrkraft; ohne Zusatzabfrage aus den Ordnern
 		$ws = $frame['workspace'];
@@ -55,9 +53,8 @@ class FolderListViewService {
 		}
 		unset($list);
 		$rows = [];
-		$walk = function (int $parent, int $depth, array $seen) use (&$walk, &$rows, $children, $direct, $speedDial, $material, $restricted, $frame): array {
+		$walk = function (int $parent, int $depth, array $seen) use (&$walk, &$rows, $children, $direct, $material, $restricted, $frame): int {
 			$total = 0;
-			$dial = 0;
 			foreach ($children[$parent] ?? [] as $f) {
 				$id = (int)$f->getId();
 				if (isset($seen[$id])) {
@@ -65,9 +62,7 @@ class FolderListViewService {
 				}
 				$index = count($rows);
 				$rows[] = null;
-				[$subTotal, $subDial] = $walk($id, $depth + 1, $seen + [$id => true]);
-				$count = ($direct[$id] ?? 0) + $subTotal;
-				$dialCount = ($speedDial[$id] ?? 0) + $subDial;
+				$count = ($direct[$id] ?? 0) + $walk($id, $depth + 1, $seen + [$id => true]);
 				$rows[$index] = [
 					'id' => $id,
 					'name' => (string)$f->getName(),
@@ -76,16 +71,14 @@ class FolderListViewService {
 					'count' => $count,
 					'hasChildren' => isset($children[$id]),
 					'favorite' => (int)$f->getFavorite() === 1,
-					'speedDial' => $count > 0 && $dialCount === $count,
 					'iconClass' => IndexViewService::iconClass((string)($f->getIcon() ?? ''), 'lucide-folder'),
 					'iconColor' => IndexViewService::iconColor((string)($f->getIconColor() ?? '')),
 					'material' => !isset($material[$id]) ? '' : ((int)$f->getMaterial() === 1 ? 'own' : 'inherited'),
 					'writable' => $frame['canWrite'] && !($restricted && isset($material[$id])),
 				];
 				$total += $count;
-				$dial += $dialCount;
 			}
-			return [$total, $dial];
+			return $total;
 		};
 		$walk(0, 0, []);
 		return [

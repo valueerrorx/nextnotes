@@ -139,7 +139,7 @@ class PageController extends Controller {
 			'view' => $view,
 			'baseUrl' => $baseUrl,
 			'railMentions' => $this->mentions->railCount($uid),
-			'railAssignments' => $this->assignmentsView->railLabel($uid),
+			'railAssignments' => $view['railAssignments'],
 		]);
 	}
 
@@ -433,13 +433,12 @@ class PageController extends Controller {
 	}
 
 	// Aufgaben austeilen und einsammeln (M6g, SPEC §9.6): Liste, Abgaben und Dialoge per nextnotes-assignments.js über die Aufgaben-API;
-	// ?team=, ?assignment=, ?create=<Notiz> wertet nur das Skript aus (Rechte prüft die API)
+	// Bereich = Team des Frame-Workspace (M6i); ?assignment= wertet nur das Skript aus (Rechte prüft die API)
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
 	public function assignments(): TemplateResponse {
-		return $this->listPage('assignments', fn (string $uid) => [
-			'teacherTeams' => $teams = $this->assignmentsView->teacherTeams($uid),
-			'createTeam' => $this->assignmentsView->createTeam($uid, $this->request->getParam('create'), $teams),
+		return $this->listPage('assignments', fn (string $uid, array $frame) => [
+			'asg' => $this->assignmentsView->page($uid, $frame['workspace'], $this->request->getParam('create')),
 			'texts' => $this->assignmentsView->texts(),
 			'hintBytes' => AssignmentsViewService::HINT_BYTES,
 		]);
@@ -479,7 +478,7 @@ class PageController extends Controller {
 			'frame' => $frame,
 			'currentPage' => $page . '.php',
 			'railMentions' => $this->mentions->railCount($uid),
-			'railAssignments' => $this->assignmentsView->railLabel($uid),
+			'railAssignments' => $this->assignmentsView->railLabel($frame['workspace']),
 			'view' => ['workspaceKey' => $frame['workspaceKey'], 'iconPalette' => IndexViewService::iconPalette()],
 		] + $extra);
 	}

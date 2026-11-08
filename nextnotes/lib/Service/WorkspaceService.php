@@ -179,6 +179,38 @@ class WorkspaceService {
 		return $this->keys($uid)[$workspaceId] ?? null;
 	}
 
+	/**
+	 * Lesbare Team-Workspaces (kind=normal) je Team, aufsteigend nach ID wie WorkspaceResourceProvider; der erste ist die Heimat der Aufgaben-Seite (M6i)
+	 * @return array<string, list<string>> Team-ID → Schlüssel
+	 */
+	public function teamWorkspaceKeys(string $uid): array {
+		$keys = $this->keys($uid);
+		$byTeam = [];
+		foreach ($this->listVisible($uid) as $ws) {
+			if ($ws->getOwnerType() === 'team' && $ws->getKind() === 'normal' && isset($keys[(int)$ws->getId()])) {
+				$byTeam[(string)$ws->getOwnerId()][(int)$ws->getId()] = $keys[(int)$ws->getId()];
+			}
+		}
+		return array_map(static function (array $list): array {
+			ksort($list);
+			return array_values($list);
+		}, $byTeam);
+	}
+
+	// Ziel-Workspace für Links auf assignments.php (M6i): erster Team-Workspace des Teams, sonst erster eigener (Aufgaben ohne Team-Workspace); nie schreibend
+	public function assignmentsKey(string $uid, string $teamId): ?string {
+		$team = $this->teamWorkspaceKeys($uid)[$teamId][0] ?? null;
+		if ($team !== null) {
+			return $team;
+		}
+		foreach ($this->listVisible($uid) as $ws) {
+			if ($ws->getOwnerType() === 'user' && $ws->getOwnerId() === $uid && $ws->getKind() === 'normal') {
+				return $this->keyFor($uid, (int)$ws->getId());
+			}
+		}
+		return null;
+	}
+
 	// R16: Paletten-Besitzer eines sichtbaren Workspace (nicht sichtbar → Aufrufer)
 	public function paletteOwner(string $uid, int $workspaceId): string {
 		$this->listVisible($uid);

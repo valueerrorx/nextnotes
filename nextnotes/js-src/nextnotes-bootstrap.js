@@ -24,7 +24,11 @@
 	// 0. Inhalt trägt inert schon im Template (gegen Klick/Fokus im unsichtbaren Inhalt); Rückfall 2 s ab Navigationsstart wie im CSS
 	var waiting = document.querySelectorAll('#nextnotes-root > :is(#right_pane, .nn-page-main, #outline-panel), #nextnotes-root:is(.nextnotes-subpage, .nextnotes-excalidraw)');
 	function releaseContent() { waiting.forEach(function (el) { el.inert = false; }); }
-	setTimeout(releaseContent, Math.max(0, 2000 - performance.now()));
+	// nextnotes-released: Rückfall gilt auch für später eingefügte Kinder (z. B. #app-tab-bar), deren CSS-Animation neu startet
+	setTimeout(function () {
+		releaseContent();
+		if (!document.documentElement.classList.contains('nextnotes-ready')) document.documentElement.classList.add('nextnotes-released');
+	}, Math.max(0, 2000 - performance.now()));
 
 	var config = readState('config') || {};
 	var baseUrl = String(config.baseUrl || '/index.php/apps/nextnotes/').replace(/\/?$/, '/');
