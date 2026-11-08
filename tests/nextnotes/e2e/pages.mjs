@@ -229,21 +229,14 @@ await runSpec(import.meta.url, async (ctx, page) => {
 	}
 	ctx.assertClean('Info über ⋮-Menü', m);
 
-	// ⋮-Menü öffnen ohne Fehler; „Zu Speed Dial hinzufügen“ fügt hinzu (Befund 1: fehlende .speed-dial-state-off)
+	// ⋮-Menü öffnen ohne Fehler; Speed Dial entfernt (M6g1, Thomas): keine Speed-Dial-Einträge mehr
 	m = ctx.mark();
-	const noteTags = async () => String((await api.must('GET', `/notes/${nid}?${wq}`)).note?.tags ?? '');
-	ctx.ok(!/speed-dial/.test(await noteTags()), 'Speed Dial: vorher nicht enthalten');
 	await page.goto(ctx.appUrl(`index.php?note=${nid}&${wq}`), { waitUntil: 'networkidle' });
 	await page.locator('[data-action="toggle-mobile-toolbar-menu"]').first().click();
-	const sdOff = page.locator(`.mobile-toolbar-menu .speed-dial-state-off[data-note-id="${nid}"]`);
-	const sdOn = page.locator(`.mobile-toolbar-menu .speed-dial-state-on[data-note-id="${nid}"]`);
-	ctx.ok(await sdOff.isVisible().catch(() => false) && !(await sdOn.isVisible().catch(() => false)), '⋮-Menü: „Zu Speed Dial hinzufügen“ sichtbar, „Entfernen“ nicht');
-	const put = page.waitForResponse((r) => r.request().method() === 'PUT' && /\/notes\/\d+\/tags/.test(r.url()), { timeout: 10000 }).catch(() => null);
-	await sdOff.click();
-	const putResp = await put;
-	ctx.ok(putResp?.status() === 200, `Speed Dial: Tags gespeichert (HTTP ${putResp?.status()})`);
-	ctx.ok(/speed-dial/.test(await noteTags()), 'Speed Dial: hinzugefügt (nicht entfernt)');
-	ctx.assertClean('⋮-Menü Speed Dial', m);
+	await page.waitForTimeout(300);
+	ctx.ok(await page.locator('.mobile-toolbar-menu :is(.speed-dial-state-off, .speed-dial-state-on)').evaluateAll((els) => els.filter((e) => e.getClientRects().length).length) === 0, '⋮-Menü: kein Speed-Dial-Eintrag');
+	await page.keyboard.press('Escape');
+	ctx.assertClean('⋮-Menü ohne Speed Dial', m);
 
 	// Audio im Editor einfügen (P5: audio_player.php mit App-Präfix)
 	m = ctx.mark();

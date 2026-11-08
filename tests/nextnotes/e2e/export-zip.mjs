@@ -92,7 +92,8 @@ await runSpec(import.meta.url, async (ctx, page) => {
 	ctx.ok(await box.isVisible(), 'Link: Fehlerseite sichtbar');
 	await ctx.screenshot(page, 'export-error');
 	await box.locator('a.button').click();
-	await page.waitForURL(/\/apps\/nextnotes\/?(\?.*)?$/, { timeout: 15000 });
+	// UI-rail: App-Wurzel leitet aufs Dashboard
+	await page.waitForURL(/\/apps\/nextnotes\/(dashboard\.php|index\.php)?(\?.*)?$/, { timeout: 15000 });
 	ctx.ok(true, 'Zurück-Link führt in die App');
 	rmSync(dir, { recursive: true, force: true });
 });

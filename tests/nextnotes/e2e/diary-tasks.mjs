@@ -127,8 +127,11 @@ await runSpec(import.meta.url, async (ctx, page) => {
 	}
 	ctx.assertClean('Aufgaben', m);
 
-	// 5. Erstellen-Seite: Tagebuch-Karte sichtbar
-	m = await open('create.php', 'Erstellen');
-	ctx.ok(await page.locator('#create-diary-entry-card').isVisible(), 'Erstellen: Tagebuch-Karte');
+	// 5. Erstellen (UI-rail: Erstellen-Seite entfernt): „+“-Menü der Hauptansicht bietet den Tagebuch-Eintrag
+	m = await open('index.php', 'Hauptansicht');
+	await page.click('#sidebarCreateBtn');
+	await page.locator('#create-menu').waitFor({ state: 'visible', timeout: 5000 });
+	ctx.ok(await page.locator('#create-menu .create-note-option[data-type="diary"]').isVisible(), '„+“-Menü: Tagebuch-Eintrag');
+	await page.keyboard.press('Escape');
 	ctx.assertClean('Erstellen', m);
 });

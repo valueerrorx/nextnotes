@@ -21,7 +21,7 @@ const FORBIDDEN_PAGES = /(^|\/)(shared|offline_notes|login|logout|profile|backup
 // Sichtbare Texte (de/en) gestrichener Funktionen; „Neuer Workspace“ seit M4a, Tagebuch seit M4f sichtbar
 const FORBIDDEN_TEXT = [
 	/\b(ab|an)melden\b|log ?out|log ?in\b|sign (in|out)/i, /\bkonten\b|\bkonto\b|accounts?\b|benutzerverwaltung|users? management/i,
-	/\bKI\b|\bAI\b|künstliche intelligenz|assistent/i, /teilen|share|öffentlich(er)? link|public link/i, /offline/i, /\bPWA\b|installieren|install app/i,
+	/\bKI\b|\bAI\b|künstliche intelligenz|assistent/i, /(?<!aus)teilen|share|öffentlich(er)? link|public link/i /* „austeilen“ = Aufgaben (M6g) */, /offline/i, /\bPWA\b|installieren|install app/i,
 	/backup|sicherung|wiederherstell|restore/i, /\btheme\b|design wählen|farbschema|schriftart|\bfont\b|dunkel(er)? modus|dark mode|light mode|hell(er)? modus/i,
 	/\bgit\b|github|gitea|sync/i, /export|herunterladen|download/i, /dokumentation|documentation|\bdocs?\b|spende|donat|sponsor|poznote/i,
 	/über poznote|about poznote/i, // M4g Graph, M4h Einstellungen/Über/Arbeitsbereiche bearbeiten portiert
@@ -188,7 +188,7 @@ await runSpec(import.meta.url, async (ctx, page) => {
 	const M4_PAGES = {
 		'dashboard.php': [], 'diary.php': [], 'tasks.php': [], 'graph.php': [], 'mentions.php': [], 'notes_manager.php': [],
 		// Papierkorb/Revisionen: „wiederherstellen“ ist dort die Hauptaktion, kein Backup-Restore; Einstellungen: Hinweis-Karte „Mein Konto“ verlinkt NC (M4h)
-		'list_tags.php': [], 'list_folders.php': [], 'attachments_list.php': [/herunterladen|download/i], 'trash.php': [RESTORE], 'create.php': [],
+		'list_tags.php': [], 'list_folders.php': [], 'attachments_list.php': [/herunterladen|download/i], 'trash.php': [RESTORE], 'assignments.php': [/export|herunterladen|download/i],
 		[`attachments.php?note_id=${pnid}`]: [/herunterladen|download/i], [`revisions.php?note_id=${pnid}`]: [RESTORE],
 		'settings.php': [/export|herunterladen|download/i, /^Mein Konto$/],
 	};

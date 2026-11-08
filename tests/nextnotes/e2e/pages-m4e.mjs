@@ -86,7 +86,9 @@ await runSpec(import.meta.url, async (ctx, page) => {
 	let m = ctx.mark();
 	await page.goto(ctx.appUrl(`index.php?${wq}`), { waitUntil: 'networkidle' });
 	await ctx.selfTest(page);
-	for (const id of ['iconSidebarCreateBtn', 'iconSidebarNotesBtn', 'iconSidebarFoldersBtn', 'iconSidebarTagsBtn', 'iconSidebarAttachmentsBtn', 'iconSidebarTrashBtn']) {
+	// UI-rail: kein Erstellen-Eintrag mehr (Erstellen über „+“), Dashboard/Notizen neu
+	ctx.ok(await page.locator('#icon_sidebar #iconSidebarCreateBtn').count() === 0, 'Hauptansicht: kein Erstellen-Eintrag');
+	for (const id of ['iconSidebarDashboardBtn', 'iconSidebarHomeBtn', 'iconSidebarNotesBtn', 'iconSidebarFoldersBtn', 'iconSidebarTagsBtn', 'iconSidebarAttachmentsBtn', 'iconSidebarTrashBtn']) {
 		ctx.ok(await page.locator(`#icon_sidebar #${id}`).isVisible(), `Hauptansicht: ${id} sichtbar`);
 	}
 	await Promise.all([page.waitForURL(/trash\.php/), page.locator('#iconSidebarTrashBtn').click()]);
@@ -245,14 +247,18 @@ await runSpec(import.meta.url, async (ctx, page) => {
 	await ctx.screenshot(page, 'notes-manager');
 	ctx.assertClean('Notizen', m);
 
-	// 6. Erstellen: Notiz anlegen öffnet den Editor
-	m = await open('create.php', 'Erstellen');
-	ctx.ok(await page.locator('.home-card[data-create-type]').count() === 5 && await page.locator('#create-diary-entry-card').count() === 1, 'Erstellen: fünf Karten inkl. Tagebuch (M4f)');
+	// 6. Erstellen (UI-rail: Erstellen-Seite entfernt): create.php leitet auf die Hauptansicht, „+“-Menü bietet alle Typen, Notiz öffnet den Editor
+	m = await open('create.php', 'Erstellen → Hauptansicht');
+	ctx.ok(new URL(page.url()).pathname.endsWith('/index.php') && await page.locator('#left_col').count() === 1, 'create.php → Hauptansicht', page.url());
+	await page.click('#sidebarCreateBtn');
+	await page.locator('#create-menu').waitFor({ state: 'visible', timeout: 5000 });
+	const types = await page.$$eval('#create-menu .create-note-option[data-type]', (els) => els.filter((e) => e.getClientRects().length).map((e) => e.dataset.type));
+	ctx.ok(['html', 'markdown', 'list', 'diary', 'folder'].every((t) => types.includes(t)), '„+“-Menü: Notiz, Markdown, Aufgabenliste, Tagebuch, Ordner', types.join(' '));
 	await ctx.screenshot(page, 'create');
-	await Promise.all([page.waitForURL(/index\.php\?.*note=\d+/, { timeout: 15000 }), page.locator('#create-note-card').click()]);
-	await page.waitForLoadState('networkidle');
-	const created = new URL(page.url()).searchParams.get('note');
-	ctx.ok(await page.locator(`#entry${created}[contenteditable="true"]`).isVisible(), 'Erstellen: Editor der neuen Notiz offen', page.url());
+	await Promise.all([page.waitForLoadState('networkidle'), page.click('#create-menu [data-type="html"]')]);
+	await page.waitForTimeout(1200);
+	const entry = page.locator('#right_col .noteentry');
+	ctx.ok(await entry.count() === 1 && await entry.first().getAttribute('contenteditable') === 'true', 'Erstellen: Editor der neuen Notiz offen', page.url());
 	ctx.assertClean('Erstellen', m);
 
 	// 7. XSS (Done M4e 3, Nutzlasten aus pages.mjs/xss.mjs): gleiche Element-/Attributzahl Basis vs. Nutzlast auf allen sechs Seiten (nur Hell)
@@ -290,7 +296,7 @@ await runSpec(import.meta.url, async (ctx, page) => {
 			xss: window.__xss ?? null,
 		};
 	});
-	const ready = { 'trash.php': '.trash-notecard', 'list_tags.php': '.tag-item', 'list_folders.php': '.folder-item', 'attachments_list.php': '[data-attachment-id]', 'notes_manager.php': '#nmNotesContainer a', 'create.php': '.home-card' };
+	const ready = { 'trash.php': '.trash-notecard', 'list_tags.php': '.tag-item', 'list_folders.php': '.folder-item', 'attachments_list.php': '[data-attachment-id]', 'notes_manager.php': '#nmNotesContainer a' };
 	for (const [path, sel] of Object.entries(ready)) {
 		const m0 = ctx.mark();
 		const load = async (q) => { await page.goto(ctx.appUrl(`${path}?${q}`), { waitUntil: 'networkidle' }); await page.waitForSelector(sel, { timeout: 10000 }).catch(() => {}); await page.waitForTimeout(300); return dom(); };

@@ -223,4 +223,44 @@ final class MaterialIsolationTest extends MaterialTestCase {
 		self::denied($s->call('PATCH', "/notes/$lc", ['content' => '<p>x</p>']), 'L-Kopie ist Material');
 		Teams::reset();
 	}
+
+	// M6h: Aufgaben-Pfade (Q2) – Mitglied S legt aus Material keine Aufgabe an; Kopie/Vorlage/Abgabe-Wege ändern Material nie; Positivkontrolle L
+	public function testAssignmentPathsKeepMaterial(): void {
+		$x = $this->fixture();
+		['l' => $l, 's' => $s, 'm' => $m, 'n1' => $n1, 'ws' => $ws, 't' => $t, 'att' => $att] = $x;
+		$matBefore = [self::note($n1), self::folderRow($m), self::attachments($n1), self::tags($n1)];
+		$body = ['team' => $t, 'title' => 'Aus Material', 'due_at' => time() + 7200, 'source_note_id' => $n1];
+		self::assertContains($s->call('POST', '/assignments', $body)->status, [403, 404], 'S legt aus Material keine Aufgabe an');
+		$r = $l->call('POST', '/assignments', $body);
+		self::assertSame(201, $r->status, 'L legt Aufgabe aus Material an: ' . $r->describe());
+		$aid = (int)$r->json()['assignment']['id'];
+		$tpl = (int)$r->json()['assignment']['template_note_id'];
+		try {
+			self::assertContains($s->call('POST', "/assignments/$aid/distribute")->status, [403, 404], 'S teilt nicht aus');
+			self::ok($l->call('POST', "/assignments/$aid/distribute"), 'L teilt aus');
+			$qb = self::db()->getQueryBuilder();
+			$qb->select('id', 'note_id')->from('nextnotes_submissions')
+				->where($qb->expr()->eq('assignment_id', $qb->createNamedParameter($aid, IQueryBuilder::PARAM_INT)))
+				->andWhere($qb->expr()->eq('student_uid', $qb->createNamedParameter($s->uid)));
+			$sub = $qb->executeQuery()->fetchAssociative();
+			self::assertIsArray($sub, 'Abgabe von S angelegt');
+			$copy = (int)$sub['note_id'];
+			self::assertNotSame($n1, $copy);
+			// S schreibt die eigene Kopie, nicht die Vorlage, nicht das Material; Kopie nie in den Material-Ordner
+			self::ok($s->call('PATCH', "/notes/$copy", ['content' => '<p>Lösung</p>']), 'S schreibt Kopie');
+			self::assertContains($s->call('PATCH', "/notes/$copy", ['folder_id' => $m])->status, [400, 403, 404, 409], 'S verschiebt Kopie nach M');
+			self::assertContains($s->call('POST', "/notes/$copy/folder", ['folder' => (string)self::folderRow($m)['name'], 'workspace' => $ws])->status, [400, 403, 404, 409], 'S Kopie per Ordnername nach M');
+			self::assertContains($s->call('GET', "/notes/$tpl")->status, [403, 404], 'S liest Vorlage nicht');
+			self::assertContains($s->call('PATCH', "/notes/$tpl", ['content' => '<p>x</p>'])->status, [403, 404], 'S schreibt Vorlage nicht');
+			self::assertContains($s->call('PATCH', "/assignments/$aid", ['title' => 'gekapert'])->status, [403, 404], 'S ändert Aufgabe nicht');
+			self::assertContains($s->call('DELETE', "/assignments/$aid?confirm=1")->status, [403, 404], 'S löscht Aufgabe nicht');
+			self::denied($s->call('PATCH', "/notes/$n1", ['content' => '<p>x</p>']), 'S schreibt Material weiter nicht');
+			self::ok($s->call('POST', "/submissions/{$sub['id']}/submit"), 'S gibt ab');
+			self::assertSame($matBefore, [self::note($n1), self::folderRow($m), self::attachments($n1), self::tags($n1)], 'Material unverändert');
+			// Positivkontrolle: L schreibt Material weiter
+			self::ok($l->call('PATCH', "/notes/$n1", ['content' => '<p>L neu</p>']), 'L schreibt Material');
+		} finally {
+			\OCP\Server::get(\OCA\NextNotes\Service\AssignmentDeletion::class)->purge($aid);
+		}
+	}
 }

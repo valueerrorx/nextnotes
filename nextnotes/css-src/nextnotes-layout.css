@@ -1224,6 +1224,11 @@ body.icon-sidebar-collapsed #content #nextnotes-root #iconSidebarToggle {
 	#content #nextnotes-root {
 		--nn-view-pad: calc(var(--default-grid-baseline) * 4);
 	}
+
+	/* Upstream responsive.css gibt Listen mobil 10 px Innenabstand; Abstand kommt nur von .nn-page-main (M6h layout-left) */
+	#content #nextnotes-root > .nn-page-main .shared-content {
+		padding-inline: 0;
+	}
 }
 
 #content #nextnotes-root > .nn-page-main {

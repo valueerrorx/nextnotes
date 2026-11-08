@@ -33,7 +33,8 @@ mkdir -p "$NN_CACHE"
 occ "$env" db:schema:export --output=json > "$NN_CACHE/schema-$env.json"
 tables="$(nn_tables)"
 n="$(grep -c . <<<"$tables" || true)"
-[[ "$n" -eq 11 ]] || die "$n statt 11 oc_nextnotes_*-Tabellen"
+# M6d: + assignments, submissions
+[[ "$n" -eq 13 ]] || die "$n statt 13 oc_nextnotes_*-Tabellen"
 
 # Optionale Prüfungen bei aktivierter App
 if [[ "${CHECK_PAGE:-0}" == 1 ]]; then

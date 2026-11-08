@@ -102,7 +102,17 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	m = ctx.mark();
 	await p1.goto(ctx.appUrl('assignments.php'), { waitUntil: 'networkidle' });
 	ctx.ok(await p1.locator('#iconSidebarAssignmentsBtn').count() === 1, 'S1: Leisten-Eintrag');
-	ctx.ok(await p1.locator('#nnAsgNew').count() === 0, 'S1: kein „Neue Aufgabe“');
+	// S1 ist in dieser Klasse Mitglied; „Neue Aufgabe“ gibt es nur, wenn S1 anderswo Lehrkraft ist (teams-m5d legt ein Team von B an,
+	// im Dunkel-Lauf schon vorhanden) – dann darf die Klasse nicht zur Auswahl stehen
+	if (await p1.locator('#nnAsgNew').count() === 0) ctx.ok(true, 'S1: kein „Neue Aufgabe“');
+	else {
+		await p1.locator('#nnAsgNew').click();
+		await p1.locator('#nnAsgCreateTeam').waitFor({ state: 'attached', timeout: 10000 });
+		const opts = await p1.locator('#nnAsgCreateTeam option').evaluateAll((os) => os.map((o) => o.value));
+		ctx.ok(!opts.includes(teamId), 'S1: Klasse nicht als eigenes Lehr-Team wählbar', opts.join(','));
+		await p1.keyboard.press('Escape');
+		await p1.goto(ctx.appUrl('assignments.php'), { waitUntil: 'networkidle' });
+	}
 	const s1Row = p1.locator(`.nn-asg-item[data-assignment-id="${aid}"]`);
 	await s1Row.waitFor({ timeout: 10000 });
 	ctx.ok(await s1Row.locator('.nn-asg-chip-assigned').count() === 1, 'S1: Chip „Zugewiesen“');
@@ -155,7 +165,10 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	ctx.ok((await apiC.call('GET', `/submissions/${s1.id}`)).status === 404, 'S2: Abgabe S1 → 404');
 	ctx.ok((await apiC.call('GET', `/notes/${s1.note_id}`)).status === 404, 'S2: Kopie S1 → 404');
 	const listC = (await apiC.must('GET', '/assignments')).assignments;
-	ctx.ok(listC.length === 1 && listC[0].submission?.id === s2.id && !JSON.stringify(listC).includes(`"id":${s1.id},`), 'S2: nur eigene Abgabe');
+	// Abgabe-IDs aus der Liste (ein Vergleich auf "id":N träfe auch Aufgaben-/Team-IDs mit gleicher Zahl)
+	const subIds = [];
+	JSON.stringify(listC, (k, v) => { if (k === 'submission' && v?.id) subIds.push(v.id); if (k === 'submissions' && Array.isArray(v)) subIds.push(...v.map((x) => x.id)); return v; });
+	ctx.ok(listC.length === 1 && listC[0].submission?.id === s2.id && !subIds.includes(s1.id) && !JSON.stringify(listC).includes(`Lösung ${RUN}`), 'S2: nur eigene Abgabe', JSON.stringify(listC).slice(0, 400));
 
 	// ---------- 3. S2 verpasst (Frist per Test-Hook in die Vergangenheit) ----------
 	ctx.ok((await apiC.call('GET', `/assignments/${aid}/export`)).status === 403, 'S2: kein Lehrkraft-ZIP (403, Aufgabe sichtbar)');

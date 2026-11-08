@@ -24,6 +24,8 @@ await runSpec(import.meta.url, async (ctx, page) => {
 	const params = () => new URL(page.url()).searchParams;
 	const fragmentReq = (r) => r.request().method() === 'GET' && r.request().headers()['x-poznote-fragment'] === 'left_col';
 
+	// interner Tag speed-dial (Altdaten) vor dem Laden setzen: Abschnitt 1 prüft ihn ohne Reload
+	const sdPut = (await api.call('PUT', `/notes/${id}/tags`, { tags: ['speed-dial'], workspace: WS })).status;
 	await page.goto(ctx.appUrl(`index.php?${wq}&note=${id}`), { waitUntil: 'networkidle' });
 	await ctx.selfTest(page);
 	await page.waitForSelector(`#entry${id}`);
@@ -36,12 +38,9 @@ await runSpec(import.meta.url, async (ctx, page) => {
 		ctx.ok(await page.locator(`#entry${id}`).isVisible(), `${label}: offene Notiz bleibt offen`);
 	};
 
-	// 1. Zu Speed Dial hinzufügen (⋮-Menü): gespeichert, aber kein sichtbarer Tag, nicht in GET /tags
+	// 1. Interner Tag speed-dial (Menüpunkt seit M6g1 entfernt; Altdaten tragen ihn noch): per API gesetzt, kein sichtbarer Tag, nicht in GET /tags
 	let m = ctx.mark();
-	await page.locator('[data-action="toggle-mobile-toolbar-menu"]').first().click();
-	const put = page.waitForResponse((r) => r.request().method() === 'PUT' && /\/notes\/\d+\/tags/.test(r.url()), { timeout: 10000 }).catch(() => null);
-	await page.locator(`.mobile-toolbar-menu .speed-dial-state-off[data-note-id="${id}"]`).click();
-	ctx.ok((await put)?.status() === 200, 'Speed Dial: Tags gespeichert');
+	ctx.ok(sdPut === 200, 'Speed Dial: Tags gespeichert (API, Altdaten)');
 	ctx.ok(/speed-dial/.test(await noteTags()), 'Speed Dial: Notiz trägt den internen Tag');
 	ctx.ok(await waitFor(async () => (await page.locator(`#entry${id}`).count()) === 1 && (await page.locator('.clickable-tag-wrapper[data-internal-tag]').count()) === 1), 'Speed Dial: Tag-Element vorhanden (versteckt)');
 	ctx.ok(!(await page.locator('.clickable-tag[data-tag="speed-dial"]').isVisible()), 'Speed Dial: Tag „speed-dial“ nicht sichtbar');

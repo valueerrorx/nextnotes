@@ -3,6 +3,7 @@
 // Anti-Flicker (M4h, UI-nav ADR 0019, UI-nav-mobil Zusatz 7): nur der Inhalt wartet bis html.nextnotes-ready. Die Inhaltsflächen
 // (#right_pane, .nn-page-main, #outline-panel) bleiben deckend (opacity 1), ihre Kinder sind opacity 0; Unterseiten ganz #nextnotes-root.
 // inert steht im Template und fällt bei DOMContentLoaded, Rückfall CSS/JS nach 2 s ab Navigationsstart. Icon-Leiste und Seitenleiste sofort.
+// UI-rail: App-Wurzel = Dashboard, Hauptansicht über index.php.
 // A) Normale Ladezeit: Phase „Inhalt im DOM, opacity 0“ bis „nextnotes-ready“ < 1 s je Seite, danach opacity 1 und nicht inert.
 // B) nextnotes-late.js künstlich verzögert (DOMContentLoaded/ready warten auf defer-Skripte), je index und tasks.php:
 //    B1 vor 2 s: Inhalt opacity 0 + inert, kein Fokus (Tab, focus()), kein Klick; Leisten sichtbar, nicht inert, per Klick/Tab erreichbar.
@@ -11,7 +12,7 @@
 import { runSpec } from './lib/harness.mjs';
 import { apiClient } from './lib/api.mjs';
 
-const PAGES = ['', '', '', 'diary.php', 'tasks.php', 'dashboard.php', 'settings.php', 'trash.php', 'list_tags.php', 'notes_manager.php'];
+const PAGES = ['index.php', 'index.php', 'index.php', 'diary.php', 'tasks.php', 'dashboard.php', 'settings.php', 'trash.php', 'list_tags.php', 'notes_manager.php'];
 const DELAY_MS = 4500;
 const WAITING = '#nextnotes-root > :is(#right_pane, .nn-page-main, #outline-panel), #nextnotes-root:is(.nextnotes-subpage, .nextnotes-excalidraw)';
 const STRIP = process.env.AF_STRIP || '';

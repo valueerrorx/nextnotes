@@ -20,7 +20,9 @@ await runSpec(import.meta.url, async (ctx, page) => {
 	const ws = encodeURIComponent(WS);
 	const fname = `Mobil ${Date.now()}`;
 	const f = await api.folder(WS, fname);
-	await api.note(WS, 'Mobile Notiz', f, '<p>Ein Absatz Text.</p>');
+	// eindeutiger Titel je Lauf: der Hell-Lauf hinterlässt eine gleichnamige Notiz in einem eingeklappten Ordner
+	const nTitle = `Mobile Notiz ${Date.now().toString(36)}`;
+	await api.note(WS, nTitle, f, '<p>Ein Absatz Text.</p>');
 	await page.evaluate(() => localStorage.removeItem('iconSidebarCollapsed'));
 
 	// Desktop: Pfeil in der Leistenfläche, ein- und ausklappen
@@ -42,7 +44,7 @@ await runSpec(import.meta.url, async (ctx, page) => {
 
 	// Mobil: alle Unterseiten
 	await page.setViewportSize({ width: 390, height: 844 });
-	const pages = ['dashboard.php', 'tasks.php', 'diary.php', 'graph.php', 'notes_manager.php', 'list_folders.php', 'list_tags.php', 'attachments_list.php', 'trash.php', 'create.php', 'settings.php', 'mentions.php'];
+	const pages = ['dashboard.php', 'tasks.php', 'diary.php', 'graph.php', 'notes_manager.php', 'list_folders.php', 'list_tags.php', 'attachments_list.php', 'trash.php', 'assignments.php', 'settings.php', 'mentions.php'];
 	for (const p of pages) {
 		const resp = await page.goto(ctx.appUrl(`${p}?workspace=${ws}`), { waitUntil: 'networkidle' });
 		if (p === 'mentions.php' && resp && resp.status() !== 200) { ctx.info(`${p}: ${resp.status()} (kein geteilter Workspace), übersprungen`); continue; }
@@ -74,7 +76,7 @@ await runSpec(import.meta.url, async (ctx, page) => {
 	ctx.ok(g.left && g.left.b <= g.vh + 0.5, 'Liste: unteres Ende sichtbar', `${g.left?.b}/${g.vh}`);
 	ctx.ok(g.sw <= g.vw + 1, 'Liste: kein horizontaler Überlauf');
 	await ctx.screenshot(page, 'list');
-	const link = page.locator('#left_col a.links_arbo_left', { hasText: 'Mobile Notiz' }).first();
+	const link = page.locator('#left_col a.links_arbo_left', { hasText: nTitle }).first();
 	if (!(await link.isVisible())) await page.locator('#left_col .folder-toggle', { hasText: fname }).first().click();
 	await link.waitFor({ state: 'visible', timeout: 5000 });
 	await link.click();
@@ -100,7 +102,7 @@ await runSpec(import.meta.url, async (ctx, page) => {
 	g = await page.evaluate(GEO);
 	ctx.ok(g.noteOpen && !!g.pane && !g.left, 'Kanban: Board statt Liste');
 	ctx.ok(await page.locator('#right_pane .kanban-board').first().isVisible(), 'Kanban: Board sichtbar');
-	ctx.ok(await page.locator('#right_pane .kanban-board .kanban-card-title', { hasText: 'Mobile Notiz' }).first().isVisible(), 'Kanban: Karte der Notiz sichtbar');
+	ctx.ok(await page.locator('#right_pane .kanban-board .kanban-card-title', { hasText: nTitle }).first().isVisible(), 'Kanban: Karte der Notiz sichtbar');
 	await ctx.screenshot(page, 'kanban');
 	await page.locator('#right_pane .kanban-mobile-home').click();
 	await page.waitForTimeout(400);

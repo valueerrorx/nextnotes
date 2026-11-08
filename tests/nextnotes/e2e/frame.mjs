@@ -137,6 +137,8 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	const hdrPending = [];
 	context.on('request', (req) => {
 		if (!/\/apps\/nextnotes\/(index\.php\/)?api\/v1\//.test(new URL(req.url()).pathname) && !/\/index\.php\/apps\/nextnotes\/api\/v1\//.test(req.url())) return;
+		// <img>/<audio> laden Anhänge nativ (Cookie, GET ohne CSRF-Bedarf); Header setzt nur der Adapter für fetch/XHR
+		if (['image', 'media'].includes(req.resourceType())) return;
 		hdrPending.push(req.headersArray().then((h) => {
 			hdrChecked++;
 			const tok = h.filter((x) => x.name.toLowerCase() === 'requesttoken');
@@ -202,14 +204,15 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 		const q = (s, p) => { const e = document.querySelector(s); return e ? getComputedStyle(e).getPropertyValue(p) : null; };
 		return {
 			dataTheme: document.documentElement.getAttribute('data-theme'), expected,
-			appBg: q('#app-content', 'background-color'), leftBg: q('#left_col', 'background-color'),
+			appBg: q('#nextnotes-root > #right_pane', 'background-color'), // UI-nav: #app-content transparent, Inhaltsfläche deckend
+			 leftBg: q('#left_col', 'background-color'),
 			noteColor: q('#left_col .note-title', 'color'), folderColor: q('#left_col .folder-name', 'color'),
 			inputBg: q('#unified-search', 'background-color'), inputColor: q('#unified-search', 'color'),
 		};
 	});
 	ctx.info(`Theme: ${JSON.stringify(th)}`);
 	ctx.ok(th.dataTheme === ctx.theme, `html[data-theme]=${ctx.theme}`, th.dataTheme);
-	ctx.ok(th.appBg === th.expected, '#app-content = --color-main-background', `${th.appBg} vs ${th.expected}`);
+	ctx.ok(th.appBg === th.expected, 'Inhaltsfläche #right_pane = --color-main-background', `${th.appBg} vs ${th.expected}`);
 	const dark = ctx.theme === 'dark';
 	for (const [k, v] of [['leftBg', th.leftBg], ['inputBg', th.inputBg]]) {
 		if (/rgba\(0, 0, 0, 0\)|transparent/.test(v)) { ctx.info(`${k} transparent`); continue; }
@@ -430,7 +433,8 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	await anon.close();
 
 	// 9. Header je API-Request
-	await Promise.all(hdrPending);
+	// headersArray() geschlossener Kontexte (bob, abgemeldet) kann offen bleiben: höchstens 10 s warten
+	await Promise.race([Promise.all(hdrPending), new Promise((r) => setTimeout(r, 10000))]);
 	ctx.ok(hdrChecked > 0, `API-Requests mit Headerprüfung: ${hdrChecked}`);
 	ctx.ok(hdrProblems.length === 0, 'requesttoken und X-Requested-With (XHR) je genau einmal', hdrProblems.slice(0, 6).join(' | '));
 	ctx.assertClean('gesamter Lauf');

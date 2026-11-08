@@ -38,12 +38,14 @@ async function themeState(page) {
 		const expected = getComputedStyle(probe).backgroundColor;
 		probe.remove();
 		const app = document.querySelector('#app-content');
+		// UI-nav (ADR 0019): #app-content ist transparent (NC-Rahmen), die Inhaltsflächen tragen --color-main-background
+		const surface = document.querySelector('#nextnotes-root > :is(#right_pane, .nn-page-main), #nextnotes-root.nextnotes-subpage');
 		return {
 			dataTheme: document.documentElement.getAttribute('data-theme'),
 			ready: document.documentElement.classList.contains('nextnotes-ready'),
 			bodyThemes: document.body.getAttribute('data-themes'),
 			expected,
-			actual: app ? getComputedStyle(app).backgroundColor : null,
+			actual: surface ? getComputedStyle(surface).backgroundColor : null,
 			visibility: app ? getComputedStyle(app).visibility : null,
 		};
 	});
@@ -65,7 +67,8 @@ await runSpec(import.meta.url, async (ctx, page, context) => {
 	// 1. Seitenaufbau
 	let m = ctx.mark();
 	const resp = await page.goto(ctx.appUrl(''), { waitUntil: 'networkidle' });
-	ctx.ok(resp?.status() === 200, 'App-Seite angemeldet HTTP 200', `HTTP ${resp?.status()}`);
+	// UI-rail: App-Start = Dashboard
+	ctx.ok(resp?.status() === 200 && new URL(page.url()).pathname.endsWith('/dashboard.php'), 'App-Start angemeldet HTTP 200 (Dashboard)', `HTTP ${resp?.status()} ${page.url()}`);
 	ctx.ok(await page.locator('#nextnotes-root').count() === 1, '#nextnotes-root vorhanden');
 	const resp2 = await page.goto(ctx.appUrl('index.php'), { waitUntil: 'networkidle' });
 	ctx.ok(resp2?.status() === 200, 'index.php HTTP 200', `HTTP ${resp2?.status()}`);
@@ -96,7 +99,7 @@ await runSpec(import.meta.url, async (ctx, page, context) => {
 	ctx.ok(st.ready, 'html.nextnotes-ready gesetzt');
 	ctx.ok(st.visibility === 'visible', '#app-content sichtbar', st.visibility);
 	ctx.ok(st.dataTheme === theme, `html[data-theme] = ${theme}`, `${st.dataTheme} (body data-themes=${st.bodyThemes})`);
-	ctx.ok(st.actual === st.expected, '#app-content-Hintergrund = --color-main-background', `${st.actual} vs ${st.expected}`);
+	ctx.ok(st.actual === st.expected, 'Inhaltsfläche-Hintergrund = --color-main-background', `${st.actual} vs ${st.expected}`);
 	ctx.ok(theme === 'dark' ? luminance(st.actual ?? '') < 0.4 : luminance(st.actual ?? '') > 0.6, `Hintergrund passt zu ${theme}`, st.actual);
 	await ctx.screenshot(page, 'index');
 
