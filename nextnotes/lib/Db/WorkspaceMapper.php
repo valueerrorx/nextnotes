@@ -212,4 +212,26 @@ class WorkspaceMapper extends QBMapper {
 			->where($qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT)))
 			->executeStatement();
 	}
+
+	// Schüler-Workspace je Team (kind=assignments, UNIQUE nn_ws_asg); idempotent, gleichzeitiges Austeilen legt ihn genau einmal an
+	public function ensureAssignmentWorkspace(string $uid, string $teamId, string $name, int $now): Workspace {
+		$this->db->insertIgnoreConflict(self::TABLE, [
+			'owner_type' => 'user',
+			'owner_id' => $uid,
+			'kind' => 'assignments',
+			'linked_team_id' => $teamId,
+			'name' => mb_substr($name, 0, 255),
+			'display_order' => 0,
+			'created_by' => $uid,
+			'created_at' => $now,
+			'updated_at' => $now,
+		]);
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')->from(self::TABLE)
+			->where($qb->expr()->eq('owner_type', $qb->createNamedParameter('user')))
+			->andWhere($qb->expr()->eq('owner_id', $qb->createNamedParameter($uid)))
+			->andWhere($qb->expr()->eq('kind', $qb->createNamedParameter('assignments')))
+			->andWhere($qb->expr()->eq('linked_team_id', $qb->createNamedParameter($teamId)));
+		return $this->findEntity($qb);
+	}
 }

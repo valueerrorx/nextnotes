@@ -103,7 +103,7 @@ class DashboardViewService {
 		$tags = [];
 		$colors = [];
 		$ids = [];
-		foreach ($this->workspaces->listVisible($uid) as $ws) {
+		foreach ($this->workspaces->listMenu($uid) as $ws) {
 			$key = $keys[(int)$ws->getId()];
 			$ids[$key] = (int)$ws->getId();
 			$tags[$key] = $this->validator->workspaceTags((string)($ws->getTags() ?? ''));

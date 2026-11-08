@@ -57,6 +57,7 @@ class AccessService {
 		private TeamStateService $teamState,
 		private AssignmentMapper $assignments,
 		private SubmissionMapper $submissions,
+		private SubmissionStateService $states,
 	) {
 	}
 
@@ -282,24 +283,31 @@ class AccessService {
 
 	// ---------- Aufgaben, Vorlagen, Abgaben (M6d, SPEC §9.7, Plan M6 §2.3) ----------
 
-	// Abgabe-Notiz: eigener Schüler im eigenen Schüler-Workspace liest (schreiben ab M6e1); sonst nur review (Lehrkraft bzw. owner_uid), nie über Aufgabe read
+	// Abgabe-Notiz: eigener Schüler im eigenen Schüler-Workspace liest, schreibt nur mit studentCanEdit (§9.3); sonst nur review, nie über Aufgabe read
 	private function submissionNoteLevel(string $uid, Note $note): int {
 		$sub = $this->submissionOfNote($note);
-		if ($sub === null) {
+		$assignment = $sub === null ? null : $this->assignmentOrNull((int)$sub->getAssignmentId());
+		if ($sub === null || $assignment === null) {
 			return self::NONE;
 		}
-		if ($sub->getStudentUid() !== null && $sub->getStudentUid() === $uid && $note->getWorkspaceId() !== null) {
-			try {
-				$ws = $this->workspaces->find((int)$note->getWorkspaceId());
-			} catch (DoesNotExistException) {
-				$ws = null;
-			}
-			if ($ws !== null && $ws->getOwnerType() === 'user' && $ws->getOwnerId() === $uid && $ws->getKind() === 'assignments') {
-				return self::READ;
-			}
+		if ($this->ownSubmissionNote($uid, $sub, $note)) {
+			// Frist vor jedem Zugriff materialisieren (eigenes UPDATE, letzte Sperre)
+			$sub = $this->states->materialize($sub, $assignment);
+			return $this->states->studentCanEdit($uid, $sub, $assignment) ? self::WRITE : self::READ;
 		}
-		$assignment = $this->assignmentOrNull((int)$sub->getAssignmentId());
-		return $assignment !== null && $this->assignmentAllows($uid, $assignment, 'review') ? self::READ : self::NONE;
+		return $this->assignmentAllows($uid, $assignment, 'review') ? self::READ : self::NONE;
+	}
+
+	private function ownSubmissionNote(string $uid, Submission $sub, Note $note): bool {
+		if ($sub->getStudentUid() === null || $sub->getStudentUid() !== $uid || $note->getWorkspaceId() === null) {
+			return false;
+		}
+		try {
+			$ws = $this->workspaces->find((int)$note->getWorkspaceId());
+		} catch (DoesNotExistException) {
+			return false;
+		}
+		return $ws->getOwnerType() === 'user' && $ws->getOwnerId() === $uid && $ws->getKind() === 'assignments';
 	}
 
 	// Vorlage: review liest; schreiben nur Lehrkraft bei Aufgabe draft und Team active; Schüler nie
@@ -602,6 +610,7 @@ class AccessService {
 			throw new NotFoundException('Note not found');
 		}
 		$level = $this->noteLevelFor($uid, $note, $perm !== 'read');
+		self::checkSubmissionWrite($note, $level, $perm);
 		$this->check($level, $perm === 'manage' ? 'write' : $perm, 'Note not found');
 		// manage = Löschen, Papierkorb, Verschieben, Archiv: Vorlagen/Abgaben nie (nur mit der Aufgabe, SPEC §3)
 		if ($perm === 'manage' && $note->getRole() !== 'note') {
@@ -614,6 +623,41 @@ class AccessService {
 			throw new BadRequestException('Note is not in trash');
 		}
 		return $note;
+	}
+
+	// Abgabe lesbar, aber nicht schreibbar: eigener Fehlercode für den Editor-Banner (Plan M6 §2.4)
+	private static function checkSubmissionWrite(Note $note, int $level, string $perm): void {
+		if ($perm !== 'read' && $level === self::READ && $note->getRole() === 'submission') {
+			throw new ForbiddenException('This submission can no longer be edited', ['code' => 'submission_locked']);
+		}
+	}
+
+	/**
+	 * In der Transaktion des Schreibers: Vorlage/Abgabe unter Notiz-Zeilensperre neu laden und Schreibrecht neu prüfen
+	 * (Vorlage gegen Austeilen, Abgabe gegen submit; Review M6-Plan r2 Hinweis 1, M6d-r1 H3); normale Notizen unverändert ohne Sperre
+	 */
+	public function lockForWrite(string $uid, Note $note): Note {
+		if ($note->getRole() === 'note') {
+			return $note;
+		}
+		$this->notes->lockRow((int)$note->getId());
+		try {
+			$fresh = $this->notes->find((int)$note->getId());
+		} catch (DoesNotExistException) {
+			throw new NotFoundException('Note not found');
+		}
+		$this->recheckLocked($uid, $fresh);
+		return $fresh;
+	}
+
+	// Notiz ist schon gesperrt und frisch gelesen (Aufrufer mit eigenem lockRow)
+	public function recheckLocked(string $uid, Note $note): void {
+		if ($note->getRole() === 'note') {
+			return;
+		}
+		$level = $this->noteLevelFor($uid, $note, true);
+		self::checkSubmissionWrite($note, $level, 'write');
+		$this->check($level, 'write', 'Note not found');
 	}
 
 	/** Verknüpfte Notiz → Ziel mit Leserecht (B42), eine Stufe; fehlt/fremd/selbst verknüpft → 404; sonst die Notiz selbst */

@@ -64,7 +64,7 @@ class DuplicateService {
 	 * Eine Notiz kopieren (läuft in einer Transaktion des Aufrufers)
 	 * @param int[] $created neue Notiz-IDs (Aufräumen bei Rollback)
 	 */
-	private function cloneNote(Note $src, ?int $wsId, ?int $folderId, string $uid, array &$created, ?int $assignmentId = null): Note {
+	private function cloneNote(Note $src, ?int $wsId, ?int $folderId, string $uid, array &$created, ?int $assignmentId = null, ?int $submissionId = null): Note {
 		$now = $this->time->getTime();
 		$n = new Note();
 		$n->setWorkspaceId($wsId);
@@ -73,9 +73,10 @@ class DuplicateService {
 		$n->setHeading($wsId === null ? ($heading === '' ? $this->l->t('New note') : $heading) : $this->uniqueHeading($wsId, $folderId, $heading));
 		$n->setContent($src->getContent());
 		$n->setType($src->getType() ?: 'note');
-		// Vorlage einer Aufgabe: ohne Workspace, trägt assignment_id (Quote beim Team, Plan M6 §2.3a)
-		$n->setRole($assignmentId === null ? 'note' : 'template');
+		// Vorlage (ohne Workspace) bzw. Kopie eines Schülers: tragen assignment_id (Quote beim Team, Plan M6 §2.3a)
+		$n->setRole($assignmentId === null ? 'note' : ($submissionId === null ? 'template' : 'submission'));
 		$n->setAssignmentId($assignmentId);
+		$n->setSubmissionId($submissionId);
 		foreach (['Icon', 'IconColor', 'Color', 'ContentWidth', 'TitleColor', 'TitleSize'] as $f) {
 			$n->{'set' . $f}($src->{'get' . $f}());
 		}
@@ -114,6 +115,15 @@ class DuplicateService {
 	 */
 	public function copyAsTemplate(Note $src, int $assignmentId, string $uid, array &$created): Note {
 		return $this->cloneNote($src, null, null, $uid, $created, $assignmentId);
+	}
+
+	/**
+	 * Kopie der Vorlage für einen Schüler (SPEC §9.1): im Aufgaben-Ordner seines Schüler-Workspace, Anhänge physisch kopiert.
+	 * Läuft in der Transaktion des Austeilens nach enforce; Dateien bei Rollback über discardFiles der $created entfernen (Review M6-Plan r2 Hinweis 3)
+	 * @param int[] $created
+	 */
+	public function copyAsSubmission(Note $template, int $wsId, int $folderId, int $assignmentId, int $submissionId, string $uid, array &$created): Note {
+		return $this->cloneNote($template, $wsId, $folderId, $uid, $created, $assignmentId, $submissionId);
 	}
 
 	/** @param int[] $created */

@@ -104,7 +104,8 @@ final class AssignmentAccessTest extends AssignmentTestCase {
 		$teams->method('getLevel')->willReturn(0);
 		$state = new TeamStateService(Server::get(\OCA\NextNotes\Db\TeamMapper::class), $teams, Server::get(\OCP\AppFramework\Utility\ITimeFactory::class));
 		return new AccessService(Server::get(WorkspaceMapper::class), Server::get(WsShareMapper::class), Server::get(NoteMapper::class),
-			Server::get(FolderMapper::class), $teams, $state, Server::get(AssignmentMapper::class), Server::get(SubmissionMapper::class));
+			Server::get(FolderMapper::class), $teams, $state, Server::get(AssignmentMapper::class), Server::get(SubmissionMapper::class),
+			new \OCA\NextNotes\Service\SubmissionStateService(Server::get(SubmissionMapper::class), $teams, $state, Server::get(\OCP\AppFramework\Utility\ITimeFactory::class)));
 	}
 
 	// Done 3a: S2 erreicht S1-Abgabe über keinen Pfad; L (aktiv), O (verwaist) ja; Lehrkraft ohne owner_uid im verwaisten Team nein; abgelöste Kopie nur L/O
@@ -118,7 +119,7 @@ final class AssignmentAccessTest extends AssignmentTestCase {
 		$own = $fx['s2']->call('GET', "/assignments/$aid");
 		self::assertSame(200, $own->status, 'S2 liest die Aufgabe');
 		self::assertSame($sub2['sid'], $own->json()['assignment']['submission']['id'], 'S2 sieht nur eigene Abgabe');
-		foreach (['abgabe1', (string)$sub1['sid'] . ',', 'template_note_id', 'submissions_total'] as $needle) {
+		foreach (['abgabe1', '"id":' . $sub1['sid'] . ',', 'template_note_id', 'submissions_total'] as $needle) {
 			self::assertStringNotContainsString($needle, $own->body, "Aufgabe für S2 ohne $needle");
 		}
 		self::ok($fx['s2']->call('GET', "/submissions/{$sub2['sid']}"), 'S2 eigene Abgabe');
@@ -170,8 +171,9 @@ final class AssignmentAccessTest extends AssignmentTestCase {
 		$aid = $fx['aid'];
 		// zweite Aufgabe, deren owner_uid X ist, im verwaisten zweiten Team (b)
 		$t2 = $this->teams->create($fx['l']->uid, 'Asg2 ' . bin2hex(random_bytes(3)));
-		self::teamWs($fx['l'], $t2, 'Asg2');
-		$a2 = $this->createAssignment($fx['l'], $t2, $fx['src'], 'Zweite');
+		[$ws2] = self::teamWs($fx['l'], $t2, 'Asg2');
+		// Quelle aus dem eigenen Team (Lead 2026-11-08: keine Quelle aus anderem Team)
+		$a2 = $this->createAssignment($fx['l'], $t2, self::newNote($fx['l'], $ws2, 'Quelle 2', '<p>q2</p>'), 'Zweite');
 		self::setColumn('nextnotes_assignments', (int)$a2['id'], 'owner_uid', $fx['x']->uid);
 		self::setTeamState($t2, 'orphaned');
 		$access->resetCache();

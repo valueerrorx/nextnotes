@@ -16,6 +16,7 @@ use OCA\NextNotes\Db\WorkspaceMapper;
 use OCA\NextNotes\Db\WsShareMapper;
 use OCA\NextNotes\Service\Exception\BadRequestException;
 use OCA\NextNotes\Service\Exception\ForbiddenException;
+use Psr\Log\LoggerInterface;
 
 // Workspace löschen (DELETE /workspaces, workspaces.php delete) und endgültiger Löschpfad (Team-Workspace ohne Ziel, M5c-Purge)
 class WorkspaceDeletion {
@@ -29,6 +30,7 @@ class WorkspaceDeletion {
 		private WorkspaceMapper $workspaces,
 		private BackgroundFiles $backgrounds,
 		private Transaction $tx,
+		private LoggerInterface $logger,
 	) {
 	}
 
@@ -81,7 +83,12 @@ class WorkspaceDeletion {
 	// Endgültig wie UserDataService::purgeWorkspaces: Notizen samt Anhängen/Snapshots/Erinnerungen/Sperren/Erwähnungen, Ordner, Freigaben, Hintergründe; Dateien nach Commit (Team-Purge M5c)
 	public function purge(int $workspaceId): void {
 		$this->tx->run(function () use ($workspaceId) {
-			$this->noteService->purge($this->notes->idsInWorkspace($workspaceId));
+			// nur role=note; ein Workspace mit Abgaben/Vorlagen bleibt (Plan M6 §2.5 H3)
+			$this->noteService->purge($this->notes->idsInWorkspace($workspaceId, 'note'));
+			if ($this->notes->idsInWorkspace($workspaceId) !== []) {
+				$this->logger->warning('nextnotes: workspace still holds system notes, kept', ['workspace' => $workspaceId]);
+				return;
+			}
 			$this->folders->deleteByIds(array_map(static fn ($f) => (int)$f->getId(), $this->folders->findInWorkspace($workspaceId)));
 			$this->shares->deleteForWorkspace($workspaceId);
 			$this->workspaces->deleteById($workspaceId);

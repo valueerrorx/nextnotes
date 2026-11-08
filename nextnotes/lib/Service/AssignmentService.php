@@ -11,15 +11,19 @@ namespace OCA\NextNotes\Service;
 
 use OCA\NextNotes\Db\Assignment;
 use OCA\NextNotes\Db\AssignmentMapper;
+use OCA\NextNotes\Db\Note;
 use OCA\NextNotes\Db\Submission;
 use OCA\NextNotes\Db\SubmissionMapper;
+use OCA\NextNotes\Db\WorkspaceMapper;
 use OCA\NextNotes\Service\Exception\BadRequestException;
 use OCA\NextNotes\Service\Exception\ConflictException;
+use OCA\NextNotes\Service\Exception\ForbiddenException;
 use OCA\NextNotes\Service\Exception\NotFoundException;
+use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\IUserManager;
 
-// Aufgaben anlegen, ändern, löschen, lesen (SPEC §9.1, §9.5, Plan M6 §2.3); Austeilen und Zustände folgen in M6e1
+// Aufgaben anlegen, ändern, austeilen, schließen, löschen, lesen (SPEC §9.1, §9.5, Plan M6 §2.3/§2.4)
 class AssignmentService {
 	private const MAX_POINTS = 100000;
 
@@ -37,14 +41,21 @@ class AssignmentService {
 		private Transaction $tx,
 		private ITimeFactory $time,
 		private IUserManager $users,
+		private DistributionService $distribution,
+		private SubmissionStateService $states,
+		private WorkspaceMapper $workspaceRows,
 	) {
 	}
 
 	/** @return array{assignments: list<array<string, mixed>>} GET /assignments (§9.6) */
 	public function index(string $uid): array {
+		$this->reconcileOwn($uid);
 		$list = $this->assignments->findByIds($this->access->visibleAssignmentIds($uid));
 		$ids = array_map(static fn (Assignment $a) => (int)$a->getId(), $list);
 		$own = $this->submissions->findOwn($uid, $ids);
+		foreach ($own as $aid => $s) {
+			$own[$aid] = $this->states->materialize($s, $this->byId($list, $aid));
+		}
 		$reviewable = array_values(array_filter($ids, fn (int $id) => $this->access->assignmentAllows($uid, $this->byId($list, $id), 'review')));
 		$counts = $reviewable === [] ? [] : $this->submissions->counts($reviewable);
 		$out = [];
@@ -53,6 +64,34 @@ class AssignmentService {
 			$out[] = $this->view($uid, $a, $own[$id] ?? null, in_array($id, $reviewable, true) ? ($counts[$id] ?? ['total' => 0, 'submitted' => 0]) : null);
 		}
 		return ['assignments' => $out];
+	}
+
+	/**
+	 * Nachzügler (§9.4) beim Öffnen der Aufgabenliste durch den Schüler: fehlende eigene Abgaben anlegen, Austrittsmarke nach Wiedereintritt löschen (H5);
+	 * Quote-Mangel bleibt ohne Fehler nach außen (Plan M6 §2.3a (3))
+	 */
+	private function reconcileOwn(string $uid): void {
+		$teamIds = $this->teams->isAvailable() ? array_map('strval', array_keys($this->teams->memberTeams($uid))) : [];
+		if ($teamIds === []) {
+			return;
+		}
+		$now = $this->time->getTime();
+		$own = array_flip($this->submissions->assignmentIdsOf($uid));
+		$todo = [];
+		foreach ($this->assignments->findOpenDistributed($teamIds, $now) as $a) {
+			// nur Schüler (Level 1); Lehrkräfte ohne Zusatzabfrage je Aufgabe
+			if (!isset($own[(int)$a->getId()]) && $this->teams->getLevel((string)$a->getTeamId(), $uid) === 1) {
+				$todo[(int)$a->getId()] = $a;
+			}
+		}
+		$left = array_filter($this->submissions->findOwn($uid), static fn (Submission $s) => $s->getLeftTeamAt() !== null);
+		foreach ($left === [] ? [] : $this->assignments->findByIds(array_keys($left)) as $a) {
+			$todo[(int)$a->getId()] ??= $a;
+		}
+		$deadline = $now + DistributionService::BUDGET_SECONDS;
+		foreach ($todo as $a) {
+			$this->distribution->reconcile($a, $uid, $deadline);
+		}
 	}
 
 	/** @param Assignment[] $list */
@@ -76,7 +115,8 @@ class AssignmentService {
 		$id = (int)$a->getId();
 		$review = $this->access->assignmentAllows($uid, $a, 'review');
 		$counts = $review ? ($this->submissions->counts([$id])[$id] ?? ['total' => 0, 'submitted' => 0]) : null;
-		return $this->view($uid, $a, $this->submissions->findOwn($uid, [$id])[$id] ?? null, $counts);
+		$own = $this->submissions->findOwn($uid, [$id])[$id] ?? null;
+		return $this->view($uid, $a, $own === null ? null : $this->states->materialize($own, $a), $counts);
 	}
 
 	/**
@@ -118,7 +158,7 @@ class AssignmentService {
 	 * Abgabe als JSON; $teacher = Sicht mit review (alle Felder), sonst eigene Abgabe (Feedback erst nach Rückgabe)
 	 * @return array<string, mixed>
 	 */
-	private function submissionView(Submission $s, bool $teacher): array {
+	public function submissionView(Submission $s, bool $teacher): array {
 		$returned = $s->getStatus() === 'returned';
 		$out = [
 			'id' => (int)$s->getId(),
@@ -148,12 +188,14 @@ class AssignmentService {
 	/** @return array{submissions: list<array<string, mixed>>} GET /assignments/{id}/submissions (review) */
 	public function submissions(string $uid, int $id): array {
 		$a = $this->access->requireAssignment($uid, $id, 'review');
+		$this->states->materializeAssignment($a);
 		return ['submissions' => array_map(fn (Submission $s) => $this->submissionView($s, true), $this->submissions->findByAssignment((int)$a->getId()))];
 	}
 
 	/** @return array{submission: array<string, mixed>} GET /submissions/{id}: eigene oder review */
 	public function submission(string $uid, int $id): array {
 		[$s, $a] = $this->access->requireSubmission($uid, $id, 'read');
+		$s = $this->states->materialize($s, $a);
 		return ['submission' => $this->submissionView($s, $this->access->assignmentAllows($uid, $a, 'review'))];
 	}
 
@@ -175,6 +217,7 @@ class AssignmentService {
 		if ($source->getRole() !== 'note') {
 			throw new BadRequestException('Only regular notes can be used for an assignment');
 		}
+		$this->requireSourceAllowed($uid, $teamId, $source);
 		$this->teamState->ensure($teamId, $this->teams->memberTeams($uid)[$teamId] ?? null);
 		$quota = $this->quota->quotaForTeam($teamId, $this->attachments->bytesOf([(int)$source->getId()]));
 		$now = $this->time->getTime();
@@ -208,6 +251,63 @@ class AssignmentService {
 			}
 			throw $e;
 		}
+		return ['assignment' => $this->viewOne($uid, $a)];
+	}
+
+	/**
+	 * Quelle nur aus eigenem Workspace oder einem Workspace desselben Teams (inkl. Material); fremde Freigaben und andere Teams → 403
+	 * (Verlassen-Regel SPEC §3, Lead-Entscheidung 2026-11-08)
+	 */
+	private function requireSourceAllowed(string $uid, string $teamId, Note $source): void {
+		try {
+			$ws = $source->getWorkspaceId() === null ? null : $this->workspaceRows->find((int)$source->getWorkspaceId());
+		} catch (DoesNotExistException) {
+			$ws = null;
+		}
+		$allowed = $ws !== null && $ws->getKind() === 'normal' && (
+			($ws->getOwnerType() === 'user' && $ws->getOwnerId() === $uid)
+			|| ($ws->getOwnerType() === 'team' && $ws->getOwnerId() === $teamId));
+		if (!$allowed) {
+			throw new ForbiddenException('Only your own notes or notes of this team can become an assignment', ['code' => 'source_not_allowed']);
+		}
+	}
+
+	/**
+	 * POST /assignments/{id}/distribute (§9.1): draft → distributed, dann Abgaben je Schüler im Zeitbudget; erneuter Aufruf teilt Nachzügler aus.
+	 * 413 quota_exceeded vorab (nichts angelegt); knapp gewordene Quote → 200 mit pending und error (Plan M6 §2.3a)
+	 * @return array<string, mixed>
+	 */
+	public function distribute(string $uid, int $id): array {
+		$a = $this->distribution->start($this->access->requireAssignment($uid, $id, 'distribute'));
+		$result = $this->distribution->reconcile($a, null, $this->time->getTime() + DistributionService::BUDGET_SECONDS);
+		$out = ['assignment' => $this->viewOne($uid, $a), 'created' => $result['created'], 'pending' => $result['pending']];
+		if ($result['error'] !== null) {
+			$out['error'] = $result['error'];
+		}
+		return $out;
+	}
+
+	/**
+	 * POST /assignments/{id}/close: distributed → closed, offene Abgaben → missed; friert alle Übergänge ein (§9.2). Sperren: Aufgabe → Abgaben
+	 * @return array{assignment: array<string, mixed>}
+	 */
+	public function close(string $uid, int $id): array {
+		$this->access->requireAssignment($uid, $id, 'close');
+		$a = $this->tx->run(function () use ($uid, $id): Assignment {
+			if ($this->assignments->lockRow($id) === 0) {
+				throw new NotFoundException('Assignment not found');
+			}
+			$a = $this->access->requireAssignment($uid, $id, 'close');
+			if ($a->getStatus() !== 'distributed') {
+				throw new ConflictException('Only a distributed assignment can be closed', ['code' => 'invalid_state']);
+			}
+			$now = $this->time->getTime();
+			$a->setStatus('closed');
+			$a->setUpdatedAt($now);
+			$a = $this->assignments->update($a);
+			$this->submissions->closeOpen($id, $now);
+			return $a;
+		});
 		return ['assignment' => $this->viewOne($uid, $a)];
 	}
 
@@ -249,6 +349,10 @@ class AssignmentService {
 			$a->setUpdatedAt($now);
 			return $this->assignments->update($a);
 		});
+		// Verlängerung: Nachzügler gleich austeilen (§9.2), Rest beim nächsten Zugriff
+		if ($due !== null && $a->getStatus() === 'distributed') {
+			$this->distribution->reconcile($a, null, $this->time->getTime() + DistributionService::BUDGET_SECONDS);
+		}
 		return ['assignment' => $this->viewOne($uid, $a)];
 	}
 
@@ -275,7 +379,7 @@ class AssignmentService {
 	}
 
 	// Unix-Sekunden (Zahl oder Ziffernfolge) oder ISO 8601 mit Zeitzone; muss in der Zukunft liegen
-	private function dueAt(mixed $raw): int {
+	public function dueAt(mixed $raw): int {
 		$ts = null;
 		if (is_int($raw) || (is_string($raw) && preg_match('/^\d{1,12}$/', $raw))) {
 			$ts = (int)$raw;

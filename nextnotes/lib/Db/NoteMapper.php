@@ -564,12 +564,32 @@ class NoteMapper extends QBMapper {
 		return array_map('intval', $qb->executeQuery()->fetchFirstColumn());
 	}
 
-	/** @return int[] alle Notiz-IDs eines Workspace (jede Rolle, auch Papierkorb) */
-	public function idsInWorkspace(int $workspaceId): array {
+	/** @return int[] alle Notiz-IDs eines Workspace (jede Rolle, auch Papierkorb); $role = nur diese Rolle */
+	public function idsInWorkspace(int $workspaceId, ?string $role = null): array {
 		$qb = $this->db->getQueryBuilder();
 		$qb->select('id')->from(self::TABLE)
 			->where($qb->expr()->eq('workspace_id', $qb->createNamedParameter($workspaceId, IQueryBuilder::PARAM_INT)));
+		if ($role !== null) {
+			$qb->andWhere($qb->expr()->eq('role', $qb->createNamedParameter($role)));
+		}
 		return array_map('intval', $qb->executeQuery()->fetchFirstColumn());
+	}
+
+	/**
+	 * Kontolöschung: Kopien aus dem Schüler-Workspace lösen (SPEC §8); Anhänge und Snapshots bleiben an der Notiz
+	 * @param int[] $ids
+	 */
+	public function detachSubmissions(array $ids, int $now): void {
+		foreach (array_chunk(array_values(array_unique($ids)), 1000) as $chunk) {
+			$qb = $this->db->getQueryBuilder();
+			$qb->update(self::TABLE)
+				->set('workspace_id', $qb->createNamedParameter(null, IQueryBuilder::PARAM_NULL))
+				->set('folder_id', $qb->createNamedParameter(null, IQueryBuilder::PARAM_NULL))
+				->set('updated_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT))
+				->where($qb->expr()->in('id', $qb->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY)))
+				->andWhere($qb->expr()->eq('role', $qb->createNamedParameter('submission')))
+				->executeStatement();
+		}
 	}
 
 	/**

@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OCA\NextNotes\Service;
 
 use OCA\NextNotes\BackgroundJob\UserDataDeletionJob;
+use OCA\NextNotes\Db\AssignmentMapper;
 use OCA\NextNotes\Db\AttachmentMapper;
 use OCA\NextNotes\Db\FolderMapper;
 use OCA\NextNotes\Db\LockMapper;
@@ -17,6 +18,7 @@ use OCA\NextNotes\Db\MentionHandledMapper;
 use OCA\NextNotes\Db\NoteMapper;
 use OCA\NextNotes\Db\ReminderMapper;
 use OCA\NextNotes\Db\SnapshotMapper;
+use OCA\NextNotes\Db\SubmissionMapper;
 use OCA\NextNotes\Db\WorkspaceMapper;
 use OCA\NextNotes\Db\WsShareMapper;
 use OCP\AppFramework\Utility\ITimeFactory;
@@ -45,6 +47,7 @@ class UserDataService {
 		private ITimeFactory $time,
 		private LoggerInterface $logger,
 		private BackgroundFiles $backgrounds,
+		private SubmissionMapper $submissions,
 	) {
 	}
 
@@ -57,10 +60,10 @@ class UserDataService {
 	 * Synchron beim UserDeletedEvent: danach verleiht und trägt keine Zeile mehr die UID (SPEC §2 UID-Regel)
 	 * @return string|null Kennung der entkoppelten Workspaces für den Job, null wenn keine
 	 */
-	public function neutralize(string $uid): ?string {
+	public function neutralize(string $uid, ?string $displayName = null): ?string {
 		// Kennung statt UID: '#' kommt in NC-UIDs nicht vor; hält nn_ws_asg eindeutig und das Job-Argument klein
 		$token = '#' . bin2hex(random_bytes(8));
-		$found = $this->tx->run(function () use ($uid, $token): bool {
+		$found = $this->tx->run(function () use ($uid, $token, $displayName): bool {
 			// Erste Anweisung schreibt (SQLite: Schreibsperre vor jedem Lesen)
 			$qb = $this->db->getQueryBuilder();
 			$moved = $qb->update(WorkspaceMapper::TABLE)
@@ -69,6 +72,12 @@ class UserDataService {
 				->where($qb->expr()->eq('owner_type', $qb->createNamedParameter('user')))
 				->andWhere($qb->expr()->eq('owner_id', $qb->createNamedParameter($uid)))
 				->executeStatement();
+			// Abgaben bleiben (ADR 0008 a, Plan M6 §2.5 O3): in derselben Transaktion wie owner_type=deleted Kopien lösen (Workspace → Notizen → Abgaben)
+			$now = $this->time->getTime();
+			$this->notes->detachSubmissions($this->submissions->noteIdsOf($uid), $now);
+			$this->submissions->detachStudent($uid, $displayName, $now);
+			$this->submissions->clearFeedbackBy($uid);
+			$this->clear(AssignmentMapper::TABLE, 'created_by', $uid);
 			// Hintergrundbilder in fremden Workspaces: Freigaben und Team-Workspaces der Teams vor der Löschung bzw. mit created_by (R15); eigene gehen mit dem Workspace im Job
 			$teamWs = $this->workspaces->teamWorkspaceIdsFor($this->teamsBefore[$uid] ?? [], $uid);
 			$this->backgrounds->queueUser(array_merge($this->shares->workspaceIdsSharedWith($uid), $teamWs), $uid, false);
@@ -86,7 +95,7 @@ class UserDataService {
 			$this->clear(NoteMapper::TABLE, 'updated_by', $uid);
 			$this->clear(AttachmentMapper::TABLE, 'created_by', $uid);
 			$this->clear(SnapshotMapper::TABLE, 'created_by', $uid);
-			// Team-Workspaces bleiben (gehören dem Team, ADR 0003), created_by oben NULL; M6: Aufgaben (owner_uid, created_by) und Abgaben (student_uid, feedback_by) hier ergänzen
+			// Team-Workspaces bleiben (gehören dem Team, ADR 0003), created_by oben NULL; assignments.owner_uid folgt mit transferOwnership (M6f)
 			if ($moved > 0) {
 				$this->jobs->add(UserDataDeletionJob::class, ['token' => $token]);
 			}
@@ -125,9 +134,13 @@ class UserDataService {
 			if ($deadline !== null && $this->time->getTime() >= $deadline) {
 				break;
 			}
-			// Je Workspace eine Transaktion; Dateien (IAppData) erst nach deren Commit
+			// Je Workspace eine Transaktion; Dateien (IAppData) erst nach deren Commit; nur role=note, Abgaben/Vorlagen nie (Plan M6 §2.5 H3)
 			$this->tx->run(function () use ($id) {
-				$this->noteService->purge($this->notes->idsInWorkspace($id));
+				$this->noteService->purge($this->notes->idsInWorkspace($id, 'note'));
+				if ($this->notes->idsInWorkspace($id) !== []) {
+					$this->logger->warning('nextnotes: deleted workspace still holds system notes, kept', ['workspace' => $id]);
+					return;
+				}
 				$this->folders->deleteByIds(array_map(static fn ($f) => (int)$f->getId(), $this->folders->findInWorkspace($id)));
 				$this->shares->deleteForWorkspace($id);
 				$this->workspaces->deleteById($id);

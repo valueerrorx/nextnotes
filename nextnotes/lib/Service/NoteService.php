@@ -492,12 +492,8 @@ class NoteService {
 		// Versionsprüfung und Schreiben unter Zeilensperre (wie Aufgaben): keine verlorene Änderung
 		$this->notes->lockRow($id);
 		$note = $this->notes->find($id);
-		// Vorlage: Aufgabenstatus unter der Notizsperre neu prüfen (draft, Review M6-Plan r2 Hinweis 1)
-		if ($note->getRole() !== 'note') {
-			if ($this->access->noteLevel($uid, $note) < AccessService::WRITE) {
-				throw new ForbiddenException('Permission denied');
-			}
-		}
+		// Vorlage/Abgabe: Status unter der Notizsperre neu prüfen (Review M6-Plan r2 Hinweis 1)
+		$this->access->recheckLocked($uid, $note);
 		$current = NoteSerializer::version($note);
 		if ($expected !== '' && $expected !== '*' && !hash_equals($current, $expected)) {
 			throw new ConflictException('Version conflict: the note was modified since the version you provided', [
@@ -635,6 +631,7 @@ class NoteService {
 		$note = $this->access->requireNote($uid, $id, 'write');
 		$this->locks->assertCanSave($uid, $id, $session);
 		$this->tx->run(function () use ($note, $content, $uid) {
+			$note = $this->access->lockForWrite($uid, $note);
 			$this->snapshots->autoBefore($note, $uid);
 			$this->applyContent($note, (string)$content);
 			$note->setUpdatedAt($this->now());
@@ -648,6 +645,7 @@ class NoteService {
 		$note = $this->access->requireNote($uid, $id, 'write');
 		$snapshot = $this->snapshots->require($note, $key, $date);
 		return $this->tx->run(function () use ($uid, $note, $snapshot, $meta) {
+			$note = $this->access->lockForWrite($uid, $note);
 			$now = $this->now();
 			$changedHeading = null;
 			$heading = trim((string)$snapshot->getHeading());
@@ -791,7 +789,8 @@ class NoteService {
 			throw new NotFoundException('Note not found');
 		}
 		$tags = $this->validator->noteTags($in['tags']);
-		$this->tx->run(function () use ($note, $tags, $uid) {
+		$this->tx->run(function () use (&$note, $tags, $uid) {
+			$note = $this->access->lockForWrite($uid, $note);
 			$this->snapshots->autoBefore($note, $uid);
 			$this->tags->replace((int)$note->getId(), $tags);
 			$note->setUpdatedAt($this->now());
@@ -801,36 +800,46 @@ class NoteService {
 		return ['tags' => $this->serializer->tagString($tags), 'version' => NoteSerializer::version($note)];
 	}
 
+	/**
+	 * Einzelne Felder schreiben; Vorlage/Abgabe unter Notiz-Zeilensperre neu geprüft (lockForWrite)
+	 * @param callable(Note): mixed $change
+	 */
+	private function writeFields(string $uid, Note $note, callable $change): Note {
+		if ($note->getRole() === 'note') {
+			$change($note);
+			return $this->notes->update($note);
+		}
+		return $this->tx->run(function () use ($uid, $note, $change): Note {
+			$note = $this->access->lockForWrite($uid, $note);
+			$change($note);
+			return $this->notes->update($note);
+		});
+	}
+
 	/** @return array{0: string, 1: ?string} */
 	public function setIcon(string $uid, int $id, mixed $icon, mixed $iconColor): array {
 		$iconValue = $this->validator->icon($icon);
 		$colorValue = $this->validator->iconColor($iconColor);
-		$note = $this->access->requireNote($uid, $id, 'write');
-		$note->setIcon($iconValue);
-		$note->setIconColor($colorValue);
-		$this->notes->update($note);
+		$this->writeFields($uid, $this->access->requireNote($uid, $id, 'write'), static function (Note $note) use ($iconValue, $colorValue): void {
+			$note->setIcon($iconValue);
+			$note->setIconColor($colorValue);
+		});
 		return [$iconValue ?? NoteSerializer::DEFAULT_ICON, $colorValue];
 	}
 
 	/** @return array{0: ?string, 1: ?string} gespeicherte Farbe, Hex nach Besitzer-Palette (R16) */
 	public function setColor(string $uid, int $id, mixed $color): array {
 		$value = $this->validator->color($color);
-		$note = $this->access->requireNote($uid, $id, 'write');
-		$note->setColor($value);
-		$this->notes->update($note);
+		$note = $this->writeFields($uid, $this->access->requireNote($uid, $id, 'write'), static fn (Note $note) => $note->setColor($value));
 		return [$value, $this->validator->colorHex($value, $this->workspaces->paletteOwner($uid, (int)$note->getWorkspaceId()))];
 	}
 
 	public function setPinned(string $uid, int $id, bool $pinned): void {
-		$note = $this->access->requireNote($uid, $id, 'write');
-		$note->setPinned($pinned ? 1 : 0);
-		$this->notes->update($note);
+		$this->writeFields($uid, $this->access->requireNote($uid, $id, 'write'), static fn (Note $note) => $note->setPinned($pinned ? 1 : 0));
 	}
 
 	public function setContentWidth(string $uid, int $id, ?int $width): void {
-		$note = $this->access->requireNote($uid, $id, 'write');
-		$note->setContentWidth($width);
-		$this->notes->update($note);
+		$this->writeFields($uid, $this->access->requireNote($uid, $id, 'write'), static fn (Note $note) => $note->setContentWidth($width));
 	}
 
 	/** @return array{title_color: ?string, title_size: ?int} */
@@ -848,14 +857,14 @@ class NoteService {
 				throw new BadRequestException('Invalid value for "title_size": expected a size in px between 12 and 64, or null');
 			}
 		}
-		$note = $this->access->requireNote($uid, $id, 'write');
-		if ($hasColor) {
-			$note->setTitleColor($color);
-		}
-		if ($hasSize) {
-			$note->setTitleSize($size);
-		}
-		$this->notes->update($note);
+		$note = $this->writeFields($uid, $this->access->requireNote($uid, $id, 'write'), static function (Note $note) use ($hasColor, $color, $hasSize, $size): void {
+			if ($hasColor) {
+				$note->setTitleColor($color);
+			}
+			if ($hasSize) {
+				$note->setTitleSize($size);
+			}
+		});
 		return ['title_color' => $note->getTitleColor(), 'title_size' => $note->getTitleSize()];
 	}
 
@@ -866,8 +875,7 @@ class NoteService {
 			throw new NotFoundException('Note not found');
 		}
 		$value = (int)$note->getFavorite() === 1 ? 0 : 1;
-		$note->setFavorite($value);
-		$this->notes->update($note);
+		$this->writeFields($uid, $note, static fn (Note $note) => $note->setFavorite($value));
 		return $value;
 	}
 
@@ -1057,9 +1065,8 @@ class NoteService {
 	}
 
 	public function setKanbanCompleted(string $uid, int $id, bool $completed): void {
-		$note = $this->access->requireNote($uid, $id, 'write');
-		$note->setKanbanCompleted($completed ? $this->now() : null);
-		$this->notes->update($note);
+		$stamp = $completed ? $this->now() : null;
+		$this->writeFields($uid, $this->access->requireNote($uid, $id, 'write'), static fn (Note $note) => $note->setKanbanCompleted($stamp));
 	}
 
 	/** @return array<string, mixed> POST /notes/reorder */
@@ -1082,10 +1089,10 @@ class NoteService {
 		}
 		$note = $this->access->requireNote($uid, $noteId, 'write');
 		$target = $this->access->requireNote($uid, $targetId, 'write');
-		$wsId = (int)$target->getWorkspaceId();
-		if ($note->getWorkspaceId() !== $wsId) {
+		if ($note->getWorkspaceId() === null || $note->getWorkspaceId() !== $target->getWorkspaceId()) {
 			throw new BadRequestException('Notes must be in the same workspace');
 		}
+		$wsId = (int)$target->getWorkspaceId();
 		$ws = $this->workspaces->resolveOptional($uid, $in['workspace'] ?? null);
 		if ($ws !== null && $ws->getId() !== $wsId) {
 			throw new BadRequestException('Workspace does not match target note');
@@ -1135,7 +1142,8 @@ class NoteService {
 				$order = FolderService::placeAround($order, $fixed, $noteId, $targetId, $position);
 				$index = (int)array_search($noteId, $order, true);
 			}
-			$this->tx->run(function () use ($order, $byId, $column, $fixed) {
+			$this->tx->run(function () use ($uid, $order, $byId, $column, $fixed, $noteId, $note) {
+				$byId[$noteId] = $this->access->lockForWrite($uid, $note);
 				foreach ($order as $i => $nid) {
 					if (isset($fixed[$nid])) {
 						continue;
@@ -1151,6 +1159,13 @@ class NoteService {
 				['kanban' => 'kanban_order', 'dashboard' => 'dashboard_order', 'speed_dial' => 'speed_dial_order'][$scope] => $index + 1,
 			], 'share_delta' => 0];
 		}
+		// Seitenleiste mit Ordnerwechsel – Vorlage/Abgabe: nie in einen anderen Ordner (SPEC §9.3); Zielordner wie beim Verschieben prüfen (System-/Material-Ordner)
+		if ($changes && $note->getRole() !== 'note') {
+			throw new ForbiddenException('This content is managed by the system');
+		}
+		if ($changes && $folderId !== null) {
+			$this->access->requireFolder($uid, (int)$folderId, 'write');
+		}
 		if ($changes && $this->notes->headingExists($wsId, $folderId, (string)$note->getHeading(), $noteId)) {
 			throw new ConflictException('A note with the same title already exists in the destination folder');
 		}
@@ -1163,7 +1178,8 @@ class NoteService {
 			$byId[(int)$s->getId()] = $s;
 		}
 		$index = $this->insertAt($order, $targetId, $noteId, $position);
-		$this->tx->run(function () use ($order, $byId, $noteId, $folderId, $changes, $uid) {
+		$this->tx->run(function () use ($order, $byId, $noteId, $folderId, $changes, $uid, $note) {
+			$byId[$noteId] = $this->access->lockForWrite($uid, $note);
 			foreach ($order as $i => $nid) {
 				$n = $byId[$nid];
 				$n->setDisplayOrder($i + 1);

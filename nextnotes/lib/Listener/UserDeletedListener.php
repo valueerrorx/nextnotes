@@ -31,7 +31,7 @@ class UserDeletedListener implements IEventListener {
 			return;
 		}
 		try {
-			$this->userData->neutralize($event->getUid());
+			$this->userData->neutralize($event->getUid(), $event->getUser()->getDisplayName());
 		} catch (\Throwable $e) {
 			$this->logger->error('nextnotes: neutralizing data of deleted user failed', ['uid' => $event->getUid(), 'exception' => $e]);
 			throw $e;

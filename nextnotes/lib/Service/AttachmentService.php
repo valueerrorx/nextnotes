@@ -314,8 +314,9 @@ class AttachmentService {
 		$name = self::cleanName($original);
 		$mime = $this->mimeOf($tmp, $name);
 		$quota = $this->quotaForNote($note, $size);
-		$a = $this->tx->run(function () use ($quota, $noteId, $name, $mime, $size, $uid, $tmp) {
+		$a = $this->tx->run(function () use ($quota, $note, $noteId, $name, $mime, $size, $uid, $tmp) {
 			$this->enforceQuota($quota);
+			$this->access->lockForWrite($uid, $note);
 			$a = $this->newRow($noteId, $name, $mime, $size, $uid);
 			$this->removeOnRollback($noteId, (int)$a->getId());
 			$handle = fopen($tmp, 'rb');
@@ -347,7 +348,8 @@ class AttachmentService {
 		$note = $this->access->requireNote($uid, $noteId, 'write');
 		$this->checkWorkspace($uid, $note, $wsKey);
 		$a = $this->attachmentOn($noteId, $attachmentId);
-		$this->tx->run(function () use ($note, $a, $noteId, $attachmentId) {
+		$this->tx->run(function () use ($uid, $note, $a, $noteId, $attachmentId) {
+			$note = $this->access->lockForWrite($uid, $note);
 			$this->attachments->delete($a);
 			$content = (string)$note->getContent();
 			$stripped = self::stripReferences($content, $attachmentId);

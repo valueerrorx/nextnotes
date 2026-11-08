@@ -198,4 +198,47 @@ abstract class AssignmentTestCase extends TeamTestCase {
 		}
 		return $errors;
 	}
+
+	/** @return array<string, mixed> Fixture mit echtem Austeilen (M6e1): subs[uid] = Abgabe-Zeile (Schüler S1, S2, X) */
+	protected function distributedFixture(): array {
+		$fx = $this->fixture(false);
+		$fx['distribute'] = self::ok($fx['l']->call('POST', "/assignments/{$fx['aid']}/distribute"), 'Austeilen');
+		$fx['subs'] = self::submissionsOf($fx['aid']);
+		return $fx;
+	}
+
+	/** @return array<string, array<string, mixed>> student_uid → Abgabe-Zeile */
+	protected static function submissionsOf(int $aid): array {
+		$qb = self::db()->getQueryBuilder();
+		$qb->select('*')->from('nextnotes_submissions')->where($qb->expr()->eq('assignment_id', $qb->createNamedParameter($aid, IQueryBuilder::PARAM_INT)));
+		$out = [];
+		foreach ($qb->executeQuery()->fetchAll() as $row) {
+			$out[(string)($row['student_uid'] ?? '#' . $row['id'])] = $row;
+		}
+		return $out;
+	}
+
+	/**
+	 * Wettlauf deterministisch: dieser Prozess hält die Notizzeile, die Anfrage läuft an (Rechteprüfung vor der Sperre),
+	 * $mutate ändert in derselben Transaktion den Zustand, dann Commit; die Anfrage muss unter Sperre neu prüfen
+	 * Nur MariaDB/PostgreSQL beweiskräftig (Zeilensperre); SQLite sperrt die ganze DB, die Anfrage wartet dort schon vor der Rechteprüfung
+	 */
+	protected static function raceOnNote(ApiClient $c, string $method, string $path, ?array $body, int $noteId, callable $mutate): Response {
+		$db = self::db();
+		$db->beginTransaction();
+		try {
+			$qb = $db->getQueryBuilder();
+			$qb->update('nextnotes_notes')->set('id', 'id')->where($qb->expr()->eq('id', $qb->createNamedParameter($noteId, IQueryBuilder::PARAM_INT)))->executeStatement();
+			$req = $c->start($method, $path, $body);
+			for ($t = microtime(true); microtime(true) - $t < 2.0; usleep(50000)) {
+				($req->pump)();
+			}
+			$mutate();
+			$db->commit();
+		} catch (\Throwable $e) {
+			$db->rollBack();
+			throw $e;
+		}
+		return ($req->wait)();
+	}
 }

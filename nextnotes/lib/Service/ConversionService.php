@@ -158,6 +158,7 @@ class ConversionService {
 			$this->attachments->enforceQuota($images['quota'] ?? null);
 			$this->notes->lockRow($id);
 			$note = $this->notes->find($id);
+			$this->access->recheckLocked($uid, $note);
 			self::checkType((string)($note->getType() ?: 'note'), $target);
 			$content = (string)$note->getContent();
 			if ($target === 'markdown') {

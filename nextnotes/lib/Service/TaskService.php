@@ -277,6 +277,7 @@ class TaskService {
 		[$out, $note, $old] = $this->tx->run(function () use ($uid, $id, $change) {
 			$this->notes->lockRow($id);
 			$note = $this->notes->find($id);
+			$this->access->recheckLocked($uid, $note);
 			$old = (string)$note->getContent();
 			[$tasks, $out, $after] = $change(self::rawTasks($old), $note);
 			$this->noteService->saveContent($note, self::encode($tasks), $uid);

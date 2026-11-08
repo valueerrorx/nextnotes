@@ -152,6 +152,42 @@ final class ApiClient {
 		return $out;
 	}
 
+	/**
+	 * Uploads verschiedener Benutzer gleichzeitig (curl_multi); $uploads = [[Client, Pfad, Dateiname, Bytes], …]
+	 * @return Response[]
+	 */
+	public static function parallelUploadsOf(array $uploads): array {
+		$mh = curl_multi_init();
+		$handles = [];
+		foreach ($uploads as $i => [$client, $path, $filename, $bytes]) {
+			$ch = curl_init(self::baseUrl() . self::PREFIX . $path);
+			curl_setopt_array($ch, [
+				CURLOPT_CUSTOMREQUEST => 'POST',
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_HEADER => true,
+				CURLOPT_TIMEOUT => 60,
+				CURLOPT_USERPWD => $client->uid . ':' . $client->secret,
+				CURLOPT_HTTPHEADER => array_merge($client->extraHeaders, ['Accept: application/json']),
+				CURLOPT_POSTFIELDS => ['file' => new \CURLStringFile($bytes, $filename, 'application/octet-stream')],
+			]);
+			$handles[$i] = $ch;
+			curl_multi_add_handle($mh, $ch);
+		}
+		do {
+			$st = curl_multi_exec($mh, $running);
+			if ($running) {
+				curl_multi_select($mh, 1.0);
+			}
+		} while ($running && $st === CURLM_OK);
+		$out = [];
+		foreach ($handles as $i => $ch) {
+			$out[$i] = self::toResponse($ch, (string)curl_multi_getcontent($ch));
+			curl_multi_remove_handle($mh, $ch);
+		}
+		curl_multi_close($mh);
+		return $out;
+	}
+
 	/** Mehrere Anfragen gleichzeitig (curl_multi); $requests = [[Verb, Pfad, ?JSON-Body], …], Reihenfolge der Antworten = Eingabe */
 	public function parallel(array $requests): array {
 		$mh = curl_multi_init();

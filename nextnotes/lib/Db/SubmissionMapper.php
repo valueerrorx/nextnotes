@@ -106,6 +106,8 @@ class SubmissionMapper extends QBMapper {
 			->set('updated_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT))
 			->where($expr->eq('assignment_id', $qb->createNamedParameter($assignmentId, IQueryBuilder::PARAM_INT)))
 			->andWhere($expr->eq('status', $qb->createNamedParameter('missed')))
+			// gelöschte Konten bleiben verpasst
+			->andWhere($expr->isNotNull('student_uid'))
 			->andWhere($expr->isNull('submitted_at'))
 			->andWhere($expr->isNull('due_override_at'))
 			->executeStatement();
@@ -138,5 +140,125 @@ class SubmissionMapper extends QBMapper {
 			$res->closeCursor();
 		}
 		return $out;
+	}
+
+	/**
+	 * Bedingter Übergang (SPEC §9.2): nur wenn der Status noch $from ist; Rückgabe true = genau diese Zeile geändert
+	 * @param array<string, int|string|null> $values Spalte → Wert
+	 */
+	public function updateIfStatus(int $id, string $from, array $values): bool {
+		$qb = $this->db->getQueryBuilder();
+		$qb->update(self::TABLE);
+		foreach ($values as $col => $v) {
+			$qb->set($col, $qb->createNamedParameter($v, $v === null ? IQueryBuilder::PARAM_NULL : (is_int($v) ? IQueryBuilder::PARAM_INT : IQueryBuilder::PARAM_STR)));
+		}
+		$qb->where($qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT)))
+			->andWhere($qb->expr()->eq('status', $qb->createNamedParameter($from)));
+		return $qb->executeStatement() === 1;
+	}
+
+	/**
+	 * Materialisierung (§9.3) als Massen-UPDATE: assigned nach Aufgabenfrist, reopened nach eigener Frist → missed
+	 * @param int[]|null $ids null = alle Abgaben der Aufgabe
+	 */
+	public function materialize(int $assignmentId, int $dueAt, int $now, ?array $ids = null): int {
+		$qb = $this->db->getQueryBuilder();
+		$expr = $qb->expr();
+		$open = [$expr->andX($expr->eq('status', $qb->createNamedParameter('reopened')), $expr->isNotNull('due_override_at'),
+			$expr->lt('due_override_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT)))];
+		if ($dueAt < $now) {
+			$open[] = $expr->eq('status', $qb->createNamedParameter('assigned'));
+		}
+		$qb->update(self::TABLE)
+			->set('status', $qb->createNamedParameter('missed'))
+			->set('updated_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT))
+			->where($expr->eq('assignment_id', $qb->createNamedParameter($assignmentId, IQueryBuilder::PARAM_INT)))
+			->andWhere($expr->orX(...$open));
+		if ($ids !== null) {
+			if ($ids === []) {
+				return 0;
+			}
+			$qb->andWhere($expr->in('id', $qb->createNamedParameter(array_values($ids), IQueryBuilder::PARAM_INT_ARRAY)));
+		}
+		return $qb->executeStatement();
+	}
+
+	// Schließen (§9.2): offene Abgaben (assigned, reopened) → missed
+	public function closeOpen(int $assignmentId, int $now): void {
+		$qb = $this->db->getQueryBuilder();
+		$expr = $qb->expr();
+		$qb->update(self::TABLE)
+			->set('status', $qb->createNamedParameter('missed'))
+			->set('updated_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT))
+			->where($expr->eq('assignment_id', $qb->createNamedParameter($assignmentId, IQueryBuilder::PARAM_INT)))
+			->andWhere($expr->in('status', $qb->createNamedParameter(['assigned', 'reopened'], IQueryBuilder::PARAM_STR_ARRAY)))
+			->executeStatement();
+	}
+
+	/** @return array<string, int> student_uid → Abgabe-ID (ohne gelöschte Konten) */
+	public function studentsOf(int $assignmentId): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('id', 'student_uid')->from(self::TABLE)
+			->where($qb->expr()->eq('assignment_id', $qb->createNamedParameter($assignmentId, IQueryBuilder::PARAM_INT)))
+			->andWhere($qb->expr()->isNotNull('student_uid'));
+		$out = [];
+		$res = $qb->executeQuery();
+		while ($row = $res->fetch()) {
+			$out[(string)$row['student_uid']] = (int)$row['id'];
+		}
+		$res->closeCursor();
+		return $out;
+	}
+
+	/** @return Submission[] Abgaben mit Austrittsmarke (reconcile Schritt a) */
+	public function findLeft(int $assignmentId): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')->from(self::TABLE)
+			->where($qb->expr()->eq('assignment_id', $qb->createNamedParameter($assignmentId, IQueryBuilder::PARAM_INT)))
+			->andWhere($qb->expr()->isNotNull('left_team_at'))
+			->andWhere($qb->expr()->isNotNull('student_uid'));
+		return $this->findEntities($qb);
+	}
+
+	public function clearLeft(int $id, int $now): void {
+		$qb = $this->db->getQueryBuilder();
+		$qb->update(self::TABLE)
+			->set('left_team_at', $qb->createNamedParameter(null, IQueryBuilder::PARAM_NULL))
+			->set('updated_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT))
+			->where($qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT)))
+			->andWhere($qb->expr()->isNotNull('left_team_at'))
+			->executeStatement();
+	}
+
+	/** @return int[] Notiz-IDs der Kopien eines Schülers */
+	public function noteIdsOf(string $uid): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('note_id')->from(self::TABLE)
+			->where($qb->expr()->eq('student_uid', $qb->createNamedParameter($uid)))
+			->andWhere($qb->expr()->isNotNull('note_id'));
+		return array_map('intval', $qb->executeQuery()->fetchFirstColumn());
+	}
+
+	// Kontolöschung (SPEC §8): Abgaben bleiben, UID wird gelöst (eine neu vergebene UID sieht sie nicht)
+	public function detachStudent(string $uid, ?string $name, int $now): void {
+		$qb = $this->db->getQueryBuilder();
+		$qb->update(self::TABLE)
+			->set('student_uid_former', $qb->createNamedParameter($uid))
+			->set('student_uid', $qb->createNamedParameter(null, IQueryBuilder::PARAM_NULL))
+			->set('student_deleted_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT))
+			->set('updated_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT))
+			->where($qb->expr()->eq('student_uid', $qb->createNamedParameter($uid)));
+		if ($name !== null && $name !== '') {
+			$qb->set('student_name', $qb->createNamedParameter(mb_substr($name, 0, 255)));
+		}
+		$qb->executeStatement();
+	}
+
+	public function clearFeedbackBy(string $uid): void {
+		$qb = $this->db->getQueryBuilder();
+		$qb->update(self::TABLE)
+			->set('feedback_by', $qb->createNamedParameter(null, IQueryBuilder::PARAM_NULL))
+			->where($qb->expr()->eq('feedback_by', $qb->createNamedParameter($uid)))
+			->executeStatement();
 	}
 }

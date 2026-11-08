@@ -98,4 +98,23 @@ class AssignmentMapper extends QBMapper {
 			->where($qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT)))
 			->executeStatement();
 	}
+
+	/**
+	 * Ausgeteilte Aufgaben mit offener Frist in diesen Teams (Nachzügler beim Zugriff des Schülers, §9.4)
+	 * @param string[] $teamIds
+	 * @return Assignment[]
+	 */
+	public function findOpenDistributed(array $teamIds, int $now): array {
+		$out = [];
+		foreach (array_chunk(array_values(array_unique($teamIds)), 1000) as $chunk) {
+			$qb = $this->db->getQueryBuilder();
+			$expr = $qb->expr();
+			$qb->select('*')->from(self::TABLE)
+				->where($expr->in('team_id', $qb->createNamedParameter($chunk, IQueryBuilder::PARAM_STR_ARRAY)))
+				->andWhere($expr->eq('status', $qb->createNamedParameter('distributed')))
+				->andWhere($expr->gte('due_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT)));
+			array_push($out, ...$this->findEntities($qb));
+		}
+		return $out;
+	}
 }

@@ -494,7 +494,7 @@ final class UserDeletionTest extends ApiTestCase {
 			self::db(), Server::get(\OCA\NextNotes\Service\Transaction::class), Server::get(IJobList::class), $notes,
 			Server::get(WorkspaceService::class), Server::get(\OCA\NextNotes\Db\NoteMapper::class), Server::get(\OCA\NextNotes\Db\FolderMapper::class),
 			Server::get(\OCA\NextNotes\Db\WsShareMapper::class), Server::get(\OCA\NextNotes\Db\WorkspaceMapper::class), $time, $log,
-			Server::get(\OCA\NextNotes\Service\BackgroundFiles::class),
+			Server::get(\OCA\NextNotes\Service\BackgroundFiles::class), Server::get(\OCA\NextNotes\Db\SubmissionMapper::class),
 		);
 	}
 

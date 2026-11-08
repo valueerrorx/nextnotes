@@ -231,7 +231,7 @@ final class TeamLifecycleTest extends TeamTestCase {
 		$broken->method('get')->willThrowException(new \RuntimeException('circles kaputt'));
 		$teams = new TeamService(Server::get(ITeamManager::class), $broken, Server::get(LoggerInterface::class));
 		$state = new TeamStateService(Server::get(TeamMapper::class), $teams, Server::get(ITimeFactory::class));
-		$access = new AccessService(Server::get(WorkspaceMapper::class), Server::get(WsShareMapper::class), Server::get(NoteMapper::class), Server::get(FolderMapper::class), $teams, $state, Server::get(\OCA\NextNotes\Db\AssignmentMapper::class), Server::get(\OCA\NextNotes\Db\SubmissionMapper::class));
+		$access = new AccessService(Server::get(WorkspaceMapper::class), Server::get(WsShareMapper::class), Server::get(NoteMapper::class), Server::get(FolderMapper::class), $teams, $state, Server::get(\OCA\NextNotes\Db\AssignmentMapper::class), Server::get(\OCA\NextNotes\Db\SubmissionMapper::class), new \OCA\NextNotes\Service\SubmissionStateService(Server::get(\OCA\NextNotes\Db\SubmissionMapper::class), $teams, $state, Server::get(ITimeFactory::class)));
 		$ws = Server::get(WorkspaceMapper::class)->find($wsId);
 		self::assertSame(AccessService::NONE, $access->workspaceLevel($b->uid, $ws), 'B ohne Recht bei Circles-Fehler');
 		self::assertNotContains($wsId, $access->visibleWorkspaceIds($b->uid), 'nicht sichtbar bei Fehler');
