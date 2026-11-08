@@ -25,10 +25,10 @@ start=$SECONDS
 
 # Build: Netz nur, falls build/node_modules fehlt
 [[ -d "$app/build/node_modules/esbuild" ]] || npm ci --prefix "$app/build" --no-audit --no-fund
-sums() { (cd "$app" && find js css i18n -type f | sort | xargs sha256sum); }
+sums() { (cd "$app" && find js css i18n -type f | sort | xargs "${NN_SHA256[@]}"); }
 make -C "$app" clean build
 sums > "$tmp/sum1"
-unshare -rn make -C "$app" clean build
+nn_offline make -C "$app" clean build
 sums > "$tmp/sum2"
 cmp -s "$tmp/sum1" "$tmp/sum2" || { diff "$tmp/sum1" "$tmp/sum2" | head -20 >&2; die "Build nicht reproduzierbar"; }
 echo "Build reproduzierbar ($(wc -l < "$tmp/sum1") Dateien, zweiter Lauf ohne Netz)"

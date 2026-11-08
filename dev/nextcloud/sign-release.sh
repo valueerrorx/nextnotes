@@ -9,6 +9,7 @@ set -euo pipefail
 export NN_PROJECT="${NN_PROJECT:-nextnotes-sign}" NN_PORT_BASE="${NN_PORT_BASE:-9300}"
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 export LC_ALL=C TZ=UTC
+[[ "${1:-}" == --verify ]] || { nn_need_gnu_tar; nn_need_gnu_gzip; }
 env=sqlite
 svc="$(svc_for "$env")"
 
@@ -49,7 +50,7 @@ trap cleanup EXIT
 
 if [[ $mode == sign ]]; then
 	# Schlüssel nie im Repo (nur in ignorierten Pfaden geduldet)
-	keyabs="$(realpath "$key")"
+	keyabs="$(nn_abspath "$key")"
 	if [[ "$keyabs" == "$NN_REPO_ROOT"/* ]] && ! git -C "$NN_REPO_ROOT" check-ignore -q "$keyabs"; then
 		die "Schlüssel liegt im Repo und ist nicht ignoriert: $keyabs"
 	fi
@@ -85,7 +86,7 @@ verify_pkg() {
 		echo "check-app: FEHLER"; echo "$out"
 	fi
 	openssl x509 -in "$crt" -noout -pubkey > "$pubkey"
-	if base64 -d "$sig" | openssl dgst -sha512 -verify "$pubkey" -signature /dev/stdin "$pkg" >/dev/null 2>&1; then
+	if tr -d '\r\n' < "$sig" | openssl base64 -d -A | openssl dgst -sha512 -verify "$pubkey" -signature /dev/stdin "$pkg" >/dev/null 2>&1; then
 		echo "Release-Signatur: OK ($(basename "$sig"))"
 	else
 		echo "Release-Signatur: FEHLER ($(basename "$sig"))"; rc=1
@@ -100,8 +101,8 @@ fi
 
 # entpacken (Zeitstempel bleiben), signature.json im Container erzeugen
 mkdir -p "$work/x"
-tar -xzf "$tarball" -C "$work/x"
-epoch="$(stat -c %Y "$work/x/nextnotes/appinfo/info.xml")"
+nn_tar -xzf "$tarball" -C "$work/x"
+epoch="$(nn_mtime "$work/x/nextnotes/appinfo/info.xml")"
 version="$(sed -n 's:.*<version>\([^<]*\)</version>.*:\1:p' "$work/x/nextnotes/appinfo/info.xml" | head -n1)"
 in_ctr 'rm -rf /tmp/nnsign && mkdir /tmp/nnsign && tar -xzf - -C /tmp/nnsign' < "$tarball"
 in_ctr 'cat > /tmp/nnsign.crt' < "$crt"
@@ -118,13 +119,12 @@ diff <(jq -r '.hashes | keys[]' "$work/x/nextnotes/appinfo/signature.json" | sor
 	|| die "signature.json deckt den Paketinhalt nicht ab"
 
 # neu packen mit denselben Flags wie make dist
-out="${NN_SIGN_OUT:-$(dirname "$(realpath "$tarball")")/signed}"
+out="${NN_SIGN_OUT:-$(dirname "$(nn_abspath "$tarball")")/signed}"
 name="nextnotes-$version.tar.gz"
 mkdir -p "$out"
-touch -d "@$epoch" "$work/x/nextnotes/appinfo/signature.json"
-tar -C "$work/x" --format=gnu --sort=name --mtime="@$epoch" --owner=0 --group=0 --numeric-owner \
+nn_tar -C "$work/x" --format=gnu --sort=name --mtime="@$epoch" --owner=0 --group=0 --numeric-owner \
 	--mode='u=rwX,go=rX' -cf - nextnotes | gzip -n -9 > "$out/$name"
-(cd "$out" && sha256sum "$name" > "$name.sha256")
+(cd "$out" && nn_sha256 "$name" > "$name.sha256")
 # Release-Signatur für den App Store
 sig="$out/$name.sig"
 openssl dgst -sha512 -sign "$key" "$out/$name" | openssl base64 > "$sig"

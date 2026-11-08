@@ -36,7 +36,7 @@ done
 for a in firstrunwizard recommendations; do occ "$env" app:disable "$a" >/dev/null 2>&1 || true; done
 
 export NN_USER="$NN_TEST_USER" NN_PASS="$NN_TEST_PASS" NN_USER2="$NN_TEST_USER2" NN_PASS2="$NN_TEST_PASS2"
-export PW_CORE="$NN_DEV_DIR/node_modules/playwright-core" CHROMIUM="${CHROMIUM:-/usr/bin/chromium}"
+export PW_CORE="$NN_DEV_DIR/node_modules/playwright-core" CHROMIUM="${CHROMIUM:-/usr/bin/chromium}" # env.sh: nn_chromium
 failed=()
 for theme in ${THEMES:-light dark}; do
 	for u in "$NN_TEST_USER" "$NN_TEST_USER2"; do
@@ -45,7 +45,7 @@ for theme in ${THEMES:-light dark}; do
 	for s in "${specs[@]}"; do
 		echo "--- $env $theme $(basename "$s")"
 		t0=$SECONDS
-		if ! timeout 600 node "$s" "$(base_url "$env")" "$theme"; then
+		if ! nn_timeout 600 node "$s" "$(base_url "$env")" "$theme"; then
 			failed+=("$theme:$(basename "$s")")
 		fi
 		echo "--- $env $theme $(basename "$s"): $((SECONDS - t0)) s"

@@ -12,6 +12,7 @@ svc="$(svc_for "$env")"
 tests="$NN_REPO_ROOT/tests/nextnotes"
 [[ -x "$tests/vendor/bin/phpunit" ]] || die "PHPUnit fehlt: composer install -d tests/nextnotes"
 dest=/tmp/nn-tests
+nn_need_gnu_tar
 
 # Tests + Referenzdateien (Routen-Diff) in den Container
 stage="$(mktemp -d)"; trap 'rm -rf "$stage"' EXIT
@@ -21,9 +22,9 @@ cp "$NN_REPO_ROOT/docs/inventory/A-backend.md" "$stage/ref/A-backend.md"
 cp "$NN_REPO_ROOT/docs/inventory/B-frontend.md" "$stage/ref/B-frontend.md"
 # Upstream-Importfunktionen nur lesend (Export-Lesbarkeit, Plan M4d Done 2)
 cp "$NN_REPO_ROOT/src/import_helpers.php" "$stage/ref/import_helpers.php"
-{ tar -C "$tests" --exclude=.phpunit.cache -cf - . ; } \
+{ nn_tar -C "$tests" --exclude=.phpunit.cache -cf - . ; } \
 	| dc "$env" exec -T -u root "$svc" sh -c "rm -rf '$dest' && mkdir -p '$dest' && tar -xf - -C '$dest'"
-tar -C "$stage" -cf - ref | dc "$env" exec -T -u root "$svc" sh -c "tar -xf - -C '$dest' && chown -R www-data:www-data '$dest'"
+nn_tar -C "$stage" -cf - ref | dc "$env" exec -T -u root "$svc" sh -c "tar -xf - -C '$dest' && chown -R www-data:www-data '$dest'"
 
 occ "$env" app:enable notifications >/dev/null
 

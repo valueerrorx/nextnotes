@@ -7,6 +7,8 @@ export LC_ALL=C TZ=UTC
 app="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 repo="$(git -C "$app" rev-parse --show-toplevel)"
 die() { echo "FEHLER: $*" >&2; exit 1; }
+source "$repo/dev/portable.sh"
+nn_need_gnu_tar; nn_need_gnu_gzip
 
 # node_modules nur aus dem Hauptbaum (kein Netz, kein npm install)
 mods="$app/build/node_modules"
@@ -29,7 +31,7 @@ version="$(sed -n 's:.*<version>\([^<]*\)</version>.*:\1:p' "$wt/nextnotes/appin
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || die "Version aus appinfo/info.xml unbrauchbar: '$version'"
 
 echo "dist: Commit $commit, Version $version, SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
-echo "dist: $(tar --version | head -n1); $(gzip --version | head -n1); esbuild $("$mods/.bin/esbuild" --version); node $(node --version)"
+echo "dist: $("$NN_TAR" --version | head -n1); $(gzip --version | head -n1); esbuild $("$mods/.bin/esbuild" --version); node $(node --version)"
 
 make -C "$wt/nextnotes" build >/dev/null
 
@@ -38,15 +40,15 @@ excl=()
 while IFS= read -r p; do [[ -z "$p" || "$p" == \#* ]] || excl+=("--exclude=$p"); done < "$app/build/dist-exclude.txt"
 stage="$work/stage"
 mkdir -p "$stage/nextnotes"
-tar -C "$wt/nextnotes" --anchored "${excl[@]}" -cf - . | tar -xf - -C "$stage/nextnotes"
+nn_tar -C "$wt/nextnotes" --anchored "${excl[@]}" -cf - . | nn_tar -xf - -C "$stage/nextnotes"
 
 out="$app/dist"
 name="nextnotes-$version.tar.gz"
 mkdir -p "$out"
-tar -C "$stage" --format=gnu --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 --numeric-owner \
+nn_tar -C "$stage" --format=gnu --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 --numeric-owner \
 	--mode='u=rwX,go=rX' -cf - nextnotes | gzip -n -9 > "$out/$name.tmp"
 mv "$out/$name.tmp" "$out/$name"
-(cd "$out" && sha256sum "$name" > "$name.sha256")
+(cd "$out" && nn_sha256 "$name" > "$name.sha256")
 
 check="$repo/dev/nextcloud/check-dist.sh"
 [[ -x "$check" ]] && "$check" "$out/$name"

@@ -9,6 +9,6 @@ env="${1:?Aufruf: check-csp.sh <env>}"
 check_env "$env"
 # playwright-core nur lokal in dev/nextcloud, ohne Browser-Download
 [[ -d "$NN_DEV_DIR/node_modules/playwright-core" ]] || npm --prefix "$NN_DEV_DIR" ci --no-audit --no-fund
-timeout 180 node "$NN_DEV_DIR/scripts/check-csp.mjs" "$(base_url "$env")" "$NN_TEST_USER" "$NN_TEST_PASS" \
+nn_timeout 180 node "$NN_DEV_DIR/scripts/check-csp.mjs" "$(base_url "$env")" "$NN_TEST_USER" "$NN_TEST_PASS" \
 	/index.php/apps/nextnotes/index.php /index.php/apps/nextnotes/dashboard.php
 echo "$env: CSP OK"

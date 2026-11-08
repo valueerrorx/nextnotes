@@ -28,7 +28,7 @@ note() { req A GET "api/v1/notes/$1" >/dev/null; json note.content; }
 atts() { req A GET "api/v1/notes/$1/attachments" >/dev/null; php -r 'echo count(json_decode(file_get_contents($argv[1]),true)["attachments"]??[]);' "$tmp/body"; }
 wsjson() { req A GET api/v1/workspaces >/dev/null; cat "$tmp/body"; }
 
-MARK="Mk$(date +%s%N | tail -c 9)"
+MARK="Mk$(date +%s | tail -c 6)$RANDOM"
 WS="Probe $MARK"; WS2="Ziel $MARK"
 XSS='<img src=x onerror=alert(1)>'
 req A POST api/v1/workspaces -H 'Content-Type: application/json' -d "{\"name\":\"$WS\"}" >/dev/null

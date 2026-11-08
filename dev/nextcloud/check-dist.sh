@@ -36,4 +36,4 @@ for f in CHANGELOG.md COPYING LICENCE THIRD-PARTY-NOTICES.md LICENSES/MIT.txt; d
 done
 
 [[ $fail -eq 0 ]] || exit 1
-echo "check-dist: OK $(basename "$tarball") (Version $version, $(wc -l <<<"$list") Einträge, $(stat -c %s "$tarball") Bytes, $(du -h "$tarball" | cut -f1))"
+echo "check-dist: OK $(basename "$tarball") (Version $version, $(wc -l <<<"$list") Einträge, $(wc -c < "$tarball" | tr -d " ") Bytes, $(du -h "$tarball" | cut -f1))"

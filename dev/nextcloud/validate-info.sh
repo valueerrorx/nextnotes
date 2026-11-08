@@ -47,7 +47,7 @@ for ((i = 1; i <= c; i++)); do
 	[[ "$u" =~ ^https://raw\.githubusercontent\.com/valueerrorx/nextnotes/[^/]+/nextnotes/(screenshots/[a-z0-9-]+\.png)$ ]] || die "Screenshot-URL nicht …/nextnotes/screenshots/<name>.png: $u"
 	f="$app/${BASH_REMATCH[1]}"
 	[[ -f "$f" ]] || die "Screenshot-Datei zur URL fehlt: ${BASH_REMATCH[1]}"
-	(( $(stat -c %s "$f") <= 2097152 )) || die "Screenshot größer als 2 MiB: ${BASH_REMATCH[1]}"
+	(( $(nn_size "$f") <= 2097152 )) || die "Screenshot größer als 2 MiB: ${BASH_REMATCH[1]}"
 done
 
 node "$NN_DEV_DIR/scripts/check-notices.mjs" "$app" "$NN_REPO_ROOT" || die "Drittanbieter-Hinweise/CHANGELOG"

@@ -12,6 +12,8 @@ repo="$(cd "$app/.." && pwd)"
 src="${SRC:-$repo/src}"
 fail=0
 err() { echo "FEHLER: $*" >&2; fail=1; }
+source "$repo/dev/portable.sh"
+nn_chromium
 
 command -v php >/dev/null || { echo "FEHLER: Host-php fehlt (siehe dev/nextcloud/README.md)" >&2; exit 2; }
 command -v node >/dev/null || { echo "FEHLER: node fehlt" >&2; exit 2; }
@@ -47,7 +49,7 @@ if [[ $fail -eq 0 ]]; then echo "check-upstream (c): Template-Kopfkommentare vor
 css_out="${OUT_DIR:-$app}/css"
 if ! compgen -G "$css_out/nextnotes-core.css" >/dev/null; then
 	err "Build-Ausgabe css/ fehlt (zuerst make build)"
-elif hits="$(grep -rlw 'Inter' "$css_out" --include='*.css')"; then
+elif hits="$(grep -rlw --include='*.css' 'Inter' "$css_out")"; then
 	err "Schrift 'Inter' in gebauter CSS: ${hits//$'\n'/ }"
 else
 	echo "check-upstream (e): gebaute CSS ohne 'Inter'"
@@ -66,7 +68,7 @@ while read -r up sum port; do
 	[[ -f "$app/$port" ]] || err "upstream-ported.txt: Port $port fehlt"
 	if [[ ! -f "$file" ]]; then
 		err "upstream-ported.txt: $up fehlt"
-	elif [[ "$(sha256sum "$file" | cut -d' ' -f1)" != "$sum" ]]; then
+	elif [[ "$(nn_sha256 "$file" | cut -d' ' -f1)" != "$sum" ]]; then
 		err "$up geändert: Port prüfen ($port), dann Hash in build/upstream-ported.txt aktualisieren"
 	fi
 done < "$app/build/upstream-ported.txt"
@@ -84,7 +86,7 @@ else
 	echo "check-upstream (h): DOM-Parser nur über HtmlSanitizer::loadHtmlQuiet"
 fi
 # (i) Abschluss M4 (Plan M4i, O8): keine bekannten Lücken, kein erzwungenes Ausblenden
-if ! grep -qE '^\s*public const FORCED_HIDDEN = \[\];' "$app/lib/Service/View/IndexViewService.php"; then err "IndexViewService::FORCED_HIDDEN nicht leer"; fi
+if ! grep -qE '^[[:space:]]*public const FORCED_HIDDEN = \[\];' "$app/lib/Service/View/IndexViewService.php"; then err "IndexViewService::FORCED_HIDDEN nicht leer"; fi
 if [[ -f "$repo/tests/nextnotes/e2e/stripped.mjs" ]] && ! grep -qE '^const KNOWN_MISSING = \{\};' "$repo/tests/nextnotes/e2e/stripped.mjs"; then err "stripped.mjs KNOWN_MISSING nicht leer"; fi
 if [[ $fail -eq 0 ]]; then echo "check-upstream (i): FORCED_HIDDEN und KNOWN_MISSING leer"; fi
 

@@ -36,7 +36,7 @@ ws="Grenzen $(date +%s)"
 note="$("${NN_CURL[@]}" -sSf "${auth[@]}" -H 'Content-Type: application/json' \
 	-d "{\"heading\":\"Großanhang\",\"content\":\"x\",\"workspace\":\"$ws\"}" "$base/api/v1/notes" | php -r 'echo json_decode(stream_get_contents(STDIN), true)["note"]["id"];')"
 head -c $((200 * 1024 * 1024)) /dev/urandom > "$work/gross.bin"
-want="$(sha256sum "$work/gross.bin" | cut -d' ' -f1)"
+want="$(nn_sha256 "$work/gross.bin" | cut -d' ' -f1)"
 code="$(curl --max-time 300 -sS "${auth[@]}" -o "$work/up.json" -w '%{http_code}' -F "file=@$work/gross.bin;type=application/octet-stream" "$base/api/v1/notes/$note/attachments")"
 [[ "$code" == 200 || "$code" == 201 ]] || die "Upload HTTP $code: $(head -c 300 "$work/up.json")"
 
@@ -47,7 +47,7 @@ out="$(curl --max-time 300 -sS "${auth[@]}" -o "$work/all.zip" -w '%{http_code} 
 code="${out% *}"; secs="${out#* }"
 [[ "$code" == 200 ]] || bad "Export HTTP $code"
 mkdir -p "$work/x" && (cd "$work/x" && unzip -q "$work/all.zip") || bad "ZIP nicht lesbar"
-got="$(find "$work/x" -type f -size +100M -exec sha256sum {} + | cut -d' ' -f1 | grep -x "$want" || true)"
+got="$(find "$work/x" -type f -size +100M -exec "${NN_SHA256[@]}" {} + | cut -d' ' -f1 | grep -x "$want" || true)"
 [[ "$got" == "$want" ]] || bad "Anhang im ZIP nicht byte-gleich"
 echo "Export „alle Anhänge“ 200 MiB: HTTP $code, ${secs} s, sha256 $([[ "$got" == "$want" ]] && echo gleich || echo ABWEICHEND)"
 sleep 2

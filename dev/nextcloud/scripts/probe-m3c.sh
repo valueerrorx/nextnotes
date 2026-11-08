@@ -24,7 +24,7 @@ expect() { local who="$1" want="$2" path="$3"; shift 3; local got; got="$(req "$
 	if [[ "$who" == Bo && "$want" == 404 ]]; then ok "$(grep -q "$MARK" "$tmp/body" || echo 1)" "  kein A-Marker im Body"; fi; }
 json() { php -r '$d=json_decode(file_get_contents($argv[1]),true); foreach(explode(".",$argv[2]) as $k){$d=$d[$k]??null;} echo is_scalar($d)?$d:json_encode($d);' "$tmp/body" "$1"; }
 
-MARK="Mk$(date +%s%N | tail -c 9)"
+MARK="Mk$(date +%s | tail -c 6)$RANDOM"
 WS="Probe $MARK"
 req A POST api/v1/workspaces -H 'Content-Type: application/json' -d "{\"name\":\"$WS\"}" >/dev/null
 req A POST api/v1/folders -H 'Content-Type: application/json' -d "{\"folder_name\":\"Board $MARK\",\"workspace\":\"$WS\"}" >/dev/null; F="$(json folder_id)"

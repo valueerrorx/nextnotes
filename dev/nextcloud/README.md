@@ -4,7 +4,8 @@
 -->
 # Testsetup Next Notes (nur Tests, nicht für den Betrieb)
 
-Benötigt: Docker mit Compose v2 (Profile; getestet mit 5.6.1), `curl`, `jq`, `xmllint`, `php` auf dem Host (Schematest, `make -C nextnotes check-upstream`), Node 20+ (Build `make -C nextnotes build` mit esbuild aus `nextnotes/build/`, einmalig mit Netz `npm ci --prefix nextnotes/build`; danach offline) und `/usr/bin/chromium` (CSP-Prüfung, `check-upstream` (e2); `playwright-core` wird lokal per `npm ci` in `dev/nextcloud/` installiert, ohne Browser-Download; anderer Pfad über `CHROMIUM=`).
+Benötigt: Docker mit Compose v2 (Profile; getestet mit 5.6.1), `curl`, `jq`, `xmllint`, `php` auf dem Host (Schematest, `make -C nextnotes check-upstream`), Node 20+ (Build `make -C nextnotes build` mit esbuild aus `nextnotes/build/`, einmalig mit Netz `npm ci --prefix nextnotes/build`; danach offline) und Chromium (CSP-Prüfung, E2E, `check-upstream` (e2); `playwright-core` wird lokal per `npm ci` in `dev/nextcloud/` installiert, ohne Browser-Download). Chromium wird gesucht (`/usr/bin/chromium`, Playwright-Cache, `/Applications`), sonst `CHROMIUM=<pfad>`.
+Alle Skripte brauchen bash ≥ 4.4 und GNU tar (`dev/portable.sh` prüft beides mit Hinweis); `make dist` und `sign-release.sh` zusätzlich GNU gzip (gleicher sha256 auf Linux und macOS).
 Images (gepinnt): `nextcloud:35.0.2-apache`, `nextcloud:35.0.2-fpm`, `nginx:1.30.6-alpine`, `mariadb:11.4.13`, `postgres:17.11-alpine` (so getestet).
 Die App wird in den Container **kopiert**, nie gemountet: `occ app:remove` löscht das App-Verzeichnis.
 
@@ -32,3 +33,17 @@ Upstream-Fixtures: `../upstream/up.sh` (Build einmalig mit Netz, Port 8090), `ph
 Umgebungen: `sqlite` (Apache, 8081), `mariadb` (Apache, 8082), `pgsql` (Apache, 8083), `nginx` (nginx + fpm, SQLite, 8084). Eigene Instanz neben anderen: `NN_PROJECT=nextnotes-<name> NN_PORT_BASE=8190` (Ports Basis+1 … +4) vor jedem Skript setzen; `nextnotes-demo` und `nc35-gftest` sind gesperrt.
 `run-m2.sh`/`run-m3.sh` entfallen (M4i-fix): vollständig in `run-m5.sh` enthalten (M5e: `run-m4.sh` → `run-m5.sh`). Laufzeit vorher seriell 2 h 43 min (run-m4) plus run-m3/m2/m1 als Regression. Zugang: `admin`/`admin`, `alice` (Passwort in `env.sh`).
 Beispiel: `./run-m5.sh`, `./run-m5.sh pgsql` oder `./run-m1.sh pgsql`
+
+## macOS (Apple Silicon, Docker Desktop)
+
+Ungetestet auf echter Hardware (M7-mac, nur unter Linux nachgestellt). Einmalig:
+
+1. Docker Desktop installieren und starten; Repo unter `/Users/…` (Docker-Dateifreigabe, `nginx/nextcloud.conf` wird gemountet). Alle Images sind multi-arch (arm64), keine `platform:`-Angabe nötig.
+2. Homebrew-Pakete: `brew install bash gnu-tar gzip jq php composer node` (Node ≥ 20, Linux-Stand 24; `xmllint`, `curl`, `openssl`, `lsof`, `shasum` bringt macOS mit). `bash` und `gzip` aus Homebrew müssen vor `/bin` bzw. `/usr/bin` im `PATH` stehen (`eval "$(/opt/homebrew/bin/brew shellenv)"`); `bash --version` ≥ 4.4, `gzip --version` beginnt mit `gzip 1.`. GNU tar wird als `gtar` gefunden, `timeout` fällt ohne `coreutils` auf einen eingebauten Watchdog zurück.
+3. OCP-Referenz (nur lesen, nicht im Repo, in `.git/info/exclude`): `git clone --filter=blob:none --depth 1 --branch v35.0.2 https://github.com/nextcloud/server.git .ref/nextcloud-server`
+4. Node-Abhängigkeiten (einmalig mit Netz): `npm ci --prefix nextnotes/build`, `npm ci --prefix dev/nextcloud`, `composer install -d tests/nextnotes`.
+5. Browser: `node dev/nextcloud/node_modules/playwright-core/cli.js install --no-shell chromium` (landet in `~/Library/Caches/ms-playwright/`, wird automatisch gefunden); alternativ Google Chrome in `/Applications` oder `CHROMIUM=<pfad>`.
+
+Prüfen: `make -C nextnotes build check-upstream`, `make -C nextnotes dist` (sha256 muss dem Linux-Paket desselben Commits entsprechen).
+Test-Instanz: `NN_PROJECT=nextnotes-mac NN_PORT_BASE=10200 dev/nextcloud/up.sh sqlite`, dann `install-app.sh sqlite`, `occ app:enable nextnotes` (`source dev/nextcloud/env.sh`), `run-phpunit.sh sqlite --filter RouteDiffTest`, `run-e2e.sh sqlite smoke-m6`, Abbau `down.sh all` (gleiche Variablen).
+Unterschiede: kein `unshare` → „ohne Netz“-Läufe in `run-m5/6/7.sh` laufen mit Netz (Warnung); Port-Prüfung über `lsof` statt `ss`.

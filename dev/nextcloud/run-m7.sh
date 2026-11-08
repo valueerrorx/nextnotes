@@ -46,9 +46,9 @@ if want dist; then
 	# node_modules nur aus dem Hauptbaum (dist.sh); Netz nur, falls es fehlt
 	[[ -x "$app/build/node_modules/.bin/esbuild" ]] || npm ci --prefix "$app/build" --no-audit --no-fund
 	make -C "$app" dist
-	sha256sum < "$pkg" > "$tmp/sha1"
-	unshare -rn make -C "$app" dist
-	sha256sum < "$pkg" > "$tmp/sha2"
+	nn_sha256 < "$pkg" > "$tmp/sha1"
+	nn_offline make -C "$app" dist
+	nn_sha256 < "$pkg" > "$tmp/sha2"
 	cmp -s "$tmp/sha1" "$tmp/sha2" || die "Paket nicht reproduzierbar: $(cut -c1-16 "$tmp/sha1") vs. $(cut -c1-16 "$tmp/sha2")"
 	echo "Paket reproduzierbar: $(basename "$pkg") sha256 $(cut -d' ' -f1 "$tmp/sha1") (zweiter Lauf ohne Netz)"
 fi
@@ -56,16 +56,16 @@ fi
 # eigene Kopie: ein paralleles make dist (anderer Slice) darf das getestete Paket nicht austauschen
 mkdir -p "$logs/pkg"
 cp "$pkg" "$logs/pkg/" && pkg="$logs/pkg/$(basename "$pkg")"
-(cd "$logs/pkg" && sha256sum "$(basename "$pkg")" > "$(basename "$pkg").sha256")
+(cd "$logs/pkg" && nn_sha256 "$(basename "$pkg")" > "$(basename "$pkg").sha256")
 export NN_APP_TARBALL="$pkg"
 echo "Paket für alle Umgebungen: $pkg ($(cut -c1-16 "$pkg.sha256"))"
 want checkdist && "$dir/check-dist.sh" "$pkg"
 if want upstream; then
 	# check-upstream prüft u. a. die gebaute CSS im Hauptbaum; Build ohne Netz
-	unshare -rn make -C "$app" clean build
+	nn_offline make -C "$app" clean build
 	make -C "$app" check-upstream
 fi
-want info && unshare -rn "$dir/validate-info.sh"
+want info && nn_offline "$dir/validate-info.sh"
 want sql && "$dir/check-forbidden-sql.sh"
 [[ -d "$NN_DEV_DIR/node_modules/playwright-core" ]] || npm --prefix "$NN_DEV_DIR" ci --no-audit --no-fund
 

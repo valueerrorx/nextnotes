@@ -6,6 +6,8 @@
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo="$(cd "$here/../.." && pwd)"
+source "$repo/dev/portable.sh"
+nn_need_gnu_tar
 dc() { docker compose -f "$here/compose.yaml" "$@"; }
 occ() { dc exec -T -u www-data nc php occ "$@"; }
 
@@ -22,7 +24,7 @@ for i in $(seq 1 150); do
 	sleep 2
 done
 dest=/var/www/html/custom_apps/nextnotes
-tar -C "$src/nextnotes" --exclude=.gitignore --exclude=./build/node_modules --exclude=./build --exclude=./Makefile --exclude=./js-src --exclude=./css-src -cf - . \
+nn_tar -C "$src/nextnotes" --exclude=.gitignore --exclude=./build/node_modules --exclude=./build --exclude=./Makefile --exclude=./js-src --exclude=./css-src -cf - . \
 	| dc exec -T -u root nc sh -c "rm -rf '$dest' && mkdir -p '$dest' && tar -xf - -C '$dest' && chown -R www-data:www-data '$dest'"
 occ app:enable nextnotes >/dev/null || true
 occ upgrade >/dev/null || true

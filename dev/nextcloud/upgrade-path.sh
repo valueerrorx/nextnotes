@@ -25,6 +25,7 @@ appver() { occ "$env" app:list --output=json | jq -r '.enabled.nextnotes // empt
 pkg="${NN_APP_TARBALL:-$NN_REPO_ROOT/nextnotes/dist/nextnotes-$(xmlver "$NN_REPO_ROOT/nextnotes/appinfo/info.xml").tar.gz}"
 [[ -f "$pkg" ]] || die "Paket fehlt: $pkg (make -C nextnotes dist)"
 "$dir/check-dist.sh" "$pkg" >/dev/null
+nn_need_gnu_tar
 work="$(mktemp -d)"
 wt="$work/src"
 cleanup() {
@@ -38,7 +39,7 @@ tar -xzf "$pkg" -O nextnotes/appinfo/info.xml > "$work/pkg-info.xml"
 pkgver="$(xmlver "$work/pkg-info.xml")"
 mapfile -t pjobs < <(sed -n 's:.*<job>\([^<]*\)</job>.*:\1:p' "$work/pkg-info.xml")
 tar -tzf "$pkg" | sed -n 's:^nextnotes/lib/Migration/Version\([0-9A-Za-z_]*\)\.php$:\1:p' | sort > "$work/pkg-migrations"
-pkgsha="$(sha256sum "$pkg" | cut -c1-12)"
+pkgsha="$(nn_sha256 "$pkg" | cut -c1-12)"
 echo "upgrade-path: $env, von $ref nach Paket $(basename "$pkg") ($pkgsha), ${#pjobs[@]} Jobs, $(wc -l < "$work/pkg-migrations") Migrationen"
 
 # nur die Tabellen der App, Schlüssel sortiert
@@ -78,7 +79,7 @@ step "alten Stand installieren"
 "$dir/up.sh" "$env"
 excl=()
 while IFS= read -r p; do [[ -z "$p" || "$p" == \#* ]] || excl+=("--exclude=$p"); done < "$NN_REPO_ROOT/nextnotes/build/dist-exclude.txt"
-tar -C "$wt/nextnotes" --anchored "${excl[@]}" --exclude=./build -cf - . \
+nn_tar -C "$wt/nextnotes" --anchored "${excl[@]}" --exclude=./build -cf - . \
 	| dc "$env" exec -T -u root "$(svc_for "$env")" sh -c \
 		"rm -rf /var/www/html/custom_apps/nextnotes && mkdir -p /var/www/html/custom_apps/nextnotes && tar -xf - -C /var/www/html/custom_apps/nextnotes && chown -R www-data:www-data /var/www/html/custom_apps/nextnotes"
 occ "$env" app:enable nextnotes
@@ -109,7 +110,7 @@ grep -q "'/api/v1/workspaces'" "$routes" 2>/dev/null && seed=1
 grep -q "'/api/v1/assignments'" "$routes" 2>/dev/null && seed_team=1
 WS="Upgrade WS"; TW="Upgrade Team"; HEAD_N="Upgrade Notiz"; CONTENT='<p>Upgrade-Inhalt äöü ß 🙂</p>'; TAG=upgradetag
 printf 'Anhang für den Upgrade-Test äöü\n' > "$work/att.txt"
-attsha="$(sha256sum < "$work/att.txt" | cut -c1-64)"
+attsha="$(nn_sha256 < "$work/att.txt" | cut -c1-64)"
 
 if [[ $seed == 1 ]]; then
 	step "Beispieldaten anlegen"
@@ -185,7 +186,7 @@ if [[ $seed == 1 ]]; then
 	jq -e --arg t "$TAG" '.note.tags | tostring | contains($t)' >/dev/null <<<"$note" || fail "Notiz $NID: Tag fehlt"
 	api "${A[@]}" GET "/tags?workspace=$ws" | jq -e --arg t "$TAG" 'tostring | contains($t)' >/dev/null || fail "Tag-Liste ohne $TAG"
 	api "${A[@]}" GET "/notes/$NID/attachments?workspace=$ws" | jq -e --argjson a "$ATT" '[.attachments[] | select((.id | tostring) == ($a | tostring))] | length == 1' >/dev/null || fail "Anhang $ATT nicht gelistet"
-	got="$("${NN_CURL[@]}" -fsS -u "${A[0]}:${A[1]}" -H 'OCS-APIRequest: true' "$(base_url "$env")/index.php/apps/nextnotes/api/v1/notes/$NID/attachments/$ATT?workspace=$ws" | sha256sum | cut -c1-64 || true)"
+	got="$("${NN_CURL[@]}" -fsS -u "${A[0]}:${A[1]}" -H 'OCS-APIRequest: true' "$(base_url "$env")/index.php/apps/nextnotes/api/v1/notes/$NID/attachments/$ATT?workspace=$ws" | nn_sha256 | cut -c1-64 || true)"
 	[[ "$got" == "$attsha" ]] || fail "Anhang $ATT: Inhalt abweichend"
 fi
 if [[ $seed_team == 1 ]]; then

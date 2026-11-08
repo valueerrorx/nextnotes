@@ -17,10 +17,11 @@ if [[ -n "${NN_APP_TARBALL:-}" ]]; then
 	exit 0
 fi
 [[ -f "$NN_REPO_ROOT/nextnotes/js/nextnotes-app.js" ]] || echo "WARNUNG: Build-Ausgabe fehlt (make -C nextnotes build), Seite ohne Assets" >&2
+nn_need_gnu_tar
 # Ausschlüsse aus derselben Liste wie make dist
 excl=()
 while IFS= read -r p; do [[ -z "$p" || "$p" == \#* ]] || excl+=("--exclude=$p"); done < "$NN_REPO_ROOT/nextnotes/build/dist-exclude.txt"
-tar -C "$NN_REPO_ROOT/nextnotes" --anchored "${excl[@]}" -cf - . \
+nn_tar -C "$NN_REPO_ROOT/nextnotes" --anchored "${excl[@]}" -cf - . \
 	| dc "$env" exec -T -u root "$(svc_for "$env")" sh -c \
 		"rm -rf '$dest' && mkdir -p '$dest' && tar -xf - -C '$dest' && chown -R www-data:www-data '$dest'"
 echo "$env: App nach $dest kopiert"
