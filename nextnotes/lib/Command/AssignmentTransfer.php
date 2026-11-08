@@ -80,6 +80,10 @@ class AssignmentTransfer extends Command {
 		try {
 			$r = $this->ownership->adminTransfer($a, $uid, $force);
 			$output->writeln(sprintf('Assignment %d (team %s): %s → %s', (int)$a->getId(), $r['state'], $r['from'] ?? '-', $r['to']));
+			// M6f-r1 Hinweis 3: Zustand unknown = Circles hat nicht geantwortet; ist das Team doch aktiv, setzt der Cleanup-Job eine Lehrkraft ein
+			if ($r['state'] === 'unknown') {
+				$output->writeln('<comment>The Teams app did not confirm the team. If the team still exists, the daily cleanup job hands the assignment back to a teacher of the team.</comment>');
+			}
 			return true;
 		} catch (\InvalidArgumentException $e) {
 			$output->writeln(sprintf('<error>Assignment %d: %s</error>', (int)$a->getId(), $e->getMessage()));

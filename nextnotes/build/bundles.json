@@ -38,7 +38,8 @@
 		"public_note": "Öffentliche Links gestrichen (ADR 0011)",
 		"public_folder": "Öffentliche Links gestrichen (ADR 0011)",
 		"shared": "Öffentliche Links gestrichen (ADR 0011)",
-		"create": "Erstellen-Seite entfernt, Erstellen über das „+“-Menü der Hauptansicht (UI-rail)"
+		"create": "Erstellen-Seite entfernt, Erstellen über das „+“-Menü der Hauptansicht (UI-rail)",
+		"speed_dial": "Speed Dial entfernt, speed_dial.php leitet aufs Dashboard um (Thomas 2026-11-08, M6g)"
 	},
 	"js": {
 		"head": [
@@ -607,22 +608,6 @@
 			"css/graph.css",
 			"@icon-sidebar"
 		],
-		"speed_dial": [
-			"css/lucide.css",
-			"@components",
-			"css/home/base.css",
-			"css/home/search.css",
-			"css/modals/base.css",
-			"css/modal-alerts.css",
-			"css/modals/ui-customization.css",
-			"css/ui-customization-panel.css",
-			"css/markdown-syntax.css",
-			"css/background-image.css",
-			"css/notes/title-menu.css",
-			"@theme",
-			"css/speed-dial.css",
-			"@icon-sidebar"
-		],
 		"list_folders": [
 			"css/lucide.css",
 			"@components",
@@ -944,23 +929,6 @@
 				"js/icon-sidebar-toggle.js"
 			]
 		},
-		"speed_dial": {
-			"js": [
-				"js/theme-manager.js",
-				"js/speed-dial.js",
-				"js/globals.js",
-				"js/navigation.js",
-				"js/color-palette.js",
-				"js/request-errors.js",
-				"js/modal-alerts.js",
-				"js/icon-sidebar-toggle.js",
-				"js/workspace-background.js",
-				"js/ui-customization.js"
-			],
-			"omit": {
-				"js/ui-customization-panel.js": "kein Kontext-Anpassungspanel auf den Seiten (Elementsichtbarkeit über ui-customization.js und Einstellungen)"
-			}
-		},
 		"mentions": {
 			"js": [
 				"js/theme-manager.js",
@@ -1014,6 +982,13 @@
 				"js/custom-logo.js": "Admin-Werkzeuge gestrichen (Inventur B 1.4)",
 				"js/delete-account.js": "Konto löschen verwaltet Nextcloud (Inventur B 1.3)"
 			}
+		}
+	},
+	"ownPages": {
+		"_doc": "Eigene Seiten ohne Upstream-Vorlage (M6g): Rahmen aus Upstream-Dateien (Theme, Navigation, Icon-Leiste, Meldungen) → js/css nextnotes-page-<seite>; check-upstream prüft nur die Existenz",
+		"assignments": {
+			"js": ["js/theme-manager.js", "js/navigation.js", "js/icon-sidebar-toggle.js", "js/request-errors.js", "js/modal-alerts.js"],
+			"css": ["css/lucide.css", "@components", "@modals", "css/tasks-page.css", "@theme", "@icon-sidebar"]
 		}
 	}
 }

@@ -540,7 +540,7 @@ final class PageIsolationTest extends ApiTestCase {
 		'GET /' => 'testM4PagesForeignShowOwnOnly', 'GET /index.php' => 'testM4PagesForeignShowOwnOnly', 'POST /index.php' => 'testM4PagesForeignShowOwnOnly',
 		'GET /dashboard.php' => 'testM4PagesForeignShowOwnOnly', 'GET /graph.php' => 'testM4PagesForeignShowOwnOnly',
 		'GET /speed_dial.php' => 'testM4PagesForeignShowOwnOnly', 'GET /mentions.php' => 'testM4PagesForeignShowOwnOnly',
-		'GET /diary.php' => 'testM4PagesForeignShowOwnOnly', 'GET /tasks.php' => 'testM4PagesForeignShowOwnOnly', 'GET /settings.php' => 'testM4PagesForeignShowOwnOnly',
+		'GET /diary.php' => 'testM4PagesForeignShowOwnOnly', 'GET /tasks.php' => 'testM4PagesForeignShowOwnOnly', 'GET /assignments.php' => 'testM4PagesForeignShowOwnOnly', 'GET /settings.php' => 'testM4PagesForeignShowOwnOnly',
 		'GET /login.php' => 'testM4PagesForeignShowOwnOnly', 'GET /logout.php' => 'testM4PagesForeignShowOwnOnly',
 		'GET /audio_player.php' => 'testForeignEveryIdPositionIs404', 'GET /revisions.php' => 'testForeignEveryIdPositionIs404',
 		'GET /attachments.php' => 'testForeignEveryIdPositionIs404', 'GET /kanban_content.php' => 'testForeignEveryIdPositionIs404',
@@ -596,19 +596,24 @@ final class PageIsolationTest extends ApiTestCase {
 		$before = self::dump($a->uid);
 		$wq = 'workspace=' . self::enc($ws);
 		// Positivkontrolle: A sieht die eigenen Daten serverseitig gerendert (tasks.php lädt per API)
-		foreach (["dashboard.php?$wq", "speed_dial.php?$wq", "diary.php?$wq", "index.php?$wq"] as $p) {
+		foreach (["dashboard.php?$wq", "diary.php?$wq", "index.php?$wq"] as $p) {
 			$r = self::get($a, $p);
 			self::assertSame(200, $r->status, "A $p: " . $r->describe());
 			self::assertStringContainsString($mark, $r->body, "A $p: eigene Daten fehlen (Detektor)");
 		}
 		foreach (['index.php', "index.php?$wq", "?workspace=$wsId", "dashboard.php?$wq", 'dashboard.php?scope=all', 'dashboard.php?scope=list&ws[]=' . self::enc($ws),
-			"graph.php?$wq", "speed_dial.php?$wq", "mentions.php?$wq", 'mentions.php?handled=1', "diary.php?$wq", "diary.php?$wq&diary={$x['diary']}",
-			"tasks.php?$wq", "settings.php?$wq", 'settings.php?open=about'] as $p) {
+			"graph.php?$wq", "mentions.php?$wq", 'mentions.php?handled=1', "diary.php?$wq", "diary.php?$wq&diary={$x['diary']}",
+			"tasks.php?$wq", "settings.php?$wq", 'settings.php?open=about', "assignments.php?$wq", "assignments.php?$wq&create=$n"] as $p) {
 			$r = self::get($b, $p);
 			self::assertSame(200, $r->status, "B $p: " . $r->describe());
 			self::assertStringNotContainsString($mark, $r->body, "B $p: Daten von A");
 			self::assertStringNotContainsString(htmlspecialchars($ws), $r->body, "B $p: Workspace-Name von A");
 		}
+		// Speed Dial entfernt (M6g): Umleitung aufs Dashboard, B bleibt im eigenen Workspace
+		$r = self::get($b, "speed_dial.php?$wq");
+		self::assertSame(303, $r->status, 'B speed_dial.php: ' . $r->describe());
+		self::assertStringNotContainsString(self::enc($ws), (string)$r->header('Location'), 'B speed_dial.php: nicht A-Workspace');
+		self::assertStringNotContainsString($mark, $r->body, 'B speed_dial.php: Daten von A');
 		// App-Start ohne Parameter (UI-rail) → Dashboard, ohne Inhalt
 		$r = self::get($b, '');
 		self::assertSame(303, $r->status, 'B App-Start: ' . $r->describe());

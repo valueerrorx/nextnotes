@@ -42,7 +42,7 @@ await runSpec(import.meta.url, async (ctx, page) => {
 
 	// Mobil: alle Unterseiten
 	await page.setViewportSize({ width: 390, height: 844 });
-	const pages = ['dashboard.php', 'tasks.php', 'diary.php', 'graph.php', 'speed_dial.php', 'notes_manager.php', 'list_folders.php', 'list_tags.php', 'attachments_list.php', 'trash.php', 'create.php', 'settings.php', 'mentions.php'];
+	const pages = ['dashboard.php', 'tasks.php', 'diary.php', 'graph.php', 'notes_manager.php', 'list_folders.php', 'list_tags.php', 'attachments_list.php', 'trash.php', 'create.php', 'settings.php', 'mentions.php'];
 	for (const p of pages) {
 		const resp = await page.goto(ctx.appUrl(`${p}?workspace=${ws}`), { waitUntil: 'networkidle' });
 		if (p === 'mentions.php' && resp && resp.status() !== 200) { ctx.info(`${p}: ${resp.status()} (kein geteilter Workspace), übersprungen`); continue; }

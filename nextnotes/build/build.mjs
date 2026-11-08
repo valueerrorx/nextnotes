@@ -161,6 +161,16 @@ for (const [page, def] of Object.entries(bundles.pages)) {
 	const jsName = `js/nextnotes-page-${page}.js`;
 	write(jsName, minifyJs(def.js.map((f) => `/* --- ${f} --- */\n${read(f)}\n;\n`).join(''), jsName));
 }
+// Eigene Seiten ohne Upstream-Vorlage (bundles.json ownPages): gleiche Ausgabe aus gelisteten Upstream-Dateien
+for (const [page, def] of Object.entries(bundles.ownPages ?? {})) {
+	if (page === '_doc') continue;
+	if (bundles.pages[page]) die(`ownPages.${page}: auch in pages`);
+	const css = def.css.flatMap((f) => (f.startsWith('@') ? bundles.cssPageGroups[f] : [f]));
+	const cssName = `css/nextnotes-page-${page}.css`;
+	writeCss(cssName, css.map((f) => `/* --- ${f} --- */\n${cssFile(f, cssName)}\n`).join(''));
+	const jsName = `js/nextnotes-page-${page}.js`;
+	write(jsName, minifyJs(def.js.map((f) => `/* --- ${f} --- */\n${read(f)}\n;\n`).join(''), jsName));
+}
 for (const f of walk(path.join(app, 'css-src'))) {
 	write(`css/${f}`, fs.readFileSync(path.join(app, 'css-src', f)));
 }

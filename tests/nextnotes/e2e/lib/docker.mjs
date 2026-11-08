@@ -142,3 +142,10 @@ export function dropTeams(base, owner, ids) {
 			$qb->delete('nextnotes_teams')->where($qb->expr()->eq('team_id', $qb->createNamedParameter($id)))->executeStatement();
 		}`, JSON.stringify(ids), owner);
 }
+
+// Test-Hook (M6g): Frist einer Aufgabe direkt setzen (Fristablauf ohne Warten auf die Minute; API erlaubt nur Verlängern)
+export function setAssignmentDue(base, id, ts) {
+	ncPhp(base, `$qb = \\OCP\\Server::get(\\OCP\\IDBConnection::class)->getQueryBuilder();
+		$qb->update('nextnotes_assignments')->set('due_at', $qb->createNamedParameter((int)$argv[2], \\OCP\\DB\\QueryBuilder\\IQueryBuilder::PARAM_INT))
+			->where($qb->expr()->eq('id', $qb->createNamedParameter((int)$argv[1], \\OCP\\DB\\QueryBuilder\\IQueryBuilder::PARAM_INT)))->executeStatement();`, String(id), String(ts));
+}

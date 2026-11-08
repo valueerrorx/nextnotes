@@ -43,6 +43,8 @@ class TeamService {
 	private array $levels = [];
 	/** @var array<string, bool> teamId → zählt als normales Team */
 	private array $normal = [];
+	/** @var array<string, array<string, string>> teamId|level → uid → Anzeigename (nur im Request, M6g1-r1) */
+	private array $members = [];
 
 	public function __construct(
 		private ITeamManager $teamManager,
@@ -61,6 +63,7 @@ class TeamService {
 		$this->memberTeams = [];
 		$this->levels = [];
 		$this->normal = [];
+		$this->members = [];
 	}
 
 	/** @return array<string, string> teamId → Anzeigename, nur Status Member und nur Teams, die probe() zulässt */
@@ -133,7 +136,7 @@ class TeamService {
 		if (!$this->isNormalTeam($teamId)) {
 			return [];
 		}
-		return $this->guarded(function (CirclesManager $cm) use ($teamId, $level): array {
+		return $this->members[$teamId . '|' . ($level ?? '*')] ??= $this->guarded(function (CirclesManager $cm) use ($teamId, $level): array {
 			$out = [];
 			foreach ($this->circleAsOwner($cm, $teamId)->getInheritedMembers() as $m) {
 				if ($m->getUserType() !== Member::TYPE_USER || !$m->isLocal() || $m->getStatus() !== Member::STATUS_MEMBER) {

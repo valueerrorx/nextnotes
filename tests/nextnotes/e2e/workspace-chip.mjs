@@ -7,7 +7,7 @@
 import { runSpec } from './lib/harness.mjs';
 import { apiClient } from './lib/api.mjs';
 
-const BOUND = ['list_tags.php', 'tasks.php', 'diary.php', 'speed_dial.php', 'notes_manager.php', 'trash.php', 'attachments_list.php',
+const BOUND = ['list_tags.php', 'tasks.php', 'diary.php', 'notes_manager.php', 'trash.php', 'attachments_list.php',
 	'list_folders.php', 'graph.php', 'create.php'];
 
 await runSpec(import.meta.url, async (ctx, page) => {

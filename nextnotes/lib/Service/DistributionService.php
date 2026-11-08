@@ -98,6 +98,20 @@ class DistributionService {
 		}
 	}
 
+	/**
+	 * Hinweis „N noch nicht ausgeteilt“ (Plan M6 §2.3a (4)): Mitglieder mit Level 1 ohne Abgabe, Grund volle Team-Quote; nur ausgeteilt, Frist offen, Team aktiv
+	 * @return array{not_distributed: int, quota_full: bool}
+	 */
+	public function pending(Assignment $a): array {
+		$teamId = (string)$a->getTeamId();
+		if ($a->getStatus() !== 'distributed' || $this->time->getTime() > (int)$a->getDueAt() || $this->teamState->stateOf($teamId) !== TeamStateService::ACTIVE) {
+			return ['not_distributed' => 0, 'quota_full' => false];
+		}
+		$missing = count(array_diff_key($this->teams->members($teamId, self::STUDENT_LEVEL), $this->submissions->studentsOf((int)$a->getId())));
+		$bytes = $missing > 0 ? $this->attachments->bytesOf([(int)$a->getTemplateNoteId()]) : 0;
+		return ['not_distributed' => $missing, 'quota_full' => $bytes > 0 && $bytes > $this->quota->limit() - $this->quota->used('team', $teamId)];
+	}
+
 	// §2.3a (1): Anhänge der Vorlage × Schüler ohne Abgabe gegen den Rest der Team-Quote
 	private function precheckQuota(Assignment $a): void {
 		$bytes = $this->attachments->bytesOf([(int)$a->getTemplateNoteId()]);

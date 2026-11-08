@@ -569,7 +569,7 @@ body.diary-journal-active #nextnotes-root .nn-diary-main .diary-outline {
 	background-attachment: scroll !important;
 }
 
-/* Dashboard, Graph, Speed Dial (M4g): Upstream setzt Höhe/Abstände auf body (dashboard.css, graph.css, speed-dial.css); hier im Hauptbereich */
+/* Dashboard, Graph (M4g): Upstream setzt Höhe/Abstände auf body (dashboard.css, graph.css); hier im Hauptbereich */
 #nextnotes-root.graph-page {
 	--graph-page-bg: var(--pz-surface);
 }
@@ -595,24 +595,6 @@ html[data-theme='dark'] #nextnotes-root.graph-page {
 #nextnotes-root .nn-dashboard-main,
 #nextnotes-root.mentions-page .nn-page-main {
 	background: var(--pz-surface);
-}
-
-/* Speed Dial: eigenes Bild hinter den Kacheln, nur im Hauptbereich (Upstream fixed über das Fenster) */
-#nextnotes-root .nn-speed-dial-main {
-	isolation: isolate;
-}
-
-#nextnotes-root .nn-speed-dial-main .speed-dial-background {
-	position: absolute;
-	inset: 0;
-	pointer-events: none;
-}
-
-/* Hintergrund-Knopf rechts vom Filter (Upstream-Raster: Größe | Filter | frei) */
-#nextnotes-root .speed-dial-toolbar #edgeMenuSpeedDialBackground {
-	grid-column: 3;
-	grid-row: 1;
-	justify-self: start;
 }
 
 /* Teams-Oberfläche (M5d): Kennzeichen, Banner, Freigabe-Dialog, Team-Auswahl; Farben nur über NC-Tokens (Hell/Dunkel) */
@@ -1255,6 +1237,24 @@ body.icon-sidebar-collapsed #content #nextnotes-root #iconSidebarToggle {
 	margin-block-start: 0;
 }
 
+#content #nextnotes-root > .nn-page-main .poznote-page-title {
+	padding-block-start: 0;
+	margin-block-start: 0;
+}
+
+#content #nextnotes-root > .nn-page-main :is(.home-container, .tasks-container, .notes-manager-container, .tags-container, .trash-container,
+	.trash-content, .favorites-container, .shared-container, .tasks-progress-section, .tasks-filter-bar, .mentions-toolbar, .nm-filter-bar, .nm-content, .trash-filter-bar,
+	.shared-filter-bar, .attachments-list-container, .shared-notes-list, .tags-info, .dashboard-grid-container) {
+	margin-inline: 0 auto;
+	padding-inline-start: 0;
+}
+
+/* Weitere mittig gesetzte Blöcke links; eigene Innenabstände (Auswahlleisten mit Rahmen) bleiben */
+#content #nextnotes-root > .nn-page-main :is(.tasks-note-group, .diary-month, .diary-journal, .nm-bulk-bar, .dashboard-selection-bar,
+	.dashboard-topbar-filter, .dashboard-breadcrumb, #dashboardGrid.dash-grid-sectioned, .attachments-filter-bar, .favorites-notes-list) {
+	margin-inline: 0 auto;
+}
+
 /* Dashboard-Karten (Thomas 2026-11-08): Theme-Farbe wie die aktive Seitenleisten-Zeile statt Grau; Hover ohne Anheben/Schatten
    (Upstream translateY(-2px) ließ den Inhalt springen), Rahmen bleibt gleich breit, nur Farbe wechselt. Notizfarben bleiben. */
 #nextnotes-root #dashboardGrid .dash-card:not(.has-note-color) {
@@ -1274,24 +1274,6 @@ body.icon-sidebar-collapsed #content #nextnotes-root #iconSidebarToggle {
 
 #nextnotes-root #dashboardGrid .dash-card:not(.is-selected):hover {
 	box-shadow: none;
-}
-
-#content #nextnotes-root > .nn-page-main .poznote-page-title {
-	padding-block-start: 0;
-	margin-block-start: 0;
-}
-
-#content #nextnotes-root > .nn-page-main :is(.home-container, .tasks-container, .speed-dial-container, .notes-manager-container, .tags-container, .trash-container,
-	.trash-content, .favorites-container, .shared-container, .tasks-progress-section, .tasks-filter-bar, .mentions-toolbar, .nm-filter-bar, .nm-content, .trash-filter-bar,
-	.shared-filter-bar, .attachments-list-container, .shared-notes-list, .tags-info, .dashboard-grid-container) {
-	margin-inline: 0 auto;
-	padding-inline-start: 0;
-}
-
-/* Weitere mittig gesetzte Blöcke links; eigene Innenabstände (Auswahlleisten mit Rahmen) bleiben */
-#content #nextnotes-root > .nn-page-main :is(.tasks-note-group, .diary-month, .diary-journal, .nm-bulk-bar, .dashboard-selection-bar,
-	.dashboard-topbar-filter, .dashboard-breadcrumb, #dashboardGrid.dash-grid-sectioned, .attachments-filter-bar, .favorites-notes-list) {
-	margin-inline: 0 auto;
 }
 
 /* Graph: Kopfblock schwebt breit über der Zeichenfläche (Upstream ab 641 px mittig); schmal bleibt er gestreckt */
@@ -1331,7 +1313,7 @@ body.icon-sidebar-collapsed #content #nextnotes-root #iconSidebarToggle {
 }
 /* Leerer Papierkorb: der Kreis steht links (text-align der .trash-no-notes), das Symbol bleibt im Kreis mittig (Upstream inline-flex center) */
 
-#content #nextnotes-root > .nn-page-main :is(.dashboard-empty, .empty-message, .speed-dial-empty, .trash-no-notes, .trash-page-count, .no-tags, .tags-info,
+#content #nextnotes-root > .nn-page-main :is(.dashboard-empty, .empty-message, .trash-no-notes, .trash-page-count, .no-tags, .tags-info,
 	.graph-empty, .mentions-empty) {
 	text-align: start;
 }

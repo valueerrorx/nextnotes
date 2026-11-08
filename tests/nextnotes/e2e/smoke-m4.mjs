@@ -161,7 +161,6 @@ await runSpec(import.meta.url, async (ctx, page) => {
 
 	// Listen-Ansichten: Inhalt lädt
 	const lists = [
-		['speed_dial.php', 'Speed Dial', `.speed-dial-tile[data-note-id="${note}"]`],
 		['list_tags.php', 'Tags', `.tag-item[data-tag="tag${RUN}"]`],
 		['list_folders.php', 'Ordner', `.folder-item[data-folder-id="${board}"]`],
 		['notes_manager.php', 'Notizverwaltung', '#nmNotesContainer a'],

@@ -32,7 +32,7 @@ await runSpec(import.meta.url, async (ctx, page) => {
 	// 1. Dashboard: Karte sichtbar, Klick öffnet die Notiz
 	let m = await open(page, 'dashboard.php', 'Dashboard');
 	await ctx.selfTest(page);
-	for (const id of ['iconSidebarDashboardBtn', 'iconSidebarGraphBtn', 'iconSidebarSpeedDialBtn']) ctx.ok(await page.locator(`#icon_sidebar #${id}`).isVisible(), `Icon-Leiste: ${id}`);
+	for (const id of ['iconSidebarDashboardBtn', 'iconSidebarGraphBtn']) ctx.ok(await page.locator(`#icon_sidebar #${id}`).isVisible(), `Icon-Leiste: ${id}`);
 	const dash = page.locator(`.dash-note-card[data-note-id="${card}"] .dash-card-link`);
 	await dash.waitFor({ state: 'visible', timeout: 15000 });
 	await ctx.screenshot(page, 'dashboard');
@@ -51,23 +51,12 @@ await runSpec(import.meta.url, async (ctx, page) => {
 	await ctx.screenshot(page, 'graph');
 	ctx.assertClean('Graph', m);
 
-	// 3. Speed Dial: Kachel mit Link; eigenes Bild über den Dialog (hell)
-	m = await open(page, 'speed_dial.php', 'Speed Dial');
-	const tile = page.locator(`.speed-dial-tile[data-note-id="${card}"] .speed-dial-link`);
-	ctx.ok(await tile.isVisible(), 'Speed Dial: Kachel sichtbar');
-	ctx.ok((await tile.getAttribute('href')) === `https://example.org/${RUN}`, 'Speed Dial: Link der Notiz', await tile.getAttribute('href'));
-	if (ctx.theme === 'light') {
-		await page.locator('#edgeMenuSpeedDialBackground').click();
-		await page.locator('#backgroundImageModal').waitFor({ state: 'visible', timeout: 10000 });
-		await page.locator('#backgroundImageInput').setInputFiles({ name: 'sd.png', mimeType: 'image/png', buffer: PNG });
-		const up = page.waitForResponse((r) => r.request().method() === 'POST' && r.url().includes('api_upload_background.php'));
-		await Promise.all([page.waitForEvent('load', { timeout: 20000 }), page.locator('#saveBackgroundBtn').click()]);
-		ctx.ok((await up).status() === 200, 'Speed Dial: Bild hochgeladen');
-		await page.waitForLoadState('networkidle');
-		ctx.ok(await page.locator('.speed-dial-background').count() === 1, 'Speed Dial: Bild nach dem Speichern');
-	}
-	await ctx.screenshot(page, 'speed-dial');
-	ctx.assertClean('Speed Dial', m);
+	// 3. Speed Dial entfernt (M6g): alte Adresse leitet aufs Dashboard, kein Leisten-Eintrag
+	m = ctx.mark();
+	await page.goto(ctx.appUrl(`speed_dial.php?workspace=${encodeURIComponent(WS)}`), { waitUntil: 'networkidle' });
+	ctx.ok(new URL(page.url()).pathname.endsWith('/apps/nextnotes/dashboard.php'), 'Speed Dial: Umleitung aufs Dashboard', page.url());
+	ctx.ok(await page.locator('#iconSidebarSpeedDialBtn').count() === 0, 'Speed Dial: kein Leisten-Eintrag');
+	ctx.assertClean('Speed Dial → Dashboard', m);
 
 	// 4. Hauptansicht: Hintergrund-Ebene unter der NC-Kopfleiste, Status kommt mit der Seite
 	const up = await page.request.fetch(ctx.appUrl('api_upload_background.php'), {

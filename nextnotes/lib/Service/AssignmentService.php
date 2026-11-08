@@ -62,7 +62,7 @@ class AssignmentService {
 		$out = [];
 		foreach ($list as $a) {
 			$id = (int)$a->getId();
-			$out[] = $this->view($uid, $a, $own[$id] ?? null, in_array($id, $reviewable, true) ? ($counts[$id] ?? ['total' => 0, 'submitted' => 0]) : null);
+			$out[] = $this->view($uid, $a, $own[$id] ?? null, in_array($id, $reviewable, true) ? ($counts[$id] ?? ['total' => 0, 'submitted' => 0, 'by_status' => []]) : null);
 		}
 		return ['assignments' => $out];
 	}
@@ -115,13 +115,13 @@ class AssignmentService {
 	private function viewOne(string $uid, Assignment $a): array {
 		$id = (int)$a->getId();
 		$review = $this->access->assignmentAllows($uid, $a, 'review');
-		$counts = $review ? ($this->submissions->counts([$id])[$id] ?? ['total' => 0, 'submitted' => 0]) : null;
+		$counts = $review ? ($this->submissions->counts([$id])[$id] ?? ['total' => 0, 'submitted' => 0, 'by_status' => []]) : null;
 		$own = $this->submissions->findOwn($uid, [$id])[$id] ?? null;
 		return $this->view($uid, $a, $own === null ? null : $this->states->materialize($own, $a), $counts);
 	}
 
 	/**
-	 * @param array{total: int, submitted: int}|null $counts nur mit review
+	 * @param array{total: int, submitted: int, by_status: array<string, int>}|null $counts nur mit review
 	 * @return array<string, mixed>
 	 */
 	private function view(string $uid, Assignment $a, ?Submission $own, ?array $counts): array {
@@ -147,7 +147,11 @@ class AssignmentService {
 			$out['source_note_id'] = $a->getSourceNoteId();
 			$out['submissions_total'] = $counts['total'];
 			$out['submissions_submitted'] = $counts['submitted'];
+			$out['submissions_by_status'] = (object)$counts['by_status'];
+			$out += $this->distribution->pending($a);
 		}
+		// verwaistes Team: Löschtermin (Restfrist, §9.6)
+		$out['deletion_at'] = $out['team_state'] === TeamStateService::ORPHANED ? $this->teamState->deletionDate($teamId) : null;
 		$out['can'] = [];
 		foreach (['review', 'edit', 'distribute', 'close', 'export', 'delete'] as $action) {
 			$out['can'][$action] = $this->access->assignmentAllows($uid, $a, $action);
@@ -186,11 +190,12 @@ class AssignmentService {
 		return $out;
 	}
 
-	/** @return array{submissions: list<array<string, mixed>>} GET /assignments/{id}/submissions (review) */
+	/** @return array{submissions: list<array<string, mixed>>, not_distributed: int, quota_full: bool} GET /assignments/{id}/submissions (review) */
 	public function submissions(string $uid, int $id): array {
 		$a = $this->access->requireAssignment($uid, $id, 'review');
 		$this->states->materializeAssignment($a);
-		return ['submissions' => array_map(fn (Submission $s) => $this->submissionView($s, true), $this->submissions->findByAssignment((int)$a->getId()))];
+		return ['submissions' => array_map(fn (Submission $s) => $this->submissionView($s, true), $this->submissions->findByAssignment((int)$a->getId()))]
+			+ $this->distribution->pending($a);
 	}
 
 	/** @return array{submission: array<string, mixed>} GET /submissions/{id}: eigene oder review */

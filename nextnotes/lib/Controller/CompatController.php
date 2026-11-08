@@ -170,7 +170,7 @@ class CompatController extends ApiController {
 	}
 
 	/** @param array<string, mixed> $r ExportService-Ergebnis file|zip: immer Download, nosniff (B48) */
-	private static function fileResponse(array $r): Response {
+	public static function fileResponse(array $r): Response {
 		if ($r['kind'] === 'zip') {
 			$response = new StreamResponse($r['stream']);
 			$response->addHeader('Content-Type', $r['mime']);

@@ -41,6 +41,8 @@ return [
 		// Tagebuch und Aufgaben (M4f)
 		['name' => 'page#diary', 'url' => '/diary.php', 'verb' => 'GET'],
 		['name' => 'page#tasks', 'url' => '/tasks.php', 'verb' => 'GET'],
+		// Aufgaben austeilen und einsammeln (M6g, SPEC §9.6)
+		['name' => 'page#assignments', 'url' => '/assignments.php', 'verb' => 'GET'],
 		// Persönliche Einstellungen (M4h)
 		['name' => 'page#settings', 'url' => '/settings.php', 'verb' => 'GET'],
 		// Admin-Formular (Settings\AdminSettings), nur Admins
@@ -180,6 +182,8 @@ return [
 		['name' => 'assignments_api#giveBack', 'url' => '/api/v1/submissions/{id}/return', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 		['name' => 'assignments_api#reopen', 'url' => '/api/v1/submissions/{id}/reopen', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 		['name' => 'assignments_api#feedback', 'url' => '/api/v1/submissions/{id}/feedback', 'verb' => 'PUT', 'requirements' => ['id' => '\d+']],
+		['name' => 'assignments_api#export', 'url' => '/api/v1/assignments/{id}/export', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
+		['name' => 'assignments_api#exportSubmission', 'url' => '/api/v1/submissions/{id}/export', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
 		['name' => 'tags_api#index', 'url' => '/api/v1/tags', 'verb' => 'GET'],
 		['name' => 'tags_api#rename', 'url' => '/api/v1/tags/{tag}', 'verb' => 'PATCH', 'requirements' => ['tag' => '[^/]+']],
 		['name' => 'tags_api#destroy', 'url' => '/api/v1/tags/{tag}', 'verb' => 'DELETE', 'requirements' => ['tag' => '[^/]+']],

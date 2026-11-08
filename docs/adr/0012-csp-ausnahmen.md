@@ -48,3 +48,6 @@ Papierkorb: `trash` gehört zu `NOTE_VIEWS` und bekommt dieselbe Policy wie `ind
 
 ## Nachtrag M4f (2026-11-04)
 Tagebuch: `diary` gehört zu `NOTE_VIEWS` (`frame-src 'self'` + Embed-Domains aus `EmbedDomainService`), weil die Journal-Ansicht ganze Einträge mit erlaubten Einbettungen und Audio-Player (`audio_player.php`) zeigt. Gleiche Policy wie `index`, keine weitere Ausnahme. `tasks` bleibt bei der NC-Standard-CSP.
+
+## Nachtrag M6g (2026-11-08)
+Aufgaben-Seite `assignments` gehört zu `SELF_FRAME_VIEWS` (nur `frame-src 'self'`, keine Embed-Domains): Der Lesemodus einer Abgabe zeigt die Druckansicht der Kopie (`api_export_note.php?…&format=html&disposition=inline`, serverseitig bereinigt, Rechte über `requireNote`) im iFrame neben dem Feedback. Eingebettete Videos der Abgabe lädt die Druckansicht selbst unter ihrer eigenen Policy (`export_print`). Keine weitere Lockerung.

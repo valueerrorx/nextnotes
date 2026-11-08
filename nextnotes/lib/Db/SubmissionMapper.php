@@ -120,7 +120,7 @@ class SubmissionMapper extends QBMapper {
 			->executeStatement();
 	}
 
-	/** @return array<int, array{total: int, submitted: int}> assignment_id → Zähler (Lehrkraft-Liste) */
+	/** @return array<int, array{total: int, submitted: int, by_status: array<string, int>}> assignment_id → Zähler (Lehrkraft-Liste) */
 	public function counts(array $assignmentIds): array {
 		$out = [];
 		foreach (array_chunk(array_values(array_unique($assignmentIds)), 1000) as $chunk) {
@@ -131,8 +131,9 @@ class SubmissionMapper extends QBMapper {
 			$res = $qb->executeQuery();
 			while ($row = $res->fetch()) {
 				$id = (int)$row['assignment_id'];
-				$out[$id] ??= ['total' => 0, 'submitted' => 0];
+				$out[$id] ??= ['total' => 0, 'submitted' => 0, 'by_status' => []];
 				$out[$id]['total'] += (int)$row['n'];
+				$out[$id]['by_status'][(string)$row['status']] = (int)$row['n'];
 				if (in_array($row['status'], ['submitted', 'returned'], true)) {
 					$out[$id]['submitted'] += (int)$row['n'];
 				}

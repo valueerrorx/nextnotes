@@ -15,7 +15,7 @@ await runSpec(import.meta.url, async (ctx, page) => {
 	const fname = `Board ${Date.now().toString(36)}`;
 	const fid = await api.folder(ws, fname);
 	await api.note(ws, `Karte ${Date.now().toString(36)}`, fid, '<p>k</p>');
-	const pages = ['list_tags.php', 'settings.php', 'dashboard.php', 'tasks.php', 'diary.php', 'speed_dial.php', 'mentions.php', 'notes_manager.php', 'trash.php',
+	const pages = ['list_tags.php', 'settings.php', 'dashboard.php', 'tasks.php', 'diary.php', 'mentions.php', 'notes_manager.php', 'trash.php',
 		'attachments_list.php', 'list_folders.php', 'graph.php', 'create.php', `revisions.php?note_id=${n}`, `attachments.php?note_id=${n}`];
 	for (const width of [1400, 390]) {
 		await page.setViewportSize({ width, height: 900 });

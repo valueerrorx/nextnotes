@@ -127,6 +127,7 @@ class IndexViewService {
 		private NotePalette $palette,
 		private IL10N $l,
 		private TeamStateService $teamState,
+		private AssignmentsViewService $assignmentsView,
 	) {
 	}
 
@@ -198,7 +199,8 @@ class IndexViewService {
 			'showNoteIcons' => $this->bool($uid, 'show_note_icons'),
 			'tree' => $tree,
 			'exitFolderUrl' => $baseUrl . 'index.php?' . http_build_query(['workspace' => $key]),
-			'body' => $this->body($uid, $key, $note === null),
+			// M6g: „Als Aufgabe austeilen…“ nur, wo der Server die Quelle annimmt: eigener Workspace (Lehrkraft irgendwo) oder Team-Workspace als Lehrkraft (§9.6)
+			'body' => array_merge_recursive($this->body($uid, $key, $note === null), ['data' => ['nn-teacher' => $this->canAssignFrom($uid, $ws, $rights['teacher']) ? '1' : '0']]),
 			'poznoteConfig' => $this->poznoteConfig($uid),
 			'workspaceMap' => $this->workspaceMap($uid),
 			'pageConfig' => $this->pageConfig($uid, $key, $noteFolderId !== null ? ($byId[$noteFolderId] ?? null)?->getName() : null, $canWrite, $search['active']),
@@ -257,6 +259,16 @@ class IndexViewService {
 	 * @param array<int, Folder> $byId
 	 * @return array{canWrite: bool, teacher: bool, restricted: bool, material: array<int, true>}
 	 */
+	private function canAssignFrom(string $uid, Workspace $ws, bool $teacher): bool {
+		if ($ws->getKind() !== 'normal') {
+			return false;
+		}
+		if ($ws->getOwnerType() === 'user') {
+			return $ws->getOwnerId() === $uid && $this->assignmentsView->teachesAny($uid);
+		}
+		return $teacher || $this->access->canManageTeam($uid, $ws);
+	}
+
 	private function rights(string $uid, Workspace $ws, bool $canWrite, array $byId): array {
 		// ohne Ordner kein Ordner-Menü: Lehrkraft-Abfrage (Circles) entfällt
 		$team = $ws->getOwnerType() === 'team' && $ws->getKind() === 'normal' && $byId !== [];
@@ -863,8 +875,8 @@ class IndexViewService {
 			'TAG_COLORS' => is_array($tagColors) ? (object)$tagColors : new \stdClass(),
 			'NOTE_COLOR_PALETTE' => $palette,
 			'PoznoteActiveAccountIsOwn' => true,
-			// Texte des Ports (NC-l10n), z. B. reservierter Tag speed-dial (P27)
-			'NEXTNOTES_TXT' => ['speedDialReserved' => $this->l->t('The tag "%1$s" is reserved. Use "%2$s" in the menu of the note.', [TagService::SPEED_DIAL, $this->tr->t('speed_dial.add', [], 'Add to speed dial')])],
+			// Texte des Ports (NC-l10n), z. B. reservierter Tag speed-dial (P27; Speed Dial entfernt, Tag bleibt reserviert)
+			'NEXTNOTES_TXT' => ['speedDialReserved' => $this->l->t('The tag "%s" is reserved for internal use.', [TagService::SPEED_DIAL])],
 			'calendarTranslations' => [
 				'months' => array_map(static fn ($m) => $t('calendar.months.' . $m), $months),
 				'weekdays' => array_map(static fn ($d) => $t('calendar.weekdays.' . $d), $days),

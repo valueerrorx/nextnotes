@@ -25,6 +25,8 @@ class PageAssets {
 		'vendor/highlight/highlight.min', 'vendor/highlight/powershell.min', 'syntax-highlight',
 		'nextnotes-app', 'nextnotes-late', 'nextnotes-teams',
 	];
+	// Eigene Seiten ohne Upstream-Vorlage (bundles.json ownPages): Seitenskript und -stil aus js-src/css-src zuletzt
+	private const OWN_ASSETS = ['assignments' => 'nextnotes-assignments'];
 
 	/** Hauptansicht; $lang = Upstream-Sprachcode mit Wörterbuch (PageTranslator::languageFor) */
 	public function index(string $lang): void {
@@ -48,15 +50,16 @@ class PageAssets {
 	}
 
 	/**
-	 * Eigene Seite aus bundles.json pages (revisions, attachments, excalidraw_editor): Adapter, Vendor, Seitenbündel, Late-Adapter, Teams-Oberfläche
+	 * Eigene Seite aus bundles.json pages bzw. ownPages: Adapter, Vendor, Seitenbündel, Late-Adapter, Teams-Oberfläche, ggf. eigenes Seitenskript
 	 * @param string[] $vendor unveränderte Vendor-Skripte (js/vendor/…), vor dem Seitenbündel
 	 */
 	public function page(string $page, string $lang, array $vendor = []): void {
 		Util::addScript(Application::APP_ID, 'i18n/nextnotes-i18n-' . $lang);
-		foreach (['nextnotes-bootstrap', ...$vendor, 'nextnotes-page-' . $page, 'nextnotes-late', 'nextnotes-teams'] as $script) {
+		$own = isset(self::OWN_ASSETS[$page]) ? [self::OWN_ASSETS[$page]] : [];
+		foreach (['nextnotes-bootstrap', ...$vendor, 'nextnotes-page-' . $page, 'nextnotes-late', 'nextnotes-teams', ...$own] as $script) {
 			Util::addScript(Application::APP_ID, $script);
 		}
-		foreach (['nextnotes-page-' . $page, 'nextnotes-tokens', 'nextnotes-layout'] as $style) {
+		foreach (['nextnotes-page-' . $page, 'nextnotes-tokens', 'nextnotes-layout', ...$own] as $style) {
 			Util::addStyle(Application::APP_ID, $style);
 		}
 	}

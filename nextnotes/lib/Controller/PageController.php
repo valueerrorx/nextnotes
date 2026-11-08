@@ -19,6 +19,7 @@ use OCA\NextNotes\Service\MentionService;
 use OCA\NextNotes\Service\Exception\NotFoundException;
 use OCA\NextNotes\Service\SettingsService;
 use OCA\NextNotes\Service\SnapshotService;
+use OCA\NextNotes\Service\View\AssignmentsViewService;
 use OCA\NextNotes\Service\View\DashboardViewService;
 use OCA\NextNotes\Service\View\DiaryViewService;
 use OCA\NextNotes\Service\View\IndexViewService;
@@ -29,7 +30,6 @@ use OCA\NextNotes\Service\View\PageAssets;
 use OCA\NextNotes\Service\View\PageFrameService;
 use OCA\NextNotes\Service\View\PageTranslator;
 use OCA\NextNotes\Service\View\SettingsViewService;
-use OCA\NextNotes\Service\View\SpeedDialViewService;
 use OCA\NextNotes\Service\TeamService;
 use OCA\NextNotes\Service\View\TagListViewService;
 use OCA\NextNotes\Service\View\TeamsUiConfig;
@@ -71,11 +71,11 @@ class PageController extends Controller {
 		private DiaryViewService $diaryView,
 		private BackgroundService $backgrounds,
 		private DashboardViewService $dashboardView,
-		private SpeedDialViewService $speedDialView,
 		private MentionService $mentions,
 		private SettingsViewService $settingsView,
 		private TeamService $teams,
 		private TeamsUiConfig $teamsUi,
+		private AssignmentsViewService $assignmentsView,
 	) {
 		parent::__construct(Application::APP_ID, $request);
 	}
@@ -139,6 +139,7 @@ class PageController extends Controller {
 			'view' => $view,
 			'baseUrl' => $baseUrl,
 			'railMentions' => $this->mentions->railCount($uid),
+			'railAssignments' => $this->assignmentsView->railLabel($uid),
 		]);
 	}
 
@@ -431,6 +432,19 @@ class PageController extends Controller {
 		});
 	}
 
+	// Aufgaben austeilen und einsammeln (M6g, SPEC §9.6): Liste, Abgaben und Dialoge per nextnotes-assignments.js über die Aufgaben-API;
+	// ?team=, ?assignment=, ?create=<Notiz> wertet nur das Skript aus (Rechte prüft die API)
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function assignments(): TemplateResponse {
+		return $this->listPage('assignments', fn (string $uid) => [
+			'teacherTeams' => $teams = $this->assignmentsView->teacherTeams($uid),
+			'createTeam' => $this->assignmentsView->createTeam($uid, $this->request->getParam('create'), $teams),
+			'texts' => $this->assignmentsView->texts(),
+			'hintBytes' => AssignmentsViewService::HINT_BYTES,
+		]);
+	}
+
 	/** @return array<string, mixed> Monats-/Tagesnamen der Datumsauswahl (Upstream diary.php/tasks.php) */
 	private function calendarTranslations(): array {
 		$t = fn (string $k) => $this->translator->t($k);
@@ -465,6 +479,7 @@ class PageController extends Controller {
 			'frame' => $frame,
 			'currentPage' => $page . '.php',
 			'railMentions' => $this->mentions->railCount($uid),
+			'railAssignments' => $this->assignmentsView->railLabel($uid),
 			'view' => ['workspaceKey' => $frame['workspaceKey'], 'iconPalette' => IndexViewService::iconPalette()],
 		] + $extra);
 	}
@@ -486,13 +501,12 @@ class PageController extends Controller {
 		return $this->listPage('graph');
 	}
 
-	// Upstream speed_dial.php: Notizen mit dem internen Tag speed-dial als Kacheln, eigenes Hintergrundbild
+	// Speed Dial entfernt (Thomas 2026-11-08, SPEC Frontend-Liste 28): alte Lesezeichen → Dashboard, Workspace bleibt
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
-	public function speedDial(): TemplateResponse {
-		return $this->listPage('speed_dial', fn (string $uid, array $frame) => [
-			'speedDial' => $this->speedDialView->build($uid, $frame),
-		]);
+	public function speedDial(): RedirectResponse {
+		$frame = $this->pageFrame->frame($this->userSession->getUser()?->getUID() ?? '', $this->request->getParam('workspace'));
+		return new RedirectResponse($this->urls->linkToRoute('nextnotes.page.dashboard') . '?' . http_build_query(['workspace' => $frame['workspaceKey']]));
 	}
 
 	// Upstream mentions.php: Notizen geteilter Workspaces, die den Benutzer mit @uid nennen; ?handled=1 zeigt erledigte

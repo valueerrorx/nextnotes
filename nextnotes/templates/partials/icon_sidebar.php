@@ -5,8 +5,8 @@
  */
 // abgeleitet von src/icon_sidebar.php @ 7e2e0b6aa501ba95ac1e9789fd2bb477c281a001
 // Icon-Leiste: App-Symbol „Next Notes“ als Startseiten-Link (Dashboard), Einträge der portierten Seiten (M4e: Notizen, Ordner,
-// Tags, Anhänge, Papierkorb; M4f: Aufgaben, Tagebuch; M4g: Dashboard, Graph, Speed Dial, Erwähnungen nur mit geteiltem Workspace und Zähler).
-// UI-rail: oben Dashboard, Hauptansicht (#iconSidebarHomeBtn, href pflegen tabs.js/icon-sidebar-toggle.js), Aufgaben, Tagebuch; Erstellen-Seite entfernt.
+// Tags, Anhänge, Papierkorb; M4f: Aufgaben, Tagebuch; M4g: Dashboard, Graph, Erwähnungen nur mit geteiltem Workspace und Zähler; Speed Dial entfernt, M6g).
+// UI-rail: oben Dashboard, Hauptansicht (#iconSidebarHomeBtn, href pflegen tabs.js/icon-sidebar-toggle.js), Aufgaben, Aufgaben (Team, M6g), Tagebuch; Erstellen-Seite entfernt.
 // Unten Einstellungen (M4h; „Über“ entfernt, Thomas 2026-11-08: in den Einstellungen erreichbar); gestrichen: Teilen-Seite, Offline, Theme-Umschalter,
 // Abmelden, Konten, Git, Profil-/Farb-/Reihenfolge-Modals (gespeicherte icon_sidebar_order wird nicht angewendet).
 /** @var array $_ */
@@ -15,19 +15,20 @@ $railToggleLabel = $tr->t('sidebar.toggle_icon_sidebar', [], 'Hide/Show icon sid
 $overflowLabel = $tr->t('sidebar.show_hidden_icons', [], 'Show hidden icons');
 $railPage = $_['currentPage'] ?? 'index.php';
 $railQuery = '?' . http_build_query(['workspace' => $view['workspaceKey']]);
-// Gruppen wie Upstream (Trennlinie beim Gruppenwechsel); Kern-Ansichten als eigene Gruppe oben (UI-rail)
+// Trennlinie beim Gruppenwechsel: nur unter den Kern-Ansichten (start) und über dem Papierkorb (Thomas 2026-11-08)
 $railItems = [
 	['id' => 'iconSidebarDashboardBtn', 'group' => 'start', 'page' => 'dashboard.php', 'icon' => 'lucide-layout-dashboard', 'label' => $tr->t('common.back_to_home', [], 'Dashboard')],
 	['id' => 'iconSidebarHomeBtn', 'group' => 'start', 'page' => 'index.php', 'icon' => 'lucide-folder-tree', 'label' => $tr->t('common.notes', [], 'Notes')],
 	['id' => 'iconSidebarTasksBtn', 'group' => 'start', 'page' => 'tasks.php', 'icon' => 'lucide-list-todo', 'label' => $tr->t('tasks_page.title', [], 'Tasks')],
+	// M6g: Aufgaben austeilen/abgeben, nur mit Team oder eigener Aufgabe; railAssignments = Text aus NC-l10n (AssignmentsViewService::railLabel)
+	...(($_['railAssignments'] ?? null) !== null ? [['id' => 'iconSidebarAssignmentsBtn', 'group' => 'start', 'page' => 'assignments.php', 'icon' => 'lucide-graduation-cap', 'label' => (string)$_['railAssignments']]] : []),
 	['id' => 'iconSidebarDiaryBtn', 'group' => 'start', 'page' => 'diary.php', 'icon' => 'lucide-book-open', 'label' => $tr->t('diary.title', [], 'Diary')],
-	['id' => 'iconSidebarGraphBtn', 'group' => 'home', 'page' => 'graph.php', 'icon' => 'lucide-network', 'label' => $tr->t('home.graph', [], 'Graph')],
-	['id' => 'iconSidebarSpeedDialBtn', 'group' => 'home', 'page' => 'speed_dial.php', 'icon' => 'lucide-zap', 'label' => $tr->t('speed_dial.title', [], 'Speed dial')],
 	['id' => 'iconSidebarNotesBtn', 'group' => 'content', 'page' => 'notes_manager.php', 'icon' => 'lucide-layout-list', 'label' => $tr->t('notes_manager.age_all', [], 'All notes')],
 	...(($_['railMentions'] ?? null) !== null ? [['id' => 'iconSidebarMentionsBtn', 'group' => 'content', 'page' => 'mentions.php', 'icon' => 'lucide-at-sign', 'label' => $tr->t('mentions.title', [], 'Mentions'), 'badge' => (int)$_['railMentions']]] : []),
 	['id' => 'iconSidebarFoldersBtn', 'group' => 'content', 'page' => 'list_folders.php', 'icon' => 'lucide-folder-open', 'label' => $tr->t('home.folders', [], 'Folders')],
-	['id' => 'iconSidebarTagsBtn', 'group' => 'collections', 'page' => 'list_tags.php', 'icon' => 'lucide-tags', 'label' => $tr->t('notes_list.system_folders.tags', [], 'Tags')],
-	['id' => 'iconSidebarAttachmentsBtn', 'group' => 'collections', 'page' => 'attachments_list.php', 'icon' => 'lucide-paperclip', 'label' => $tr->t('notes_list.system_folders.attachments', [], 'Attachments')],
+	['id' => 'iconSidebarTagsBtn', 'group' => 'content', 'page' => 'list_tags.php', 'icon' => 'lucide-tags', 'label' => $tr->t('notes_list.system_folders.tags', [], 'Tags')],
+	['id' => 'iconSidebarAttachmentsBtn', 'group' => 'content', 'page' => 'attachments_list.php', 'icon' => 'lucide-paperclip', 'label' => $tr->t('notes_list.system_folders.attachments', [], 'Attachments')],
+	['id' => 'iconSidebarGraphBtn', 'group' => 'content', 'page' => 'graph.php', 'icon' => 'lucide-network', 'label' => $tr->t('home.graph', [], 'Graph')],
 	['id' => 'iconSidebarTrashBtn', 'group' => 'utility', 'page' => 'trash.php', 'icon' => 'lucide-trash-2', 'label' => $tr->t('notes_list.system_folders.trash', [], 'Trash')],
 ];
 $railBottom = [

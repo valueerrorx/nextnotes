@@ -186,7 +186,7 @@ await runSpec(import.meta.url, async (ctx, page) => {
 	const RESTORE = /^(?!.*(backup|sicherung)).*wiederherstel/i;
 	const shown = (b) => b.match(/„([^“]*)“/)?.[1] ?? b; // Ausnahmen nur gegen den sichtbaren Text, nicht die Regex-Quelle
 	const M4_PAGES = {
-		'dashboard.php': [], 'diary.php': [], 'tasks.php': [], 'graph.php': [], 'speed_dial.php': [], 'mentions.php': [], 'notes_manager.php': [],
+		'dashboard.php': [], 'diary.php': [], 'tasks.php': [], 'graph.php': [], 'mentions.php': [], 'notes_manager.php': [],
 		// Papierkorb/Revisionen: „wiederherstellen“ ist dort die Hauptaktion, kein Backup-Restore; Einstellungen: Hinweis-Karte „Mein Konto“ verlinkt NC (M4h)
 		'list_tags.php': [], 'list_folders.php': [], 'attachments_list.php': [/herunterladen|download/i], 'trash.php': [RESTORE], 'create.php': [],
 		[`attachments.php?note_id=${pnid}`]: [/herunterladen|download/i], [`revisions.php?note_id=${pnid}`]: [RESTORE],

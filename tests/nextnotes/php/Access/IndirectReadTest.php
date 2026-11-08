@@ -175,7 +175,7 @@ final class IndirectReadTest extends ApiTestCase {
 		$wq = 'workspace=' . self::enc($fx['wsB']);
 		$out = [];
 		foreach ([
-			"dashboard.php?$wq", 'dashboard.php?scope=all', "speed_dial.php?$wq", "mentions.php?$wq", 'mentions.php?handled=1',
+			"dashboard.php?$wq", 'dashboard.php?scope=all', "mentions.php?$wq", 'mentions.php?handled=1',
 			"graph.php?$wq", "kanban_content.php?ajax=1&folder_id={$fx['bF']}&$wq", "diary.php?$wq", "tasks.php?$wq",
 			"notes_manager.php?$wq", "index.php?$wq&note={$fx['bRef']}",
 		] as $p) {

@@ -121,6 +121,25 @@ class ExportService {
 		return self::file(ExportFormatter::styledHtml($this->htmlBody($uid, $note, $type, $content), (string)($note->getHeading() ?? ''), $this->tagsOf($note)), $name . '.html', 'text/html');
 	}
 
+	/**
+	 * Notiz als Datei in Sammel-ZIPs (Abgaben, M6g): Markdown roh, sonst gestaltetes HTML; Anhänge relativ unter attachments/. Recht prüft der Aufrufer
+	 * @return array{ext: string, text: string, own: array<int, array{id: int, name: string, mime: string, file: string, size: int, entity: Attachment}>}
+	 */
+	public function archiveFile(string $uid, Note $note): array {
+		$type = self::typeOf($note);
+		$id = (int)$note->getId();
+		$content = (string)($note->getContent() ?? '');
+		$own = $this->ownAttachments($note);
+		if ($type === 'markdown') {
+			$content = self::zipPaths($content, $id, $own);
+			return ['ext' => 'md', 'text' => $content . ExportFormatter::attachmentMarkdown(array_values($own), $content), 'own' => $own];
+		}
+		$this->language($uid);
+		$body = self::zipPaths($this->htmlBody($uid, $note, $type, $content), $id, $own);
+		$html = ExportFormatter::styledHtml($body, (string)($note->getHeading() ?? ''), $this->tagsOf($note), ExportFormatter::attachmentLinks(array_values($own), $body));
+		return ['ext' => 'html', 'text' => $html, 'own' => $own];
+	}
+
 	// Leserecht, ?workspace= muss (falls gesetzt) zur angefragten Notiz passen, verknüpfte Notiz → Ziel (B42)
 	private function source(string $uid, mixed $rawId, mixed $wsKey): Note {
 		if (!is_string($rawId) || !ctype_digit($rawId)) {

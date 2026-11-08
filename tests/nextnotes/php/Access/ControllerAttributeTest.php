@@ -19,7 +19,9 @@ use PHPUnit\Framework\TestCase;
 // Done M2a 7 / SPEC §4.5: alle API-Methoden NoAdminRequired, CSRF aktiv außer Allowlist, nie PublicPage
 final class ControllerAttributeTest extends TestCase {
 	// "Klasse::methode" mit #[NoCSRFRequired]; M2b: Anhang-GET (wird als <img src> geladen)
-	private const CSRF_ALLOWLIST = ['AttachmentsApiController::show'];
+	private const CSRF_ALLOWLIST = ['AttachmentsApiController::show',
+		// M6g: ZIP der Abgaben, GET-Download ohne Seiteneffekt (SPEC §9.5)
+		'AssignmentsApiController::export', 'AssignmentsApiController::exportSubmission'];
 
 	/** @return array<string, \ReflectionMethod> */
 	private static function apiMethods(): array {
@@ -106,6 +108,8 @@ final class ControllerAttributeTest extends TestCase {
 		'PageController::graph', 'PageController::speedDial', 'PageController::mentions', 'CompatController::background',
 		// M4h: Einstellungen, workspaces.php GET (Weiterleitung), Speicher-Fragment; GET ohne Seiteneffekt
 		'PageController::settings', 'CompatController::workspacesPage', 'CompatController::storageStatsUser',
+		// M6g: Aufgaben-Seite, GET ohne Seiteneffekt außer Nachzügler-Abgleich des Schülers (§9.4, wie GET /assignments)
+		'PageController::assignments',
 	];
 	// M3c2: schreibende Kompatibilitätsrouten (POST) prüfen CSRF
 	private const PAGE_COMPAT_CSRF = ['PageController::search', 'PageController::trashSearch', 'CompatController::noteInfo', 'CompatController::saveExcalidraw', 'CompatController::workspaces', 'CompatController::importDroppedNotes',

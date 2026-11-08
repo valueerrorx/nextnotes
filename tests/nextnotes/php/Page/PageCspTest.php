@@ -46,6 +46,8 @@ final class PageCspTest extends ApiTestCase {
 				'revisions' => ["revisions.php?note_id=$n&$wq", true],
 				'kanban_content' => ["kanban_content.php?ajax=1&folder_id=$f&$wq", true],
 				'attachments' => ["attachments.php?note_id=$n&$wq", false],
+				// M6g: Lesemodus der Abgaben (Druckansicht im iFrame)
+				'assignments' => ["assignments.php?$wq", false],
 			];
 			foreach ($pages as $view => [$path, $embed]) {
 				$r = $a->absolute('GET', self::APP . $path);

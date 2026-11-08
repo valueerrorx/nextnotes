@@ -65,6 +65,16 @@ for (const [p, def] of Object.entries(b.pages)) {
 	}
 }
 
+// Eigene Seiten ohne Upstream-Vorlage (M6g): Dateien und Gruppen existieren, Name kollidiert nicht mit einer Upstream-Seite
+for (const [p, def] of Object.entries(b.ownPages ?? {})) {
+	if (p === '_doc') continue;
+	if (b.pages[p] || up.manifest[p] || fs.existsSync(path.join(pub, p + '.php'))) errors.push(`ownPages.${p}: Upstream-Seite gleichen Namens`);
+	for (const f of def.js) if (!fs.existsSync(path.join(pub, f)) || matches(b.exclude, f)) errors.push(`ownPages.${p}: ${f} fehlt oder ausgeschlossen`);
+	for (const f of def.css) {
+		if (f.startsWith('@') ? !b.cssPageGroups[f] : !fs.existsSync(path.join(pub, f))) errors.push(`ownPages.${p}: ${f} fehlt`);
+	}
+}
+
 // Einzeldateien und Vendor existieren
 for (const f of b.jsSingle) if (!fs.existsSync(path.join(pub, f))) errors.push(`jsSingle ${f}: fehlt in src/public`);
 for (const def of Object.values(b.cssSingle)) if (!fs.existsSync(path.join(pub, def.src))) errors.push(`cssSingle ${def.src}: fehlt in src/public`);

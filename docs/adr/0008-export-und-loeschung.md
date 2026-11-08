@@ -41,3 +41,7 @@ Die Aufbewahrung von Abgaben nach Kontolöschung oder Austritt schränkt das Rec
 - Upstream-Exportcode wird als Service nachgebaut (Formate gleich, damit Exporte in Upstream-Poznote lesbar bleiben).
 - Datenmodell: `submissions.student_uid` nullable, neue Spalten `student_name`, `student_uid_former`, `student_deleted_at`, `feedback_by_name`; `assignments.owner_uid`, `created_by_name`; Tabelle `nextnotes_teams` (SPEC §2.1). `notes.workspace_id` NULL auch bei verwaisten Abgabe-Kopien.
 - Testfälle: Kontolöschung entfernt alle Zeilen mit `uid` außer bewusst behaltenen (Liste in SPEC §8); Abgaben bleiben vollständig mit Name; Team-Löschung entfernt Abgaben erst nach der Frist.
+
+## Nachtrag M6g (2026-11-08)
+- ZIP der Abgaben über `ExportArchive` (Temp-Ordner, 1 GiB, ein Export je Benutzer), nicht `ZipResponse`. Lehrkraft (Aktion `export`) bekommt alle Abgaben inkl. gelöschter Konten; Schüler exportiert nur die eigene Abgabe, `feedback.txt` erst ab `returned`.
+- `status.csv`: Zellen mit führendem `= + - @`, Tab oder CR werden mit `'` präfigiert (keine Formel-Ausführung in Tabellenprogrammen).

@@ -392,7 +392,7 @@ class ZipExportService {
 	 * @param callable(): array<string, mixed> $fn
 	 * @return array<string, mixed>
 	 */
-	private function locked(string $uid, callable $fn): array {
+	public function locked(string $uid, callable $fn): array {
 		$key = self::lockKey($uid);
 		try {
 			$this->locks->acquireLock($key, ILockingProvider::LOCK_EXCLUSIVE);

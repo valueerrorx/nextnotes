@@ -1,0 +1,334 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Thomas Weissel
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+/* Aufgaben-Seite (M6g): nur NC-Variablen (Hell/Dunkel), linksbündig ab --nn-view-pad (nextnotes-layout.css), Anlehnung an MS Teams „Aufgaben“.
+   Zwei IDs gegen Upstream-Seitenstile (ADR 0017). */
+#content #nextnotes-root .nn-asg {
+	max-width: 1100px;
+	margin: 0;
+	padding: 0 0 calc(var(--default-grid-baseline) * 8);
+	color: var(--color-main-text);
+}
+
+#content #nextnotes-root .nn-asg-scope {
+	cursor: default;
+}
+
+#content #nextnotes-root .nn-asg-team-select {
+	min-height: 0;
+	margin: 0;
+	padding: 0 calc(var(--default-grid-baseline) * 1);
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+}
+
+#content #nextnotes-root .nn-asg-toolbar,
+#content #nextnotes-root .nn-asg-actions,
+#content #nextnotes-root .nn-asg-review-nav,
+#content #nextnotes-root .nn-asg-feedback-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: calc(var(--default-grid-baseline) * 2);
+	margin-block: calc(var(--default-grid-baseline) * 3);
+}
+
+#content #nextnotes-root .nn-asg :is(.btn-primary, .btn-secondary, .btn-cancel, .nn-asg-back, .nn-asg-link) {
+	display: inline-flex;
+	align-items: center;
+	gap: calc(var(--default-grid-baseline) * 2);
+	min-height: var(--default-clickable-area);
+	margin: 0;
+	padding-inline: calc(var(--default-grid-baseline) * 4);
+	border-radius: var(--border-radius-element);
+	font-weight: bold;
+	text-decoration: none;
+}
+
+#content #nextnotes-root .nn-asg :is(.btn-secondary, .nn-asg-link) {
+	border: 1px solid var(--color-border-maxcontrast);
+	background-color: var(--color-main-background);
+	color: var(--color-main-text);
+}
+
+#content #nextnotes-root .nn-asg .nn-asg-back {
+	padding-inline: calc(var(--default-grid-baseline) * 2);
+	border: 0;
+	background: transparent;
+	color: var(--color-main-text);
+}
+
+#content #nextnotes-root .nn-asg :is(.btn-secondary, .nn-asg-link, .nn-asg-back):hover {
+	background-color: var(--color-background-hover);
+}
+
+#content #nextnotes-root .nn-asg-status:empty {
+	display: none;
+}
+
+#content #nextnotes-root .nn-asg-status {
+	margin-block: calc(var(--default-grid-baseline) * 2);
+	padding: calc(var(--default-grid-baseline) * 2) calc(var(--default-grid-baseline) * 3);
+	border-radius: var(--border-radius-element);
+	background-color: var(--color-primary-element-light);
+	color: var(--color-primary-element-light-text);
+}
+
+#content #nextnotes-root .nn-asg-status.nn-asg-status-error {
+	background-color: color-mix(in srgb, var(--color-error) 15%, transparent);
+	color: var(--color-error-text);
+}
+
+/* Liste: Zeilen wie Teams-Aufgabenliste, Frist prominent */
+#content #nextnotes-root .nn-asg-items {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	border-top: 1px solid var(--color-border);
+}
+
+#content #nextnotes-root .nn-asg-item {
+	border-bottom: 1px solid var(--color-border);
+}
+
+#content #nextnotes-root .nn-asg-item-main {
+	display: block;
+	width: 100%;
+	margin: 0;
+	padding: calc(var(--default-grid-baseline) * 3) calc(var(--default-grid-baseline) * 2);
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	text-align: start;
+}
+
+#content #nextnotes-root button.nn-asg-item-main {
+	cursor: pointer;
+}
+
+#content #nextnotes-root button.nn-asg-item-main:is(:hover, :focus-visible) {
+	background-color: var(--color-background-hover);
+}
+
+#content #nextnotes-root .nn-asg-item-head,
+#content #nextnotes-root .nn-asg-detail-head,
+#content #nextnotes-root .nn-asg-review-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: calc(var(--default-grid-baseline) * 3);
+}
+
+#content #nextnotes-root .nn-asg-item-title {
+	font-size: 1.05em;
+	font-weight: bold;
+}
+
+#content #nextnotes-root .nn-asg-detail-title {
+	margin: 0;
+	font-size: 1.4em;
+}
+
+#content #nextnotes-root .nn-asg-item-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: calc(var(--default-grid-baseline) * 4);
+	margin-top: calc(var(--default-grid-baseline) * 1);
+	color: var(--color-text-maxcontrast);
+}
+
+#content #nextnotes-root .nn-asg-due {
+	color: var(--color-main-text);
+	font-weight: bold;
+}
+
+#content #nextnotes-root .nn-asg-due.nn-asg-due-passed {
+	color: var(--color-error-text);
+}
+
+#content #nextnotes-root .nn-asg-hint,
+#content #nextnotes-root .nn-asg-storage.nn-asg-storage-warn {
+	margin-top: calc(var(--default-grid-baseline) * 2);
+	color: var(--color-warning-text);
+}
+
+#content #nextnotes-root .nn-asg-muted,
+#content #nextnotes-root .nn-asg-empty {
+	color: var(--color-text-maxcontrast);
+}
+
+#content #nextnotes-root .nn-asg-empty {
+	margin: calc(var(--default-grid-baseline) * 4) 0;
+	text-align: start;
+}
+
+/* Status-Chips (Zugewiesen, Abgegeben, Zurückgegeben, Verpasst, …) */
+#content #nextnotes-root .nn-asg-chip {
+	display: inline-block;
+	padding: 2px calc(var(--default-grid-baseline) * 2);
+	border-radius: var(--border-radius-pill);
+	background-color: var(--color-background-dark);
+	color: var(--color-main-text);
+	font-size: 0.85em;
+	font-weight: bold;
+	white-space: nowrap;
+}
+
+#content #nextnotes-root .nn-asg-chip:is(.nn-asg-chip-distributed, .nn-asg-chip-assigned, .nn-asg-chip-returned) {
+	background-color: var(--color-primary-element-light);
+	color: var(--color-primary-element-light-text);
+}
+
+#content #nextnotes-root .nn-asg-chip.nn-asg-chip-submitted {
+	background-color: color-mix(in srgb, var(--color-success) 18%, transparent);
+	color: var(--color-success-text);
+}
+
+#content #nextnotes-root .nn-asg-chip.nn-asg-chip-missed {
+	background-color: color-mix(in srgb, var(--color-error) 18%, transparent);
+	color: var(--color-error-text);
+}
+
+#content #nextnotes-root .nn-asg-chip:is(.nn-asg-chip-reopened, .nn-asg-chip-warning) {
+	background-color: color-mix(in srgb, var(--color-warning) 18%, transparent);
+	color: var(--color-warning-text);
+}
+
+#content #nextnotes-root .nn-asg-tag {
+	margin-inline-start: calc(var(--default-grid-baseline) * 2);
+	color: var(--color-text-maxcontrast);
+	font-size: 0.85em;
+}
+
+/* Abgaben-Tabelle */
+#content #nextnotes-root .nn-asg-section {
+	margin: calc(var(--default-grid-baseline) * 4) 0 calc(var(--default-grid-baseline) * 2);
+	font-size: 1.1em;
+}
+
+#content #nextnotes-root .nn-asg-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+#content #nextnotes-root .nn-asg-table :is(th, td) {
+	padding: calc(var(--default-grid-baseline) * 2);
+	border-bottom: 1px solid var(--color-border);
+	text-align: start;
+	vertical-align: middle;
+}
+
+#content #nextnotes-root .nn-asg-table th {
+	color: var(--color-text-maxcontrast);
+	font-weight: normal;
+}
+
+#content #nextnotes-root .nn-asg-table tbody tr:hover {
+	background-color: var(--color-background-hover);
+}
+
+#content #nextnotes-root .nn-asg-sub-open {
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--color-main-text);
+	font: inherit;
+	font-weight: bold;
+	text-align: start;
+	cursor: pointer;
+}
+
+#content #nextnotes-root .nn-asg-sub-open:is(:hover, :focus-visible) {
+	text-decoration: underline;
+}
+
+/* Lesemodus: Abgabe links, Feedback rechts */
+#content #nextnotes-root .nn-asg-review {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+	gap: calc(var(--default-grid-baseline) * 4);
+	margin-top: calc(var(--default-grid-baseline) * 3);
+}
+
+#content #nextnotes-root .nn-asg-frame {
+	width: 100%;
+	height: 70vh;
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-large);
+	/* Druckansicht ist immer hell (Papier) */
+	background-color: #fff;
+}
+
+#content #nextnotes-root .nn-asg-feedback,
+#content #nextnotes-root .nn-asg-create {
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--default-grid-baseline) * 3);
+}
+
+#content #nextnotes-root .nn-asg-field {
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--default-grid-baseline) * 1);
+}
+
+#content #nextnotes-root .nn-asg-field-label {
+	font-weight: bold;
+}
+
+#content #nextnotes-root .nn-asg-field :is(input, select, textarea) {
+	width: 100%;
+	margin: 0;
+	box-sizing: border-box;
+}
+
+#content #nextnotes-root .nn-asg-field input[type="number"] {
+	max-width: 10em;
+}
+
+#content #nextnotes-root .nn-asg-source-chosen:not(:empty) {
+	display: flex;
+	align-items: center;
+	gap: calc(var(--default-grid-baseline) * 2);
+	font-weight: bold;
+}
+
+#content #nextnotes-root .nn-asg-source-results {
+	max-height: 220px;
+	margin: 0;
+	padding: 0;
+	overflow-y: auto;
+	list-style: none;
+}
+
+#content #nextnotes-root .nn-asg-source-result {
+	display: flex;
+	flex-direction: column;
+	padding: calc(var(--default-grid-baseline) * 2);
+	border-radius: var(--border-radius-element);
+	cursor: pointer;
+}
+
+#content #nextnotes-root .nn-asg-source-result:is(:hover, :focus-visible) {
+	background-color: var(--color-background-hover);
+}
+
+#content #nextnotes-root .nn-asg-modal .modal-content {
+	max-width: 560px;
+}
+
+@media (max-width: 800px) {
+	#content #nextnotes-root .nn-asg-review {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	#content #nextnotes-root .nn-asg-table :is(th, td):nth-child(3) {
+		display: none;
+	}
+}

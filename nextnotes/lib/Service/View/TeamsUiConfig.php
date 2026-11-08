@@ -69,6 +69,7 @@ class TeamsUiConfig {
 				'copiedToPrivate' => $l->t('Copy created in your private workspace "{workspace}".'),
 				'openCopy' => $l->t('Open copy'),
 				'copyFailed' => $l->t('The note could not be copied.'),
+				'assignNote' => $l->t('Hand out as assignment…'),
 			],
 		];
 	}

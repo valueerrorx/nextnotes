@@ -205,9 +205,14 @@ await runSpec(import.meta.url, async (ctx, page, context) => {
 	ctx.ok(start?.status() === 200 && new URL(page.url()).pathname.endsWith('/apps/nextnotes/dashboard.php'), 'E App-Start öffnet das Dashboard', page.url());
 	ctx.ok(await page.locator('#iconSidebarDashboardBtn[aria-current="page"]').count() === 1, 'E Dashboard in der Leiste aktiv');
 	const rail = await page.evaluate(() => [...document.querySelectorAll('#icon_sidebar .icon-sidebar-scroll > a')].map((l) => l.id));
-	const want = ['iconSidebarDashboardBtn', 'iconSidebarHomeBtn', 'iconSidebarTasksBtn', 'iconSidebarDiaryBtn', 'iconSidebarGraphBtn', 'iconSidebarSpeedDialBtn',
-		'iconSidebarNotesBtn', 'iconSidebarMentionsBtn', 'iconSidebarFoldersBtn', 'iconSidebarTagsBtn', 'iconSidebarAttachmentsBtn', 'iconSidebarTrashBtn'];
-	ctx.ok(rail.join() === want.filter((id) => id !== 'iconSidebarMentionsBtn' || rail.includes(id)).join(), 'E Reihenfolge: Dashboard, Notizen, Aufgaben, Tagebuch, Rest', rail.join(' '));
+	const want = ['iconSidebarDashboardBtn', 'iconSidebarHomeBtn', 'iconSidebarTasksBtn', 'iconSidebarAssignmentsBtn', 'iconSidebarDiaryBtn',
+		'iconSidebarNotesBtn', 'iconSidebarMentionsBtn', 'iconSidebarFoldersBtn', 'iconSidebarTagsBtn', 'iconSidebarAttachmentsBtn', 'iconSidebarGraphBtn', 'iconSidebarTrashBtn'];
+	// Erwähnungen nur mit geteiltem Workspace, Aufgaben (M6g) nur mit Team
+	const optional = ['iconSidebarMentionsBtn', 'iconSidebarAssignmentsBtn'];
+	ctx.ok(rail.join() === want.filter((id) => !optional.includes(id) || rail.includes(id)).join(), 'E Reihenfolge: Dashboard, Notizen, Aufgaben, Tagebuch, Rest', rail.join(' '));
+	// Trennlinien nur nach Tagebuch und vor Papierkorb (Thomas 2026-11-08)
+	const dividers = await page.evaluate(() => [...document.querySelectorAll('#icon_sidebar .icon-sidebar-scroll > .icon-sidebar-divider')].map((d) => d.nextElementSibling?.id));
+	ctx.ok(dividers.join() === 'iconSidebarNotesBtn,iconSidebarTrashBtn', 'E Trennlinien: unter Tagebuch, über Papierkorb', dividers.join(' '));
 	const homeHref = await page.getAttribute('#iconSidebarHomeBtn', 'href');
 	ctx.ok(/\/apps\/nextnotes\/index\.php\?/.test(homeHref ?? ''), 'E „Notizen“ öffnet die Hauptansicht', String(homeHref));
 	ctx.ok(await page.locator('#iconSidebarCreateBtn, #icon_sidebar a[href*="create.php"], #iconSidebarOverflowMenu [href*="create.php"]').count() === 0, 'E kein Erstellen in der Leiste');

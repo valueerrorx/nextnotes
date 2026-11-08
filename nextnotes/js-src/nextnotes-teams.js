@@ -5,6 +5,7 @@
 // Teams-Oberfläche (M5d, Plan M5 §2.7) nach nextnotes-app.js: Freigabe-Dialog mit Suche, Team-Auswahl beim Anlegen,
 // Team-Kennzeichen im Workspace-Menü, Löschen eines Team-Workspace (Q2), Umwandeln aus dem Banner.
 // Material (M6b, Plan M6 §2.6): Kennzeichen im Ordner-Menü, Schreibaktionen ohne Recht ausgeblendet, Drop-Abwehr, Duplikat (Q1).
+// Aufgaben (M6g): Notiz-Menü „Als Aufgabe austeilen…“ für Lehrkräfte im Team-Workspace.
 // Ersetzt bzw. umhüllt Upstream-Globals (bundles.json adapterHooks); Texte aus NC-l10n (config.teams.txt).
 (function () {
 	'use strict';
@@ -457,6 +458,30 @@
 		menu.querySelectorAll('.nn-write-hidden').forEach(function (item) { item.classList.remove('nn-write-hidden'); });
 		var mark = menu.querySelector('.nn-material-item');
 		if (mark) mark.remove();
+		var assign = menu.querySelector('.nn-assign-item');
+		if (assign) assign.remove();
+	}
+
+	// M6g: „Als Aufgabe austeilen…“ (Lehrkraft im Team-Workspace, data-nn-teacher am body) öffnet den Erstellen-Dialog der Aufgaben-Seite
+	function assignItem(menu, toggle) {
+		var noteId = toggle.getAttribute('data-note-id') || '';
+		if (document.body.getAttribute('data-nn-teacher') !== '1' || !/^\d+$/.test(noteId)) return;
+		var item = el('div', 'note-actions-menu-item nn-assign-item');
+		item.setAttribute('role', 'menuitem');
+		item.tabIndex = 0;
+		item.appendChild(el('i', 'lucide lucide-graduation-cap'));
+		item.appendChild(el('span', '', t('assignNote')));
+		var run = function (e) {
+			e.preventDefault();
+			e.stopPropagation();
+			var query = 'create=' + encodeURIComponent(noteId) + '&workspace=' + encodeURIComponent(document.body.getAttribute('data-workspace') || '');
+			window.location.href = String(config.baseUrl || '') + 'assignments.php?' + query;
+		};
+		item.addEventListener('click', run);
+		item.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') run(e); });
+		var anchor = menu.querySelector('[data-action="duplicate-note"]');
+		if (anchor) menu.insertBefore(item, anchor);
+		else menu.appendChild(item);
 	}
 
 	function materialItem(menu, toggle) {
@@ -524,6 +549,7 @@
 			if (toggle && toggle.getAttribute('data-nn-write') === '0') {
 				hideWriteItems(menu, NOTE_WRITE, toggle.getAttribute('data-nn-material-copy') === '1' ? 'duplicate-note' : null);
 			}
+			if (toggle) assignItem(menu, toggle);
 			return result;
 		};
 	}

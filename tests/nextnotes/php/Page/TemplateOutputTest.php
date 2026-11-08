@@ -42,10 +42,11 @@ final class TemplateOutputTest extends TestCase {
 		// M4g: Dashboard, Graph, Speed Dial, Erwähnungen (nur JSON-Inseln)
 		'dashboard.php' => ['json_encode($islandData, $jsonFlags)'],
 		'graph.php' => ['json_encode($island, $jsonFlags)'],
-		'speed_dial.php' => ['json_encode($island, $jsonFlags)'],
 		'mentions.php' => ['json_encode($island, $jsonFlags)'],
 		// M4h: Einstellungen (Inseln: Body-Attribute, Paletten-Globals, page-config-data)
 		'settings.php' => ['json_encode($islandData, $jsonFlags)'],
+		// M6g: Aufgaben (Liste und Dialoge per JS aus der API, Insel mit Texten und Teams)
+		'assignments.php' => ['json_encode($islandData, $jsonFlags)'],
 	];
 
 	/** @return array<string, string> relativer Pfad => Inhalt */
