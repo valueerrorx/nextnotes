@@ -28,7 +28,7 @@ tar -C "$stage" -cf - ref | dc "$env" exec -T -u root "$svc" sh -c "tar -xf - -C
 occ "$env" app:enable notifications >/dev/null
 
 # APCu im Webserver kennt die per occ aktivierte App ggf. erst nach kurzer Zeit (404)
-url="$(base_url "$env")/index.php/apps/nextnotes/"
+url="$(base_url "$env")/index.php/apps/nextnotes/index.php"
 for i in $(seq 1 30); do
 	code="$("${NN_CURL[@]}" -sS -u "$NN_TEST_USER:$NN_TEST_PASS" -o /dev/null -w '%{http_code}' "$url")"
 	[[ "$code" == 404 ]] || break

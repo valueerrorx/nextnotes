@@ -6,15 +6,9 @@
 // abgeleitet von src/modals/ui_customization_sections.php @ 7e2e0b6aa501ba95ac1e9789fd2bb477c281a001
 // Elementsichtbarkeit (Einstellungen): nur Elemente des Ports. Weggelassen: Einstellungskarten gestrichener Funktionen,
 // Teilen/öffentliche Links, Offline, Git, Theme-Schalter, Abmelden, andere Konten, Benachrichtigungen (NC-Glocke),
-// Kontext-Anpassungspanel (edge*), Backup/Restore-Abschnitte.
+// Kontext-Anpassungspanel (edge*), Backup/Restore-Abschnitte, Erstellen-Karten (Seite entfernt, UI-rail).
 /** @var callable(string, ?string=, array=): string $t */
 ?>
-<div class="ui-custom-section" data-ui-pages="notes">
-<h4 class="ui-custom-section-title"><span><?php p($t('modals.ui_customization.sections.create_cards', 'Create Cards')); ?></span><button type="button" class="ui-custom-toggle-all" data-label-check="<?php p($t('modals.ui_customization.check_all', 'Check all')); ?>" data-label-uncheck="<?php p($t('modals.ui_customization.uncheck_all', 'Uncheck all')); ?>"></button></h4>
-<div class="ui-custom-items">
-</div>
-</div>
-
 <div class="ui-custom-section" data-ui-pages="settings">
 <h4 class="ui-custom-section-title"><span><?php p($t('modals.ui_customization.sections.settings_cards', 'Settings Cards')); ?></span><button type="button" class="ui-custom-toggle-all" data-label-check="<?php p($t('modals.ui_customization.check_all', 'Check all')); ?>" data-label-uncheck="<?php p($t('modals.ui_customization.uncheck_all', 'Uncheck all')); ?>"></button></h4>
 <div class="ui-custom-items">
@@ -80,16 +74,16 @@
 <p class="ui-custom-section-hint"><?php p($t('modals.ui_customization.icon_rail_hint', 'Narrow column of icons on the far left of every page.')); ?></p>
 <div class="ui-custom-items">
 	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarDashboardBtn" checked><span><?php p($t('common.back_to_home', 'Dashboard')); ?></span></label>
-	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarNotesBtn" checked><span><?php p($t('common.notes', 'Notes')); ?></span></label>
-	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarTagsBtn" checked><span><?php p($t('notes_list.system_folders.tags', 'Tags')); ?></span></label>
-	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarFoldersBtn" checked><span><?php p($t('home.folders', 'Folders')); ?></span></label>
-	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarAttachmentsBtn" checked><span><?php p($t('notes_list.system_folders.attachments', 'Attachments')); ?></span></label>
-	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarTrashBtn" checked><span><?php p($t('notes_list.system_folders.trash', 'Trash')); ?></span></label>
-	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarDiaryBtn" checked><span><?php p($t('diary.title', 'Diary')); ?></span></label>
 	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarTasksBtn" checked><span><?php p($t('tasks_page.title', 'Tasks')); ?></span></label>
-	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarMentionsBtn" checked><span><?php p($t('mentions.title', 'Mentions')); ?></span></label>
+	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarDiaryBtn" checked><span><?php p($t('diary.title', 'Diary')); ?></span></label>
 	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarGraphBtn" checked><span><?php p($t('home.graph', 'Graph')); ?></span></label>
 	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarSpeedDialBtn" checked><span><?php p($t('speed_dial.title', 'Speed dial')); ?></span></label>
+	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarNotesBtn" checked><span><?php p($t('notes_manager.age_all', 'All notes')); ?></span></label>
+	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarMentionsBtn" checked><span><?php p($t('mentions.title', 'Mentions')); ?></span></label>
+	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarFoldersBtn" checked><span><?php p($t('home.folders', 'Folders')); ?></span></label>
+	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarTagsBtn" checked><span><?php p($t('notes_list.system_folders.tags', 'Tags')); ?></span></label>
+	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarAttachmentsBtn" checked><span><?php p($t('notes_list.system_folders.attachments', 'Attachments')); ?></span></label>
+	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarTrashBtn" checked><span><?php p($t('notes_list.system_folders.trash', 'Trash')); ?></span></label>
 	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarAboutBtn" checked><span><?php p($t('settings.categories.documentation', 'About')); ?></span></label>
 </div>
 </div>

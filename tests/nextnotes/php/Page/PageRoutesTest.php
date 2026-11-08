@@ -60,6 +60,25 @@ final class PageRoutesTest extends ApiTestCase {
 		self::assertStringContainsString('class="workspace-title-text" title="' . htmlspecialchars($aDefault) . '">', $r->body, "unbekannter Workspace → Standard „{$aDefault}“");
 	}
 
+	// UI-rail: App-Start ohne Parameter → Dashboard; mit Parametern Hauptansicht; create.php → Hauptansicht im Workspace
+	public function testStartAndCreateRedirect(): void {
+		$a = $this->createUser('a');
+		[$ws] = self::newWorkspace($a, 'Start');
+		$nA = self::newNote($a, $ws, 'Startnotiz', '<p>x</p>');
+		$root = '/index.php/apps/nextnotes/';
+		$r = $a->absolute('GET', $root);
+		self::assertSame(303, $r->status, 'App-Start: ' . $r->describe());
+		self::assertStringEndsWith('/apps/nextnotes/dashboard.php', (string)$r->header('Location'), 'App-Start → Dashboard');
+		foreach (['?workspace=' . self::enc($ws), "?note=$nA"] as $q) {
+			$r = $a->absolute('GET', $root . $q);
+			self::assertSame(200, $r->status, "App-Start$q: " . $r->describe());
+			self::assertStringContainsString('id="left_col"', $r->body, "App-Start$q: Hauptansicht");
+		}
+		$r = $a->absolute('GET', $root . 'create.php?workspace=' . self::enc($ws));
+		self::assertSame(303, $r->status, 'create.php: ' . $r->describe());
+		self::assertStringEndsWith('/apps/nextnotes/index.php?' . http_build_query(['workspace' => $ws]), (string)$r->header('Location'), 'create.php → Hauptansicht im Workspace');
+	}
+
 	public function testGetHasNoSideEffect(): void {
 		$a = $this->createUser('a');
 		[$ws] = self::newWorkspace($a, 'Seite');

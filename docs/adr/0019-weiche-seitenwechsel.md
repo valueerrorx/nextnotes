@@ -30,3 +30,7 @@ Option 2:
 - Seitenleiste blendet beim Verschwinden (z. B. Hauptansicht → Aufgaben) aus und beim Erscheinen ein (150 ms); steht sie auf beiden Seiten, wechselt das Bildpaar ohne Animation (0 s).
 - Umsetzung: Gruppen nur `animation-name: none` (Bilder erben die Dauer der Gruppe, `animation: none` setzte sie auf 0 s); `::view-transition-old/new(nn-sidebar)` 0 s, mit `:only-child` 150 ms. `:not(:only-child)` matcht in Chromium nicht und wird nicht verwendet.
 - E2E `ui-nav.mjs` B prüft Ausblenden, Einblenden und Stehen (nur Animationen mit Dauer > 0).
+
+## Nachtrag UI-rail (2026-11-08)
+- App-Start `/apps/nextnotes/` ohne Parameter leitet per 303 auf `dashboard.php`; Leisten-Links zeigen direkt auf die Zielseite (Logo und Dashboard auf `dashboard.php`), daher kein Vorabruf einer Weiterleitung und Übergänge unverändert.
+- „Notizen“ (`#iconSidebarHomeBtn`) ist jetzt ein Leisten-Eintrag statt des Logos; Vorladen und Seitenleisten-Ein-/Ausblenden gelten wie zuvor.

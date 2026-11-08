@@ -84,10 +84,14 @@ class PageController extends Controller {
 	private const SEARCH_PARAMS = ['search', 'tags_search', 'created_from', 'created_to', 'search_combined', 'unified_search',
 		'search_in_notes', 'search_in_tags', 'preserve_notes', 'preserve_tags'];
 
-	// Hauptansicht (Upstream index.php); fremde/unbekannte ?note= → NC-404 ohne Inhalt
+	// Hauptansicht (Upstream index.php); fremde/unbekannte ?note= → NC-404 ohne Inhalt; App-Start `/` ohne Parameter → Dashboard (UI-rail)
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
-	public function index(): TemplateResponse {
+	public function index(): Response {
+		if ($this->request->getParam('start') === '1' && $this->request->getHeader('X-Poznote-Fragment') === ''
+			&& array_diff(array_keys($this->request->getParams()), ['_route', 'start']) === []) {
+			return new RedirectResponse($this->urls->linkToRoute('nextnotes.page.dashboard'));
+		}
 		return $this->render();
 	}
 
@@ -386,14 +390,12 @@ class PageController extends Controller {
 		return $this->listPage('notes_manager');
 	}
 
-	// Upstream create.php: Erstellen-Hub (Notiz, Markdown, Aufgabenliste, Ordner, Tagebuch-Eintrag)
+	// Upstream create.php entfernt (UI-rail): Erstellen über das „+“-Menü der Hauptansicht; alte Lesezeichen → Hauptansicht
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
-	public function create(): TemplateResponse {
-		return $this->listPage('create', fn (string $uid) => [
-			'globals' => ['DEFAULT_NOTE_TITLES' => $this->translator->defaultNoteTitles()],
-			'diaryMarkdown' => $this->settings->get($uid, 'diary_default_note_type', '') === 'markdown',
-		]);
+	public function create(): RedirectResponse {
+		$frame = $this->pageFrame->frame($this->userSession->getUser()?->getUID() ?? '', $this->request->getParam('workspace'));
+		return new RedirectResponse($this->urls->linkToRoute('nextnotes.page.index') . 'index.php?' . http_build_query(['workspace' => $frame['workspaceKey']]));
 	}
 
 	// Upstream diary.php: Tagebuch-Karten/Journal; ?date= mit vorhandenem Eintrag → Notiz, sonst legt diary-page.js ihn an

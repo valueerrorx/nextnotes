@@ -36,7 +36,6 @@ final class TemplateOutputTest extends TestCase {
 		'list_folders.php' => ['json_encode($islandData, $jsonFlags)'],
 		'attachments_list.php' => ['json_encode($islandData, $jsonFlags)'],
 		'notes_manager.php' => ['json_encode($islandData, $jsonFlags)'],
-		'create.php' => ['json_encode($islandData, $jsonFlags)'],
 		// M4f: Tagebuch und Aufgaben (Karten/Journal per JS aus JSON-Insel bzw. entries.php)
 		'diary.php' => ['json_encode($islandData, $jsonFlags)'],
 		'tasks.php' => ['json_encode($islandData, $jsonFlags)'],
@@ -87,7 +86,7 @@ final class TemplateOutputTest extends TestCase {
 	public static function islandTemplates(): array {
 		return ['index.php' => ['index.php'], 'revisions.php' => ['revisions.php'], 'attachments.php' => ['attachments.php'], 'excalidraw_editor.php' => ['excalidraw_editor.php'], 'export_print.php' => ['export_print.php'],
 			'trash.php' => ['trash.php'], 'list_tags.php' => ['list_tags.php'], 'list_folders.php' => ['list_folders.php'], 'attachments_list.php' => ['attachments_list.php'],
-			'notes_manager.php' => ['notes_manager.php'], 'create.php' => ['create.php'], 'settings.php' => ['settings.php']];
+			'notes_manager.php' => ['notes_manager.php'], 'settings.php' => ['settings.php']];
 	}
 
 	#[\PHPUnit\Framework\Attributes\DataProvider('islandTemplates')]

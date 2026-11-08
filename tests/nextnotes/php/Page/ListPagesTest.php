@@ -19,11 +19,11 @@ use OCA\NextNotes\Tests\Support\Response;
 use OCP\IDBConnection;
 use OCP\Server;
 
-// Plan M4 §M4e Done 2 und 5: Listen-Seiten (trash, list_tags, list_folders, attachments_list, notes_manager, create) – Inhalte des Besitzers,
+// Plan M4 §M4e Done 2 und 5: Listen-Seiten (trash, list_tags, list_folders, attachments_list, notes_manager; create.php seit UI-rail Weiterleitung) – Inhalte des Besitzers,
 // Papierkorb-Suche/-Sortierung, Seed 1 000 Notizen: Abfragezähler je Seite ≤ 15 (ViewServices direkt), Antwortzeit ≤ 500 ms.
 final class ListPagesTest extends ApiTestCase {
 	private const APP = '/index.php/apps/nextnotes/';
-	private const PAGES = ['trash.php', 'list_tags.php', 'list_folders.php', 'attachments_list.php', 'notes_manager.php', 'create.php', 'diary.php', 'tasks.php'];
+	private const PAGES = ['trash.php', 'list_tags.php', 'list_folders.php', 'attachments_list.php', 'notes_manager.php', 'diary.php', 'tasks.php'];
 
 	private static function get(ApiClient $c, string $path): Response {
 		return $c->absolute('GET', self::APP . $path);

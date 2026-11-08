@@ -58,26 +58,6 @@
 		if ((e.key === 'Enter' || e.key === ' ') && t && t.closest && t.closest('.nn-folder-quick')) e.stopPropagation();
 	}, true);
 
-	// Karten der Seite create.php (Upstream-Inline-Skript): Typ wählen, dann executeCreateAction aus utils-note-create.js
-	document.addEventListener('click', function (e) {
-		var card = e.target && e.target.closest ? e.target.closest('.home-card[data-create-type]') : null;
-		if (!card || typeof window.executeCreateAction !== 'function') return;
-		e.preventDefault();
-		var type = card.dataset.createType;
-		window.noteCreationTriggerElement = card;
-		window.selectedCreateType = type;
-		window.targetFolderId = null;
-		window.targetFolderName = null;
-		window.isCreatingInFolder = false;
-		window.selectedWorkspace = document.body.dataset.workspace || '';
-		if (['html', 'markdown', 'list', 'diary'].indexOf(type) !== -1 && typeof window.showNoteCreationLoading === 'function') {
-			window.showNoteCreationLoading(card);
-			window.setTimeout(window.executeCreateAction, 80);
-			return;
-		}
-		window.executeCreateAction();
-	});
-
 	// Papierkorb „Mehr laden“ (M4e-fix): nächste Karten ab dem Cursor als Fragment anhängen, ohne Neuladen
 	document.addEventListener('click', function (e) {
 		var btn = e.target && e.target.closest ? e.target.closest('.trash-load-more-btn') : null;

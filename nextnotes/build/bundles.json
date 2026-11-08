@@ -37,7 +37,8 @@
 		"oauth/authorize": "OAuth gestrichen (Inventur B 1.4)",
 		"public_note": "Öffentliche Links gestrichen (ADR 0011)",
 		"public_folder": "Öffentliche Links gestrichen (ADR 0011)",
-		"shared": "Öffentliche Links gestrichen (ADR 0011)"
+		"shared": "Öffentliche Links gestrichen (ADR 0011)",
+		"create": "Erstellen-Seite entfernt, Erstellen über das „+“-Menü der Hauptansicht (UI-rail)"
 	},
 	"js": {
 		"head": [
@@ -550,22 +551,6 @@
 			"@icon-sidebar",
 			"@theme"
 		],
-		"create": [
-			"css/lucide.css",
-			"@components",
-			"@modals",
-			"css/home/base.css",
-			"css/home/search.css",
-			"css/home/alerts.css",
-			"css/home/cards.css",
-			"css/home/buttons.css",
-			"css/home/dark-mode.css",
-			"css/home/responsive.css",
-			"css/modal-alerts.css",
-			"css/note-reference.css",
-			"@theme",
-			"@icon-sidebar"
-		],
 		"dashboard": [
 			"css/lucide.css",
 			"@components",
@@ -898,37 +883,6 @@
 				"js/icon-sidebar-toggle.js",
 				"js/date-time-format.js",
 				"js/notes-manager.js"
-			]
-		},
-		"create": {
-			"js": [
-				"js/theme-manager.js",
-				"js/globals.js",
-				"js/workspaces-core.js",
-				"js/workspaces-create.js",
-				"js/workspaces-share.js",
-				"js/workspaces-actions.js",
-				"js/workspaces-page.js",
-				"js/navigation.js",
-				"js/request-errors.js",
-				"js/modal-alerts.js",
-				"js/ui.js",
-				"js/utils-note-create.js",
-				"js/utils-folders.js",
-				"js/utils-updates.js",
-				"js/utils-move-folder.js",
-				"js/utils-folder-tree.js",
-				"js/utils-move-note.js",
-				"js/utils-export-create.js",
-				"js/utils-menus.js",
-				"js/utils-note-rename.js",
-				"js/utils-kanban.js",
-				"js/linked-note-selector.js",
-				"js/modals-events.js",
-				"js/notes.js",
-				"js/folder-hierarchy.js",
-				"js/ui-customization.js",
-				"js/icon-sidebar-toggle.js"
 			]
 		},
 		"diary": {

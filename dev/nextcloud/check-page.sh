@@ -7,7 +7,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 
 env="${1:?Aufruf: check-page.sh <env>}"
 check_env "$env"
-url="$(base_url "$env")/index.php/apps/nextnotes/"
+url="$(base_url "$env")/index.php/apps/nextnotes/index.php"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 
 # APCu im Webserver kennt die per occ aktivierte App ggf. erst nach kurzer Zeit (404)

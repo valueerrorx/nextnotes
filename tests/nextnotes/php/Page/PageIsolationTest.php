@@ -200,7 +200,7 @@ final class PageIsolationTest extends ApiTestCase {
 		$gone = self::newNote($a, $x['ws'], "Weg $mark", "<p>Papierkorb $mark</p>");
 		self::ok($a->call('DELETE', "/notes/$gone?$wq"), 'Papierkorb A');
 		$before = self::dump($a->uid);
-		foreach (['trash.php', 'list_tags.php', 'list_folders.php', 'attachments_list.php', 'notes_manager.php', 'create.php'] as $p) {
+		foreach (['trash.php', 'list_tags.php', 'list_folders.php', 'attachments_list.php', 'notes_manager.php'] as $p) {
 			foreach (["$p?$wq", "$p?workspace=" . $x['wsId'], $p] as $path) {
 				$r = self::get($b, $path);
 				self::assertSame(200, $r->status, "B $path: " . $r->describe());
@@ -208,6 +208,15 @@ final class PageIsolationTest extends ApiTestCase {
 				self::assertStringNotContainsString(htmlspecialchars($x['ws']), $r->body, "B $path: Workspace-Name von A");
 				self::assertStringContainsString('replaceWorkspace', $r->body, "B $path: Rahmen vorhanden");
 			}
+		}
+		// create.php (UI-rail): Weiterleitung auf die Hauptansicht im eigenen Workspace, nichts von A in der Location
+		foreach (["create.php?$wq", 'create.php?workspace=' . $x['wsId'], 'create.php'] as $path) {
+			$r = self::get($b, $path);
+			$loc = (string)$r->header('Location');
+			self::assertSame(303, $r->status, "B $path: " . $r->describe());
+			self::assertStringContainsString('/apps/nextnotes/index.php?workspace=', $loc, "B $path: Ziel Hauptansicht");
+			self::assertStringNotContainsString($mark, $loc . $r->body, "B $path: Daten von A");
+			self::assertStringNotContainsString(rawurlencode($x['ws']), $loc, "B $path: Workspace von A in der Location");
 		}
 		// Papierkorb-Suche per POST auf A's Workspace
 		$post = $b->form(self::APP . 'trash.php', ['search' => 'Weg', 'workspace' => $x['ws']]);
@@ -592,7 +601,7 @@ final class PageIsolationTest extends ApiTestCase {
 			self::assertSame(200, $r->status, "A $p: " . $r->describe());
 			self::assertStringContainsString($mark, $r->body, "A $p: eigene Daten fehlen (Detektor)");
 		}
-		foreach (['', 'index.php', "index.php?$wq", "?workspace=$wsId", "dashboard.php?$wq", 'dashboard.php?scope=all', 'dashboard.php?scope=list&ws[]=' . self::enc($ws),
+		foreach (['index.php', "index.php?$wq", "?workspace=$wsId", "dashboard.php?$wq", 'dashboard.php?scope=all', 'dashboard.php?scope=list&ws[]=' . self::enc($ws),
 			"graph.php?$wq", "speed_dial.php?$wq", "mentions.php?$wq", 'mentions.php?handled=1', "diary.php?$wq", "diary.php?$wq&diary={$x['diary']}",
 			"tasks.php?$wq", "settings.php?$wq", 'settings.php?open=about'] as $p) {
 			$r = self::get($b, $p);
@@ -600,6 +609,11 @@ final class PageIsolationTest extends ApiTestCase {
 			self::assertStringNotContainsString($mark, $r->body, "B $p: Daten von A");
 			self::assertStringNotContainsString(htmlspecialchars($ws), $r->body, "B $p: Workspace-Name von A");
 		}
+		// App-Start ohne Parameter (UI-rail) → Dashboard, ohne Inhalt
+		$r = self::get($b, '');
+		self::assertSame(303, $r->status, 'B App-Start: ' . $r->describe());
+		self::assertStringEndsWith('/apps/nextnotes/dashboard.php', (string)$r->header('Location'), 'B App-Start: Ziel Dashboard');
+		self::assertStringNotContainsString($mark, $r->body, 'B App-Start: Daten von A');
 		foreach (["index.php?note=$n", "index.php?$wq&note=$n"] as $p) {
 			self::assertNotFoundClean(self::get($b, $p), $mark, "B $p");
 		}

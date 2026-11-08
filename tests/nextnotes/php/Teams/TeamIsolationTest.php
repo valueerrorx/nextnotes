@@ -138,13 +138,16 @@ final class TeamIsolationTest extends TeamTestCase {
 			$scan("Fragment $frag", $c->withHeaders(["X-Poznote-Fragment: $frag"])->absolute('GET', self::APP . "index.php?$wq&note=$n"), [404]);
 		}
 		// Listen-Seiten mit A's Workspace → eigener Standard (200), nichts von A; eigene ZIP-Exporte ohne A
-		foreach (['', "index.php?$wq", "?workspace={$x['wsId']}", "dashboard.php?$wq", 'dashboard.php?scope=all', "graph.php?$wq",
+		foreach (["index.php?$wq", "?workspace={$x['wsId']}", "dashboard.php?$wq", 'dashboard.php?scope=all', "graph.php?$wq",
 			"speed_dial.php?$wq", "mentions.php?$wq", 'mentions.php?handled=1', "diary.php?$wq", "diary.php?$wq&diary={$fx['aDiary']}",
 			"tasks.php?$wq", "settings.php?$wq", "trash.php?$wq", "list_tags.php?$wq", "list_folders.php?$wq", "attachments_list.php?$wq",
-			"notes_manager.php?$wq", "create.php?$wq", "storage-stats-user.php?fragment=1&$wq",
+			"notes_manager.php?$wq", "storage-stats-user.php?fragment=1&$wq",
 			'api_export_entries.php', 'api_export_structured.php', 'api_export_attachments.php'] as $p) {
 			$scan("GET $p", self::page($c, $p), [200]);
 		}
+		// App-Start und alte Erstellen-Seite leiten weiter (UI-rail)
+		$scan('GET / (App-Start)', self::page($c, ''), [303]);
+		$scan("GET create.php?$wq", self::page($c, "create.php?$wq"), [303]);
 		$scan('POST index.php Suche', $c->form(self::APP . 'index.php', ['search' => 'Geheim', 'workspace' => $x['ws']]), [200]);
 		$scan('GET workspaces.php', self::page($c, "workspaces.php?$wq"), [302, 303]);
 		// API: Liste, Lesen, Suche, Unified Search

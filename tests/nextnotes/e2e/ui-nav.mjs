@@ -6,6 +6,8 @@
 //    (UI-nav-mobil Zusatz 7), nur die Wurzel (Inhalt) blendet; reduzierte Bewegung: keine
 // C) Vorladen nur bei Hover/Fokus, nur App-Seiten; Navigation nutzt den Vorabruf
 // D) Anti-Flicker: Leisten sofort sichtbar und bedienbar, Inhaltsfläche deckend, nur ihre Kinder warten (opacity 0); nach dem Start alles sichtbar
+// E) UI-rail: Leisten-Reihenfolge Dashboard, Notizen, Aufgaben, Tagebuch, Rest; kein Erstellen; App-Start (NC-Navigation) = Dashboard;
+//    Links mit Parametern → Hauptansicht; create.php → Hauptansicht; „+“-Menü bietet alle Typen der früheren Erstellen-Seite
 // Je Abschnitt 0 CSP/pageerror/Konsolenfehler/≥ 400.
 import { runSpec } from './lib/harness.mjs';
 import { apiClient } from './lib/api.mjs';
@@ -190,5 +192,37 @@ await runSpec(import.meta.url, async (ctx, page, context) => {
 		ctx.ok(after.op === '1' && after.inert === false, `D ${p.split('?')[0]}: nach dem Start sichtbar`, JSON.stringify(after));
 	}
 	ctx.assertClean('D Anti-Flicker', m3);
+	// E) UI-rail
+	const m4 = ctx.mark();
+	// NC-Navigationseintrag aus dem Initial State (das App-Menü rendert überzählige Einträge erst im Überlauf)
+	const navHref = await page.evaluate(() => {
+		const el = document.getElementById('initial-state-core-apps');
+		const entry = el ? JSON.parse(atob(el.value)).find((e) => e.id === 'nextnotes') : null;
+		return entry ? new URL(entry.href, location.href).href : null;
+	});
+	ctx.ok(navHref !== null && /\/apps\/nextnotes\/$/.test(new URL(navHref).pathname), 'E NC-Navigationseintrag zeigt auf den App-Start', String(navHref));
+	const start = await page.goto(navHref ?? ctx.appUrl(''), { waitUntil: 'networkidle' });
+	ctx.ok(start?.status() === 200 && new URL(page.url()).pathname.endsWith('/apps/nextnotes/dashboard.php'), 'E App-Start öffnet das Dashboard', page.url());
+	ctx.ok(await page.locator('#iconSidebarDashboardBtn[aria-current="page"]').count() === 1, 'E Dashboard in der Leiste aktiv');
+	const rail = await page.evaluate(() => [...document.querySelectorAll('#icon_sidebar .icon-sidebar-scroll > a')].map((l) => l.id));
+	const want = ['iconSidebarDashboardBtn', 'iconSidebarHomeBtn', 'iconSidebarTasksBtn', 'iconSidebarDiaryBtn', 'iconSidebarGraphBtn', 'iconSidebarSpeedDialBtn',
+		'iconSidebarNotesBtn', 'iconSidebarMentionsBtn', 'iconSidebarFoldersBtn', 'iconSidebarTagsBtn', 'iconSidebarAttachmentsBtn', 'iconSidebarTrashBtn'];
+	ctx.ok(rail.join() === want.filter((id) => id !== 'iconSidebarMentionsBtn' || rail.includes(id)).join(), 'E Reihenfolge: Dashboard, Notizen, Aufgaben, Tagebuch, Rest', rail.join(' '));
+	const homeHref = await page.getAttribute('#iconSidebarHomeBtn', 'href');
+	ctx.ok(/\/apps\/nextnotes\/index\.php\?/.test(homeHref ?? ''), 'E „Notizen“ öffnet die Hauptansicht', String(homeHref));
+	ctx.ok(await page.locator('#iconSidebarCreateBtn, #icon_sidebar a[href*="create.php"], #iconSidebarOverflowMenu [href*="create.php"]').count() === 0, 'E kein Erstellen in der Leiste');
+	await page.goto(ctx.appUrl(`?${wq}&note=${note}`), { waitUntil: 'networkidle' });
+	ctx.ok(await page.locator('#left_col a.links_arbo_left.selected-note').count() >= 1 && await page.locator('#iconSidebarHomeBtn[aria-current="page"]').count() === 1,
+		'E App-Pfad mit ?note= öffnet die Hauptansicht mit der Notiz', page.url());
+	await page.goto(ctx.appUrl(`?${wq}`), { waitUntil: 'networkidle' });
+	ctx.ok(await page.locator('#left_col').count() === 1, 'E App-Pfad mit ?workspace= öffnet die Hauptansicht', page.url());
+	const types = await page.evaluate(() => [...document.querySelectorAll('.create-note-option[data-type]')].map((o) => o.dataset.type));
+	ctx.ok(['html', 'markdown', 'list', 'diary', 'folder'].every((t) => types.includes(t)), 'E „+“-Menü der Hauptansicht: Notiz, Markdown, Aufgabenliste, Tagebuch, Ordner', types.join(' '));
+	const created = await page.goto(ctx.appUrl(`create.php?${wq}`), { waitUntil: 'networkidle' });
+	const cu = new URL(page.url());
+	ctx.ok(created?.status() === 200 && cu.pathname.endsWith('/apps/nextnotes/index.php') && cu.searchParams.get('workspace') === WS && await page.locator('#left_col').count() === 1,
+		'E create.php leitet auf die Hauptansicht im Workspace', page.url());
+	await ctx.screenshot(page, `ui-rail-${ctx.theme}`);
+	ctx.assertClean('E UI-rail', m4);
 	ctx.assertClean('gesamter Lauf', m0);
 });

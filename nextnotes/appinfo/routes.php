@@ -9,7 +9,8 @@ declare(strict_types=1);
 
 return [
 	'routes' => [
-		['name' => 'page#index', 'url' => '/', 'verb' => 'GET'],
+		// App-Start (NC-Navigation): ohne Parameter → Dashboard; index.php bleibt die Hauptansicht
+		['name' => 'page#index', 'url' => '/', 'verb' => 'GET', 'defaults' => ['start' => '1']],
 		['name' => 'page#index', 'url' => '/index.php', 'verb' => 'GET', 'postfix' => 'php'],
 		// Such-Formular der Hauptansicht (POST mit requesttoken)
 		['name' => 'page#search', 'url' => '/index.php', 'verb' => 'POST'],
@@ -35,6 +36,7 @@ return [
 		['name' => 'page#listFolders', 'url' => '/list_folders.php', 'verb' => 'GET'],
 		['name' => 'page#attachmentsList', 'url' => '/attachments_list.php', 'verb' => 'GET'],
 		['name' => 'page#notesManager', 'url' => '/notes_manager.php', 'verb' => 'GET'],
+		// Erstellen-Seite entfernt (UI-rail): alte Lesezeichen → Hauptansicht
 		['name' => 'page#create', 'url' => '/create.php', 'verb' => 'GET'],
 		// Tagebuch und Aufgaben (M4f)
 		['name' => 'page#diary', 'url' => '/diary.php', 'verb' => 'GET'],
