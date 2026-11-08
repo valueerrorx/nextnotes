@@ -34,7 +34,7 @@ $toggleQuery = ['workspace' => $frame['workspaceKey']] + ($showHandled ? [] : ['
 <div id="nextnotes-root" class="nextnotes-listpage tasks-page mentions-page">
 	<script type="application/json" id="nextnotes-body"><?php print_unescaped(json_encode($island, $jsonFlags)); ?></script>
 	<?php include __DIR__ . '/partials/icon_sidebar.php'; ?>
-	<main class="nn-page-main">
+	<main class="nn-page-main" inert>
 	<div class="tasks-container">
 		<h1 class="poznote-page-title"><span class="poznote-page-title-name"><i class="lucide lucide-at-sign"></i> <?php p($t('mentions.title', 'Mentions')); ?></span></h1>
 

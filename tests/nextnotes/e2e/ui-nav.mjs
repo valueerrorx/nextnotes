@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // UI-nav: Seitenleiste/Icon-Leiste im Stil der NC-Navigation (Files), weiche Seitenwechsel (View Transition, Vorladen), Anti-Flicker nur Inhalt.
 // A) Berechnete Farben/Maße der aktiven und der Hover-Zeile = Files-Navigation (gleiches Theme)
-// B) View-Transition-Regel vorhanden; Klick in der Icon-Leiste läuft als View Transition mit Kopf-, Icon- und Seitenleiste; reduzierte Bewegung: keine
+// B) View-Transition-Regel vorhanden; Klick in der Icon-Leiste läuft als View Transition; Kopf- und Icon-Leiste eigene Gruppen ohne Animation
+//    (UI-nav-mobil Zusatz 7), nur die Wurzel (Inhalt) blendet; reduzierte Bewegung: keine
 // C) Vorladen nur bei Hover/Fokus, nur App-Seiten; Navigation nutzt den Vorabruf
-// D) Anti-Flicker: Leisten sofort sichtbar und bedienbar, nur der Inhalt wartet; nach dem Start alles sichtbar
+// D) Anti-Flicker: Leisten sofort sichtbar und bedienbar, Inhaltsfläche deckend, nur ihre Kinder warten (opacity 0); nach dem Start alles sichtbar
 // Je Abschnitt 0 CSP/pageerror/Konsolenfehler/≥ 400.
 import { runSpec } from './lib/harness.mjs';
 import { apiClient } from './lib/api.mjs';
@@ -12,11 +13,15 @@ import { apiClient } from './lib/api.mjs';
 const RUN = `${process.argv[3]}${Date.now().toString(36)}`;
 
 const INIT = () => {
-	const s = { vt: null, groups: [], first: null, ready: null };
+	const s = { vt: null, groups: [], names: null, first: null, ready: null };
 	window.__nnNav = s;
 	window.addEventListener('pagereveal', (e) => {
 		s.vt = !!e.viewTransition;
-		if (e.viewTransition) e.viewTransition.ready.then(() => { s.groups = document.getAnimations().map((a) => a.effect?.pseudoElement).filter(Boolean); }).catch(() => {});
+		if (e.viewTransition) e.viewTransition.ready.then(() => {
+			s.groups = document.getAnimations().map((a) => a.effect?.pseudoElement).filter(Boolean);
+			const n = (id) => { const el = document.getElementById(id); return el ? getComputedStyle(el).viewTransitionName : null; };
+			s.names = { header: n('header'), rail: n('icon_sidebar') };
+		}).catch(() => {});
 	});
 	const content = () => document.querySelector('#nextnotes-root > #right_pane, #nextnotes-root > .nn-page-main');
 	const check = () => {
@@ -29,6 +34,8 @@ const INIT = () => {
 				railInert: !!rail.closest('[inert]'),
 				left: document.getElementById('left_col') ? getComputedStyle(document.getElementById('left_col')).opacity : null,
 				main: getComputedStyle(main).opacity,
+				kids: main.firstElementChild ? getComputedStyle(main.firstElementChild).opacity : null,
+				mainInert: main.inert,
 				ready: document.documentElement.classList.contains('nextnotes-ready'),
 			};
 		}
@@ -121,8 +128,11 @@ await runSpec(import.meta.url, async (ctx, page, context) => {
 	const vt = await page.evaluate(() => window.__nnNav);
 	ctx.ok(vt.vt === true, 'B Icon-Leiste → Aufgaben als View Transition', JSON.stringify(vt));
 	const groups = vt.groups.join(' ');
-	ctx.ok(/nn-header/.test(groups) && /nn-rail/.test(groups), 'B Gruppen Kopfleiste und Icon-Leiste', groups);
-	ctx.ok(/nn-sidebar/.test(groups), 'B Seitenleiste (alt) Teil des Übergangs', groups);
+	ctx.ok(vt.names && vt.names.header === 'nn-header' && vt.names.rail === 'nn-rail', 'B Kopf- und Icon-Leiste eigene Gruppen im Übergang', JSON.stringify(vt.names));
+	ctx.ok(!/nn-header|nn-rail/.test(groups), 'B Kopf- und Icon-Leiste stehen (keine Animation)', groups);
+	ctx.ok(!/view-transition-group\(nn-sidebar\)/.test(groups), 'B Seitenleiste ohne Positions-Animation', groups);
+	ctx.info(`B Seitenleiste nur alt (index → tasks): ${/view-transition-old\(nn-sidebar\)/.test(groups) ? 'blendet aus' : 'keine Animation'}`);
+	ctx.ok(/view-transition-(old|new)\(root\)/.test(groups), 'B Inhalt (Wurzel) blendet', groups);
 	const names = await page.evaluate(() => getComputedStyle(document.getElementById('icon_sidebar')).viewTransitionName);
 	ctx.ok(names === 'none', 'B Name nur während des Übergangs (danach none)', names);
 	await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -162,7 +172,8 @@ await runSpec(import.meta.url, async (ctx, page, context) => {
 		await page.waitForTimeout(300);
 		const s = await page.evaluate(() => window.__nnNav.first);
 		ctx.ok(s && s.app === '1' && s.rail === '1' && !s.railInert && (s.left === null || s.left === '1'), `D ${p.split('?')[0]}: Leisten sofort sichtbar und bedienbar`, JSON.stringify(s));
-		ctx.ok(s && (s.ready || s.main === '0'), `D ${p.split('?')[0]}: Inhalt wartet bis zum Start`, JSON.stringify(s));
+		ctx.ok(s && s.main === '1', `D ${p.split('?')[0]}: Inhaltsfläche deckend ab dem ersten Bild`, JSON.stringify(s));
+		ctx.ok(s && (s.ready || (s.kids === '0' && s.mainInert === true)), `D ${p.split('?')[0]}: Inhalt (Kinder) wartet unsichtbar und inert bis zum Start`, JSON.stringify(s));
 		const after = await page.evaluate(() => { const m = document.querySelector('#nextnotes-root > #right_pane, #nextnotes-root > .nn-page-main'); return { op: getComputedStyle(m).opacity, inert: m.inert }; });
 		ctx.ok(after.op === '1' && after.inert === false, `D ${p.split('?')[0]}: nach dem Start sichtbar`, JSON.stringify(after));
 	}

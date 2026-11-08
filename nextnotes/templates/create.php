@@ -36,7 +36,7 @@ $titleText = $t('sidebar.create', 'Create');
 	<?php endforeach; ?>
 	<?php include __DIR__ . '/partials/modals.php'; ?>
 	<?php include __DIR__ . '/partials/icon_sidebar.php'; ?>
-	<main class="nn-page-main">
+	<main class="nn-page-main" inert>
 	<div class="home-container">
 		<?php include __DIR__ . '/partials/page_title.php'; ?>
 		<div class="home-grid">

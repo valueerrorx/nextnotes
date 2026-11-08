@@ -17,7 +17,7 @@ $islands = [
 ];
 ?>
 <div id="app-content">
-<div id="nextnotes-root" class="nextnotes-excalidraw">
+<div id="nextnotes-root" class="nextnotes-excalidraw" inert>
 	<?php foreach ($islands as $islandId => $islandData): ?>
 	<script type="application/json" id="<?php p($islandId); ?>"><?php print_unescaped(json_encode($islandData, $jsonFlags)); ?></script>
 	<?php endforeach; ?>

@@ -51,7 +51,7 @@ $titleText = $t('tasks_page.title', 'Tasks');
 	<script type="application/json" id="<?php p($islandId); ?>"><?php print_unescaped(json_encode($islandData, $jsonFlags)); ?></script>
 	<?php endforeach; ?>
 	<?php include __DIR__ . '/partials/icon_sidebar.php'; ?>
-	<main class="nn-page-main">
+	<main class="nn-page-main" inert>
 	<div class="tasks-container">
 		<?php include __DIR__ . '/partials/page_title.php'; ?>
 

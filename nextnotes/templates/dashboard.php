@@ -106,7 +106,7 @@ $colorTitle = $t('note_color.modal_title', 'Note color');
 	<script type="application/json" id="<?php p($islandId); ?>"><?php print_unescaped(json_encode($islandData, $jsonFlags)); ?></script>
 	<?php endforeach; ?>
 	<?php include __DIR__ . '/partials/icon_sidebar.php'; ?>
-	<main class="nn-page-main nn-dashboard-main">
+	<main class="nn-page-main nn-dashboard-main" inert>
 	<div class="favorites-container dashboard-container">
 		<h1 class="poznote-page-title"><span class="poznote-page-title-name"><i class="lucide lucide-layout-dashboard"></i> <?php p($t('common.back_to_home', 'Dashboard')); ?></span>
 			<button type="button" class="poznote-page-title-workspace" id="poznotePageTitleWorkspaceBtn" data-action="open-workspace-switcher-modal" title="<?php p($scopeTitle); ?>" aria-haspopup="dialog"><?php if (!$isMulti && $frame['workspaceColor'] !== ''): ?><span class="poznote-page-title-workspace-dot" style="background-color: <?php p($frame['workspaceColor']); ?>"></span><?php else: ?><i class="lucide lucide-layers poznote-page-title-workspace-icon" aria-hidden="true"></i><?php endif; ?><span class="poznote-page-title-workspace-name"><?php p($scopeLabel); ?></span><i class="lucide lucide-chevron-down poznote-page-title-workspace-chevron" aria-hidden="true"></i></button>

@@ -21,3 +21,7 @@ Option 2:
 - Notiz- und Ordnerklicks in der Hauptansicht bleiben ohne Neuladen (Upstream, `#right_col`-Fragment); sie sind nicht Teil dieser Stufe.
 - Stufe 2 (falls nötig): SPA-artige Navigation bleibt offen, eigene ADR.
 - E2E `ui-nav.mjs` prüft Regel, Übergang, Gruppen, reduzierte Bewegung, Vorabruf (`deliveryType`) und Anti-Flackern.
+
+## Nachtrag UI-nav-mobil (2026-11-08)
+- Kopf- und Icon-Leiste stehen still: `::view-transition-old(nn-header|nn-rail)` ausgeblendet, `-new` und Gruppe ohne Animation; Seitenleiste ebenso, wenn sie auf beiden Seiten steht.
+- Die Inhaltsfläche bleibt deckend: Anti-Flackern blendet nur ihre Kinder aus (vorher die Fläche selbst, der neue Schnappschuss zeigte Milchglas); nur die Wurzel blendet, alter Inhalt auf deckender Fläche aus, neuer ein.

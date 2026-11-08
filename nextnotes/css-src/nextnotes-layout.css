@@ -32,15 +32,29 @@ body {
 }
 
 /* Gegen Flackern: nur der Inhalt wartet bis zum Adapter-Start, Icon-Leiste und Seitenleiste stehen sofort (UI-nav); Seiten ohne Leiste
-   ganz. Rückfall nach 2 s ohne JS (inert setzt der Adapter). opacity statt visibility: ui-customization.js prüft visibility */
-#nextnotes-root > :is(#right_pane, .nn-page-main, #outline-panel),
+   ganz. Die Inhaltsfläche selbst bleibt deckend stehen (Seitenwechsel blendet nicht ins Milchglas), nur ihr Inhalt wartet.
+   Rückfall nach 2 s (inert steht im Template, der Adapter nimmt es ab). opacity statt visibility: ui-customization.js prüft visibility */
+#nextnotes-root > :is(#right_pane, .nn-page-main, #outline-panel) {
+	pointer-events: none;
+	animation: nextnotes-reveal 0s linear 2s forwards;
+}
+
+html:not(.nextnotes-ready) #nextnotes-root > :is(#right_pane, .nn-page-main, #outline-panel) > *,
 #nextnotes-root:is(.nextnotes-subpage, .nextnotes-excalidraw) {
 	opacity: 0;
 	pointer-events: none;
 	animation: nextnotes-reveal 0s linear 2s forwards;
 }
 
-html.nextnotes-ready #nextnotes-root > :is(#right_pane, .nn-page-main, #outline-panel),
+html.nextnotes-ready #nextnotes-root > :is(#right_pane, .nn-page-main, #outline-panel) {
+	pointer-events: auto;
+	animation: none;
+}
+
+html.nextnotes-ready #nextnotes-root > :is(#right_pane, .nn-page-main, #outline-panel) > * {
+	animation: nextnotes-fade-in 120ms ease-out;
+}
+
 html.nextnotes-ready #nextnotes-root:is(.nextnotes-subpage, .nextnotes-excalidraw) {
 	opacity: 1;
 	pointer-events: auto;
@@ -49,9 +63,17 @@ html.nextnotes-ready #nextnotes-root:is(.nextnotes-subpage, .nextnotes-excalidra
 }
 
 @media (prefers-reduced-motion: reduce) {
-	html.nextnotes-ready #nextnotes-root > :is(#right_pane, .nn-page-main, #outline-panel),
+	html.nextnotes-ready #nextnotes-root > :is(#right_pane, .nn-page-main, #outline-panel) > * {
+		animation: none;
+	}
 	html.nextnotes-ready #nextnotes-root:is(.nextnotes-subpage, .nextnotes-excalidraw) {
 		transition: none;
+	}
+}
+
+@keyframes nextnotes-fade-in {
+	from {
+		opacity: 0;
 	}
 }
 
@@ -774,6 +796,21 @@ html[data-theme='dark'] #nextnotes-root.graph-page {
 	pointer-events: none;
 }
 
+/* Aufgaben-Erinnerung ohne Schreibrecht: Termin-Chip bleibt bedienbar, Dialog nur für die eigene Erinnerung (nextnotes-teams.js) */
+.noteentry[data-nextnotes-readonly] .tasks-list button.task-due-chip {
+	pointer-events: auto;
+}
+
+.tasks-task-item:has(> .tasks-task-checkbox:disabled) .tasks-task-due-btn,
+#taskDueModal.nn-reminder-only #taskDueRemoveBtn {
+	display: none !important;
+}
+
+#taskDueModal.nn-reminder-only :is(#taskDueDateBtn, #taskDueTimeBtn, #taskDueRepeatSelect, #taskDueRepeatInterval, #taskDueRepeatUnit):disabled {
+	opacity: 0.6;
+	cursor: default;
+}
+
 /* Menüeinträge ohne Schreibrecht (nextnotes-teams.js), Vorrang vor den Inline-Stilen der Upstream-Menüs */
 .nn-write-hidden {
 	display: none !important;
@@ -983,10 +1020,161 @@ html:active-view-transition #nextnotes-root #left_col {
 	animation-duration: 150ms;
 }
 
+/* Kopf- und Icon-Leiste stehen still: kein Überblenden, das neue Bild gilt sofort (Zusatz 7). Seitenleiste ebenso, wenn sie auf beiden Seiten
+   steht; nur beim Erscheinen/Verschwinden blendet sie. Der Inhalt blendet in der Wurzel auf der deckenden Inhaltsfläche (Anti-Flackern oben). */
+::view-transition-group(nn-header),
+::view-transition-group(nn-rail),
+::view-transition-group(nn-sidebar),
+::view-transition-new(nn-header),
+::view-transition-new(nn-rail),
+::view-transition-new(nn-sidebar):not(:only-child) {
+	animation: none;
+}
+
+::view-transition-old(nn-header),
+::view-transition-old(nn-rail),
+::view-transition-old(nn-sidebar):not(:only-child) {
+	display: none;
+}
+
 /* Mini-Kalender (sticky unten): Milchglas statt Hauptfläche, damit die Leiste einheitlich auf der Blur-Fläche liegt */
 #nextnotes-root #left_col .mini-calendar-container {
 	background: transparent;
 	-webkit-backdrop-filter: var(--filter-background-blur, none);
 	backdrop-filter: var(--filter-background-blur, none);
 	border-top-color: var(--color-border);
+}
+
+/* Einklapp-Pfeil der Icon-Leiste (UI-nav-mobil): unten in der Leistenfläche wie ein Leisten-Eintrag statt fixed am Fensterrand;
+   eingeklappt schwebt er als NC-Knopf unten links (wie NcAppNavigationToggle) */
+#content #nextnotes-root #icon_sidebar {
+	padding-bottom: calc(var(--app-navigation-padding, calc(var(--default-grid-baseline) * 2)) * 2 + var(--default-clickable-area));
+}
+
+#content #nextnotes-root #iconSidebarToggle {
+	position: absolute;
+	top: auto;
+	bottom: var(--app-navigation-padding, calc(var(--default-grid-baseline) * 2));
+	left: calc((var(--icon-sidebar-width) - var(--default-clickable-area)) / 2);
+	z-index: 11;
+	width: var(--default-clickable-area);
+	height: var(--default-clickable-area);
+	border: 0;
+	border-radius: var(--border-radius-element);
+	background: transparent;
+	color: var(--color-main-text);
+	box-shadow: none;
+	cursor: pointer;
+	transition: background-color var(--animation-quick, 100ms) ease-in-out;
+}
+
+#content #nextnotes-root #iconSidebarToggle .lucide {
+	width: 20px;
+	height: 20px;
+}
+
+#content #nextnotes-root #iconSidebarToggle:is(:hover, :focus-visible) {
+	background-color: color-mix(in srgb, var(--color-primary-element) 8%, var(--color-main-background));
+	color: var(--color-main-text);
+	box-shadow: none;
+}
+
+#content #nextnotes-root #iconSidebarToggle:focus-visible {
+	outline: 2px solid var(--color-main-text);
+}
+
+body.icon-sidebar-collapsed #content #nextnotes-root #iconSidebarToggle {
+	left: var(--app-navigation-padding, calc(var(--default-grid-baseline) * 2));
+	background-color: var(--color-main-background);
+	box-shadow: 0 0 6px var(--color-box-shadow);
+}
+
+/*
+ * Mobil (≤ 800 px, Breite wie Upstream isMobileDevice): Upstream schiebt die Spalten per body.scrollLeft (index-mobile.css), im NC-Rahmen
+ * scrollt body nicht (B68). Hier: Icon-Leiste im Fluss neben dem Inhalt (einklappbar), Hauptansicht schaltet über body.note-open
+ * (Upstream setzt/entfernt sie in scrollToRightColumn/scrollToLeftColumn) zwischen Liste und Notiz; Höhen aus der App statt 100vh/100dvh.
+ */
+@media (max-width: 800px) {
+	#content #nextnotes-root #icon_sidebar {
+		position: relative;
+		top: auto;
+		left: auto;
+		flex: 0 0 auto;
+		height: 100%;
+	}
+
+	#content #nextnotes-root .nn-page-main {
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+
+	#content #nextnotes-root > #left_col {
+		flex: 1 1 0% !important;
+		width: auto !important;
+		min-width: 0 !important;
+		max-width: none !important;
+		height: 100% !important;
+		max-height: 100% !important;
+		margin-left: 0 !important;
+	}
+
+	#content #nextnotes-root > #right_pane {
+		flex: 1 1 0% !important;
+		width: auto !important;
+		min-width: 0 !important;
+		height: 100% !important;
+	}
+
+	/* Tastatur offen: sichtbarer Bereich unter der NC-Kopfleiste (Upstream: ganze sichtbare Höhe) */
+	body.mobile-keyboard-open #content #nextnotes-root > #right_pane {
+		height: min(100%, calc(var(--mobile-visual-viewport-height, 100dvh) - var(--header-height))) !important;
+	}
+
+	/* Liste: Notizbereich unsichtbar, aber gelayoutet (Editor misst beim Laden) und nicht fokussierbar */
+	body:not(.note-open) #content #nextnotes-root > #right_pane {
+		position: absolute;
+		inset: 0;
+		visibility: hidden;
+		pointer-events: none;
+	}
+
+	/* Notiz: volle Breite; Seitenleiste behält ihre Scrollposition (nur unsichtbar) */
+	body.note-open #content #nextnotes-root:has(> #right_pane) :is(#icon_sidebar, #iconSidebarToggle) {
+		display: none !important;
+	}
+
+	body.note-open #content #nextnotes-root > #left_col {
+		position: absolute;
+		inset: 0;
+		visibility: hidden;
+		pointer-events: none;
+	}
+
+	body.note-open #content #nextnotes-root > #right_pane {
+		border-radius: var(--body-container-radius);
+	}
+
+	#content #nextnotes-root .kanban-inline-header .kanban-mobile-home {
+		display: inline-flex;
+	}
+}
+
+/* Kanban: Knopf zurück zur Liste nur mobil (wie .mobile-home-btn der Notiz-Werkzeugleiste) */
+#nextnotes-root .kanban-inline-header .kanban-mobile-home {
+	display: none;
+	flex: 0 0 auto;
+	align-items: center;
+	justify-content: center;
+	width: var(--default-clickable-area);
+	height: var(--default-clickable-area);
+	padding: 0;
+	border: 0;
+	border-radius: var(--border-radius-element);
+	background: transparent;
+	color: var(--color-main-text);
+	cursor: pointer;
+}
+
+#nextnotes-root .kanban-inline-header .kanban-mobile-home:is(:hover, :focus-visible) {
+	background-color: var(--color-background-hover);
 }

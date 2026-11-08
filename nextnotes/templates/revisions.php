@@ -28,7 +28,7 @@ $description = array_values(array_filter($description, static fn (string $para) 
 $h = static fn (string $key, string $default) => $tr->t('revisions.' . $key, [], $default);
 ?>
 <div id="app-content">
-<div id="nextnotes-root" class="nextnotes-subpage">
+<div id="nextnotes-root" class="nextnotes-subpage" inert>
 	<?php foreach ($islands as $islandId => $islandData): ?>
 	<script type="application/json" id="<?php p($islandId); ?>"><?php print_unescaped(json_encode($islandData, $jsonFlags)); ?></script>
 	<?php endforeach; ?>

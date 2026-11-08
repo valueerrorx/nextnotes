@@ -46,7 +46,7 @@ if ($view['noteId'] !== null) {
 		</button>
 	</div>
 
-	<div id="right_pane">
+	<div id="right_pane" inert>
 		<div id="right_col"><?php if ($view['note'] !== null) {
 			$note = $view['note'];
 			include __DIR__ . '/partials/note_display.php';
@@ -59,7 +59,7 @@ if ($view['noteId'] !== null) {
 			<i class="lucide lucide-chevron-right"></i>
 		</button>
 	</div>
-	<div id="outline-panel">
+	<div id="outline-panel" inert>
 		<div class="outline-header">
 			<h2 class="outline-title"><?php p($tr->t('common.outline.title', [], 'Outline')); ?></h2>
 			<button type="button" class="outline-close-btn" aria-label="<?php p($tr->t('common.close')); ?>" title="<?php p($tr->t('common.close')); ?>">

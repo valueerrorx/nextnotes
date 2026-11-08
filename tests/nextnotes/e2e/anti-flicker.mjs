@@ -1,12 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Thomas Weissel
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Anti-Flicker (M4h, UI-nav ADR 0019): nur der Inhalt (#right_pane, .nn-page-main, #outline-panel; Unterseiten ganz #nextnotes-root)
-// ist bis html.nextnotes-ready unsichtbar (opacity 0) und inert, Rückfall CSS/JS nach 2 s. Icon-Leiste und Seitenleiste sofort.
+// Anti-Flicker (M4h, UI-nav ADR 0019, UI-nav-mobil Zusatz 7): nur der Inhalt wartet bis html.nextnotes-ready. Die Inhaltsflächen
+// (#right_pane, .nn-page-main, #outline-panel) bleiben deckend (opacity 1), ihre Kinder sind opacity 0; Unterseiten ganz #nextnotes-root.
+// inert steht im Template und fällt bei DOMContentLoaded, Rückfall CSS/JS nach 2 s ab Navigationsstart. Icon-Leiste und Seitenleiste sofort.
 // A) Normale Ladezeit: Phase „Inhalt im DOM, opacity 0“ bis „nextnotes-ready“ < 1 s je Seite, danach opacity 1 und nicht inert.
 // B) nextnotes-late.js künstlich verzögert (DOMContentLoaded/ready warten auf defer-Skripte), je index und tasks.php:
 //    B1 vor 2 s: Inhalt opacity 0 + inert, kein Fokus (Tab, focus()), kein Klick; Leisten sichtbar, nicht inert, per Klick/Tab erreichbar.
 //    B2 nach 2 s ohne ready: Rückfall, Inhalt opacity 1 und nicht inert (geprüft 2,8 s nach Erscheinen: JS-Timer startet mit dem Bootstrap).
-// Gegenprobe: AF_STRIP=css entfernt die CSS-Regel (Antwort umgeschrieben), AF_STRIP=js das inert im Bootstrap → B muss rot werden.
+// Gegenprobe: AF_STRIP=css entfernt die CSS-Regel (Antwort umgeschrieben), AF_STRIP=html das inert im Template → B muss rot werden.
 import { runSpec } from './lib/harness.mjs';
 import { apiClient } from './lib/api.mjs';
 
@@ -40,11 +41,21 @@ const INIT = (sel) => {
 // Zustand der wartenden Inhaltsbereiche und der Leisten
 const STATE = (sel) => {
 	const vis = (el) => { for (let e = el; e; e = e.parentElement) if (getComputedStyle(e).opacity === '0') return false; return true; };
-	const waiting = [...document.querySelectorAll(sel)].map((el) => ({
-		d: el.tagName + (el.id ? '#' + el.id : '') + '.' + String(el.className).split(' ')[0],
-		op: getComputedStyle(el).opacity, pe: getComputedStyle(el).pointerEvents, inert: !!el.closest('[inert]'),
-		shown: el.getClientRects().length > 0 && getComputedStyle(el).display !== 'none',
-	}));
+	// Fläche = Inhaltsfläche (#right_pane, .nn-page-main, #outline-panel) mit wartenden Kindern; sonst ganze Unterseite
+	const waiting = [...document.querySelectorAll(sel)].map((el) => {
+		const surface = el.id !== 'nextnotes-root';
+		// nur gerenderte Kinder (display none: Upstream-Elemente mit eigener opacity 0, z. B. #outlineMobileBackdrop)
+		const kids = surface ? [...el.children].filter((k) => k.getClientRects().length > 0).map((k) => getComputedStyle(k).opacity) : [];
+		const op = getComputedStyle(el).opacity;
+		const shown = el.getClientRects().length > 0 && getComputedStyle(el).display !== 'none';
+		return {
+			d: el.tagName + (el.id ? '#' + el.id : '') + '.' + String(el.className).split(' ')[0],
+			surface, op, kids, pe: getComputedStyle(el).pointerEvents, inert: !!el.closest('[inert]'),
+			hidden: !shown || op === '0' || (kids.length > 0 && kids.every((o) => o === '0')),
+			allVisible: op === '1' && kids.every((o) => o === '1'),
+			shown,
+		};
+	});
 	const bars = ['#icon_sidebar', '#left_col', '#header'].map((q) => document.querySelector(q)).filter(Boolean).map((el) => {
 		const r = el.getBoundingClientRect();
 		return { d: '#' + el.id, visible: vis(el) && r.width > 0 && r.height > 0, inert: !!el.closest('[inert]') };
@@ -61,11 +72,12 @@ runSpec(import.meta.url, async (ctx, page, context) => {
 			const body = (await r.text()).replace(/opacity:\s*0;\s*pointer-events:\s*none;\s*animation:\s*nextnotes-reveal[^;]*;/, '');
 			await route.fulfill({ response: r, body });
 		});
-	} else if (STRIP === 'js') {
-		ctx.info('Gegenprobe: inert im Bootstrap entfernt');
-		await context.route(/\/nextnotes\/js\/nextnotes-bootstrap\.js/, async (route) => {
+	} else if (STRIP === 'html') {
+		ctx.info('Gegenprobe: inert im Template entfernt');
+		await context.route(/\/apps\/nextnotes\//, async (route) => {
+			if (route.request().resourceType() !== 'document') return route.continue();
 			const r = await route.fetch();
-			await route.fulfill({ response: r, body: (await r.text()).replace('el.inert=!0', 'el.inert=!1') });
+			await route.fulfill({ response: r, body: (await r.text()).replace(/(<(?:div|main|aside)\b[^>]*?)\s+inert>/g, '$1>') });
 		});
 	}
 	const api = apiClient(ctx, page.request);
@@ -82,8 +94,8 @@ runSpec(import.meta.url, async (ctx, page, context) => {
 		ctx.ok(phase !== null && phase < 1000, `A ${p || 'index'}: Phase bis ready < 1 s`, `Phase ${phase} ms, opacity bei Erscheinen ${s.opacityAtSeen}`);
 		await page.waitForTimeout(200); // Übergang 120 ms
 		const st = await page.evaluate(STATE, WAITING);
-		const bad = st.waiting.filter((w) => w.op !== '1' || w.inert || w.pe === 'none');
-		ctx.ok(st.waiting.length > 0 && bad.length === 0, `A ${p || 'index'}: nach Start Inhalt sichtbar, bedienbar`, JSON.stringify(st.waiting));
+		const bad = st.waiting.filter((w) => !w.allVisible || w.inert || w.pe === 'none');
+		ctx.ok(st.waiting.some((w) => w.shown && w.kids.length + (w.surface ? 0 : 1) > 0) && bad.length === 0, `A ${p || 'index'}: nach Start Inhalt sichtbar, bedienbar`, JSON.stringify(st.waiting));
 	}
 
 	// B) verlängerte Phase je Seitentyp
@@ -101,7 +113,8 @@ runSpec(import.meta.url, async (ctx, page, context) => {
 		const st = await page.evaluate(STATE, WAITING);
 		ctx.info(`${label} t=${Math.round(st.t)} ms ready=${st.ready} waiting=${JSON.stringify(st.waiting)} bars=${JSON.stringify(st.bars)}`);
 		ctx.ok(!st.ready && st.t < 1700, `${label}: Messung in der Wartephase (vor ready, vor 2 s)`, `ready ${st.ready}, t ${Math.round(st.t)} ms`);
-		ctx.ok(st.waiting.length > 0 && st.waiting.every((w) => w.op === '0'), `${label}: Inhalt unsichtbar (opacity 0)`, JSON.stringify(st.waiting));
+		ctx.ok(st.waiting.length > 0 && st.waiting.every((w) => w.hidden), `${label}: Inhalt unsichtbar (Kinder opacity 0)`, JSON.stringify(st.waiting));
+		ctx.ok(st.waiting.some((w) => w.surface && w.shown) && st.waiting.filter((w) => w.surface).every((w) => w.op === '1'), `${label}: Inhaltsfläche selbst deckend (opacity 1)`, JSON.stringify(st.waiting));
 		ctx.ok(st.waiting.length > 0 && st.waiting.every((w) => w.inert), `${label}: Inhalt inert`, JSON.stringify(st.waiting));
 		const rail = st.bars.find((b) => b.d === '#icon_sidebar');
 		ctx.ok(rail?.visible && !rail.inert, `${label}: Icon-Leiste sofort sichtbar, nicht inert`, JSON.stringify(rail));
@@ -159,7 +172,7 @@ runSpec(import.meta.url, async (ctx, page, context) => {
 		ctx.info(`${label} Rückfall t=${Math.round(fb.t)} ms ready=${fb.ready} waiting=${JSON.stringify(fb.waiting)}`);
 		ctx.ok(!fb.ready, `${label}: Rückfall-Messung vor ready`, `t ${Math.round(fb.t)} ms`);
 		// nicht gerenderte Bereiche (z. B. eingeklappte Gliederung, display none) laufen keine Animation; nur sichtbare zählen
-		ctx.ok(fb.waiting.some((w) => w.shown) && fb.waiting.filter((w) => w.shown).every((w) => w.op === '1' && !w.inert && w.pe !== 'none'), `${label}: Rückfall nach 2 s sichtbar und bedienbar`, JSON.stringify(fb.waiting));
+		ctx.ok(fb.waiting.some((w) => w.shown) && fb.waiting.filter((w) => w.shown).every((w) => w.allVisible && !w.inert && w.pe !== 'none'), `${label}: Rückfall nach 2 s sichtbar und bedienbar`, JSON.stringify(fb.waiting));
 
 		await nav;
 		await page.unroute(re);

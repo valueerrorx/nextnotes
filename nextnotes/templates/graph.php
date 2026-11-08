@@ -20,7 +20,7 @@ $titleText = $tr->t('home.graph', [], 'Graph');
 <div id="nextnotes-root" class="nextnotes-listpage graph-page">
 	<script type="application/json" id="nextnotes-body"><?php print_unescaped(json_encode($island, $jsonFlags)); ?></script>
 	<?php include __DIR__ . '/partials/icon_sidebar.php'; ?>
-	<main class="nn-page-main nn-graph-main">
+	<main class="nn-page-main nn-graph-main" inert>
 		<div class="graph-container">
 			<div class="graph-head" id="graphHead">
 				<?php include __DIR__ . '/partials/page_title.php'; ?>

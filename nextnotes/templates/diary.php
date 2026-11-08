@@ -30,7 +30,7 @@ $boardPrefix = 'diary';
 	<script type="application/json" id="<?php p($islandId); ?>"><?php print_unescaped(json_encode($islandData, $jsonFlags)); ?></script>
 	<?php endforeach; ?>
 	<?php include __DIR__ . '/partials/icon_sidebar.php'; ?>
-	<main class="nn-page-main nn-diary-main">
+	<main class="nn-page-main nn-diary-main" inert>
 	<div class="favorites-container dashboard-container">
 		<?php include __DIR__ . '/partials/page_title.php'; ?>
 
@@ -112,7 +112,7 @@ $boardPrefix = 'diary';
 			<i class="lucide lucide-chevron-right"></i>
 		</button>
 	</div>
-	<aside id="outline-panel" class="diary-outline">
+	<aside id="outline-panel" class="diary-outline" inert>
 		<div class="outline-header">
 			<h2 class="outline-title"><?php p($t('common.outline.title', 'Outline')); ?></h2>
 			<button type="button" class="outline-close-btn" aria-label="<?php p($t('common.close', 'Close')); ?>" title="<?php p($t('common.close', 'Close')); ?>">

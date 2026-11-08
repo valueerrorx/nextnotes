@@ -44,7 +44,7 @@ $renderLink = static function (array $tile, string $fallbackUrl): void {
 <div id="nextnotes-root" class="nextnotes-listpage speed-dial-page<?php if ($sd['backgroundUrl'] !== null): ?> has-speed-dial-background<?php endif; ?>">
 	<script type="application/json" id="nextnotes-body"><?php print_unescaped(json_encode($island, $jsonFlags)); ?></script>
 	<?php include __DIR__ . '/partials/icon_sidebar.php'; ?>
-	<main class="nn-page-main nn-speed-dial-main">
+	<main class="nn-page-main nn-speed-dial-main" inert>
 	<?php if ($sd['backgroundUrl'] !== null): ?>
 	<div class="speed-dial-background" style="background-image: url('<?php p($sd['backgroundUrl']); ?>'); opacity: <?php p((string)($sd['backgroundOpacity'] / 100)); ?>;"></div>
 	<?php endif; ?>

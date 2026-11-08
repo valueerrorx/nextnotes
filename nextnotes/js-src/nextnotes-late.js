@@ -128,4 +128,11 @@
 	window.poznoteEnsureKatex = function () {
 		return typeof window.katex !== 'undefined' ? Promise.resolve() : ensureScript('js/katex/katex.min.js');
 	};
+
+	// Mobil (UI-nav-mobil): Zurück des Browsers auf eine URL ohne Notiz/Kanban zeigt wieder die Liste (Upstream: Wischen über body.scrollLeft)
+	window.addEventListener('popstate', function () {
+		if (window.innerWidth > 800 || !document.body.classList.contains('note-open') || typeof window.scrollToLeftColumn !== 'function') return;
+		var params = new URLSearchParams(window.location.search);
+		if (!params.get('note') && !params.get('kanban')) window.scrollToLeftColumn();
+	});
 })();

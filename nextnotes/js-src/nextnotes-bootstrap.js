@@ -21,11 +21,10 @@
 		}
 	}
 
-	// 0. Inhalt bis zum Start nicht bedienbar (gegen Klick/Fokus im unsichtbaren Inhalt); Leisten sofort; Rückfall nach 2 s wie im CSS
+	// 0. Inhalt trägt inert schon im Template (gegen Klick/Fokus im unsichtbaren Inhalt); Rückfall 2 s ab Navigationsstart wie im CSS
 	var waiting = document.querySelectorAll('#nextnotes-root > :is(#right_pane, .nn-page-main, #outline-panel), #nextnotes-root:is(.nextnotes-subpage, .nextnotes-excalidraw)');
 	function releaseContent() { waiting.forEach(function (el) { el.inert = false; }); }
-	waiting.forEach(function (el) { el.inert = true; });
-	setTimeout(releaseContent, 2000);
+	setTimeout(releaseContent, Math.max(0, 2000 - performance.now()));
 
 	var config = readState('config') || {};
 	var baseUrl = String(config.baseUrl || '/index.php/apps/nextnotes/').replace(/\/?$/, '/');

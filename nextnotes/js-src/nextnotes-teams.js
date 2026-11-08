@@ -576,12 +576,41 @@
 			var result = renderTasks.apply(this, arguments);
 			var entry = document.getElementById('entry' + noteId);
 			if (entry && entry.hasAttribute('data-nextnotes-readonly')) {
-				entry.querySelectorAll('input, textarea, select, button').forEach(function (c) {
+				entry.querySelectorAll('input, textarea, select, button:not(.task-due-chip)').forEach(function (c) {
 					c.disabled = true;
 					c.setAttribute('aria-disabled', 'true');
 				});
 			}
 			return result;
+		};
+	}
+
+	// Aufgaben-Erinnerung ohne Schreibrecht (Thomas 2026-11-08): Termin-Chip öffnet den Fälligkeits-Dialog nur für die eigene Erinnerung;
+	// Datum, Uhrzeit, Wiederholung und Entfernen gesperrt (dueAt braucht Schreibrecht), kein Speichern der Aufgabe, nur /task-reminder
+	var dueTrigger = null;
+	document.addEventListener('click', function (e) {
+		dueTrigger = e.target && e.target.closest ? e.target.closest('.task-due-chip') : null;
+	}, true);
+	function readonlyTask(noteId) {
+		var entry = document.getElementById('entry' + noteId);
+		if (entry && entry.hasAttribute('data-nextnotes-readonly')) return true;
+		var row = dueTrigger && dueTrigger.closest('.tasks-task-item');
+		return !!(row && row.querySelector('.tasks-task-checkbox:disabled'));
+	}
+	if (typeof window.openTaskDueModal === 'function') {
+		var openDue = window.openTaskDueModal;
+		window.openTaskDueModal = function (opts) {
+			var modal = document.getElementById('taskDueModal');
+			var reminderOnly = !!(opts && opts.task && modal && readonlyTask(opts.noteId));
+			if (reminderOnly && !opts.task.dueAt) return;
+			if (modal) {
+				modal.classList.toggle('nn-reminder-only', reminderOnly);
+				['taskDueDateBtn', 'taskDueTimeBtn', 'taskDueRepeatSelect', 'taskDueRepeatInterval', 'taskDueRepeatUnit'].forEach(function (id) {
+					var c = document.getElementById(id);
+					if (c) c.disabled = reminderOnly;
+				});
+			}
+			return openDue.call(this, reminderOnly ? Object.assign({}, opts, { onSave: null }) : opts);
 		};
 	}
 

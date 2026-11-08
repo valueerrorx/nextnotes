@@ -5,7 +5,7 @@
  */
 // abgeleitet von src/public/kanban_content.php @ 7e2e0b6aa501ba95ac1e9789fd2bb477c281a001
 // Kanban eines Ordners, per fetch in #right_col geladen (utils-kanban.js). Daten: KanbanViewService.
-// Abweichungen: Kartentext als Klartext ohne Links (#1672, M4), ohne Schreibrecht keine Bearbeiten-/Anlegen-Knöpfe,
+// Abweichungen: mobil Knopf zurück zur Liste (Upstream: Wischen), Kartentext als Klartext ohne Links (#1672, M4), ohne Schreibrecht keine Bearbeiten-/Anlegen-Knöpfe,
 // Fehlerfall als HTTP-Status statt Fehler-HTML mit Inline-Handler.
 /** @var array $_ */
 /** @var \OCA\NextNotes\Service\View\PageTranslator $tr */
@@ -89,6 +89,7 @@ $rootId = (string)$root['id'];
 ?>
 <div id="kanban-view-container" class="kanban-inline-view" data-folder-id="<?php p($rootId); ?>">
 	<div class="kanban-inline-header">
+		<button type="button" class="kanban-mobile-home" data-action="scroll-to-left-column" title="<?php p($tr->t('editor.toolbar.back_to_notes', [], 'Notes')); ?>" aria-label="<?php p($tr->t('editor.toolbar.back_to_notes', [], 'Notes')); ?>"><i class="lucide lucide-home"></i></button>
 		<button class="kanban-scroll-btn-header left" id="kanbanScrollLeft" title="<?php p($tr->t('common.scroll_left', [], 'Scroll Left')); ?>"><i class="lucide lucide-chevron-left"></i></button>
 		<h1 class="kanban-title"><?php $title($root); ?></h1>
 		<div class="kanban-header-actions">
