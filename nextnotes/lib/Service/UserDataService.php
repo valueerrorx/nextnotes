@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Service;
 
+use OCA\NextNotes\AppInfo\Application;
 use OCA\NextNotes\BackgroundJob\UserDataDeletionJob;
 use OCA\NextNotes\Db\AssignmentMapper;
 use OCA\NextNotes\Db\AttachmentMapper;
@@ -23,13 +24,29 @@ use OCA\NextNotes\Db\WorkspaceMapper;
 use OCA\NextNotes\Db\WsShareMapper;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\IJobList;
+use OCP\Config\IUserConfig;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
+use OCP\Notification\IManager as INotificationManager;
 use Psr\Log\LoggerInterface;
 
 // Kontolöschung (SPEC §8): Rechte und UIDs sofort neutralisieren, Inhalte später im UserDataDeletionJob löschen
 class UserDataService {
 	public const DELETED = 'deleted';
+
+	// Spalten, über die eine UID Daten trägt oder Rechte bekommt (Prüfung „Daten vorhanden“ für occ, SPEC §8)
+	private const UID_COLUMNS = [
+		WorkspaceMapper::TABLE => ['owner_id', 'created_by'],
+		WsShareMapper::TABLE => ['share_with', 'created_by'],
+		NoteMapper::TABLE => ['created_by', 'updated_by'],
+		AttachmentMapper::TABLE => ['created_by'],
+		SnapshotMapper::TABLE => ['created_by'],
+		ReminderMapper::TABLE => ['user_id'],
+		LockMapper::TABLE => ['holder_uid'],
+		MentionHandledMapper::TABLE => ['user_id'],
+		AssignmentMapper::TABLE => ['owner_uid', 'created_by'],
+		SubmissionMapper::TABLE => ['student_uid', 'feedback_by'],
+	];
 
 	/** @var array<string, string[]> uid → Team-IDs aus BeforeUserDeletedEvent (Circles entfernt die Mitgliedschaft im UserDeletedEvent) */
 	private array $teamsBefore = [];
@@ -49,7 +66,107 @@ class UserDataService {
 		private BackgroundFiles $backgrounds,
 		private SubmissionMapper $submissions,
 		private AssignmentOwnership $ownership,
+		private TeamService $teams,
+		private INotificationManager $notifications,
+		private IUserConfig $userConfig,
 	) {
+	}
+
+	// BeforeUserDeletedEvent und occ: Teams merken, solange die Mitgliedschaft besteht; wirft nie
+	public function rememberMemberships(string $uid): void {
+		try {
+			$this->teams->resetCache();
+			$this->rememberTeams($uid, array_map('strval', array_keys($this->teams->memberTeams($uid))));
+		} catch (\Throwable $e) {
+			$this->logger->error('nextnotes: reading teams of deleted user failed', ['exception' => $e]);
+		}
+	}
+
+	// Eigene Benachrichtigungen der App an die UID entfernen; Fehler stoppen die Löschung nicht
+	public function removeNotifications(string $uid): void {
+		try {
+			$n = $this->notifications->createNotification();
+			$n->setApp(Application::APP_ID)->setUser($uid);
+			$this->notifications->markProcessed($n);
+		} catch (\Throwable $e) {
+			$this->logger->error('nextnotes: removing notifications of deleted user failed', ['uid' => $uid, 'exception' => $e]);
+		}
+	}
+
+	/**
+	 * Zeilen je Tabelle.Spalte mit der UID plus App-Werte in IUserConfig (leer = keine Daten)
+	 * @return array<string, int>
+	 */
+	public function dataCounts(string $uid): array {
+		$out = [];
+		foreach (self::UID_COLUMNS as $table => $cols) {
+			foreach ($cols as $col) {
+				$qb = $this->db->getQueryBuilder();
+				$qb->select($qb->func()->count('*'))->from($table)->where($qb->expr()->eq($col, $qb->createNamedParameter($uid)));
+				if ($table === WorkspaceMapper::TABLE && $col === 'owner_id') {
+					$qb->andWhere($qb->expr()->eq('owner_type', $qb->createNamedParameter('user')));
+				}
+				$n = (int)$qb->executeQuery()->fetchOne();
+				if ($n > 0) {
+					$out[$table . '.' . $col] = $n;
+				}
+			}
+		}
+		$keys = count($this->userConfig->getKeys($uid, Application::APP_ID));
+		if ($keys > 0) {
+			$out['user config'] = $keys;
+		}
+		$notes = $this->notificationCount($uid);
+		if ($notes > 0) {
+			$out['notifications'] = $notes;
+		}
+		$bg = count($this->backgroundWorkspaces($uid));
+		if ($bg > 0) {
+			$out['backgrounds'] = $bg;
+		}
+		return $out;
+	}
+
+	private function notificationCount(string $uid): int {
+		try {
+			$n = $this->notifications->createNotification();
+			$n->setApp(Application::APP_ID)->setUser($uid);
+			return $this->notifications->getCount($n);
+		} catch (\Throwable $e) {
+			$this->logger->warning('nextnotes: counting notifications failed', ['uid' => $uid, 'exception' => $e]);
+			return 0;
+		}
+	}
+
+	/** @return int[] Workspaces mit Hintergrundbild der UID (auch Reste nach gescheitertem Listener) */
+	private function backgroundWorkspaces(string $uid): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('id')->from(WorkspaceMapper::TABLE);
+		$ids = array_map('intval', $qb->executeQuery()->fetchFirstColumn());
+		return $this->backgrounds->workspaceIdsWith($uid, $ids);
+	}
+
+	/**
+	 * occ nextnotes:delete-user-data (Konto deaktiviert oder gelöscht): Ablauf wie Kontolöschung, Inhalte und App-Werte synchron
+	 * @return int gelöschte Workspaces
+	 */
+	public function deleteForAdmin(string $uid, ?string $displayName): int {
+		$this->rememberMemberships($uid);
+		$token = $this->neutralize($uid, $displayName);
+		$this->removeNotifications($uid);
+		// Reste in Workspaces ohne Freigabe/Mitgliedschaft; Löschauftrag läuft nach dem Commit
+		$bgWs = $this->backgroundWorkspaces($uid);
+		$this->tx->run(fn () => $this->backgrounds->queueUser($bgWs, $uid, false));
+		$done = 0;
+		if ($token !== null) {
+			$done = $this->purgeWorkspaces($token);
+			$this->jobs->remove(UserDataDeletionJob::class, ['token' => $token]);
+		}
+		// bei echter Kontolöschung entfernt der Kern die Benutzerwerte selbst
+		foreach ($this->userConfig->getKeys($uid, Application::APP_ID) as $key) {
+			$this->userConfig->deleteUserConfig($uid, Application::APP_ID, $key);
+		}
+		return $done;
 	}
 
 	/** @param string[] $teamIds */

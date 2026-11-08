@@ -37,7 +37,7 @@ class AssignmentOwnership {
 	}
 
 	/**
-	 * Ziel-Lehrkraft: Team fehlerfrei vorhanden, höchstes Level, dann kleinste UID, Level einzeln bestätigt; null = kein Ziel
+	 * Ziel-Lehrkraft: Team fehlerfrei vorhanden, höchstes Level, dann kleinste UID, Konto aktiv, Level einzeln bestätigt; null = kein Ziel
 	 * @throws TeamUnavailableException Circles-Fehler (nie „kein Ziel“ vortäuschen)
 	 */
 	public function target(string $teamId, string $exclude): ?string {
@@ -48,6 +48,10 @@ class AssignmentOwnership {
 		unset($candidates[$exclude]);
 		uksort($candidates, static fn ($a, $b) => ($candidates[$b] <=> $candidates[$a]) ?: strcmp((string)$a, (string)$b));
 		foreach (array_keys($candidates) as $uid) {
+			// deaktiviertes Konto (z. B. per delete-user-data geleert) wird nie Nachfolger (SPEC §8)
+			if ($this->users->get((string)$uid)?->isEnabled() !== true) {
+				continue;
+			}
 			if ($this->teams->currentLevel($teamId, (string)$uid) >= self::TEACHER_LEVEL) {
 				return (string)$uid;
 			}

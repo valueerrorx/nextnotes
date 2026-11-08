@@ -246,7 +246,8 @@
   "\"{title}\" was deleted.": "„{title}“ wurde gelöscht.",
   "The team was deleted. The assignment and all submissions are deleted on {date}. Download them before.": "Das Team wurde gelöscht. Die Aufgabe und alle Abgaben werden am {date} gelöscht. Lade sie vorher herunter.",
   "The team was deleted. Your submission is deleted on {date}. Download it before.": "Das Team wurde gelöscht. Deine Abgabe wird am {date} gelöscht. Lade sie vorher herunter.",
-  "The Teams app is not available. The assignment is read-only.": "Die Teams-App ist nicht verfügbar. Die Aufgabe ist schreibgeschützt."
+  "The Teams app is not available. The assignment is read-only.": "Die Teams-App ist nicht verfügbar. Die Aufgabe ist schreibgeschützt.",
+  "Own notes and workspaces, own submissions with feedback (export only)": "Eigene Notizen und Workspaces, eigene Abgaben mit Feedback (nur Export)"
  },
  "pluralForm": "nplurals=2; plural=(n != 1);"
 }

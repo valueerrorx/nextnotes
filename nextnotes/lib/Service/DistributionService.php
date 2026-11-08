@@ -107,9 +107,23 @@ class DistributionService {
 		if ($a->getStatus() !== 'distributed' || $this->time->getTime() > (int)$a->getDueAt() || $this->teamState->stateOf($teamId) !== TeamStateService::ACTIVE) {
 			return ['not_distributed' => 0, 'quota_full' => false];
 		}
-		$missing = count(array_diff_key($this->teams->members($teamId, self::STUDENT_LEVEL), $this->submissions->studentsOf((int)$a->getId())));
+		$missing = count($this->missingStudents($a));
 		$bytes = $missing > 0 ? $this->attachments->bytesOf([(int)$a->getTemplateNoteId()]) : 0;
 		return ['not_distributed' => $missing, 'quota_full' => $bytes > 0 && $bytes > $this->quota->limit() - $this->quota->used('team', $teamId)];
+	}
+
+	/**
+	 * Schüler (Level 1) ohne Abgabe mit aktivem Konto; deaktivierte erhalten nichts und zählen nicht als ausstehend (SPEC §8, M7b)
+	 * @param array<string, string>|null $students uid → Name, null = alle Schüler des Teams
+	 * @return array<string, string>
+	 */
+	public function missingStudents(Assignment $a, ?array $students = null): array {
+		$students ??= $this->teams->members((string)$a->getTeamId(), self::STUDENT_LEVEL);
+		if ($students === []) {
+			return [];
+		}
+		$missing = array_diff_key($students, $this->submissions->studentsOf((int)$a->getId()));
+		return array_filter($missing, fn ($uid): bool => $this->users->get((string)$uid)?->isEnabled() === true, ARRAY_FILTER_USE_KEY);
 	}
 
 	// §2.3a (1): Anhänge der Vorlage × Schüler ohne Abgabe gegen den Rest der Team-Quote
@@ -118,7 +132,7 @@ class DistributionService {
 		if ($bytes <= 0) {
 			return;
 		}
-		$missing = count(array_diff_key($this->teams->members((string)$a->getTeamId(), self::STUDENT_LEVEL), $this->submissions->studentsOf((int)$a->getId())));
+		$missing = count($this->missingStudents($a));
 		$needed = $bytes * $missing;
 		$available = max(0, $this->quota->limit() - $this->quota->used('team', (string)$a->getTeamId()));
 		if ($needed > $available) {
@@ -149,7 +163,7 @@ class DistributionService {
 		} else {
 			$students = $this->teams->members($teamId, self::STUDENT_LEVEL);
 		}
-		$missing = $students === [] ? [] : array_diff_key($students, $this->submissions->studentsOf((int)$a->getId()));
+		$missing = $this->missingStudents($a, $students);
 		ksort($missing, SORT_STRING);
 		$bytes = $missing === [] ? 0 : $this->attachments->bytesOf([(int)$a->getTemplateNoteId()]);
 		$left = count($missing);
@@ -207,8 +221,8 @@ class DistributionService {
 				if ($a->getStatus() !== 'distributed' || $now > (int)$a->getDueAt() || $team === null || $team->getState() !== TeamStateService::ACTIVE) {
 					return self::STOP;
 				}
-				// Konto inzwischen gelöscht (Rennen mit UserDeletedListener): nichts mit der UID anlegen (SPEC §8)
-				if ($this->submissions->existsFor($id, $uid) || !$this->users->userExists($uid)) {
+				// Konto gelöscht (Rennen mit UserDeletedListener) oder deaktiviert (occ delete-user-data, M7b): nichts mit der UID anlegen (SPEC §8)
+				if ($this->submissions->existsFor($id, $uid) || $this->users->get($uid)?->isEnabled() !== true) {
 					return self::EXISTS;
 				}
 				$ws = $this->workspaces->ensureAssignmentWorkspace($uid, $teamId, $this->workspaceName($uid, (string)$team->getTeamNameSnapshot()), $now);

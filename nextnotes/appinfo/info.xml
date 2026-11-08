@@ -35,6 +35,9 @@ Based on Poznote by Timothé Poznanski (MIT).]]></description>
 	<commands>
 		<command>OCA\NextNotes\Command\TeamOrphanCheck</command>
 		<command>OCA\NextNotes\Command\AssignmentTransfer</command>
+		<command>OCA\NextNotes\Command\ExportUser</command>
+		<command>OCA\NextNotes\Command\DeleteUserData</command>
+		<command>OCA\NextNotes\Command\Purge</command>
 	</commands>
 	<settings>
 		<admin>OCA\NextNotes\Settings\AdminSettings</admin>

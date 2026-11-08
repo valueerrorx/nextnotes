@@ -22,7 +22,6 @@ use Psr\Log\LoggerInterface;
 class AssignmentDeadlineService {
 	private const BATCH = 100;
 	private const CURSOR = 'deadline_job_cursor';
-	private const STUDENT_LEVEL = 1;
 	private const TEACHER_LEVEL = 4;
 
 	public function __construct(
@@ -89,7 +88,7 @@ class AssignmentDeadlineService {
 		$teamId = (string)$a->getTeamId();
 		$missing = 0;
 		if ($this->teamState->stateOf($teamId) === TeamStateService::ACTIVE) {
-			$missing = count(array_diff_key($this->teams->members($teamId, self::STUDENT_LEVEL), $this->submissions->studentsOf((int)$a->getId())));
+			$missing = count($this->distribution->missingStudents($a));
 		}
 		return [
 			'submitted' => ($byStatus['submitted'] ?? 0) + ($byStatus['returned'] ?? 0),

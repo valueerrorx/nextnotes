@@ -56,6 +56,29 @@ class BackgroundFiles {
 		}
 	}
 
+	/**
+	 * Workspaces aus $wsIds, in denen $uid Bilder hat; legt nichts an
+	 * @param int[] $wsIds
+	 * @return int[]
+	 */
+	public function workspaceIdsWith(string $uid, array $wsIds): array {
+		try {
+			$root = $this->appData->getFolder('backgrounds');
+		} catch (FilesNotFoundException) {
+			return [];
+		}
+		$out = [];
+		foreach ($wsIds as $wsId) {
+			try {
+				$root->getFolder((string)$wsId)->getFolder($uid);
+				$out[] = (int)$wsId;
+			} catch (FilesNotFoundException) {
+				// kein Bild von $uid
+			}
+		}
+		return $out;
+	}
+
 	/** Workspace gelöscht: Bilder aller Benutzer und deren Deckkraft-Einstellungen */
 	public function queueWorkspace(int $wsId): void {
 		$this->cleanup->add(function () use ($wsId): void {

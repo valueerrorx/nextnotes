@@ -19,6 +19,7 @@ use OCA\NextNotes\Notification\Notifier;
 use OCA\NextNotes\Search\NotesProvider;
 use OCA\NextNotes\Service\TeamService;
 use OCA\NextNotes\Teams\WorkspaceResourceProvider;
+use OCA\NextNotes\UserMigration\NextNotesMigrator;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
@@ -42,6 +43,7 @@ class Application extends App implements IBootstrap {
 		$context->registerEventListener(BeforeUserDeletedEvent::class, BeforeUserDeletedListener::class);
 		$context->registerEventListener(UserDeletedEvent::class, UserDeletedListener::class);
 		$context->registerTeamResourceProvider(WorkspaceResourceProvider::class);
+		$context->registerUserMigrator(NextNotesMigrator::class);
 		// Circles-Events als Namen: App läuft auch ohne Circles (M5b)
 		$context->registerEventListener(TeamService::EVENT_DESTROYING, CircleDestroyedListener::class);
 		$context->registerEventListener(TeamService::EVENT_DESTROYED, CircleDestroyedListener::class);

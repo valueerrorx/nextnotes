@@ -15,6 +15,7 @@ use OCA\NextNotes\Db\FolderMapper;
 use OCA\NextNotes\Db\Note;
 use OCA\NextNotes\Db\NoteMapper;
 use OCA\NextNotes\Db\NoteTagMapper;
+use OCA\NextNotes\Db\Workspace;
 use OCA\NextNotes\Service\Exception\NotFoundException;
 use OCA\NextNotes\Service\Exception\TooManyRequestsException;
 use OCP\IDateTimeZone;
@@ -122,8 +123,22 @@ class ZipExportService {
 	 * @return array<string, mixed>
 	 */
 	public function structured(string $uid, mixed $wsKey): array {
-		$ws = $this->workspaces->resolveOptional($uid, $wsKey);
-		$wsIds = $this->scope($uid, $wsKey);
+		return $this->structuredOf($uid, $this->workspaces->resolveOptional($uid, $wsKey), $this->scope($uid, $wsKey));
+	}
+
+	/**
+	 * Strukturierter Export eines eigenen Workspace ohne Schlüssel (occ export-user, IMigrator; Recht prüft der Aufrufer)
+	 * @return array<string, mixed>
+	 */
+	public function structuredWorkspace(string $uid, Workspace $ws): array {
+		return $this->structuredOf($uid, $ws, [(int)$ws->getId()]);
+	}
+
+	/**
+	 * @param int[] $wsIds
+	 * @return array<string, mixed>
+	 */
+	private function structuredOf(string $uid, ?Workspace $ws, array $wsIds): array {
 		$items = $this->collect($uid, $wsIds, [], true);
 		$byId = $this->foldersById($wsIds);
 		usort($items, static fn (array $a, array $b): int => [(int)$a['note']->getFolderId(), (string)$a['note']->getHeading()] <=> [(int)$b['note']->getFolderId(), (string)$b['note']->getHeading()]);

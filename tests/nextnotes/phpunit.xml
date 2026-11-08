@@ -14,4 +14,10 @@
 			<directory>php</directory>
 		</testsuite>
 	</testsuites>
+	<!-- destructive: löscht alle App-Daten (PurgeTest), nur über dev/nextcloud/check-purge.sh -->
+	<groups>
+		<exclude>
+			<group>destructive</group>
+		</exclude>
+	</groups>
 </phpunit>
