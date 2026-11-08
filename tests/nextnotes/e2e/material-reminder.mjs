@@ -49,7 +49,8 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	ctx.ok(await pb.locator(`#entry${tl}[data-nextnotes-readonly]`).count() === 1, 'S: Tasklist nur lesen');
 	const chip = pb.locator(`#entry${tl} .task-due-chip`).first();
 	ctx.ok(await chip.isEnabled(), 'S: Termin-Chip bedienbar');
-	ctx.info(await chip.evaluate((c) => { const o = []; for (let e = c; e && e.id !== 'note' + c.dataset.noteId; e = e.parentElement) o.push(`${e.tagName}.${e.className.toString().slice(0, 30)} op=${getComputedStyle(e).opacity} pe=${getComputedStyle(e).pointerEvents}`); return o.join(' | '); }));
+	const chipLook = await chip.evaluate((c) => { let op = 1; for (let e = c; e && e.id !== 'note' + c.dataset.noteId; e = e.parentElement) op *= Number(getComputedStyle(e).opacity); return { op, pe: getComputedStyle(c).pointerEvents }; });
+	ctx.ok(chipLook.op === 1 && chipLook.pe !== 'none', 'S: Termin-Chip sieht normal aus (keine Opazität)', JSON.stringify(chipLook));
 	ctx.ok(await pb.locator(`#entry${tl} .task-due-btn:visible, #entry${tl} .task-delete-btn:visible, #entry${tl} .task-menu-btn:visible`).count() === 0, 'S: übrige Aufgaben-Knöpfe verborgen');
 	await chip.click();
 	await check('Notiz');

@@ -18,7 +18,7 @@ const INIT = () => {
 	window.addEventListener('pagereveal', (e) => {
 		s.vt = !!e.viewTransition;
 		if (e.viewTransition) e.viewTransition.ready.then(() => {
-			s.groups = document.getAnimations().map((a) => a.effect?.pseudoElement).filter(Boolean);
+			s.groups = document.getAnimations().filter((a) => Number(a.effect?.getTiming().duration) > 0).map((a) => a.effect?.pseudoElement).filter(Boolean); // nur sichtbare (Dauer > 0)
 			const n = (id) => { const el = document.getElementById(id); return el ? getComputedStyle(el).viewTransitionName : null; };
 			s.names = { header: n('header'), rail: n('icon_sidebar') };
 		}).catch(() => {});
@@ -131,10 +131,22 @@ await runSpec(import.meta.url, async (ctx, page, context) => {
 	ctx.ok(vt.names && vt.names.header === 'nn-header' && vt.names.rail === 'nn-rail', 'B Kopf- und Icon-Leiste eigene Gruppen im Übergang', JSON.stringify(vt.names));
 	ctx.ok(!/nn-header|nn-rail/.test(groups), 'B Kopf- und Icon-Leiste stehen (keine Animation)', groups);
 	ctx.ok(!/view-transition-group\(nn-sidebar\)/.test(groups), 'B Seitenleiste ohne Positions-Animation', groups);
-	ctx.info(`B Seitenleiste nur alt (index → tasks): ${/view-transition-old\(nn-sidebar\)/.test(groups) ? 'blendet aus' : 'keine Animation'}`);
+	ctx.ok(/view-transition-old\(nn-sidebar\)/.test(groups) && !/view-transition-new\(nn-sidebar\)/.test(groups), 'B Seitenleiste verschwindet (index → tasks): blendet aus', groups);
 	ctx.ok(/view-transition-(old|new)\(root\)/.test(groups), 'B Inhalt (Wurzel) blendet', groups);
 	const names = await page.evaluate(() => getComputedStyle(document.getElementById('icon_sidebar')).viewTransitionName);
 	ctx.ok(names === 'none', 'B Name nur während des Übergangs (danach none)', names);
+	// UI-fein 3: zurück zur Hauptansicht blendet die Seitenleiste ein; Wechsel Notiz → Notiz: Seitenleiste steht
+	await page.locator('#iconSidebarHomeBtn').click();
+	await page.waitForFunction(() => window.__nnNav?.ready !== null, null, { timeout: 10000 });
+	await page.waitForTimeout(400);
+	const vtIn = await page.evaluate(() => window.__nnNav);
+	const groupsIn = vtIn.groups.join(' ');
+	ctx.ok(vtIn.vt === true && /view-transition-new\(nn-sidebar\)/.test(groupsIn) && !/view-transition-old\(nn-sidebar\)/.test(groupsIn), 'B Seitenleiste erscheint (tasks → index): blendet ein', groupsIn);
+	await page.locator('#iconSidebarHomeBtn').click();
+	await page.waitForFunction(() => window.__nnNav?.ready !== null, null, { timeout: 10000 });
+	await page.waitForTimeout(400);
+	const vtStay = await page.evaluate(() => window.__nnNav);
+	ctx.ok(vtStay.vt === true && !/nn-sidebar/.test(vtStay.groups.join(' ')), 'B Seitenleiste auf beiden Seiten: steht (keine Animation)', vtStay.groups.join(' '));
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await page.locator('#iconSidebarDashboardBtn').click();
 	await page.waitForFunction(() => window.__nnNav?.ready !== null, null, { timeout: 10000 });

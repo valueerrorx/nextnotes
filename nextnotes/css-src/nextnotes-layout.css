@@ -114,6 +114,24 @@ html.nextnotes-ready #nextnotes-root:is(.nextnotes-subpage, .nextnotes-excalidra
 	opacity: revert;
 }
 
+/* NC-Kern stylt div[contenteditable=false] wie ein gesperrtes Feld (grau, Rahmen, opacity .5; 0,1,1): im App-Bereich zurück.
+   Gleiche Spezifität, später geladen; Upstream (+1 ID) und Bibliotheken (CodeMirror, Excalidraw) mit höherer Spezifität setzen sich durch. */
+:where(#nextnotes-root) div[contenteditable="false"] {
+	width: revert;
+	min-height: revert;
+	box-sizing: revert;
+	margin: revert;
+	padding: revert;
+	border: revert;
+	border-radius: revert;
+	background-color: revert;
+	color: revert;
+	font-size: revert;
+	cursor: revert;
+	outline: revert;
+	opacity: revert;
+}
+
 /* Unterseiten (revisions.php, attachments.php) im NC-Rahmen: Spalte, eigener Scrollbereich */
 #nextnotes-root.nextnotes-subpage {
 	display: block;
@@ -780,6 +798,22 @@ html[data-theme='dark'] #nextnotes-root.graph-page {
 	opacity: 0.45;
 }
 
+/* Kennzeichen „Nur lesen“ / „Material – nur lesen“ in der Notiz-Kopfzeile (UI-fein): NC-Pille, Theme-Farben */
+#nextnotes-root .nn-readonly-badge {
+	display: inline-flex;
+	flex: 0 0 auto;
+	align-items: center;
+	gap: 4px;
+	margin-inline-start: auto;
+	padding: 2px 10px;
+	border-radius: var(--border-radius-pill, 100px);
+	background-color: var(--color-primary-element-light);
+	color: var(--color-primary-element-light-text);
+	font-size: var(--font-size-small, 13px);
+	line-height: 20px;
+	white-space: nowrap;
+}
+
 /* Tasklist ohne Schreibrecht: kein Eingabefeld, keine Zieh-/Aktionsknöpfe (Kästchen sperrt nextnotes-teams.js) */
 .noteentry[data-nextnotes-readonly] .task-input-container,
 .noteentry[data-nextnotes-readonly] .task-drag-handle,
@@ -1021,20 +1055,33 @@ html:active-view-transition #nextnotes-root #left_col {
 }
 
 /* Kopf- und Icon-Leiste stehen still: kein Überblenden, das neue Bild gilt sofort (Zusatz 7). Seitenleiste ebenso, wenn sie auf beiden Seiten
-   steht; nur beim Erscheinen/Verschwinden blendet sie. Der Inhalt blendet in der Wurzel auf der deckenden Inhaltsfläche (Anti-Flackern oben). */
+   steht; nur beim Erscheinen/Verschwinden blendet sie. Der Inhalt blendet in der Wurzel auf der deckenden Inhaltsfläche (Anti-Flackern oben).
+   Gruppen nur ohne Positions-Animation: Bilder erben die Dauer von der Gruppe, `animation: none` hätte das Ein-/Ausblenden auf 0 s gesetzt. */
 ::view-transition-group(nn-header),
 ::view-transition-group(nn-rail),
-::view-transition-group(nn-sidebar),
+::view-transition-group(nn-sidebar) {
+	animation-name: none;
+}
+
 ::view-transition-new(nn-header),
-::view-transition-new(nn-rail),
-::view-transition-new(nn-sidebar):not(:only-child) {
+::view-transition-new(nn-rail) {
 	animation: none;
 }
 
 ::view-transition-old(nn-header),
-::view-transition-old(nn-rail),
-::view-transition-old(nn-sidebar):not(:only-child) {
+::view-transition-old(nn-rail) {
 	display: none;
+}
+
+/* Seitenleiste: Bildpaar wechselt sofort (0 s), nur ein einzelnes Bild (Erscheinen/Verschwinden) blendet mit der Gruppendauer */
+::view-transition-old(nn-sidebar),
+::view-transition-new(nn-sidebar) {
+	animation-duration: 0s;
+}
+
+::view-transition-old(nn-sidebar):only-child,
+::view-transition-new(nn-sidebar):only-child {
+	animation-duration: 150ms;
 }
 
 /* Mini-Kalender (sticky unten): Milchglas statt Hauptfläche, damit die Leiste einheitlich auf der Blur-Fläche liegt */
@@ -1177,4 +1224,112 @@ body.icon-sidebar-collapsed #content #nextnotes-root #iconSidebarToggle {
 
 #nextnotes-root .kanban-inline-header .kanban-mobile-home:is(:hover, :focus-visible) {
 	background-color: var(--color-background-hover);
+}
+
+/* Ansichten linksbündig wie NC-Apps (UI-fein 4, Thomas 2026-11-08): Upstream zentriert Container, Titel, Leisten und Leerzustände.
+   Innenabstand ab der Inhaltsfläche --nn-view-pad; max-width bleibt, Container hängen links. Zwei IDs gegen Upstream (+1 ID, ADR 0017). */
+#content #nextnotes-root {
+	--nn-view-pad: calc(var(--default-grid-baseline) * 4);
+}
+
+#content #nextnotes-root > .nn-page-main {
+	padding-inline: var(--nn-view-pad);
+}
+
+#content #nextnotes-root > .nn-page-main :is(.home-container, .tasks-container, .speed-dial-container, .notes-manager-container, .tags-container, .trash-container,
+	.trash-content, .favorites-container, .shared-container, .tasks-progress-section, .tasks-filter-bar, .mentions-toolbar, .nm-filter-bar, .nm-content, .trash-filter-bar,
+	.shared-filter-bar, .attachments-list-container, .shared-notes-list, .tags-info) {
+	margin-inline: 0 auto;
+	padding-inline-start: 0;
+}
+
+/* Graph: Kopfblock schwebt breit über der Zeichenfläche (Upstream ab 641 px mittig); schmal bleibt er gestreckt */
+@media (min-width: 641px) {
+	#content #nextnotes-root > .nn-page-main .graph-head {
+		margin-inline: 0 auto;
+		padding-inline-start: 0;
+	}
+}
+
+/* Upstream shared/responsive.css setzt mobil padding: 10px !important */
+#content #nextnotes-root > .nn-page-main .shared-container {
+	padding-inline: 0 !important;
+}
+
+/* Filterzeile (Dashboard, Tagebuch) bricht schmal um statt über den Rand zu laufen */
+#content #nextnotes-root > .nn-page-main .board-filter-row {
+	flex-wrap: wrap;
+}
+
+/* Anhänge: Vorschau-Schalter (Upstream nowrap) bricht schmal um */
+#content #nextnotes-root > .nn-page-main .thumbnails-toggle {
+	white-space: normal;
+}
+
+#content #nextnotes-root .poznote-page-title {
+	justify-content: flex-start;
+	margin-inline-start: 0;
+	text-align: start;
+}
+
+#content #nextnotes-root > .nn-page-main :is(.board-filter-row, .diary-actions, .trash-buttons-container, .graph-toolbar, .graph-checks, .graph-options,
+	.filter-search-row, .graph-empty, .trash-no-notes-icon) {
+	justify-content: flex-start;
+}
+
+#content #nextnotes-root > .nn-page-main :is(.dashboard-empty, .empty-message, .speed-dial-empty, .trash-no-notes, .trash-page-count, .no-tags, .tags-info,
+	.graph-empty, .mentions-empty) {
+	text-align: start;
+}
+
+/* Kanban: Titel links (Upstream space-between mit verborgenem Scroll-Knopf zentriert ihn), Kopf und Spalten mit gleichem Innenabstand */
+#content #nextnotes-root .kanban-inline-header .kanban-title {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+#content #nextnotes-root .kanban-inline-header :is(.kanban-scroll-btn-header.left, .kanban-header-actions) {
+	order: 1;
+}
+
+#content #nextnotes-root .kanban-inline-header .kanban-mobile-home {
+	order: -1;
+}
+
+#content #nextnotes-root .kanban-inline-header,
+#content #nextnotes-root .kanban-inline-view .kanban-board {
+	padding-inline-start: var(--nn-view-pad);
+}
+
+/* Unterseiten Verlauf/Anhänge (ohne Leiste): Zurück-Knopf und Titel links, Container links */
+#content #nextnotes-root.nextnotes-subpage :is(.revisions-shell, .settings-container) {
+	margin-inline: 0 auto;
+}
+
+#content #nextnotes-root.nextnotes-subpage .revisions-header {
+	grid-template-columns: auto auto 1fr;
+}
+
+#content #nextnotes-root.nextnotes-subpage :is(.poznote-back-to-note-bar, .revisions-heading, .revisions-state) {
+	justify-content: flex-start;
+}
+
+#content #nextnotes-root.nextnotes-subpage .revisions-state {
+	align-items: flex-start;
+	text-align: start;
+}
+
+#content #nextnotes-root.nextnotes-subpage .attachments-back-to-note-bar {
+	padding-inline-start: var(--nn-view-pad);
+}
+
+/* Notiz: Werkzeugleiste links, schmaler Inhalt (Breiten-Einstellung) links statt mittig */
+#content #nextnotes-root #right_col .note-edit-toolbar {
+	justify-content: flex-start;
+}
+
+@media (min-width: 801px) {
+	#content #nextnotes-root #right_col .innernote > :not(.note-header):not(.note-scroll-edge-controls) {
+		align-self: flex-start;
+	}
 }

@@ -19,9 +19,9 @@
 <h4 class="ui-custom-section-title"><span><?php p($t('modals.ui_customization.sections.settings_cards', 'Settings Cards')); ?></span><button type="button" class="ui-custom-toggle-all" data-label-check="<?php p($t('modals.ui_customization.check_all', 'Check all')); ?>" data-label-uncheck="<?php p($t('modals.ui_customization.uncheck_all', 'Uncheck all')); ?>"></button></h4>
 <div class="ui-custom-items">
 		<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:default-workspace-card" checked><span><?php p($t('workspaces.default.title', 'Default Workspace')); ?></span></label>
+		<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:storage-stats-user-card" checked><span><?php p($t('settings.cards.storage_stats_user', 'User Storage statistics')); ?></span></label>
 		<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:structured-export-card" checked><span><?php p($t('backup_export.sections.structured_export.title', 'Structured Export')); ?></span></label>
 		<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:attachments-export-card" checked><span><?php p($t('backup_export.sections.attachments_export.title', 'Attachments Export')); ?></span></label>
-		<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:storage-stats-user-card" checked><span><?php p($t('settings.cards.storage_stats_user', 'User Storage statistics')); ?></span></label>
 		<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:spellcheck-html-notes-card" checked><span><?php p($t('display.cards.spellcheck_html_notes', 'Spell check')); ?></span></label>
 		<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:slash-menu-trigger-card" checked><span><?php p($t('display.cards.slash_menu_trigger', 'Command menu shortcut (computer)')); ?></span></label>
 		<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:slash-menu-trigger-mobile-card" checked><span><?php p($t('display.cards.slash_menu_trigger_mobile', 'Command menu shortcut (mobile)')); ?></span></label>

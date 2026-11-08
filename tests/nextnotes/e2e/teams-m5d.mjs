@@ -6,6 +6,7 @@
 import { runSpec } from './lib/harness.mjs';
 import { apiClient } from './lib/api.mjs';
 import { createTeam, ensureUser, occ, orphanTeam, share } from './lib/docker.mjs';
+import { assertReadonlyView } from './lib/readonly.mjs';
 
 const RUN = `${process.argv[3]}${Date.now().toString(36)}`;
 const A = process.env.NN_USER;
@@ -64,6 +65,20 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	ctx.ok(denied.status === 403, `C nur lesen: Schreiben 403 (${denied.status})`);
 	const idC = noteC.body?.note?.id;
 	ctx.ok((await apiC.call('GET', `/notes/${idC}`)).status === 200, 'C liest weiter');
+	// UI-fein 1: Lesefreigabe in der Notiz-Ansicht voll lesbar, Kennzeichen „Nur lesen“
+	await ctx.attach(ctxC);
+	const pc = await ctxC.newPage();
+	await pc.setViewportSize({ width: 1400, height: 900 });
+	const noteUrlC = ctx.appUrl(`index.php?workspace=${encodeURIComponent(keyC)}&note=${idC}`);
+	await pc.goto(noteUrlC, { waitUntil: 'networkidle' });
+	// apiC kann schon eine Sitzung im Kontext haben
+	if (new URL(pc.url()).pathname.includes('/login')) {
+		await ctx.login(pc, C, process.env.NN_PASS2);
+		await pc.goto(noteUrlC, { waitUntil: 'networkidle' });
+	}
+	await assertReadonlyView(ctx, pc, idC, { label: 'C' });
+	await ctx.screenshot(pc, 'readonly-share');
+	await pc.close();
 
 	await openShare();
 	save = page.waitForResponse((r) => r.url().includes('workspaces.php') && r.request().method() === 'POST');

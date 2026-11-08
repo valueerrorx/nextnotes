@@ -614,7 +614,7 @@
 		};
 	}
 
-	// Nur-Lesen (P11) sperrt die ganze Werkzeugleiste; Erinnerung (persönlich) und bei Material Duplizieren (Q1) wieder freigeben
+	// Nur-Lesen (P11) sperrt die ganze Werkzeugleiste; Lesewerkzeuge (Erinnerung, Suchen ohne Ersetzen, Verlauf, Info, Ordnerpfad) und bei Material Duplizieren (Q1) wieder freigeben
 	function releaseControl(c) {
 		if (!c || !c.hasAttribute('data-note-lock-managed')) return;
 		if ('disabled' in c) c.disabled = c.getAttribute('data-note-lock-prev-disabled') === '1';
@@ -628,7 +628,9 @@
 		document.querySelectorAll('.noteentry[data-nextnotes-readonly][data-note-id]').forEach(function (entry) {
 			var card = document.getElementById('note' + entry.getAttribute('data-note-id'));
 			if (!card) return;
-			var sel = '.note-edit-toolbar .btn-reminder';
+			var sel = '.note-edit-toolbar :is(.btn-reminder, .btn-snapshot, .btn-search-replace, .btn-search-replace-format, .btn-toolbar-overflow, .mobile-more-btn), '
+				+ '.mobile-toolbar-menu :is([data-action="show-snapshot"], [data-action="show-note-info"], [data-selector=".btn-search-replace"]), '
+				+ '.search-replace-controls :is(.search-replace-input, .search-replace-prev-btn, .search-replace-next-btn, .search-replace-close-btn), .note-tags-row [data-action="reveal-folder-in-tree"]';
 			if (entry.hasAttribute('data-nn-material-copy')) sel += ', .note-edit-toolbar .btn-duplicate, .mobile-toolbar-menu [data-selector=".btn-duplicate"]';
 			card.querySelectorAll(sel).forEach(releaseControl);
 		});

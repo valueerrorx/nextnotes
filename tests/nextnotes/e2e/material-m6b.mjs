@@ -7,6 +7,7 @@
 import { runSpec } from './lib/harness.mjs';
 import { apiClient } from './lib/api.mjs';
 import { createTeam } from './lib/docker.mjs';
+import { assertReadonlyView } from './lib/readonly.mjs';
 
 const RUN = `${process.argv[3]}${Date.now().toString(36)}`;
 const A = process.env.NN_USER;
@@ -134,6 +135,20 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	ctx.ok(await entry.getAttribute('data-nn-material-copy') === '1', 'S: Duplikat-Kennzeichen am Editor');
 	ctx.ok(locks.length === 0, 'S: kein Sperr-Request', locks.join(' '));
 	ctx.ok(await pb.locator('.note-edit-lock-banner').count() === 0, 'S: kein Sperr-Banner');
+	// UI-fein 1: voll lesbar, Kennzeichen, Lesewerkzeuge frei; Suchen ohne Ersetzen und ohne Schreib-Request
+	await assertReadonlyView(ctx, pb, n1, { material: true });
+	await ctx.screenshot(pb, 'readonly-student');
+	const mS = ctx.mark();
+	await pb.evaluate((id) => window.openSearchReplaceModal(String(id)), n1);
+	await pb.locator(`#searchInput${n1}`).fill('Arbeits');
+	await pb.waitForTimeout(400);
+	ctx.ok(/1/.test(await pb.locator(`#searchCount${n1}`).innerText().catch(() => '')), 'S: Suche findet Treffer', await pb.locator(`#searchCount${n1}`).innerText().catch(() => ''));
+	ctx.ok(await pb.locator(`#replaceInput${n1}`).isDisabled() && await pb.locator(`#searchToggleReplaceBtn${n1}`).isDisabled(), 'S: Ersetzen gesperrt');
+	await pb.locator(`#searchCloseBtn${n1}`).click();
+	await pb.waitForTimeout(500);
+	const sWrites = ctx.requests.slice(mS.q).filter((r) => r.method !== 'GET' && r.url.includes(`/notes/${n1}`));
+	ctx.ok(sWrites.length === 0, 'S: Suche ohne Schreib-Request', sWrites.map((r) => `${r.method} ${r.url}`).join(' '));
+	ctx.ok(await pb.locator(`#entry${n1} .search-replace-highlight`).count() === 0, 'S: Treffer-Markierung nach Schließen entfernt');
 	// M6c-fix: Glocke und Duplizieren aktiv, Schreibwerkzeuge gesperrt; Erinnerung als Schüler setzen und löschen
 	const tb = pb.locator(`#note${n1} .note-edit-toolbar`);
 	const usable = (sel) => tb.locator(sel).first().evaluate((b) => !b.disabled && getComputedStyle(b).pointerEvents !== 'none');

@@ -25,3 +25,8 @@ Option 2:
 ## Nachtrag UI-nav-mobil (2026-11-08)
 - Kopf- und Icon-Leiste stehen still: `::view-transition-old(nn-header|nn-rail)` ausgeblendet, `-new` und Gruppe ohne Animation; Seitenleiste ebenso, wenn sie auf beiden Seiten steht.
 - Die Inhaltsfläche bleibt deckend: Anti-Flackern blendet nur ihre Kinder aus (vorher die Fläche selbst, der neue Schnappschuss zeigte Milchglas); nur die Wurzel blendet, alter Inhalt auf deckender Fläche aus, neuer ein.
+
+## Nachtrag UI-fein (2026-11-08)
+- Seitenleiste blendet beim Verschwinden (z. B. Hauptansicht → Aufgaben) aus und beim Erscheinen ein (150 ms); steht sie auf beiden Seiten, wechselt das Bildpaar ohne Animation (0 s).
+- Umsetzung: Gruppen nur `animation-name: none` (Bilder erben die Dauer der Gruppe, `animation: none` setzte sie auf 0 s); `::view-transition-old/new(nn-sidebar)` 0 s, mit `:only-child` 150 ms. `:not(:only-child)` matcht in Chromium nicht und wird nicht verwendet.
+- E2E `ui-nav.mjs` B prüft Ausblenden, Einblenden und Stehen (nur Animationen mit Dauer > 0).

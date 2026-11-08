@@ -13,7 +13,9 @@ const GONE = ['my-profile-card', 'change-password-card', 'two-factor-card', 'app
 	'language-card', 'timezone-card', 'backup-export-card', 's3-backup-card', 'restore-import-card', 'import-notes-card', 'git-sync-card',
 	'offline-notes-card', 'main-font-card', 'markdown-font-card', 'login-display-card', 'icon-sidebar-order-card', 'icon-rail-scale-card',
 	'whats-new-card', 'discussions-card', 'discord-card', 'tips-card', 'support-card', 'api-rest-card', 'admin-tools-grid',
-	'workspace-activity-emails-card', 'sidebar-offline-marks-card'];
+	'workspace-activity-emails-card', 'sidebar-offline-marks-card',
+	// UI-fein 2: Abschnitt „Mein Konto“ aufgelöst (Profil/Sprache im NC-Benutzermenü)
+	'settings-account-section-grid', 'settings-account-section-title', 'nextcloud-account-card', 'nextcloud-language-card'];
 
 await runSpec(import.meta.url, async (ctx, page) => {
 	const api = apiClient(ctx, page.request);
@@ -40,8 +42,18 @@ await runSpec(import.meta.url, async (ctx, page) => {
 	await ctx.selfTest(page);
 	ctx.ok(await page.locator('#icon_sidebar #iconSidebarSettingsBtn.icon-sidebar-btn-active').count() === 1, 'Icon-Leiste: Einstellungen aktiv');
 	const navCount = await page.locator('#settings-nav .settings-nav-item').count();
-	ctx.ok(navCount === 11, 'Navigation: 11 Abschnitte', String(navCount));
+	ctx.ok(navCount === 10, 'Navigation: 10 Abschnitte', String(navCount));
+	const sections = await page.locator('#settings-nav .settings-nav-item').evaluateAll((a) => a.map((e) => e.dataset.section));
+	ctx.ok(['settings-pinned-section-grid', 'settings-workspaces-section-grid', 'settings-export-import-section-grid', 'settings-display-section-grid'].every((k, i) => sections[i] === k)
+		&& !sections.includes('settings-account-section-grid'), 'Abschnitte ohne „Mein Konto“, Workspaces vorn', sections.join(','));
 	for (const id of GONE) ctx.ok(await page.locator(`#${id}`).count() === 0, `gestrichen: #${id}`);
+	ctx.ok(await page.locator('#settings-display-section-grid > #date-time-format-card').count() === 1, 'Datums-/Zeitformat in „Anzeige“');
+	ctx.ok(await page.locator('#settings-workspaces-section-grid #storage-stats-user-card').count() === 1, 'Speicher in „Workspaces“');
+	ctx.ok(await page.locator('.settings-content a[href*="/settings/user"]').count() === 0, 'kein Link in die NC-Kontoeinstellungen');
+	await page.locator('.settings-nav-item[data-section="settings-display-section-grid"]').click();
+	await page.waitForFunction(() => !/Laden|Loading/.test(document.getElementById('date-time-format-badge')?.textContent ?? 'Laden'), null, { timeout: 8000 }).catch(() => null);
+	ctx.ok(!/Laden|Loading/.test(await page.locator('#date-time-format-badge').innerText()), 'Datumsformat-Wert geladen', await page.locator('#date-time-format-badge').innerText());
+	await page.locator('.settings-nav-item[data-section="settings-workspaces-section-grid"]').click();
 	await page.locator('#storage-stats-user-card .settings-storage-row').first().waitFor({ state: 'attached', timeout: 10000 });
 	ctx.ok(await page.locator('#storage-stats-user-card .settings-storage-row').count() === 2, 'Speicher: Notizen und Anhänge');
 	await ctx.screenshot(page, 'settings');

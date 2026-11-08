@@ -5,7 +5,7 @@
  */
 // abgeleitet von src/public/settings.php @ 7e2e0b6aa501ba95ac1e9789fd2bb477c281a001 (mit settings_shell.php, workspaces_section.php)
 // Persönliche Einstellungen: nur Karten mit Funktion im Port, IDs wie Upstream (settings-page.js, Anheften, Elementsichtbarkeit).
-// Gestrichen: Konto/Passwort/2FA/App-Passwörter/Konto löschen, Sprache/Zeitzone (→ Hinweis auf NC-Einstellungen), Backup/Restore/Import,
+// Gestrichen: Abschnitt „Mein Konto“ (Profil, Sprache/Zeitzone im NC-Benutzermenü; Datumsformat → Anzeige, Speicher → Workspaces), Konto/Passwort/2FA/App-Passwörter/Konto löschen, Backup/Restore/Import,
 // Git, Offline, Integrationen, Apps, Admin-Werkzeuge, Schriften, Login-Titel, Icon-Leisten-Reihenfolge/-Größe, What's new,
 // Diskussionen/Discord/Tipps/Spenden, Update-Prüfung, Kontext-Anpassungspanel. Daten: PageController::settings.
 /** @var array $_ */
@@ -25,7 +25,6 @@ $several = count($page['rows']) > 1;
 $severalOwn = $page['ownCount'] > 1;
 $sections = [
 	['key' => 'settings-pinned-section-grid', 'icon' => 'lucide-pin', 'label' => $t('settings.categories.pinned', 'Pinned')],
-	['key' => 'settings-account-section-grid', 'icon' => 'lucide-user', 'label' => $t('settings.categories.account', 'My Account')],
 	['key' => 'settings-workspaces-section-grid', 'icon' => 'lucide-layers', 'label' => $t('settings.categories.workspaces', 'Workspaces')],
 	['key' => 'settings-export-import-section-grid', 'icon' => 'lucide-arrow-up-down', 'label' => $t('settings.groups.export', 'Export')],
 	['key' => 'settings-display-section-grid', 'icon' => 'lucide-monitor', 'label' => $t('settings.categories.display', 'Display')],
@@ -125,52 +124,6 @@ $jsonAttr = static fn (mixed $v): string => json_encode($v, JSON_UNESCAPED_UNICO
 
 		<h2 class="settings-category-title" id="settings-pinned-section-title" hidden><?php p($t('settings.categories.pinned', 'Pinned')); ?></h2>
 		<div class="home-grid" id="settings-pinned-section-grid" hidden></div>
-
-		<!-- Konto: Profil, Passwort, Sicherheit, Sprache und Zeitzone verwaltet Nextcloud -->
-		<h2 class="settings-category-title" id="settings-account-section-title"><?php p($t('settings.categories.account', 'My Account')); ?></h2>
-		<div class="home-grid settings-grouped" id="settings-account-section-grid">
-
-			<div class="settings-group-title"><?php p($t('settings.groups.profile_sign_in', 'Profile & sign-in')); ?></div>
-			<div class="settings-group">
-				<a href="<?php p($_['ncProfileUrl']); ?>" class="home-card" id="nextcloud-account-card">
-					<span class="setting-help" data-tooltip="<?php p($l->t('Your name, e-mail address, password, two-factor authentication and app passwords are managed in your Nextcloud settings.')); ?>"><i class="lucide lucide-help-circle"></i></span>
-					<div class="home-card-icon"><i class="lucide lucide-user"></i></div>
-					<div class="home-card-content">
-						<span class="home-card-title"><?php p($l->t('Profile and security')); ?></span>
-						<span class="setting-status enabled"><?php p($l->t('Nextcloud settings')); ?></span>
-					</div>
-				</a>
-			</div>
-
-			<div class="settings-group-title"><?php p($t('settings.groups.language_region', 'Language & region')); ?></div>
-			<div class="settings-group">
-				<a href="<?php p($_['ncLanguageUrl']); ?>" class="home-card" id="nextcloud-language-card">
-					<span class="setting-help" data-tooltip="<?php p($l->t('Next Notes uses the language and time zone of your Nextcloud account.')); ?>"><i class="lucide lucide-help-circle"></i></span>
-					<div class="home-card-icon"><i class="lucide lucide-flag"></i></div>
-					<div class="home-card-content">
-						<span class="home-card-title"><?php p($l->t('Language and time zone')); ?></span>
-						<span class="setting-status enabled"><?php p($page['settings']['language'] . ' · ' . $page['settings']['timezone']); ?></span>
-					</div>
-				</a>
-				<div class="home-card" id="date-time-format-card">
-					<span class="setting-help" data-tooltip="<?php p($t('settings.card_help.date_time_format', 'Choose how dates and times are displayed.')); ?>"><i class="lucide lucide-help-circle"></i></span>
-					<div class="home-card-icon"><i class="lucide lucide-calendar"></i></div>
-					<div class="home-card-content">
-						<span class="home-card-title"><?php p($t('display.cards.date_time_format', 'Date & time format')); ?></span>
-						<span id="date-time-format-badge" class="setting-status"><?php p($t('common.loading')); ?></span>
-					</div>
-				</div>
-			</div>
-
-			<div class="settings-group-title"><?php p($t('settings.groups.storage', 'Storage')); ?></div>
-			<div class="settings-group">
-				<div class="settings-storage-summary" id="storage-stats-user-card"
-					data-src="<?php p($baseUrl . 'storage-stats-user.php?fragment=1&' . $wsQuery); ?>"
-					data-error="<?php p($t('settings.storage_summary.error', 'Storage usage could not be loaded.')); ?>">
-					<div class="settings-storage-summary-loading"><?php p($t('common.loading')); ?></div>
-				</div>
-			</div>
-		</div>
 
 		<!-- Workspaces: eigene (Upstream workspaces_section.php, Teilen M5d) und Team-Workspaces mit Kennzeichen; Verwalten nur mit manage -->
 		<h2 class="settings-category-title" id="settings-workspaces-section-title"><?php p($t('settings.categories.workspaces', 'Workspaces')); ?></h2>
@@ -295,6 +248,15 @@ $jsonAttr = static fn (mixed $v): string => json_encode($v, JSON_UNESCAPED_UNICO
 					</div>
 				</div>
 			</div>
+
+			<div class="settings-group-title"><?php p($t('settings.groups.storage', 'Storage')); ?></div>
+			<div class="settings-group">
+				<div class="settings-storage-summary" id="storage-stats-user-card"
+					data-src="<?php p($baseUrl . 'storage-stats-user.php?fragment=1&' . $wsQuery); ?>"
+					data-error="<?php p($t('settings.storage_summary.error', 'Storage usage could not be loaded.')); ?>">
+					<div class="settings-storage-summary-loading"><?php p($t('common.loading')); ?></div>
+				</div>
+			</div>
 		</div>
 
 		<!-- Export: ZIP direkt (api_export_*); „alle“ heißt eigene Workspaces -->
@@ -353,6 +315,14 @@ $jsonAttr = static fn (mixed $v): string => json_encode($v, JSON_UNESCAPED_UNICO
 						<input type="range" id="index-icon-scale-range" class="settings-inline-control" data-control="index-icon-scale-range" min="0.5" max="2.0" step="0.1" value="1.0">
 						<output class="settings-inline-value" for="index-icon-scale-range">1.0x</output>
 					</span>
+				</div>
+			</div>
+			<div class="home-card" id="date-time-format-card">
+				<span class="setting-help" data-tooltip="<?php p($t('settings.card_help.date_time_format', 'Choose how dates and times are displayed.')); ?>"><i class="lucide lucide-help-circle"></i></span>
+				<div class="home-card-icon"><i class="lucide lucide-calendar"></i></div>
+				<div class="home-card-content">
+					<span class="home-card-title"><?php p($t('display.cards.date_time_format', 'Date & time format')); ?></span>
+					<span id="date-time-format-badge" class="setting-status"><?php p($t('common.loading')); ?></span>
 				</div>
 			</div>
 			<div class="home-card" id="note-color-palette-card">

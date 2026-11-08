@@ -22,7 +22,8 @@ final class SettingsM4hTest extends ApiTestCase {
 	private const APP = '/index.php/apps/nextnotes/';
 	private const GONE = ['change-password-card', 'two-factor-card', 'app-passwords-card', 'delete-account-card', 'language-card',
 		'timezone-card', 'backup-export-card', 'git-sync-card', 'main-font-card', 'markdown-font-card', 'icon-sidebar-order-card',
-		'whats-new-card', 'discord-card', 'admin-tools-grid', 'login-display-card', 'import-notes-card', 'offline-notes-card'];
+		'whats-new-card', 'discord-card', 'admin-tools-grid', 'login-display-card', 'import-notes-card', 'offline-notes-card',
+		'settings-account-section-grid', 'nextcloud-account-card', 'nextcloud-language-card'];
 
 	private static function get(ApiClient $c, string $path): Response {
 		return $c->absolute('GET', self::APP . $path);
@@ -52,7 +53,10 @@ final class SettingsM4hTest extends ApiTestCase {
 			self::assertStringNotContainsString('id="' . $id . '"', $r->body, "gestrichen: $id");
 		}
 		self::assertStringNotContainsString('<script>', $r->body, 'keine Inline-Skripte');
-		self::assertStringContainsString('/settings/user/language-locale', $r->body, 'Hinweis-Karte: NC-Sprache');
+		// UI-fein: kein Abschnitt „Mein Konto“, keine Links in die NC-Kontoeinstellungen; Datumsformat in „Anzeige“, Speicher in „Workspaces“
+		self::assertStringNotContainsString('/settings/user/', $r->body, 'kein Link auf NC-Kontoeinstellungen');
+		self::assertMatchesRegularExpression('/id="settings-display-section-grid".*id="date-time-format-card".*id="ui-customization"/s', $r->body, 'Datumsformat in Anzeige');
+		self::assertMatchesRegularExpression('/id="settings-workspaces-section-grid".*id="storage-stats-user-card".*id="settings-export-import-section-title"/s', $r->body, 'Speicher in Workspaces');
 
 		// B: fremder Workspace im Parameter → eigener Standard, A-Daten fehlen
 		$rb = self::get($b, 'settings.php?workspace=' . self::enc($ws));
@@ -78,10 +82,10 @@ final class SettingsM4hTest extends ApiTestCase {
 		self::newNote($b, $bws, 'Eigen', '<p>z</p>');
 		self::assertSame($notesB0 + 1, self::storage($b)[0], 'B: eigene Notiz zählt');
 
-		// ohne fragment=1 → Einstellungen, Bereich Konto; abgemeldet keine Daten
+		// ohne fragment=1 → Einstellungen, Bereich Workspaces (UI-fein); abgemeldet keine Daten
 		$r = self::get($a, 'storage-stats-user.php');
 		self::assertSame(303, $r->status, $r->describe());
-		self::assertStringContainsString('settings.php?open=account', (string)$r->header('location'));
+		self::assertStringContainsString('settings.php#section=settings-workspaces-section-grid', (string)$r->header('location'));
 		$out = ApiClient::raw('GET', ApiClient::baseUrl() . self::APP . 'storage-stats-user.php?fragment=1', null, ['Accept: text/html'], null);
 		self::assertNotSame(200, $out->status, 'abgemeldet: keine Zahlen');
 		self::assertStringNotContainsString('settings-storage-row', $out->body);

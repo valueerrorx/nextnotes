@@ -398,13 +398,13 @@ class CompatController extends ApiController {
 		return new RedirectResponse($url . '#section=settings-workspaces-section-grid');
 	}
 
-	// Upstream storage-stats-user.php?fragment=1: Zahlen des Benutzers für die Einstellungen; ohne fragment → Einstellungen, Bereich Konto
+	// Upstream storage-stats-user.php?fragment=1: Zahlen des Benutzers für die Einstellungen; ohne fragment → Einstellungen, Bereich Workspaces (Speicher)
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
 	public function storageStatsUser(): Response {
 		$uid = $this->uid();
 		if ($this->param('fragment') !== '1') {
-			return new RedirectResponse($this->urls->linkToRoute('nextnotes.page.settings') . '?open=account');
+			return new RedirectResponse($this->urls->linkToRoute('nextnotes.page.settings') . '#section=settings-workspaces-section-grid');
 		}
 		$this->tr->setLanguage($this->tr->languageFor($this->settings->read($uid, 'language')));
 		$workspace = $this->param('workspace');

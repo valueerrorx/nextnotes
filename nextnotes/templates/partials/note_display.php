@@ -140,6 +140,7 @@ $item = static function (string $action, string $icon, string $label, array $dat
 		<span class="lucide lucide-tag icon_tag cursor-pointer" data-action="show-tag-edit-modal" data-note-id="<?php p($id); ?>" title="<?php p($tr->t('tags.manage_note_tags', [], 'Manage note tags')); ?>"></span>
 	</div>
 	<span class="name_tags"><input type="hidden" id="tags<?php p($id); ?>" value="<?php p($note['tags']); ?>"/></span>
+	<?php if (!$note['canWrite']): ?><span class="nn-readonly-badge" role="status"><i class="lucide <?php p($note['materialCopy'] ? 'lucide-book-open' : 'lucide-eye'); ?>" aria-hidden="true"></i><?php p($note['materialCopy'] ? $l->t('Material – read only') : $l->t('Read only')); ?></span><?php endif; ?>
 </div>
 <?php if (!$note['attachmentsAtBottom']) { $attachmentsRow(); } ?>
 <input type="hidden" id="folder<?php p($id); ?>" value="<?php p($note['folderName']); ?>"/>
