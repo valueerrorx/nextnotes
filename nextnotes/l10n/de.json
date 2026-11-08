@@ -108,7 +108,18 @@
   "New deadline: %s": "Neue Frist: %s",
   "{user} returned your submission for {assignment}": "{user} hat deine Abgabe zu {assignment} zurückgegeben",
   "Your submission for {assignment} was returned": "Deine Abgabe zu {assignment} wurde zurückgegeben",
-  "Your submission for {assignment} was reopened": "Deine Abgabe zu {assignment} wurde wieder geöffnet"
+  "Your submission for {assignment} was reopened": "Deine Abgabe zu {assignment} wurde wieder geöffnet",
+  "You are now responsible for the assignment {assignment}": "Du bist jetzt für die Aufgabe {assignment} verantwortlich",
+  "The account of the previous teacher was deleted.": "Das Konto der bisherigen Lehrkraft wurde gelöscht.",
+  "The previous teacher left the team.": "Die bisherige Lehrkraft hat das Team verlassen.",
+  "The previous teacher is no longer a teacher of the team.": "Die bisherige Lehrkraft ist keine Lehrkraft des Teams mehr.",
+  "An administrator transferred the assignment to you.": "Die Administration hat dir die Aufgabe übertragen.",
+  "Assignments of the deleted team {team} will be deleted on {date}.": "Die Aufgaben des gelöschten Teams {team} werden am {date} gelöscht.",
+  "The team {team} was deleted. Its assignments will be deleted on {date}.": "Das Team {team} wurde gelöscht. Seine Aufgaben werden am {date} gelöscht.",
+  "_%n of your assignments has submissions; export them before that date._::_%n of your assignments have submissions; export them before that date._": [
+   "%n deiner Aufgaben hat Abgaben; exportiere sie vor diesem Datum.",
+   "%n deiner Aufgaben haben Abgaben; exportiere sie vor diesem Datum."
+  ]
  },
  "pluralForm": "nplurals=2; plural=(n != 1);"
 }

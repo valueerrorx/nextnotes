@@ -401,7 +401,7 @@ final class TeamLifecycleTest extends TeamTestCase {
 		$teams->method('uidForSingleId')->willReturn('u1');
 		$teams->method('destroyedTeam')->willReturn(['id' => 't1', 'name' => 'T']);
 		$lifecycle = $this->createMock(TeamLifecycleService::class);
-		$lifecycle->method('hasTeamWorkspaces')->willReturn(true);
+		$lifecycle->method('isRelevant')->willReturn(true);
 		$lifecycle->expects(self::exactly(2))->method('memberLeft')->willThrowException(new \RuntimeException('Adapter wirft'));
 		$lifecycle->method('teamDeleted')->willThrowException(new TeamUnavailableException('Adapter wirft'));
 		$logger = $this->createMock(LoggerInterface::class);

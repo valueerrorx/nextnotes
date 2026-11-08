@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OCA\NextNotes\Service;
 
 use OCA\NextNotes\AppInfo\Application;
+use OCA\NextNotes\Db\AssignmentMapper;
 use OCA\NextNotes\Db\Team;
 use OCA\NextNotes\Db\TeamMapper;
 use OCA\NextNotes\Db\WorkspaceMapper;
@@ -58,6 +59,9 @@ class TeamCleanupService {
 		private IAppConfig $config,
 		private ITimeFactory $time,
 		private LoggerInterface $logger,
+		private AssignmentMapper $assignments,
+		private AssignmentDeletion $assignmentDeletion,
+		private AssignmentOwnership $ownership,
 	) {
 	}
 
@@ -84,6 +88,8 @@ class TeamCleanupService {
 			$this->apply($plan['rows']);
 		}
 		$this->notifySoon();
+		// Übergang owner_uid bei Herabstufung (§9.7); teilt sich das Budget von Schritt 1
+		$this->ownership->checkDemoted(max($this->time->getTime() + 1, $start + $budget - 2 * $reserve));
 		// Purge und Dateien bekommen je mindestens ein Fünftel des Budgets, auch wenn Schritt 1 seines ausschöpft
 		$this->purgeDue(max($this->time->getTime() + $reserve, $start + $budget - $reserve));
 		$this->files->run(max($this->time->getTime() + $reserve, $start + $budget));
@@ -215,14 +221,10 @@ class TeamCleanupService {
 		$this->teamState->resetCache();
 	}
 
-	// wie das Lösch-Event; Teams ohne Team-Workspace nur verwaisen (Löschung der Zeile nach der Frist)
+	// wie das Lösch-Event (auch Teams nur mit Aufgaben oder nur mit Zeile, O6; Löschung nach der Frist)
 	private function orphan(string $teamId): void {
 		$this->logger->warning('nextnotes: team missing, marked orphaned', ['team' => $teamId]);
-		if ($this->lifecycle->hasTeamWorkspaces($teamId)) {
-			$this->lifecycle->teamDeleted($teamId, null);
-			return;
-		}
-		$this->teamState->markOrphaned($teamId, null);
+		$this->lifecycle->teamDeleted($teamId, null);
 	}
 
 	private function reactivate(string $teamId): void {
@@ -288,14 +290,19 @@ class TeamCleanupService {
 	}
 
 	/**
-	 * Team-Workspaces einzeln (je eine Transaktion), Team-Zeile erst ohne Workspace; setzt im nächsten Lauf fort
+	 * Erst Aufgaben (je eine Transaktion), dann Schüler-Workspaces, dann Team-Workspaces; Team-Zeile erst ohne Aufgaben und Team-Workspaces; setzt im nächsten Lauf fort
 	 * @return bool Team vollständig gelöscht
 	 */
 	public function purge(string $teamId, int $deadline): bool {
-		$this->beforePurge($teamId);
 		$done = 0;
+		$due = function () use (&$done, $deadline): bool {
+			return $done > 0 && $this->time->getTime() >= $deadline;
+		};
+		if (!$this->beforePurge($teamId, $due, $done)) {
+			return false;
+		}
 		foreach ($this->workspaces->findByOwner('team', $teamId) as $ws) {
-			if ($done > 0 && $this->time->getTime() >= $deadline) {
+			if ($due()) {
 				return false;
 			}
 			$id = (int)$ws->getId();
@@ -314,7 +321,15 @@ class TeamCleanupService {
 			$done++;
 			$this->logger->info('nextnotes: orphaned team workspace deleted', ['team' => $teamId, 'workspace' => $id]);
 		}
-		if ($this->workspaces->findByOwner('team', $teamId) !== [] || !$this->rows->deleteOrphaned($teamId)) {
+		$deleted = $this->tx->run(function () use ($teamId): bool {
+			// Team-Zeile nie vor ihren Aufgaben (parallel angelegte Aufgabe bzw. Rückweg gewinnt)
+			$this->rows->lockRow($teamId);
+			if ($this->assignments->existsForTeam($teamId) || $this->workspaces->findByOwner('team', $teamId) !== []) {
+				return false;
+			}
+			return $this->rows->deleteOrphaned($teamId);
+		});
+		if (!$deleted) {
 			return false;
 		}
 		$this->dismiss($teamId);
@@ -324,8 +339,38 @@ class TeamCleanupService {
 		return true;
 	}
 
-	// M6: Aufgaben, Vorlagen, Abgaben und Schüler-Workspaces des Teams vor den Team-Workspaces
-	private function beforePurge(string $teamId): void {
+	/**
+	 * Aufgaben samt Vorlagen, Abgaben und Kopien (AssignmentDeletion, Team unter Sperre verwaist), dann leere Schüler-Workspaces des Teams
+	 * @param callable(): bool $due Budget erschöpft (nach mindestens einem Schritt)
+	 * @return bool false = abgebrochen (Budget) oder Team nicht mehr verwaist
+	 */
+	private function beforePurge(string $teamId, callable $due, int &$done): bool {
+		foreach ($this->assignments->findByTeam($teamId) as $a) {
+			if ($due()) {
+				return false;
+			}
+			if (!$this->assignmentDeletion->purge((int)$a->getId(), true) && $this->rows->findByTeamId($teamId)?->getState() !== TeamStateService::ORPHANED) {
+				return false;
+			}
+			$done++;
+			$this->logger->info('nextnotes: assignment of orphaned team deleted', ['team' => $teamId, 'assignment' => (int)$a->getId()]);
+		}
+		foreach ($this->workspaces->findAssignmentWorkspacesForTeam($teamId) as $ws) {
+			if ($due()) {
+				return false;
+			}
+			$id = (int)$ws->getId();
+			$this->tx->run(function () use ($id, $teamId): void {
+				$this->rows->lockRow($teamId);
+				if ($this->rows->findByTeamId($teamId)?->getState() !== TeamStateService::ORPHANED || $this->workspaces->lockRows([$id]) < 1) {
+					return;
+				}
+				// nur role=note und leere Ordner; Workspace mit verbliebenen Systemnotizen bleibt (Warnung)
+				$this->deletion->purge($id);
+			});
+			$done++;
+		}
+		return true;
 	}
 
 	// Team-Benachrichtigungen ausblenden (Team gelöscht oder doch vorhanden)

@@ -35,8 +35,8 @@ class MembershipsRemovedListener implements IEventListener {
 				}
 				$seen[$m['team'] . '|' . $m['single']] = true;
 				try {
-					// nur Teams mit Team-Workspaces: keine Circles-Abfrage je fremder Mitgliedschaft
-					if (!($relevant[$m['team']] ??= $this->lifecycle->hasTeamWorkspaces($m['team']))) {
+					// nur Teams mit Team-Workspaces oder Aufgaben: keine Circles-Abfrage je fremder Mitgliedschaft
+					if (!($relevant[$m['team']] ??= $this->lifecycle->isRelevant($m['team']))) {
 						continue;
 					}
 					$uid = $this->teams->uidForSingleId($m['single']);
@@ -52,7 +52,7 @@ class MembershipsRemovedListener implements IEventListener {
 		}
 	}
 
-	// Schnittstelle für M6 (left_team_at)
+	// Austritt: Team-Workspaces aufräumen, Austrittsmarke der Abgaben, Übergang owner_uid (M6f)
 	public function onLeft(string $teamId, string $uid): void {
 		$this->lifecycle->memberLeft($teamId, $uid);
 	}

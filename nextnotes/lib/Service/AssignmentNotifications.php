@@ -20,6 +20,7 @@ class AssignmentNotifications {
 	public const DEADLINE_PASSED = 'assignment_deadline_passed';
 	public const RETURNED = 'submission_returned';
 	public const REOPENED = 'submission_reopened';
+	public const TRANSFERRED = 'assignment_transferred';
 
 	public function __construct(
 		private INotificationManager $notifications,
@@ -44,6 +45,11 @@ class AssignmentNotifications {
 
 	public function reopened(int $submissionId, string $uid, ?int $due): void {
 		$this->send($uid, 'submission', $submissionId, self::REOPENED, ['due' => $due]);
+	}
+
+	// neue verantwortliche Lehrkraft (§9.7); Grund: deleted, left, demoted, admin
+	public function transferred(int $assignmentId, string $uid, string $reason): void {
+		$this->send($uid, 'assignment', $assignmentId, self::TRANSFERRED, ['reason' => $reason]);
 	}
 
 	// Alte Sammelmeldung entfernen (Fristverlängerung: neue Meldung zur neuen Frist)

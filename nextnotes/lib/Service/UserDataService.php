@@ -48,6 +48,7 @@ class UserDataService {
 		private LoggerInterface $logger,
 		private BackgroundFiles $backgrounds,
 		private SubmissionMapper $submissions,
+		private AssignmentOwnership $ownership,
 	) {
 	}
 
@@ -63,6 +64,8 @@ class UserDataService {
 	public function neutralize(string $uid, ?string $displayName = null): ?string {
 		// Kennung statt UID: '#' kommt in NC-UIDs nicht vor; hält nn_ws_asg eindeutig und das Job-Argument klein
 		$token = '#' . bin2hex(random_bytes(8));
+		// Aufgaben als Lehrkraft (§9.7): Circles-Abfragen vor der Transaktion; wirft nie, Rest wird unten NULL
+		$this->ownership->releaseDeleted($uid);
 		$found = $this->tx->run(function () use ($uid, $token, $displayName): bool {
 			// Erste Anweisung schreibt (SQLite: Schreibsperre vor jedem Lesen)
 			$qb = $this->db->getQueryBuilder();
@@ -78,6 +81,7 @@ class UserDataService {
 			$this->submissions->detachStudent($uid, $displayName, $now);
 			$this->submissions->clearFeedbackBy($uid);
 			$this->clear(AssignmentMapper::TABLE, 'created_by', $uid);
+			$this->clear(AssignmentMapper::TABLE, 'owner_uid', $uid);
 			// Hintergrundbilder in fremden Workspaces: Freigaben und Team-Workspaces der Teams vor der Löschung bzw. mit created_by (R15); eigene gehen mit dem Workspace im Job
 			$teamWs = $this->workspaces->teamWorkspaceIdsFor($this->teamsBefore[$uid] ?? [], $uid);
 			$this->backgrounds->queueUser(array_merge($this->shares->workspaceIdsSharedWith($uid), $teamWs), $uid, false);
@@ -95,7 +99,7 @@ class UserDataService {
 			$this->clear(NoteMapper::TABLE, 'updated_by', $uid);
 			$this->clear(AttachmentMapper::TABLE, 'created_by', $uid);
 			$this->clear(SnapshotMapper::TABLE, 'created_by', $uid);
-			// Team-Workspaces bleiben (gehören dem Team, ADR 0003), created_by oben NULL; assignments.owner_uid folgt mit transferOwnership (M6f)
+			// Team-Workspaces bleiben (gehören dem Team, ADR 0003), created_by oben NULL
 			if ($moved > 0) {
 				$this->jobs->add(UserDataDeletionJob::class, ['token' => $token]);
 			}

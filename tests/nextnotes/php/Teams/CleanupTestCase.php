@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Tests\Teams;
 
+use OCA\NextNotes\Db\AssignmentMapper;
 use OCA\NextNotes\Db\AttachmentMapper;
 use OCA\NextNotes\Db\FolderMapper;
 use OCA\NextNotes\Db\LockMapper;
@@ -16,10 +17,14 @@ use OCA\NextNotes\Db\MentionHandledMapper;
 use OCA\NextNotes\Db\NoteMapper;
 use OCA\NextNotes\Db\ReminderMapper;
 use OCA\NextNotes\Db\SnapshotMapper;
+use OCA\NextNotes\Db\SubmissionMapper;
 use OCA\NextNotes\Db\TeamMapper;
 use OCA\NextNotes\Db\WorkspaceMapper;
 use OCA\NextNotes\Db\WsShareMapper;
 use OCA\NextNotes\Service\AccessService;
+use OCA\NextNotes\Service\AssignmentDeletion;
+use OCA\NextNotes\Service\AssignmentNotifications;
+use OCA\NextNotes\Service\AssignmentOwnership;
 use OCA\NextNotes\Service\AttachmentService;
 use OCA\NextNotes\Service\BackgroundFiles;
 use OCA\NextNotes\Service\OrphanFileCleanup;
@@ -38,6 +43,7 @@ use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\Files\IRootFolder;
 use OCP\IAppConfig;
 use OCP\IGroupManager;
+use OCP\IUserManager;
 use OCP\Notification\IManager as INotificationManager;
 use OCP\Server;
 use Psr\Log\LoggerInterface;
@@ -114,16 +120,20 @@ abstract class CleanupTestCase extends TeamTestCase {
 		$teams->resetCache();
 		$state = new TeamStateService(Server::get(TeamMapper::class), $teams, $time);
 		$tx = Server::get(Transaction::class);
+		$ownership = new AssignmentOwnership(
+			Server::get(AssignmentMapper::class), $teams, $state, Server::get(AssignmentNotifications::class), Server::get(IUserManager::class), $time, Server::get(LoggerInterface::class),
+		);
 		$lifecycle = new TeamLifecycleService(
 			$teams, $state, Server::get(TeamMapper::class), Server::get(WorkspaceMapper::class), Server::get(NoteMapper::class),
 			Server::get(FolderMapper::class), Server::get(ReminderMapper::class), Server::get(MentionHandledMapper::class), Server::get(LockMapper::class), Server::get(WsShareMapper::class),
 			Server::get(BackgroundFiles::class), Server::get(WorkspaceService::class), $tx, Server::get(INotificationManager::class), $time,
-			Server::get(LoggerInterface::class),
+			Server::get(LoggerInterface::class), Server::get(AssignmentMapper::class), Server::get(SubmissionMapper::class), $ownership,
 		);
 		return new TeamCleanupService(
 			$teams, $state, Server::get(TeamMapper::class), $lifecycle, Server::get(WorkspaceMapper::class), Server::get(WorkspaceDeletion::class),
 			Server::get(WorkspaceService::class), Server::get(AccessService::class), $tx, $this->files(), Server::get(INotificationManager::class),
 			Server::get(IGroupManager::class), Server::get(IAppConfig::class), $time, Server::get(LoggerInterface::class),
+			Server::get(AssignmentMapper::class), Server::get(AssignmentDeletion::class), $ownership,
 		);
 	}
 

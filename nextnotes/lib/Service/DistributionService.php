@@ -114,10 +114,10 @@ class DistributionService {
 
 	/**
 	 * Abgleich (§2.4): (a) Austrittsmarke löschen, wenn der Schüler wieder im aktiven Team ist (unabhängig von Frist/Status, H5);
-	 * (b) nur ausgeteilt, Frist offen, Team aktiv: fehlende Abgaben anlegen; $onlyUid = nur dieser Schüler
+	 * (b) nur ausgeteilt, Frist offen, Team aktiv: fehlende Abgaben anlegen; $onlyUid = nur dieser Schüler; $notify = false beim eigenen Zugriff des Schülers (sieht die Aufgabe ohnehin)
 	 * @return array{created: int, pending: int, error: ?string}
 	 */
-	public function reconcile(Assignment $a, ?string $onlyUid = null, ?int $deadline = null): array {
+	public function reconcile(Assignment $a, ?string $onlyUid = null, ?int $deadline = null, bool $notify = true): array {
 		$teamId = (string)$a->getTeamId();
 		$active = $this->teamState->stateOf($teamId) === TeamStateService::ACTIVE;
 		$now = $this->time->getTime();
@@ -161,7 +161,9 @@ class DistributionService {
 			$left--;
 			if ($result === self::CREATED) {
 				$out['created']++;
-				$this->notify->assigned((int)$a->getId(), (string)$uid);
+				if ($notify) {
+					$this->notify->assigned((int)$a->getId(), (string)$uid);
+				}
 			}
 		}
 		$out['pending'] = $left;

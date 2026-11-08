@@ -11,7 +11,7 @@
 	<description><![CDATA[Next Notes is a native Nextcloud app for notes, folders, tags and shared workspaces.
 
 Based on Poznote by Timothé Poznanski (MIT).]]></description>
-	<version>0.3.2</version>
+	<version>0.3.3</version>
 	<licence>AGPL-3.0-or-later</licence>
 	<author>Thomas Weissel</author>
 	<namespace>NextNotes</namespace>
@@ -34,6 +34,7 @@ Based on Poznote by Timothé Poznanski (MIT).]]></description>
 	</background-jobs>
 	<commands>
 		<command>OCA\NextNotes\Command\TeamOrphanCheck</command>
+		<command>OCA\NextNotes\Command\AssignmentTransfer</command>
 	</commands>
 	<settings>
 		<admin>OCA\NextNotes\Settings\AdminSettings</admin>

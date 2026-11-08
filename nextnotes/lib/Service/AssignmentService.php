@@ -91,7 +91,7 @@ class AssignmentService {
 		}
 		$deadline = $now + DistributionService::BUDGET_SECONDS;
 		foreach ($todo as $a) {
-			$this->distribution->reconcile($a, $uid, $deadline);
+			$this->distribution->reconcile($a, $uid, $deadline, notify: false);
 		}
 	}
 

@@ -276,13 +276,37 @@ class SubmissionMapper extends QBMapper {
 		return array_map('intval', $qb->executeQuery()->fetchFirstColumn());
 	}
 
-	/** @return int[] Aufgaben mit Austrittsmarke (reconcile Schritt a im Job) */
+	/** @return int[] Aufgaben aktiver Teams mit Austrittsmarke (reconcile Schritt a im Job; verwaiste Teams ohne Circles-Abfragen) */
 	public function assignmentIdsWithLeft(): array {
 		$qb = $this->db->getQueryBuilder();
-		$qb->selectDistinct('assignment_id')->from(self::TABLE)
-			->where($qb->expr()->isNotNull('left_team_at'))
-			->andWhere($qb->expr()->isNotNull('student_uid'));
+		$expr = $qb->expr();
+		$qb->selectDistinct('s.assignment_id')->from(self::TABLE, 's')
+			->innerJoin('s', AssignmentMapper::TABLE, 'a', $expr->eq('a.id', 's.assignment_id'))
+			->leftJoin('a', TeamMapper::TABLE, 't', $expr->eq('t.team_id', 'a.team_id'))
+			->where($expr->isNotNull('s.left_team_at'))
+			->andWhere($expr->isNotNull('s.student_uid'))
+			->andWhere($expr->orX($expr->isNull('t.state'), $expr->eq('t.state', $qb->createNamedParameter('active'))));
 		return array_map('intval', $qb->executeQuery()->fetchFirstColumn());
+	}
+
+	/**
+	 * Austritt (ADR 0008 e): Austrittsmarke für alle Abgaben des Schülers in diesen Aufgaben, nie löschen; nur noch nicht markierte
+	 * @param int[] $assignmentIds
+	 */
+	public function markLeft(array $assignmentIds, string $uid, int $now): int {
+		$n = 0;
+		foreach (array_chunk(array_values(array_unique($assignmentIds)), 1000) as $chunk) {
+			$qb = $this->db->getQueryBuilder();
+			$expr = $qb->expr();
+			$n += $qb->update(self::TABLE)
+				->set('left_team_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT))
+				->set('updated_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT))
+				->where($expr->in('assignment_id', $qb->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY)))
+				->andWhere($expr->eq('student_uid', $qb->createNamedParameter($uid)))
+				->andWhere($expr->isNull('left_team_at'))
+				->executeStatement();
+		}
+		return $n;
 	}
 
 	/** @return array<string, int> Status → Anzahl einer Aufgabe (Sammelmeldung) */

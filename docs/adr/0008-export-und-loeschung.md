@@ -28,6 +28,12 @@ Option 2, mit Aufbewahrung aller Abgaben:
 ## Nachtrag M4d (2026-11-04)
 Der Benutzer-ZIP-Export aus M4d („alle Notizen“, „strukturiert“, „Anhänge“) umfasst die eigenen Workspaces ohne Abgaben, Abgabe-Kopien und Vorlagen (`role='note'`); Ordner `kind=assignments` erscheinen dort höchstens als leere Ordner. Abgaben (inkl. Feedback) exportiert der Benutzer über M6 (Ansicht der eigenen Abgaben) und `IMigrator` (M7); der Satz „Umfang: … eigene Abgaben“ gilt damit für den Gesamtumfang, nicht für den M4d-ZIP.
 
+## Nachtrag M6f (2026-11-08)
+- **Änderung von Punkt a** („Arbeit in `QueuedJob`“): gilt nur noch für das Löschen der Inhalte. Das Lösen der Abgaben (Kopie-Notiz ohne Workspace/Ordner, `student_uid` NULL, `student_uid_former`, `student_deleted_at`, Name) geschieht synchron im `UserDeletedEvent`-Listener in derselben Transaktion wie das Entkoppeln der Workspaces (`owner_type=deleted`), damit der Job nie einen entkoppelten Workspace mit Kopien sieht und eine neu vergebene UID nichts erbt (SPEC §8, umgesetzt M6e1).
+- **Punkt c**: Systempfad heißt `AssignmentOwnership::transferOwnership` (eigene Klasse). Bei Kontolöschung laufen die Circles-Abfragen vor der DB-Transaktion; scheitern sie, setzt die Transaktion `owner_uid` = NULL (Löschung bricht nie ab).
+- **Punkt e**: Austrittsmarke für alle Abgaben des Schülers in Aufgaben des Teams, nur bei aktivem Team (Austritts-Events beim Auflösen eines Teams setzen keine Marke und lösen keinen Übergang aus).
+- **Punkt b**: Teams ohne Team-Workspace, aber mit Aufgaben werden ebenso verwaist und nach der Frist gelöscht; die Team-Zeile wird erst gelöscht, wenn keine Aufgabe mehr existiert.
+
 ## Datenschutzhinweis
 Die Aufbewahrung von Abgaben nach Kontolöschung oder Austritt schränkt das Recht auf Löschung ein. Sie braucht eine Rechtsgrundlage (DSGVO Art. 17 Abs. 3 lit. b – rechtliche Verpflichtung, z. B. schulrechtliche Aufbewahrungspflicht nach Landesrecht; lit. e – Rechtsansprüche) und eine **Aufbewahrungsfrist, die die Schule festlegt** und im Verarbeitungsverzeichnis dokumentiert. Die App setzt keine Frist durch; die Löschung nach Fristablauf erledigt die Lehrkraft selbst (Aufgabe löschen, d). README/Admin-Doku weisen darauf hin. Kein zusätzlicher Admin-Löschbefehl geplant.
 

@@ -39,17 +39,21 @@ class AssignmentDeletion {
 	/**
 	 * Aufgabe, Vorlage, Abgaben, Kopien (Anhänge, Snapshots, Erinnerungen, Sperren, Erwähnungen), Aufgaben-Ordner, leere Schüler-Workspaces;
 	 * eine Transaktion, Dateien nach dem Commit. Sperren: Team → Aufgabe → Schüler-Workspaces → Notizen → Abgaben (Plan M6 §2.4)
-	 * @return bool false = Aufgabe gab es schon nicht mehr
+	 * @param bool $onlyOrphaned Team-Purge: nur solange das Team unter Sperre verwaist ist (Rückweg gewinnt)
+	 * @return bool false = Aufgabe gab es schon nicht mehr bzw. Team nicht verwaist
 	 */
-	public function purge(int $assignmentId): bool {
+	public function purge(int $assignmentId, bool $onlyOrphaned = false): bool {
 		try {
 			$teamId = (string)$this->assignments->find($assignmentId)->getTeamId();
 		} catch (DoesNotExistException) {
 			return false;
 		}
 		$submissionIds = [];
-		$done = $this->tx->run(function () use ($assignmentId, $teamId, &$submissionIds): bool {
+		$done = $this->tx->run(function () use ($assignmentId, $teamId, $onlyOrphaned, &$submissionIds): bool {
 			$this->teams->lockRow($teamId);
+			if ($onlyOrphaned && $this->teams->findByTeamId($teamId)?->getState() !== TeamStateService::ORPHANED) {
+				return false;
+			}
 			if ($this->assignments->lockRow($assignmentId) === 0) {
 				return false;
 			}

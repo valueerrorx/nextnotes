@@ -19,10 +19,10 @@ use OCA\NextNotes\Db\Workspace;
 use OCA\NextNotes\Db\WorkspaceMapper;
 use OCA\NextNotes\Service\AccessService;
 use OCA\NextNotes\Service\AssignmentNotifications;
-use OCA\NextNotes\Service\SubmissionStateService;
 use OCA\NextNotes\Service\TeamCleanupService;
 use OCA\NextNotes\Service\WorkspaceService;
 use OCP\AppFramework\Db\DoesNotExistException;
+use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\IDateTimeZone;
 use OCP\IGroupManager;
 use OCP\IL10N;
@@ -48,8 +48,8 @@ class Notifier implements INotifier {
 		private IGroupManager $groups,
 		private AssignmentMapper $assignments,
 		private SubmissionMapper $submissions,
-		private SubmissionStateService $states,
 		private IDateTimeZone $timeZone,
+		private ITimeFactory $time,
 	) {
 	}
 
@@ -139,31 +139,48 @@ class Notifier implements INotifier {
 		return $notification;
 	}
 
-	// Nur solange das Team verwaist ist und der Empfänger noch created_by eines Team-Workspace ist (umgewandelt/gelöscht → weg)
+	// Nur solange das Team verwaist ist und der Empfänger noch created_by eines Team-Workspace oder owner_uid einer Aufgabe des Teams ist
 	private function prepareTeam(INotification $notification, string $languageCode): INotification {
 		$uid = $notification->getUser();
 		$teamId = $notification->getObjectId();
 		$team = $this->teams->findByTeamId($teamId);
 		$own = array_values(array_filter($this->workspaceRows->findForTeam($teamId), static fn (Workspace $w) => $w->getCreatedBy() === $uid));
-		if ($team === null || $team->getState() !== 'orphaned' || $team->getOrphanedAt() === null || $own === []) {
+		$owned = $this->assignments->findOwned($uid, $teamId);
+		if ($team === null || $team->getState() !== 'orphaned' || $team->getOrphanedAt() === null || ($own === [] && $owned === [])) {
 			throw new AlreadyProcessedException();
 		}
 		$l = $this->l10nFactory->get(Application::APP_ID, $languageCode);
 		$name = trim((string)($notification->getSubjectParameters()['team'] ?? '')) ?: trim((string)$team->getTeamNameSnapshot());
 		$date = (string)$l->l('date', TeamCleanupService::deletionDate((int)$team->getOrphanedAt(), $team->getDeletionNotifiedAt()));
-		$subject = $notification->getSubject() === 'team_orphaned'
-			? $l->t('The team {team} was deleted. Its workspaces will be deleted on {date}.')
-			: $l->t('Workspaces of the deleted team {team} will be deleted on {date}.');
-		$message = $l->t('Export them or convert them into a private workspace to keep the notes.');
-		$key = $this->workspaces->keyFor($uid, (int)$own[0]->getId());
+		$soon = $notification->getSubject() !== 'team_orphaned';
+		if ($own !== []) {
+			$subject = $soon
+				? $l->t('Workspaces of the deleted team {team} will be deleted on {date}.')
+				: $l->t('The team {team} was deleted. Its workspaces will be deleted on {date}.');
+			$message = $l->t('Export them or convert them into a private workspace to keep the notes.');
+		} else {
+			$subject = $soon
+				? $l->t('Assignments of the deleted team {team} will be deleted on {date}.')
+				: $l->t('The team {team} was deleted. Its assignments will be deleted on {date}.');
+			$message = '';
+		}
+		// eigene Aufgaben mit Abgaben (live): Export-Hinweis, Abgaben gehen mit dem Team
+		$withSubmissions = $owned === [] ? 0 : $this->assignments->countOwnedWithSubmissions($teamId, $uid);
+		if ($withSubmissions > 0) {
+			$message = trim($message . ' ' . $l->n('%n of your assignments has submissions; export them before that date.', '%n of your assignments have submissions; export them before that date.', $withSubmissions));
+		}
+		$key = $own === [] ? null : $this->workspaces->keyFor($uid, (int)$own[0]->getId());
 		$link = $this->urls->linkToRouteAbsolute('nextnotes.page.indexphp') . ($key !== null ? '?' . http_build_query(['workspace' => $key]) : '');
 		$teamParam = ['type' => 'highlight', 'id' => $teamId, 'name' => $name !== '' ? $name : $l->t('Team')];
 		$dateParam = ['type' => 'highlight', 'id' => 'deletion-date', 'name' => $date];
-		return $notification->setParsedSubject(str_replace(['{team}', '{date}'], [$teamParam['name'], $date], $subject))
+		$notification->setParsedSubject(str_replace(['{team}', '{date}'], [$teamParam['name'], $date], $subject))
 			->setRichSubject($subject, ['team' => $teamParam, 'date' => $dateParam])
-			->setParsedMessage($message)
 			->setLink($link)
 			->setIcon($this->urls->getAbsoluteURL($this->urls->imagePath(Application::APP_ID, 'app-dark.svg')));
+		if ($message !== '') {
+			$notification->setParsedMessage($message);
+		}
+		return $notification;
 	}
 
 	// Massenschutz des CleanupJob (Plan M5 §2.5): nur für Admins
@@ -232,10 +249,20 @@ class Notifier implements INotifier {
 		}
 		if ($subject === AssignmentNotifications::DEADLINE_PASSED && $notification->getObjectType() === 'assignment') {
 			$a = $this->assignmentOrNull($id);
-			if ($a === null || !$this->access->assignmentAllows($uid, $a, 'review')) {
+			// Frist inzwischen verlängert (Rennen Job ↔ Verlängerung): alte Sammelmeldung gilt nicht mehr
+			if ($a === null || !$this->access->assignmentAllows($uid, $a, 'review')
+				|| (int)$a->getDueAt() > $this->time->getTime() || $a->getDeadlineNotifiedAt() === null) {
 				throw new AlreadyProcessedException();
 			}
 			return $this->deadlineNotice($notification, $languageCode, $a);
+		}
+		if ($subject === AssignmentNotifications::TRANSFERRED && $notification->getObjectType() === 'assignment') {
+			$a = $this->assignmentOrNull($id);
+			// nur solange der Empfänger verantwortlich ist
+			if ($a === null || $a->getOwnerUid() !== $uid) {
+				throw new AlreadyProcessedException();
+			}
+			return $this->transferNotice($notification, $languageCode, $a);
 		}
 		throw new UnknownNotificationException();
 	}
@@ -300,6 +327,26 @@ class Notifier implements INotifier {
 		if ($missing > 0) {
 			$message .= ' ' . $l->n('%n team member did not receive the assignment.', '%n team members did not receive the assignment.', $missing);
 		}
+		return $notification->setParsedSubject(str_replace('{assignment}', $title, $text))
+			->setRichSubject($text, ['assignment' => ['type' => 'highlight', 'id' => (string)$a->getId(), 'name' => $title, 'link' => $link]])
+			->setParsedMessage($message)
+			->setLink($link)
+			->setIcon($this->urls->getAbsoluteURL($this->urls->imagePath(Application::APP_ID, 'app-dark.svg')));
+	}
+
+	// neue verantwortliche Lehrkraft (§9.7)
+	private function transferNotice(INotification $notification, string $languageCode, Assignment $a): INotification {
+		$l = $this->l10nFactory->get(Application::APP_ID, $languageCode);
+		$title = $this->title($a, $l);
+		$link = $this->urls->linkToRouteAbsolute('nextnotes.page.indexphp');
+		$text = $l->t('You are now responsible for the assignment {assignment}');
+		$reason = (string)($notification->getSubjectParameters()['reason'] ?? '');
+		$message = match ($reason) {
+			'deleted' => $l->t('The account of the previous teacher was deleted.'),
+			'left' => $l->t('The previous teacher left the team.'),
+			'demoted' => $l->t('The previous teacher is no longer a teacher of the team.'),
+			default => $l->t('An administrator transferred the assignment to you.'),
+		};
 		return $notification->setParsedSubject(str_replace('{assignment}', $title, $text))
 			->setRichSubject($text, ['assignment' => ['type' => 'highlight', 'id' => (string)$a->getId(), 'name' => $title, 'link' => $link]])
 			->setParsedMessage($message)

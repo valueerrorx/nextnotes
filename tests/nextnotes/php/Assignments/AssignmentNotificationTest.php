@@ -113,6 +113,9 @@ final class AssignmentNotificationTest extends AssignmentTestCase {
 		$fx = $this->distributedFixture();
 		['l' => $l, 'm' => $m, 's1' => $s1, 'n' => $n, 'aid' => $aid] = $fx;
 		$params = ['submitted' => 1, 'missed' => 2, 'not_distributed' => 1];
+		// Meldung gilt nur nach Fristende mit Markierung (Review M6e2-r1 Hinweis 2)
+		self::setColumn('nextnotes_assignments', $aid, 'due_at', time() - 10);
+		self::setColumn('nextnotes_assignments', $aid, 'deadline_notified_at', time());
 		foreach ([$l, $m] as $u) {
 			$p = self::prepared($u->uid, 'assignment', $aid, 'assignment_deadline_passed', $params);
 			self::assertStringContainsString("Aufgabe {$fx['mark']}", $p->getParsedSubject(), "Sammelmeldung $u->uid");

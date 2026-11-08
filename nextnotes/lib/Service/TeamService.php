@@ -219,6 +219,36 @@ class TeamService {
 		}
 	}
 
+	/**
+	 * Kandidaten für den Aufgaben-Übergang (§9.7): lokale Mitglieder mit Level ≥ $min laut Mitgliederliste; Fehler werfen statt leer
+	 * @return array<string, int> uid → Level
+	 * @throws TeamUnavailableException
+	 */
+	public function teachers(string $teamId, int $min): array {
+		if (!$this->isAvailable()) {
+			throw new TeamUnavailableException('Teams not available');
+		}
+		try {
+			$cm = $this->container->get(CirclesManager::class);
+		} catch (\Throwable $e) {
+			throw new TeamUnavailableException('Teams not available', 0, $e);
+		}
+		$previous = $this->current($cm);
+		try {
+			$out = [];
+			foreach ($this->circleAsOwner($cm, $teamId)->getInheritedMembers() as $m) {
+				if ($m->getUserType() === Member::TYPE_USER && $m->isLocal() && $m->getStatus() === Member::STATUS_MEMBER && $m->getLevel() >= $min) {
+					$out[$m->getUserId()] = max($out[$m->getUserId()] ?? 0, $m->getLevel());
+				}
+			}
+			return $out;
+		} catch (\Throwable $e) {
+			throw new TeamUnavailableException('Team member lookup failed', 0, $e);
+		} finally {
+			$this->restore($cm, $previous);
+		}
+	}
+
 	/** @return array{id: string, name: string}|null gelöschtes Team aus DestroyingCircleEvent/CircleDestroyedEvent */
 	public function destroyedTeam(object $event): ?array {
 		if (!$event instanceof CircleGenericEvent && !$event instanceof CircleResultGenericEvent) {

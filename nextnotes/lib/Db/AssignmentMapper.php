@@ -155,4 +155,78 @@ class AssignmentMapper extends QBMapper {
 			->andWhere($expr->gte('due_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT)));
 		return array_map('intval', $qb->executeQuery()->fetchFirstColumn());
 	}
+
+	/** @return Assignment[] Aufgaben eines Teams nach ID (Team-Purge, Austritt) */
+	public function findByTeam(string $teamId): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')->from(self::TABLE)
+			->where($qb->expr()->eq('team_id', $qb->createNamedParameter($teamId)))
+			->orderBy('id', 'ASC');
+		return $this->findEntities($qb);
+	}
+
+	public function existsForTeam(string $teamId): bool {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('id')->from(self::TABLE)
+			->where($qb->expr()->eq('team_id', $qb->createNamedParameter($teamId)))
+			->setMaxResults(1);
+		return $qb->executeQuery()->fetchOne() !== false;
+	}
+
+	/** @return Assignment[] owner_uid = uid, optional nur in einem Team; null = ohne Besitzer (occ --all-unowned) */
+	public function findOwned(?string $uid, ?string $teamId = null): array {
+		$qb = $this->db->getQueryBuilder();
+		$expr = $qb->expr();
+		$qb->select('*')->from(self::TABLE)
+			->where($uid === null ? $expr->isNull('owner_uid') : $expr->eq('owner_uid', $qb->createNamedParameter($uid)))
+			->orderBy('id', 'ASC');
+		if ($teamId !== null) {
+			$qb->andWhere($expr->eq('team_id', $qb->createNamedParameter($teamId)));
+		}
+		return $this->findEntities($qb);
+	}
+
+	// Übergang (§9.7): bedingt auf den gelesenen Besitzer; true = dieser Aufruf hat geändert
+	public function setOwner(int $id, ?string $from, ?string $to, int $now): bool {
+		$qb = $this->db->getQueryBuilder();
+		$expr = $qb->expr();
+		$qb->update(self::TABLE)
+			->set('owner_uid', $to === null ? $qb->createNamedParameter(null, IQueryBuilder::PARAM_NULL) : $qb->createNamedParameter($to))
+			->set('updated_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT))
+			->where($expr->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT)))
+			->andWhere($from === null ? $expr->isNull('owner_uid') : $expr->eq('owner_uid', $qb->createNamedParameter($from)));
+		return $qb->executeStatement() === 1;
+	}
+
+	/**
+	 * Besitzer je aktivem Team (Herabstufung im CleanupJob), nach Team und UID
+	 * @return list<array{team: string, owner: string}>
+	 */
+	public function ownersInActiveTeams(): array {
+		$qb = $this->db->getQueryBuilder();
+		$expr = $qb->expr();
+		$qb->selectDistinct(['a.team_id', 'a.owner_uid'])->from(self::TABLE, 'a')
+			->leftJoin('a', TeamMapper::TABLE, 't', $expr->eq('t.team_id', 'a.team_id'))
+			->where($expr->isNotNull('a.owner_uid'))
+			->andWhere($expr->orX($expr->isNull('t.state'), $expr->eq('t.state', $qb->createNamedParameter('active'))))
+			->orderBy('a.team_id', 'ASC')->addOrderBy('a.owner_uid', 'ASC');
+		$out = [];
+		$res = $qb->executeQuery();
+		while ($row = $res->fetch()) {
+			$out[] = ['team' => (string)$row['team_id'], 'owner' => (string)$row['owner_uid']];
+		}
+		$res->closeCursor();
+		return $out;
+	}
+
+	// Team-Benachrichtigung: Aufgaben des Besitzers in diesem Team mit mindestens einer Abgabe
+	public function countOwnedWithSubmissions(string $teamId, string $uid): int {
+		$qb = $this->db->getQueryBuilder();
+		$expr = $qb->expr();
+		$qb->selectDistinct('a.id')->from(self::TABLE, 'a')
+			->innerJoin('a', SubmissionMapper::TABLE, 's', $expr->eq('s.assignment_id', 'a.id'))
+			->where($expr->eq('a.team_id', $qb->createNamedParameter($teamId)))
+			->andWhere($expr->eq('a.owner_uid', $qb->createNamedParameter($uid)));
+		return count($qb->executeQuery()->fetchFirstColumn());
+	}
 }

@@ -10,11 +10,13 @@ declare(strict_types=1);
 namespace OCA\NextNotes\Service;
 
 use OCA\NextNotes\AppInfo\Application;
+use OCA\NextNotes\Db\AssignmentMapper;
 use OCA\NextNotes\Db\LockMapper;
 use OCA\NextNotes\Db\MentionHandledMapper;
 use OCA\NextNotes\Db\FolderMapper;
 use OCA\NextNotes\Db\NoteMapper;
 use OCA\NextNotes\Db\ReminderMapper;
+use OCA\NextNotes\Db\SubmissionMapper;
 use OCA\NextNotes\Db\TeamMapper;
 use OCA\NextNotes\Db\Workspace;
 use OCA\NextNotes\Db\WorkspaceMapper;
@@ -46,32 +48,42 @@ class TeamLifecycleService {
 		private INotificationManager $notifications,
 		private ITimeFactory $time,
 		private LoggerInterface $logger,
+		private AssignmentMapper $assignments,
+		private SubmissionMapper $submissions,
+		private AssignmentOwnership $ownership,
 	) {
 	}
 
-	// Team gelöscht (Event): nur Teams mit Team-Workspaces; Benachrichtigung nur beim ersten Übergang active → orphaned
+	// Team gelöscht (Event, CleanupJob): Teams mit Team-Workspaces oder Team-Zeile (auch nur Aufgaben, O6); Benachrichtigung nur beim ersten Übergang active → orphaned
 	public function teamDeleted(string $teamId, ?string $name): void {
 		$wsList = $this->workspaces->findForTeam($teamId);
-		if ($wsList === []) {
+		if ($wsList === [] && $this->teamRows->findByTeamId($teamId) === null) {
 			return;
 		}
 		if (!$this->teamState->markOrphaned($teamId, $name)) {
 			return;
 		}
 		$this->workspaceService->reset();
-		$this->logger->info('nextnotes: team deleted, team workspaces orphaned', ['team' => $teamId]);
-		$this->notifyCreators($teamId, $wsList, 'team_orphaned', $name);
+		$this->logger->info('nextnotes: team deleted, team workspaces and assignments orphaned', ['team' => $teamId]);
+		$this->notifyOwners($teamId, $wsList, 'team_orphaned', $name);
 	}
 
-	// Hinweis vor der Löschung (CleanupJob Schritt 2) an created_by der Team-Workspaces
+	// Hinweis vor der Löschung (CleanupJob Schritt 2)
 	public function deletionSoon(string $teamId): void {
-		$this->notifyCreators($teamId, $this->workspaces->findForTeam($teamId), 'team_deletion_soon', null);
+		$this->notifyOwners($teamId, $this->workspaces->findForTeam($teamId), 'team_deletion_soon', null);
 	}
 
-	/** @param Workspace[] $wsList */
-	private function notifyCreators(string $teamId, array $wsList, string $subject, ?string $name): void {
+	/**
+	 * Empfänger: created_by der Team-Workspaces und owner_uid der Aufgaben (SPEC §6); Parameter assignments = eigene Aufgaben mit Abgaben
+	 * @param Workspace[] $wsList
+	 */
+	private function notifyOwners(string $teamId, array $wsList, string $subject, ?string $name): void {
 		$label = $name ?? $this->teamState->snapshotName($teamId) ?? '';
-		$recipients = array_unique(array_filter(array_map(static fn (Workspace $w) => $w->getCreatedBy(), $wsList), static fn ($u) => $u !== null && $u !== ''));
+		$recipients = array_map(static fn (Workspace $w) => $w->getCreatedBy(), $wsList);
+		foreach ($this->assignments->findByTeam($teamId) as $a) {
+			$recipients[] = $a->getOwnerUid();
+		}
+		$recipients = array_unique(array_filter($recipients, static fn ($u) => $u !== null && $u !== ''));
 		foreach ($recipients as $uid) {
 			// ein fehlerhafter Empfänger hält die anderen nicht auf
 			try {
@@ -80,7 +92,7 @@ class TeamLifecycleService {
 					->setUser((string)$uid)
 					->setDateTime((new \DateTime())->setTimestamp($this->time->getTime()))
 					->setObject('team', $teamId)
-					->setSubject($subject, ['team' => $label, 'assignments' => 0]);
+					->setSubject($subject, ['team' => $label, 'assignments' => $this->assignments->countOwnedWithSubmissions($teamId, (string)$uid)]);
 				$this->notifications->notify($n);
 			} catch (\Throwable $e) {
 				$this->logger->error('nextnotes: ' . $subject . ' notification failed', ['team' => $teamId, 'exception' => $e]);
@@ -92,10 +104,16 @@ class TeamLifecycleService {
 		return $this->workspaces->findForTeam($teamId) !== [];
 	}
 
+	// Austritt betrifft das Team nur mit Team-Workspaces oder Aufgaben
+	public function isRelevant(string $teamId): bool {
+		return $this->hasTeamWorkspaces($teamId) || $this->assignments->existsForTeam($teamId);
+	}
+
 	// Austritt (direkt oder geerbt): nur bei bestehendem Team und sicher Level 0; Rechte hängen nicht daran (Live-Abfrage)
 	public function memberLeft(string $teamId, string $uid): void {
 		$wsList = $this->workspaces->findForTeam($teamId);
-		if ($wsList === []) {
+		$assignments = $this->assignments->findByTeam($teamId);
+		if ($wsList === [] && $assignments === []) {
 			return;
 		}
 		$this->workspaceService->reset();
@@ -109,12 +127,20 @@ class TeamLifecycleService {
 			return;
 		}
 		$wsIds = array_map(static fn (Workspace $w) => (int)$w->getId(), $wsList);
-		$this->tx->run(function () use ($wsIds, $uid): void {
-			$noteIds = $this->noteIds($wsIds);
-			$this->reminders->deleteForNotes($noteIds, $uid);
-			$this->mentions->deleteForNotes($noteIds, $uid);
-			$this->backgrounds->queueUser($wsIds, $uid);
-		});
+		if ($wsIds !== []) {
+			$this->tx->run(function () use ($wsIds, $uid): void {
+				$noteIds = $this->noteIds($wsIds);
+				$this->reminders->deleteForNotes($noteIds, $uid);
+				$this->mentions->deleteForNotes($noteIds, $uid);
+				$this->backgrounds->queueUser($wsIds, $uid);
+			});
+		}
+		// verwaistes Team (Austritts-Events beim Auflösen): keine Marke, kein Übergang (§9.7)
+		if ($assignments !== [] && $this->teamState->stateOf($teamId) === TeamStateService::ACTIVE) {
+			// Abgaben bleiben, Schüler liest nur noch (ADR 0008 e); Wiedereintritt löscht die Marke beim nächsten reconcile
+			$this->submissions->markLeft(array_map(static fn ($a) => (int)$a->getId(), $assignments), $uid, $this->time->getTime());
+			$this->ownership->memberLeft($teamId, $uid);
+		}
 		$this->workspaceService->reset();
 	}
 

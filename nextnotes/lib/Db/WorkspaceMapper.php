@@ -206,6 +206,16 @@ class WorkspaceMapper extends QBMapper {
 		return $out;
 	}
 
+	/** @return Workspace[] Schüler-Workspaces (kind=assignments) eines Teams, jeder Besitzer-Typ (Team-Purge) */
+	public function findAssignmentWorkspacesForTeam(string $teamId): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')->from(self::TABLE)
+			->where($qb->expr()->eq('kind', $qb->createNamedParameter('assignments')))
+			->andWhere($qb->expr()->eq('linked_team_id', $qb->createNamedParameter($teamId)))
+			->orderBy('id', 'ASC');
+		return $this->findEntities($qb);
+	}
+
 	public function deleteById(int $id): void {
 		$qb = $this->db->getQueryBuilder();
 		$qb->delete(self::TABLE)
