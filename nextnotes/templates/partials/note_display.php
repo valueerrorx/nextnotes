@@ -89,8 +89,6 @@ $item = static function (string $action, string $icon, string $label, array $dat
 			<?php $item('trigger-mobile-action', 'lucide-copy', $tr->t('common.duplicate', [], 'Duplicate'), ['selector' => '.btn-duplicate']); ?>
 			<?php $item('trigger-mobile-action', 'lucide-folder-output', $tr->t('common.move', [], 'Move'), ['selector' => '.btn-move']); ?>
 			<?php if ($type !== 'linked'): ?>
-			<button type="button" class="dropdown-item mobile-toolbar-item speed-dial-state-on" role="menuitem" data-action="toggle-speed-dial" data-note-id="<?php p($id); ?>" style="display: none;"><i class="lucide lucide-zap"></i> <?php p($tr->t('speed_dial.remove', [], 'Remove from speed dial')); ?></button>
-			<button type="button" class="dropdown-item mobile-toolbar-item speed-dial-state-off" role="menuitem" data-action="toggle-speed-dial" data-note-id="<?php p($id); ?>"><i class="lucide lucide-zap"></i> <?php p($tr->t('speed_dial.add', [], 'Add to speed dial')); ?></button>
 			<?php endif; ?>
 			<?php if (!$note['archive']): ?><?php $item('archive-note', 'lucide-archive', $tr->t('archive.menu_item', [], 'Archive note'), ['note-id' => $id, 'note-title' => $note['heading']]); ?><?php endif; ?>
 			<?php $item('trigger-mobile-action', 'lucide-download', $tr->t('common.download', [], 'Download'), ['selector' => '.btn-download']); ?>

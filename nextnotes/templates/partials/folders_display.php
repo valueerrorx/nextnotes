@@ -57,8 +57,6 @@ $renderFolderActionsMenu = static function (string $workspace, bool $iconOpensKa
 	$sep();
 	$menuItem($i, 'download-folder', 'lucide-download', $tr->t('notes_list.folder_actions.download_folder', [], 'Download folder'), 'requires-notes');
 	$menuItem($i, 'tag-folder-notes', 'lucide-tag', $tr->t('modals.tag_folder_notes.title', [], 'Tag all notes'), 'requires-notes');
-	$menuItem($i, 'toggle-folder-speed-dial', 'lucide-zap', $tr->t('speed_dial.add', [], 'Add to speed dial'), 'requires-notes speed-dial-state-off');
-	$menuItem($i, 'toggle-folder-speed-dial', 'lucide-zap', $tr->t('speed_dial.remove', [], 'Remove from speed dial'), 'requires-notes speed-dial-state-on active-state');
 	$sep();
 	$menuItem($i, 'favorite-folder', 'lucide-star', $tr->t('notes_list.folder_actions.remove_favorite', [], 'Remove from favorites'), 'favorite-state-favorite active-state');
 	$menuItem($i, 'favorite-folder', 'lucide-star', $tr->t('notes_list.folder_actions.add_favorite', [], 'Add to favorites'), 'favorite-state-not-favorite');
@@ -83,8 +81,6 @@ $renderNoteActionsMenu = static function (string $workspace) use ($tr, $menuItem
 	$menuItem($i, 'rename-note', 'lucide-pencil', $tr->t('notes_list.note_actions.rename_note', [], 'Rename note'));
 	$menuItem($i, 'toggle-favorite', 'lucide-star', $tr->t('notes_list.folder_actions.remove_favorite', [], 'Remove from favorites'), 'favorite-state-favorite active-state');
 	$menuItem($i, 'toggle-favorite', 'lucide-star', $tr->t('notes_list.folder_actions.add_favorite', [], 'Add to favorites'), 'favorite-state-not-favorite');
-	$menuItem($i, 'toggle-speed-dial', 'lucide-zap', $tr->t('speed_dial.remove', [], 'Remove from speed dial'), 'note-real-only speed-dial-state-on active-state');
-	$menuItem($i, 'toggle-speed-dial', 'lucide-zap', $tr->t('speed_dial.add', [], 'Add to speed dial'), 'note-real-only speed-dial-state-off');
 	?><div class="note-actions-menu-separator"></div><?php
 	$menuItem($i, 'duplicate-note', 'lucide-copy', $tr->t('common.duplicate', [], 'Duplicate'), 'note-real-only');
 	$menuItem($i, 'create-note-shortcut', 'lucide-link', $tr->t('editor.toolbar.create_linked_note', [], 'Create shortcut'), 'note-real-only');

@@ -45,8 +45,6 @@ $renderMenu = static function (string $id, string $class) use ($menuItem, $t, $c
 	$menuItem($i, 'download-folder', 'lucide-download', $t('notes_list.folder_actions.download_folder', 'Download folder'), 'requires-notes');
 	if ($canWrite) {
 		$menuItem($i, 'tag-folder-notes', 'lucide-tag', $t('modals.tag_folder_notes.title', 'Tag all notes'), 'requires-notes');
-		$menuItem($i, 'toggle-folder-speed-dial', 'lucide-zap', $t('speed_dial.add', 'Add to speed dial'), 'requires-notes speed-dial-state-off');
-		$menuItem($i, 'toggle-folder-speed-dial', 'lucide-zap', $t('speed_dial.remove', 'Remove from speed dial'), 'requires-notes speed-dial-state-on active-state');
 		$menuItem($i, 'favorite-folder', 'lucide-star', $t('notes_list.folder_actions.remove_favorite', 'Remove from favorites'), 'favorite-state-favorite');
 		$menuItem($i, 'favorite-folder', 'lucide-star', $t('notes_list.folder_actions.add_favorite', 'Add to favorites'), 'favorite-state-not-favorite');
 		$menuItem($i, 'rename-folder', 'lucide-pencil', $t('notes_list.folder_actions.rename_folder', 'Rename'));

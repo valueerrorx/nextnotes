@@ -77,7 +77,6 @@
 	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarTasksBtn" checked><span><?php p($t('tasks_page.title', 'Tasks')); ?></span></label>
 	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarDiaryBtn" checked><span><?php p($t('diary.title', 'Diary')); ?></span></label>
 	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarGraphBtn" checked><span><?php p($t('home.graph', 'Graph')); ?></span></label>
-	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarSpeedDialBtn" checked><span><?php p($t('speed_dial.title', 'Speed dial')); ?></span></label>
 	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarNotesBtn" checked><span><?php p($t('notes_manager.age_all', 'All notes')); ?></span></label>
 	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarMentionsBtn" checked><span><?php p($t('mentions.title', 'Mentions')); ?></span></label>
 	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:iconSidebarFoldersBtn" checked><span><?php p($t('home.folders', 'Folders')); ?></span></label>
@@ -119,7 +118,6 @@
 	<label class="ui-custom-item"><input type="checkbox" data-ui-key="toolbar:btn-duplicate" checked><span><?php p($t('common.duplicate', 'Duplicate')); ?></span></label>
 	<label class="ui-custom-item"><input type="checkbox" data-ui-key="toolbar:btn-move" checked><span><?php p($t('common.move', 'Move')); ?></span></label>
 	<label class="ui-custom-item"><input type="checkbox" data-ui-key="toolbar:btn-archive" checked><span><?php p($t('archive.menu_item', 'Archive note')); ?></span></label>
-	<label class="ui-custom-item"><input type="checkbox" data-ui-key="toolbar:btn-speed-dial" checked><span><?php p($t('speed_dial.add', 'Add to speed dial')); ?></span></label>
 	<label class="ui-custom-item"><input type="checkbox" data-ui-key="toolbar:btn-create-linked-note" checked><span><?php p($t('editor.toolbar.create_linked_note', 'Create linked note')); ?></span></label>
 	<label class="ui-custom-item"><input type="checkbox" data-ui-key="toolbar:btn-download" checked><span><?php p($t('common.download', 'Download')); ?></span></label>
 	<label class="ui-custom-item"><input type="checkbox" data-ui-key="toolbar:btn-print" checked><span><?php p($t('common.print', 'Print')); ?></span></label>
@@ -230,21 +228,6 @@
 </div>
 </div>
 
-<div class="ui-custom-section" data-ui-pages="speed-dial">
-<h4 class="ui-custom-section-title"><span><?php p($t('speed_dial.title', 'Speed dial')); ?></span><button type="button" class="ui-custom-toggle-all" data-label-check="<?php p($t('modals.ui_customization.check_all', 'Check all')); ?>" data-label-uncheck="<?php p($t('modals.ui_customization.uncheck_all', 'Uncheck all')); ?>"></button></h4>
-<div class="ui-custom-items">
-	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:speedDialTitle" checked><span><?php p($t('speed_dial.visibility.title', 'Page title')); ?></span></label>
-	<label class="ui-custom-item"><input type="checkbox" data-ui-key="panel:speed-dial-workspace" checked><span><?php p($t('speed_dial.visibility.workspace', 'Workspace selector')); ?></span></label>
-	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:speedDialFilter" checked><span><?php p($t('modals.ui_customization.dashboard_filter_bar', 'Filter bar')); ?></span></label>
-	<label class="ui-custom-item"><input type="checkbox" data-ui-key="panel:speed-dial-group-titles" checked><span><?php p($t('speed_dial.visibility.group_titles', 'Group titles')); ?></span></label>
-	<label class="ui-custom-item"><input type="checkbox" data-ui-key="panel:speed-dial-group-rules" checked><span><?php p($t('speed_dial.visibility.group_rules', 'Group separators')); ?></span></label>
-	<label class="ui-custom-item"><input type="checkbox" data-ui-key="panel:speed-dial-frame" checked><span><?php p($t('speed_dial.visibility.frame', 'Tile frames')); ?></span></label>
-	<label class="ui-custom-item"><input type="checkbox" data-ui-key="panel:speed-dial-icons" checked><span><?php p($t('speed_dial.visibility.icons', 'Tile icons')); ?></span></label>
-	<label class="ui-custom-item"><input type="checkbox" data-ui-key="panel:speed-dial-labels" checked><span><?php p($t('speed_dial.visibility.labels', 'Tile names')); ?></span></label>
-	<label class="ui-custom-item"><input type="checkbox" data-ui-key="card:speedDialSize" checked><span><?php p($t('speed_dial.visibility.size', 'Tile size button')); ?></span></label>
-	<label class="ui-custom-item"><input type="checkbox" data-ui-key="panel:speed-dial-edit" checked><span><?php p($t('speed_dial.visibility.edit', 'Open the note button')); ?></span></label>
-</div>
-</div>
 
 <div class="ui-custom-section" data-ui-pages="dashboard">
 <h4 class="ui-custom-section-title"><span><?php p($t('modals.ui_customization.sections.dashboard_toolbar', 'Dashboard')); ?></span><button type="button" class="ui-custom-toggle-all" data-label-check="<?php p($t('modals.ui_customization.check_all', 'Check all')); ?>" data-label-uncheck="<?php p($t('modals.ui_customization.uncheck_all', 'Uncheck all')); ?>"></button></h4>
@@ -269,7 +252,6 @@
 		<label class="ui-custom-item"><input type="checkbox" data-ui-key="folder:cut-folder" checked><span><?php p($t('notes_list.folder_actions.cut_folder', 'Cut')); ?></span></label>
 		<label class="ui-custom-item"><input type="checkbox" data-ui-key="folder:paste-into-folder" checked><span><?php p($t('notes_list.folder_actions.paste_into_folder', 'Paste into folder')); ?></span></label>
 		<label class="ui-custom-item"><input type="checkbox" data-ui-key="folder:download-folder" checked><span><?php p($t('notes_list.folder_actions.download_folder', 'Download folder')); ?></span></label>
-		<label class="ui-custom-item"><input type="checkbox" data-ui-key="folder:toggle-folder-speed-dial" checked><span><?php p($t('speed_dial.add', 'Add to speed dial')); ?></span></label>
 		<label class="ui-custom-item"><input type="checkbox" data-ui-key="folder:rename-folder" checked><span><?php p($t('notes_list.folder_actions.rename_folder', 'Rename')); ?></span></label>
 		<label class="ui-custom-item"><input type="checkbox" data-ui-key="folder:archive-folder" checked><span><?php p($t('archive.folder_menu_item', 'Archive folder')); ?></span></label>
 		<label class="ui-custom-item"><input type="checkbox" data-ui-key="folder:delete-folder" checked><span><?php p($t('notes_list.folder_actions.delete_folder', 'Delete')); ?></span></label>
@@ -283,7 +265,6 @@
 		<label class="ui-custom-item"><input type="checkbox" data-ui-key="panel:note-actions-toggle" checked><span><?php p($t('modals.ui_customization.note_actions_toggle', 'Menu button (⋮) on notes')); ?></span></label>
 		<label class="ui-custom-item"><input type="checkbox" data-ui-key="note:rename-note" checked><span><?php p($t('notes_list.note_actions.rename_note', 'Rename note')); ?></span></label>
 		<label class="ui-custom-item"><input type="checkbox" data-ui-key="note:toggle-favorite" checked><span><?php p($t('notes_list.folder_actions.add_favorite', 'Add to favorites')); ?></span></label>
-		<label class="ui-custom-item"><input type="checkbox" data-ui-key="note:toggle-speed-dial" checked><span><?php p($t('speed_dial.add', 'Add to speed dial')); ?></span></label>
 		<label class="ui-custom-item"><input type="checkbox" data-ui-key="note:duplicate-note" checked><span><?php p($t('common.duplicate', 'Duplicate')); ?></span></label>
 		<label class="ui-custom-item"><input type="checkbox" data-ui-key="note:create-note-shortcut" checked><span><?php p($t('editor.toolbar.create_linked_note', 'Create shortcut')); ?></span></label>
 		<label class="ui-custom-item"><input type="checkbox" data-ui-key="note:show-move-folder-dialog" checked><span><?php p($t('notes_list.note_actions.move_note', 'Move note')); ?></span></label>
