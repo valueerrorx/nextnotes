@@ -52,7 +52,12 @@ class AssignmentsViewService {
 
 	// Eintrag der Icon-Leiste nur in Team-Workspaces (M6i, Thomas 2026-11-08); keine Abfrage
 	public function railLabel(Workspace $ws): ?string {
-		return self::teamOf($ws) !== null ? $this->l->t('Assignments') : null;
+		return self::teamOf($ws) !== null ? $this->railText() : null;
+	}
+
+	// Text des Leisten-Eintrags; die Hauptansicht rendert ihn immer und blendet ihn je Workspace aus (M6i-fix)
+	public function railText(): string {
+		return $this->l->t('Assignments');
 	}
 
 	/**
@@ -231,6 +236,7 @@ class AssignmentsViewService {
 			'editTemplate' => $l->t('Edit template'),
 			'viewTemplate' => $l->t('View template'),
 			'distribute' => $l->t('Hand out'),
+			'distributeMissing' => $l->t('Hand out to missing students ({n})'),
 			'distributeConfirm' => $l->t('Hand out "{title}" to all students of {team}? Every student gets a copy.'),
 			'distributed_ok' => $l->t('Handed out to {n} students.'),
 			'distributePending' => $l->t('{n} students do not have the assignment yet; they get it when they open their assignments.'),

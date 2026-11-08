@@ -57,10 +57,15 @@ final class AssignmentsViewTest extends AssignmentTestCase {
 		self::assertStringContainsString('nn-asg-no-team', $p->body, 'privat: Hinweis');
 		self::assertStringContainsString('"team":null', $p->body);
 		self::assertStringNotContainsString('id="nnAsgNew"', $p->body, 'privat: kein Anlegen');
-		self::assertStringNotContainsString('iconSidebarAssignmentsBtn', self::page($l, 'index.php?workspace=' . rawurlencode($own))->body, 'Hauptansicht privat: kein Eintrag');
-		self::assertStringContainsString('"nn-teacher":"0"', self::page($l, 'index.php?workspace=' . rawurlencode($own))->body, 'privat: kein Austeilen');
+		// Hauptansicht: Eintrag immer im DOM, außerhalb von Team-Workspaces ausgeblendet; Marker in #left_col für den Wechsel ohne Reload (M6i-fix)
+		$ownIdx = self::page($l, 'index.php?workspace=' . rawurlencode($own))->body;
+		self::assertMatchesRegularExpression('/<a [^>]*id="iconSidebarAssignmentsBtn"[^>]*\shidden>/', $ownIdx, 'Hauptansicht privat: Eintrag ausgeblendet');
+		self::assertStringContainsString('data-nn-assignments="0" data-nn-teacher="0"', $ownIdx, 'privat: Marker');
+		self::assertStringContainsString('"nn-teacher":"0"', $ownIdx, 'privat: kein Austeilen');
 		$idx = self::page($l, "index.php?$wq")->body;
-		self::assertStringContainsString('iconSidebarAssignmentsBtn', $idx, 'Hauptansicht Team: Eintrag');
+		self::assertStringContainsString('id="iconSidebarAssignmentsBtn"', $idx, 'Hauptansicht Team: Eintrag');
+		self::assertDoesNotMatchRegularExpression('/<a [^>]*id="iconSidebarAssignmentsBtn"[^>]*\shidden>/', $idx, 'Hauptansicht Team: Eintrag sichtbar');
+		self::assertStringContainsString('data-nn-assignments="1" data-nn-teacher="1"', $idx, 'Team: Marker');
 		self::assertStringContainsString('"nn-teacher":"1"', $idx, 'Team-Workspace Lehrkraft: Austeilen');
 		self::assertStringContainsString('"nn-teacher":"0"', self::page($s1, "index.php?$wq")->body, 'Schüler: kein Austeilen');
 

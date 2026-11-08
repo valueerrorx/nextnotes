@@ -40,6 +40,11 @@
 	text-decoration: none;
 }
 
+/* „Neue Aufgabe“ bleibt ausgeblendet, bis das Skript den Klick verdrahtet (M6i-fix) */
+#content #nextnotes-root .nn-asg .nn-asg-new[hidden] {
+	display: none;
+}
+
 #content #nextnotes-root .nn-asg :is(.btn-secondary, .nn-asg-link) {
 	border: 1px solid var(--color-border-maxcontrast);
 	background-color: var(--color-main-background);

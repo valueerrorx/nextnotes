@@ -368,7 +368,10 @@
 		if (a.template_note_id) {
 			bar.appendChild(link(a.status === 'draft' && a.can.edit ? t('editTemplate') : t('viewTemplate'), baseUrl + 'index.php?note=' + encodeURIComponent(a.template_note_id), a.status === 'draft' && a.can.edit ? 'lucide-pencil' : 'lucide-eye'));
 		}
-		if (a.can.distribute && open) bar.appendChild(button(t('distribute'), 'btn-primary', function () { distribute(a); }, 'lucide-send'));
+		// Entwurf: „Austeilen“; ausgeteilt nur, solange Schüler fehlen (Zeitbudget, Quote); Nachzügler bekommen ihre Kopie selbst (§9, M6i-fix)
+		var missing = a.status === 'distributed' && state.pending ? state.pending.n : 0;
+		var handOut = a.status === 'draft' ? t('distribute') : (missing > 0 ? t('distributeMissing', { n: missing }) : '');
+		if (a.can.distribute && handOut) bar.appendChild(button(handOut, 'btn-primary nn-asg-distribute', function () { distribute(a, handOut); }, 'lucide-send'));
 		if (a.can.edit && open) bar.appendChild(button(t('extend'), 'btn-secondary', function () { extend(a); }, 'lucide-calendar'));
 		if (a.can.close && a.status === 'distributed') bar.appendChild(button(t('closeAssignment'), 'btn-secondary', function () { closeAssignment(a); }, 'lucide-lock'));
 		if (a.can.export && a.status !== 'draft') bar.appendChild(link(t('export'), apiBase + '/assignments/' + a.id + '/export', 'lucide-download', true));
@@ -545,9 +548,9 @@
 		} }]);
 	}
 
-	function distribute(a) {
+	function distribute(a, label) {
 		var body = el('p', '', t('distributeConfirm', { title: a.title, team: teacher && teacher.id === a.team ? teacher.name : a.team_name }));
-		modal(t('distribute'), body, [{ label: t('distribute'), id: 'nnAsgDistributeOk', run: function () {
+		modal(label, body, [{ label: label, id: 'nnAsgDistributeOk', run: function () {
 			return api('POST', 'assignments/' + a.id + '/distribute').then(function (r) {
 				if (!r.ok) return errorText(r);
 				var parts = [t('distributed_ok', { n: r.data.created || 0 })];
@@ -800,8 +803,12 @@
 		return dialog;
 	}
 
+	// sichtbar erst mit Klick-Handler und Lehrkraft-Bereich (M6i-fix)
 	var newBtn = document.getElementById('nnAsgNew');
-	if (newBtn) newBtn.addEventListener('click', function () { openCreate(null); });
+	if (newBtn && teacher) {
+		newBtn.addEventListener('click', function () { openCreate(null); });
+		newBtn.hidden = false;
+	}
 
 	load().then(function () {
 		var id = params.get('assignment');

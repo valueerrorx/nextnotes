@@ -166,6 +166,7 @@
   "Edit template": "Vorlage bearbeiten",
   "View template": "Vorlage ansehen",
   "Hand out": "Austeilen",
+  "Hand out to missing students ({n})": "An fehlende austeilen ({n})",
   "Hand out \"{title}\" to all students of {team}? Every student gets a copy.": "„{title}“ an alle Schüler von {team} austeilen? Jeder Schüler erhält eine Kopie.",
   "Handed out to {n} students.": "An {n} Schüler ausgeteilt.",
   "{n} students do not have the assignment yet; they get it when they open their assignments.": "{n} Schüler haben die Aufgabe noch nicht; sie erhalten sie beim Öffnen ihrer Aufgaben.",

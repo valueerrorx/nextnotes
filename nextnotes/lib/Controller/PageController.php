@@ -140,6 +140,7 @@ class PageController extends Controller {
 			'baseUrl' => $baseUrl,
 			'railMentions' => $this->mentions->railCount($uid),
 			'railAssignments' => $view['railAssignments'],
+			'railAssignmentsHidden' => !$view['scope']['assignments'],
 		]);
 	}
 

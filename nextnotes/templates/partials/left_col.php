@@ -46,5 +46,7 @@
 	</div>
 	<?php endif; ?>
 
+	<?php // Workspace-Rechte für Leiste und Notiz-Menü; der Wechsel ohne Reload ersetzt #left_col, nextnotes-teams.js liest den Marker (M6i-fix) ?>
+	<span class="nn-ws-scope" hidden data-nn-assignments="<?php p($view['scope']['assignments'] ? '1' : '0'); ?>" data-nn-teacher="<?php p($view['scope']['teacher'] ? '1' : '0'); ?>"></span>
 	<?php include __DIR__ . '/notes_list.php'; ?>
 </div>

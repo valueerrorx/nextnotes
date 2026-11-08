@@ -547,6 +547,18 @@
 		else menu.appendChild(item);
 	}
 
+	// M6i-fix: Wechsel ohne Reload ersetzt nur #left_col; Leisten-Eintrag „Aufgaben“ und data-nn-teacher folgen dem Marker .nn-ws-scope
+	function syncWorkspaceScope() {
+		var scope = document.querySelector('#left_col .nn-ws-scope');
+		if (!scope) return;
+		document.body.setAttribute('data-nn-teacher', scope.getAttribute('data-nn-teacher') === '1' ? '1' : '0');
+		var rail = document.getElementById('iconSidebarAssignmentsBtn');
+		var hide = scope.getAttribute('data-nn-assignments') !== '1';
+		if (rail && rail.hidden !== hide) rail.hidden = hide;
+	}
+	var leftCol = document.getElementById('left_col');
+	if (leftCol && typeof MutationObserver === 'function') new MutationObserver(syncWorkspaceScope).observe(leftCol, { childList: true });
+
 	function materialItem(menu, toggle) {
 		var state = toggle.getAttribute('data-nn-material') || '';
 		// geerbt: Kennzeichen nur am obersten Ordner (409 already_material)

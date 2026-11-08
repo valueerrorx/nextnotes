@@ -1297,6 +1297,16 @@ body.icon-sidebar-collapsed #content #nextnotes-root #iconSidebarToggle {
 	padding-inline: 0 !important;
 }
 
+/* Tagebuch: Upstream icon-sidebar.css nimmt der Filterzeile per body:not(.diary-page) den Abstand; die Klasse sitzt hier an #nextnotes-root.
+   Abstand wie Upstream diary.css/dashboard.css: 20 px unter den Aktionsknöpfen, 16 px unter der Tagebuch-Auswahl (Thomas 2026-11-08) */
+#content #nextnotes-root.diary-page .dashboard-topbar > .diary-actions + .board-filter-row {
+	margin-block-start: 20px;
+}
+
+#content #nextnotes-root.diary-page .dashboard-topbar > .diary-switcher + .board-filter-row {
+	margin-block-start: 16px;
+}
+
 /* Filterzeile (Dashboard, Tagebuch) bricht schmal um statt über den Rand zu laufen */
 #content #nextnotes-root > .nn-page-main .board-filter-row {
 	flex-wrap: wrap;

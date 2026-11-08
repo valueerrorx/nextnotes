@@ -7,6 +7,7 @@
 // zurückziehen und erneut abgeben, Feedback „Zurückgegeben von“ nach Rückgabe; S2 sieht S1 nie; verwaistes Team mit Löschdatum, Lösch-Dialog.
 // M6i: Seite folgt dem Team-Workspace (Chip statt Team-Filter, Team fest im Dialog), privat nur Hinweis ohne Leisten-Eintrag, Banner-Link mit Workspace,
 // verwaistes Team: S1 sieht die Aufgabe im eigenen Workspace unter „ohne Team-Workspace“.
+// M6i-fix: Wechsel Team → privat → Team ohne Reload (Leisten-Eintrag, Link, Austeilen-Menü), „Neue Aufgabe“ per Klick bis in die Liste, kein Austeilen-Knopf nach vollständigem Austeilen.
 import { runSpec } from './lib/harness.mjs';
 import { apiClient } from './lib/api.mjs';
 import { createTeam, ensureUser, orphanTeam, setAssignmentDue } from './lib/docker.mjs';
@@ -91,6 +92,8 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	await page.locator('.nn-asg-table tbody tr').nth(1).waitFor({ timeout: 10000 });
 	ctx.ok(await page.locator('.nn-asg-table tbody tr').count() === 2, 'zwei Abgaben (S1, S2)');
 	ctx.ok(await page.locator('.nn-asg-table .nn-asg-chip-assigned').count() === 2, 'Chips „Zugewiesen“');
+	// M6i-fix: alle ausgeteilt → kein Austeilen-Knopf mehr (Nachzügler bekommen ihre Kopie selbst)
+	ctx.ok(await page.locator('.nn-asg-actions .nn-asg-distribute').count() === 0, 'nach dem Austeilen kein Austeilen-Knopf');
 	await ctx.screenshot(page, 'distributed');
 	ctx.assertClean('Austeilen', m);
 
@@ -131,7 +134,7 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	const banner = p1.locator('.nn-asg-banner[data-nn-asg-kind="submission"]');
 	ctx.ok(await banner.isVisible().catch(() => false), 'S1: Banner im Editor');
 	ctx.ok((await banner.innerText()).includes(`Aufgabe ${RUN}`) && /Fällig/.test(await banner.innerText()), 'S1: Banner mit Titel und Frist', await banner.innerText());
-	ctx.ok(await p1.locator('#iconSidebarAssignmentsBtn').count() === 0, 'S1: Schüler-Workspace ohne Aufgaben-Eintrag (M6i)');
+	ctx.ok(!(await p1.locator('#iconSidebarAssignmentsBtn').isVisible()), 'S1: Schüler-Workspace ohne Aufgaben-Eintrag (M6i)');
 	ctx.ok(new URL(await banner.locator('.nn-asg-banner-link').getAttribute('href'), p1.url()).searchParams.get('workspace') === TW, 'S1: Banner-Link mit Team-Workspace');
 	const entry = p1.locator(`#entry${s1.note_id}`);
 	await entry.click();
@@ -238,6 +241,60 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	ctx.ok(zip.status() === 200 && /application\/zip/.test(zip.headers()['content-type'] ?? ''), 'ZIP → 200 application/zip', String(zip.status()));
 	const bytes = (await zip.body()).toString('latin1');
 	ctx.ok(bytes.startsWith('PK') && bytes.includes('status.csv') && bytes.includes('feedback.txt') && bytes.includes('attachments/'), 'ZIP: status.csv, feedback.txt, Anhänge');
+
+	// ---------- 7b. M6i-fix: Wechsel Team → privat → Team ohne Reload; Leisten-Eintrag, Austeilen-Menü, „Neue Aufgabe“ ----------
+	m = ctx.mark();
+	const PW = `Privat ${RUN}`;
+	await api.must('POST', '/workspaces', { name: PW });
+	await page.goto(ctx.appUrl(`index.php?workspace=${encodeURIComponent(TW)}`), { waitUntil: 'networkidle' });
+	const railBtn = page.locator('#iconSidebarAssignmentsBtn');
+	const railWs = async () => new URL(await railBtn.getAttribute('href'), page.url()).searchParams.get('workspace');
+	const switchTo = async (ws, shown) => {
+		await page.click('.sidebar-title');
+		await page.locator(`#workspaceMenu .workspace-menu-item[data-workspace-name="${ws}"]`).waitFor({ state: 'visible', timeout: 5000 });
+		const loads = [];
+		const onLoad = () => loads.push(1);
+		page.on('load', onLoad);
+		await page.locator(`#workspaceMenu .workspace-menu-item[data-workspace-name="${ws}"]`).click();
+		await page.waitForFunction((n) => document.querySelector('#left_col .workspace-title-text')?.textContent.trim() === n, ws, { timeout: 15000 });
+		await railBtn.waitFor({ state: shown ? 'visible' : 'hidden', timeout: 5000 }).catch(() => {});
+		page.off('load', onLoad);
+		ctx.ok(loads.length === 0, `Wechsel nach „${ws}“ ohne Neuladen`);
+	};
+	ctx.ok(await railBtn.isVisible() && await railWs() === TW, 'Team-Workspace: Leisten-Eintrag mit Team-Workspace', String(await railWs()));
+	await switchTo(PW, false);
+	ctx.ok(!(await railBtn.isVisible()), 'nach Wechsel privat: Leisten-Eintrag weg');
+	ctx.ok(await page.evaluate(() => document.body.getAttribute('data-nn-teacher')) === '0', 'nach Wechsel privat: kein Austeilen (data-nn-teacher)');
+	await switchTo(TW, true);
+	ctx.ok(await railBtn.isVisible() && await railWs() === TW, 'zurück im Team-Workspace: Eintrag wieder da, Link mit Team-Workspace', String(await railWs()));
+	ctx.ok(await page.evaluate(() => document.body.getAttribute('data-nn-teacher')) === '1', 'zurück im Team-Workspace: Austeilen (data-nn-teacher)');
+	const swNote = page.locator(`#left_col .note-actions-toggle[data-note-id="${src}"]`).first();
+	await page.locator(`#left_col a[data-note-id="${src}"]`).first().hover();
+	await swNote.click();
+	await page.waitForSelector('#note-actions-menu.show', { timeout: 5000 });
+	ctx.ok(await page.locator('#note-actions-menu .nn-assign-item').isVisible().catch(() => false), 'zurück im Team-Workspace: „Als Aufgabe austeilen…“ im Notiz-Menü');
+	await page.keyboard.press('Escape');
+	await ctx.screenshot(page, 'switch-back-team');
+	// „Neue Aufgabe“ per Klick: Dialog, Anlegen, Eintrag in der Liste
+	await Promise.all([page.waitForURL(/assignments\.php/, { timeout: 15000 }), railBtn.click()]);
+	await page.waitForLoadState('networkidle');
+	ctx.ok(new URL(page.url()).searchParams.get('workspace') === TW, 'Leisten-Eintrag nach Wechsel führt zum Team-Workspace', page.url());
+	const newBtn = page.locator('#nnAsgNew');
+	ctx.ok(await newBtn.isVisible().catch(() => false), '„Neue Aufgabe“ sichtbar');
+	await newBtn.click();
+	ctx.ok(await page.locator('#nnAsgCreateOk').waitFor({ state: 'visible', timeout: 5000 }).then(() => true, () => false), '„Neue Aufgabe“ öffnet den Dialog');
+	await page.locator('#nnAsgCreateTitle').fill(`Zweite ${RUN}`);
+	await page.locator('#nnAsgCreateSearch').fill(`Blatt ${RUN}`);
+	await page.locator('.nn-asg-source-result').first().click({ timeout: 10000 });
+	const created2 = page.waitForResponse((r) => /\/api\/v1\/assignments$/.test(new URL(r.url()).pathname) && r.request().method() === 'POST');
+	await page.locator('#nnAsgCreateOk').click();
+	const cr2 = await created2;
+	ctx.ok(cr2.status() === 201, '„Neue Aufgabe“: POST → 201', String(cr2.status()));
+	const aid2 = (await cr2.json()).assignment?.id;
+	await page.locator('.nn-asg-detail-title').waitFor({ state: 'visible', timeout: 10000 });
+	await page.locator('.nn-asg-back').first().click();
+	ctx.ok(await page.locator(`.nn-asg-item[data-assignment-id="${aid2}"]`).waitFor({ timeout: 10000 }).then(() => true, () => false), '„Neue Aufgabe“: erscheint in der Liste');
+	ctx.assertClean('Wechsel ohne Reload / Neue Aufgabe', m);
 
 	// ---------- 8. Verwaistes Team: Löschdatum, nur Export/Löschen; Lösch-Dialog mit Zahl und „Erst exportieren“ ----------
 	m = ctx.mark();

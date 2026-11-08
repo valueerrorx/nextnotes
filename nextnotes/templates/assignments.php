@@ -36,7 +36,8 @@ $titleText = $txt['title'];
 		<?php endif; ?>
 		<div class="nn-asg-toolbar">
 			<?php if ($asg['teacher'] !== null): ?>
-			<button type="button" id="nnAsgNew" class="btn-primary nn-asg-new"><i class="lucide lucide-plus" aria-hidden="true"></i> <?php p($txt['newAssignment']); ?></button>
+			<?php // ausgeblendet, bis nextnotes-assignments.js den Klick verdrahtet hat (M6i-fix: veraltetes Skript im Browser-Cache) ?>
+			<button type="button" id="nnAsgNew" class="btn-primary nn-asg-new" hidden><i class="lucide lucide-plus" aria-hidden="true"></i> <?php p($txt['newAssignment']); ?></button>
 			<?php endif; ?>
 		</div>
 		<div id="nnAsgStatus" class="nn-asg-status" role="status" aria-live="polite"></div>

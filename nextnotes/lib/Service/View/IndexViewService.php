@@ -177,6 +177,7 @@ class IndexViewService {
 		$shown = $note !== null ? $this->access->resolveLinked($uid, $note) : null;
 
 		$rights = $this->rights($uid, $ws, $canWrite, $byId);
+		$assign = $this->canAssignFrom($uid, $ws, $rights['teacher']);
 		$tree = $this->tree($uid, $baseUrl, $key, $byId, $notes, $sort, $favSort, $note, $folderFilter, $openFolder, $search, $rights);
 		$titleColor = $this->palette->hex($ws->getColor(), NotePalette::ownerOf($ws));
 
@@ -199,7 +200,7 @@ class IndexViewService {
 			'tree' => $tree,
 			'exitFolderUrl' => $baseUrl . 'index.php?' . http_build_query(['workspace' => $key]),
 			// „Als Aufgabe austeilen…“ nur im Team-Workspace als Lehrkraft (M6i, §9.1); Icon-Leiste „Aufgaben“ nur im Team-Workspace
-			'body' => array_merge_recursive($this->body($uid, $key, $note === null), ['data' => ['nn-teacher' => $this->canAssignFrom($uid, $ws, $rights['teacher']) ? '1' : '0']]),
+			'body' => array_merge_recursive($this->body($uid, $key, $note === null), ['data' => ['nn-teacher' => $assign ? '1' : '0']]),
 			'poznoteConfig' => $this->poznoteConfig($uid),
 			'workspaceMap' => $this->workspaceMap($uid),
 			'pageConfig' => $this->pageConfig($uid, $key, $noteFolderId !== null ? ($byId[$noteFolderId] ?? null)?->getName() : null, $canWrite, $search['active']),
@@ -209,7 +210,9 @@ class IndexViewService {
 			'prefetchedSettings' => ['tasklist_insert_order' => $this->value($uid, 'tasklist_insert_order') === 'top' ? 'top' : 'bottom'],
 			'note' => $shown !== null ? $this->shownView($uid, $shown, $wsId, $key, $rights, $byId) : null,
 			'iconPalette' => self::iconPalette(),
-			'railAssignments' => $this->assignmentsView->railLabel($ws),
+			// Leisten-Eintrag immer, ausgeblendet außerhalb von Team-Workspaces; Marker in #left_col für den Wechsel ohne Reload (M6i-fix)
+			'railAssignments' => $this->assignmentsView->railText(),
+			'scope' => ['assignments' => AssignmentsViewService::teamOf($ws) !== null, 'teacher' => $assign],
 		];
 	}
 

@@ -20,8 +20,8 @@ $railItems = [
 	['id' => 'iconSidebarDashboardBtn', 'group' => 'start', 'page' => 'dashboard.php', 'icon' => 'lucide-layout-dashboard', 'label' => $tr->t('common.back_to_home', [], 'Dashboard')],
 	['id' => 'iconSidebarHomeBtn', 'group' => 'start', 'page' => 'index.php', 'icon' => 'lucide-folder-tree', 'label' => $tr->t('common.notes', [], 'Notes')],
 	['id' => 'iconSidebarTasksBtn', 'group' => 'start', 'page' => 'tasks.php', 'icon' => 'lucide-list-todo', 'label' => $tr->t('tasks_page.title', [], 'Tasks')],
-	// M6g: Aufgaben austeilen/abgeben, nur mit Team oder eigener Aufgabe; railAssignments = Text aus NC-l10n (AssignmentsViewService::railLabel)
-	...(($_['railAssignments'] ?? null) !== null ? [['id' => 'iconSidebarAssignmentsBtn', 'group' => 'start', 'page' => 'assignments.php', 'icon' => 'lucide-graduation-cap', 'label' => (string)$_['railAssignments']]] : []),
+	// M6g/M6i: Aufgaben nur im Team-Workspace; railAssignments = Text aus NC-l10n; Hauptansicht rendert ihn ausgeblendet (railAssignmentsHidden), nextnotes-teams.js schaltet beim Wechsel ohne Reload
+	...(($_['railAssignments'] ?? null) !== null ? [['id' => 'iconSidebarAssignmentsBtn', 'group' => 'start', 'page' => 'assignments.php', 'icon' => 'lucide-graduation-cap', 'label' => (string)$_['railAssignments'], 'hidden' => (bool)($_['railAssignmentsHidden'] ?? false)]] : []),
 	['id' => 'iconSidebarDiaryBtn', 'group' => 'start', 'page' => 'diary.php', 'icon' => 'lucide-book-open', 'label' => $tr->t('diary.title', [], 'Diary')],
 	['id' => 'iconSidebarNotesBtn', 'group' => 'content', 'page' => 'notes_manager.php', 'icon' => 'lucide-layout-list', 'label' => $tr->t('notes_manager.age_all', [], 'All notes')],
 	...(($_['railMentions'] ?? null) !== null ? [['id' => 'iconSidebarMentionsBtn', 'group' => 'content', 'page' => 'mentions.php', 'icon' => 'lucide-at-sign', 'label' => $tr->t('mentions.title', [], 'Mentions'), 'badge' => (int)$_['railMentions']]] : []),
@@ -43,7 +43,7 @@ $railGroup = null;
 		<div class="icon-sidebar-divider" role="separator"></div>
 		<?php endif; ?>
 		<?php $railGroup = $railItem['group']; $railActive = $railItem['page'] === $railPage; ?>
-		<a href="<?php p($_['baseUrl'] . $railItem['page'] . $railQuery); ?>" id="<?php p($railItem['id']); ?>" class="icon-sidebar-btn<?php if ($railActive): ?> icon-sidebar-btn-active<?php endif; ?>" title="<?php p($railItem['label']); ?>" aria-label="<?php p($railItem['label']); ?>"<?php if ($railActive): ?> aria-current="page"<?php endif; ?>>
+		<a href="<?php p($_['baseUrl'] . $railItem['page'] . $railQuery); ?>" id="<?php p($railItem['id']); ?>" class="icon-sidebar-btn<?php if ($railActive): ?> icon-sidebar-btn-active<?php endif; ?>" title="<?php p($railItem['label']); ?>" aria-label="<?php p($railItem['label']); ?>"<?php if ($railActive): ?> aria-current="page"<?php endif; ?><?php if (!empty($railItem['hidden'])): ?> hidden<?php endif; ?>>
 			<i class="lucide <?php p($railItem['icon']); ?>"></i>
 			<?php if (isset($railItem['badge'])): // offene Erwähnungen, mentions-page.js hält den Zähler aktuell ?>
 			<span class="mention-badge"<?php if ($railItem['badge'] <= 0): ?> hidden<?php endif; ?>><?php p($railItem['badge'] > 99 ? '99+' : (string)$railItem['badge']); ?></span>
