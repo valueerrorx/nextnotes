@@ -13,7 +13,7 @@ Thomas will in Richtext-Notizen (Schule, AHS, Alltag) Formeln, Rechnungen mit Er
 5. **Drei schlanke Blöcke mit kleinen freien Bibliotheken, lokal gehostet, lazy geladen.**
 
 ## Entscheidung
-Option 5. Alle Bibliotheken liegen lokal (kein CDN), werden über `lazy-libs.js` erst beim ersten Block geladen und folgen dem NC-Theme hell/dunkel.
+Option 5. Alle Bibliotheken liegen lokal (kein CDN), werden über die Lazy-Helfer `poznoteEnsure*` (Adapter, SPEC §4.3.9) erst beim ersten Block geladen und folgen dem NC-Theme hell/dunkel.
 
 ### Block 1: Formel (inline und als Block), Slice M8a
 - Eingabe: **MathLive** (MIT), WYSIWYG, Bildschirmtastatur für Tablets.

@@ -15,6 +15,15 @@ body {
 	color: var(--color-main-text);
 }
 
+/* Listen im Notizinhalt: NC-Reset (ul{list-style:none}, ul/ol/li ohne margin/padding) auf Browser-Standard wie Poznote
+   (disc/circle/square je Ebene, decimal, 40 px Einzug). 0,0,1 nach dem NC-Kern: Upstream-Regeln (Checklisten, Aufgabenlisten,
+   Markdown-Vorschau, Nummerierung im Editor, ADR 0017 ≥ 1,1,0) setzen sich weiter durch; UI-Listen außerhalb bleiben ohne Punkte. */
+:where(.noteentry, .diary-journal-body, .paste-markdown-preview, .insert-markdown-preview) :is(ul, ol) {
+	list-style-type: revert;
+	margin-block: revert;
+	padding-inline-start: revert;
+}
+
 /* Vollbildlayout der App in #app-content (#content liegt unter dem NC-Header) */
 #app-content {
 	overflow: hidden;

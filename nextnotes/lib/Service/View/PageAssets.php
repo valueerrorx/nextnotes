@@ -14,14 +14,14 @@ use OCP\Util;
 
 /** Skripte/Stylesheets je Ansicht in fester Reihenfolge (SPEC §1.4, M3-Plan §1.2); Dateien aus make build. */
 class PageAssets {
-	// Reihenfolge wie src/public/index.php:456-475 (Upstream-Bundles), danach Token/Layout
+	// Reihenfolge wie src/public/index.php:456-475 (Upstream-Bundles), danach Token/Layout; lazy-libs.js ersetzt der Adapter (SPEC §4.3.9)
 	private const INDEX_STYLES = [
 		'nextnotes-core', 'nextnotes-mobile', 'nextnotes-modals', 'nextnotes-dark',
 		'vendor/katex.min', 'syntax-highlight', 'nextnotes-tokens', 'nextnotes-layout',
 	];
 	private const INDEX_SCRIPTS = [
 		'nextnotes-bootstrap', 'nextnotes-head',
-		'vendor/codemirror-dist/markdown-codemirror.iife', 'lazy-libs',
+		'vendor/codemirror-dist/markdown-codemirror.iife',
 		'vendor/highlight/highlight.min', 'vendor/highlight/powershell.min', 'syntax-highlight',
 		'nextnotes-app', 'nextnotes-late', 'nextnotes-teams',
 	];

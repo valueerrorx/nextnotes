@@ -87,8 +87,8 @@ await runSpec(import.meta.url, async (ctx, page, context) => {
 	ctx.ok(assets.filter((a) => a.kind === 'js').every((a) => a.defer), 'alle App-Skripte defer');
 	const js = assets.filter((a) => a.kind === 'js').map((a) => new URL(a.url).pathname);
 	const idx = (re) => js.findIndex((p) => re.test(p));
-	const order = [/nextnotes-i18n-de\.js$/, /nextnotes-bootstrap\.js$/, /nextnotes-head\.js$/, /codemirror/, /lazy-libs\.js$/, /highlight\.min\.js$/, /nextnotes-app\.js$/, /nextnotes-late\.js$/].map(idx);
-	ctx.ok(order.every((v, i) => v >= 0 && (i === 0 || v > order[i - 1])), 'Skriptreihenfolge i18n → bootstrap → head → CodeMirror/lazy-libs/highlight → app → late', JSON.stringify(order));
+	const order = [/nextnotes-i18n-de\.js$/, /nextnotes-bootstrap\.js$/, /nextnotes-head\.js$/, /codemirror/, /highlight\.min\.js$/, /nextnotes-app\.js$/, /nextnotes-late\.js$/].map(idx);
+	ctx.ok(order.every((v, i) => v >= 0 && (i === 0 || v > order[i - 1])), 'Skriptreihenfolge i18n → bootstrap → head → CodeMirror/highlight → app → late (lazy-libs ersetzt durch bootstrap, M7-fix)', JSON.stringify(order));
 	const css = assets.filter((a) => a.kind === 'css').map((a) => new URL(a.url).pathname.split('/').pop().replace(/\.css$/, ''));
 	ctx.ok(css.slice(-2).join(',') === 'nextnotes-tokens,nextnotes-layout' && css.includes('nextnotes-core') && css.includes('nextnotes-dark'), 'CSS core … dark, tokens + layout zuletzt', css.join(','));
 	ctx.info(`Asset-Pfad: ${new URL(assets[0]?.url ?? ctx.base).pathname.replace(/[^/]*$/, '')}`);

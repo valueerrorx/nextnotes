@@ -8,6 +8,7 @@
 		"js/two-factor.js": "eigenes Login gestrichen, NC-Login (Inventur B 1.3)",
 		"js/login-page.js": "eigenes Login gestrichen, NC-Login (Inventur B 1.3)",
 		"js/session-guard.js": "ersetzt durch 401-Reload im Adapter (SPEC 4.3.7)",
+		"js/lazy-libs.js": "ersetzt durch Asset-Helfer im Adapter vor dem App-Bundle (SPEC 4.3.9, M7-fix)",
 		"js/theme-init.js": "Hell/Dunkel nach NC-Theme im Adapter (ADR 0016)",
 		"js/ai-*.js": "AI gestrichen (ADR 0010)",
 		"js/backup-*.js": "Backup gestrichen (Inventur B 1.4)",
@@ -199,7 +200,6 @@
 		]
 	},
 	"jsSingle": [
-		"js/lazy-libs.js",
 		"js/syntax-highlight.js",
 		"js/math-renderer.js",
 		"js/mermaid-theme.js"
@@ -354,19 +354,19 @@
 			"by": "nextnotes-late.js"
 		},
 		{
-			"file": "js/lazy-libs.js",
-			"text": "window.poznoteEnsureScript = ensureScript",
-			"by": "nextnotes-late.js"
+			"file": "js/math-renderer.js",
+			"text": "window.poznoteEnsureKatex().then",
+			"by": "nextnotes-bootstrap.js"
 		},
 		{
-			"file": "js/lazy-libs.js",
-			"text": "window.poznoteEnsureMermaid = function",
-			"by": "nextnotes-late.js"
+			"file": "js/markdown-parser.js",
+			"text": "window.poznoteEnsureMermaid().then",
+			"by": "nextnotes-bootstrap.js"
 		},
 		{
 			"file": "js/lazy-libs.js",
 			"text": "window.poznoteEnsureKatex = function",
-			"by": "nextnotes-late.js"
+			"by": "nextnotes-bootstrap.js"
 		},
 		{
 			"file": "js/theme-manager.js",

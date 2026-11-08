@@ -595,10 +595,57 @@
 		return str;
 	};
 
+	// 15. Asset-Helfer (SPEC §4.3.9) statt lazy-libs.js: vor dem App-Bundle, weil math-renderer.js bei defer sofort rendert
+	var assetBase = String(config.assetBase || '').replace(/\/$/, '');
+	var assetVersion = '';
+	try {
+		var ownSrc = document.currentScript && document.currentScript.src;
+		assetVersion = ownSrc ? new URL(ownSrc, window.location.href).searchParams.get('v') || '' : '';
+	} catch (e) {
+		assetVersion = '';
+	}
+	// Upstream-Vendorpfade liegen im Build unter js/vendor/
+	var VENDOR = ['js/codemirror-dist/', 'js/excalidraw-dist/', 'js/mermaid/', 'js/katex/', 'js/highlight/', 'js/Sortable.min.js'];
+	function assetUrl(path) {
+		path = String(path);
+		if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(path)) return path;
+		if (path.charAt(0) === '/' && path.indexOf('/js/') !== 0) return path;
+		var p = path.replace(/^\.?\//, '');
+		for (var i = 0; i < VENDOR.length; i++) {
+			if (p.indexOf(VENDOR[i]) === 0) { p = 'js/vendor/' + p.slice(3); break; }
+		}
+		var url = assetBase + '/' + p;
+		return !assetVersion || url.indexOf('?') !== -1 ? url : url + '?v=' + encodeURIComponent(assetVersion);
+	}
+	var pendingScripts = {};
+	function ensureScript(path) {
+		if (pendingScripts[path]) return pendingScripts[path];
+		pendingScripts[path] = new Promise(function (resolve, reject) {
+			var script = document.createElement('script');
+			script.src = assetUrl(path);
+			script.onload = function () { resolve(); };
+			script.onerror = function () {
+				delete pendingScripts[path];
+				reject(new Error('Failed to load ' + path));
+			};
+			document.head.appendChild(script);
+		});
+		return pendingScripts[path];
+	}
+	window.poznoteAssetUrl = assetUrl;
+	window.poznoteEnsureScript = ensureScript;
+	window.poznoteEnsureMermaid = function () {
+		return typeof window.mermaid !== 'undefined' ? Promise.resolve() : ensureScript('js/mermaid/mermaid.min.js');
+	};
+	window.poznoteEnsureKatex = function () {
+		return typeof window.katex !== 'undefined' ? Promise.resolve() : ensureScript('js/katex/katex.min.js');
+	};
+
 	window.NEXTNOTES = {
 		config: config,
 		url: rewrite,
 		requestToken: token,
 		contentActions: CONTENT_ACTIONS,
+		assetUrl: assetUrl,
 	};
 })();

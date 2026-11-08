@@ -47,6 +47,13 @@ body#body-public #content.app-public {
 	background: transparent;
 }
 
+/* Listen im Notizinhalt wie nextnotes-layout.css (NC-Reset → Browser-Standard) */
+:where(#nextnotes-root .noteentry) :is(ul, ol) {
+	list-style-type: revert;
+	margin-block: revert;
+	padding-inline-start: revert;
+}
+
 #nextnotes-root.note-print-page .note-print-header {
 	margin-bottom: 24px;
 	padding-bottom: 16px;
