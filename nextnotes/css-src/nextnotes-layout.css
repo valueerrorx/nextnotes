@@ -1232,18 +1232,37 @@ body.icon-sidebar-collapsed #content #nextnotes-root #iconSidebarToggle {
 }
 
 /* Ansichten linksbündig wie NC-Apps (UI-fein 4, Thomas 2026-11-08): Upstream zentriert Container, Titel, Leisten und Leerzustände.
-   Innenabstand ab der Inhaltsfläche --nn-view-pad; max-width bleibt, Container hängen links. Zwei IDs gegen Upstream (+1 ID, ADR 0017). */
+   Innenabstand ab der Inhaltsfläche --nn-view-pad; max-width bleibt, Container hängen links. Zwei IDs gegen Upstream (+1 ID, ADR 0017).
+   UI-abstand (Thomas 2026-11-08): Kopf (Icon/Titel) jeder Ansicht oben und links gleich weit vom Rand, Wert der Tags-Ansicht (20 px, mobil 16 px). */
 #content #nextnotes-root {
-	--nn-view-pad: calc(var(--default-grid-baseline) * 4);
+	--nn-view-pad: calc(var(--default-grid-baseline) * 5);
+}
+
+@media (max-width: 800px) {
+	#content #nextnotes-root {
+		--nn-view-pad: calc(var(--default-grid-baseline) * 4);
+	}
 }
 
 #content #nextnotes-root > .nn-page-main {
+	padding-block-start: var(--nn-view-pad);
 	padding-inline: var(--nn-view-pad);
+}
+
+/* Upstream rückt den Titel je Seite unterschiedlich ein (Container-Padding, Titel-Padding, negative Ränder); der Abstand kommt nur von .nn-page-main */
+#content #nextnotes-root > .nn-page-main > :has(.poznote-page-title) {
+	padding-block-start: 0 !important;
+	margin-block-start: 0;
+}
+
+#content #nextnotes-root > .nn-page-main .poznote-page-title {
+	padding-block-start: 0;
+	margin-block-start: 0;
 }
 
 #content #nextnotes-root > .nn-page-main :is(.home-container, .tasks-container, .speed-dial-container, .notes-manager-container, .tags-container, .trash-container,
 	.trash-content, .favorites-container, .shared-container, .tasks-progress-section, .tasks-filter-bar, .mentions-toolbar, .nm-filter-bar, .nm-content, .trash-filter-bar,
-	.shared-filter-bar, .attachments-list-container, .shared-notes-list, .tags-info) {
+	.shared-filter-bar, .attachments-list-container, .shared-notes-list, .tags-info, .dashboard-grid-container) {
 	margin-inline: 0 auto;
 	padding-inline-start: 0;
 }
@@ -1307,6 +1326,11 @@ body.icon-sidebar-collapsed #content #nextnotes-root #iconSidebarToggle {
 	padding-inline-start: var(--nn-view-pad);
 }
 
+/* Kanban-Kopf: Band mit gleichem Abstand oben wie die Ansichten (Titel mittig zu den Knöpfen) */
+#content #nextnotes-root .kanban-inline-header {
+	padding-block: var(--nn-view-pad);
+}
+
 /* Unterseiten Verlauf/Anhänge (ohne Leiste): Zurück-Knopf und Titel links, Container links */
 #content #nextnotes-root.nextnotes-subpage :is(.revisions-shell, .settings-container) {
 	margin-inline: 0 auto;
@@ -1326,12 +1350,36 @@ body.icon-sidebar-collapsed #content #nextnotes-root #iconSidebarToggle {
 }
 
 #content #nextnotes-root.nextnotes-subpage .attachments-back-to-note-bar {
+	margin-block-start: var(--nn-view-pad);
 	padding-inline-start: var(--nn-view-pad);
+}
+
+#content #nextnotes-root.nextnotes-subpage .revisions-shell {
+	padding-block-start: var(--nn-view-pad);
+	padding-inline: var(--nn-view-pad);
 }
 
 /* Notiz: Werkzeugleiste links, schmaler Inhalt (Breiten-Einstellung) links statt mittig */
 #content #nextnotes-root #right_col .note-edit-toolbar {
 	justify-content: flex-start;
+}
+
+/* Notiz: erster Werkzeugknopf und Notizspalte im Abstand --nn-view-pad (Upstream 1 % + 2 %, mobil 3 % !important, Kopf 10 px, Knopf-Rand 4 px) */
+#content #nextnotes-root #right_col .notecard {
+	margin-inline-start: 0 !important;
+}
+
+#content #nextnotes-root #right_col .innernote {
+	padding-inline-start: var(--nn-view-pad);
+}
+
+#content #nextnotes-root #right_col .note-header {
+	padding-inline-start: 0;
+}
+
+#content #nextnotes-root #right_col .note-edit-toolbar {
+	margin-inline-start: -4px;
+	padding-inline-start: 0;
 }
 
 @media (min-width: 801px) {
