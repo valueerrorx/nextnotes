@@ -74,7 +74,7 @@ Scope-Hinweis: Funktion statt Paketierung, aber in SPEC/ADR ausdrücklich M7 zug
 - Testnachweis: Nachlauf-Stufe (sqlite-Umgebung). Review: Lead.
 
 ### M7g – Abschluss: volle Matrix
-- Scope: `run-m7.sh` ersetzt `run-m6.sh`: Vorab `make dist` 2× (zweiter ohne Netz) gleiche sha256, `check-dist.sh`, `check-upstream`, `validate-info.sh`, `check-forbidden-sql.sh`; danach alle Phasen von `run-m6.sh`, aber App in allen Umgebungen **aus dem Paket** installiert; zusätzlich `upgrade-path.sh` (alle drei Startpunkte, 3 DBs) und neue M7b-Tests. Kein separater `run-m6.sh`-Lauf.
+- Scope: `run-m7.sh` ersetzt `run-m6.sh`: Vorab `make dist` 2× (zweiter ohne Netz) gleiche sha256, `check-dist.sh`, `check-upstream`, `validate-info.sh`, `check-forbidden-sql.sh` sowie `check-purge.sh` (M7b, Vermerk M7c); danach alle Phasen von `run-m6.sh`, aber App in allen Umgebungen **aus dem Paket** installiert; zusätzlich `upgrade-path.sh` (alle drei Startpunkte, 3 DBs) und neue M7b-Tests. Kein separater `run-m6.sh`-Lauf.
 - Dateien: neu `dev/nextcloud/run-m7.sh` (aus `run-m6.sh`), `run-m6.sh` entfernen, `dev/nextcloud/README.md`.
 - Done: SPEC §13 M1–M7 alle grün auf sqlite, mariadb (+utf8mb4), pgsql, nginx; E2E alle Specs hell+dunkel (Apache + nginx); Logs unter `dev/nextcloud/.cache/run-m7-*`.
 - Testnachweis: Tester volle Matrix (Meilenstein-Ende). Danach Lead: M7 fertig, Übergabe an Thomas mit Paket, sha256 und Checkliste.

@@ -7,18 +7,49 @@
 	xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
 	<id>nextnotes</id>
 	<name>Next Notes</name>
-	<summary>Notes, folders and workspaces for Nextcloud</summary>
-	<description><![CDATA[Next Notes is a native Nextcloud app for notes, folders, tags and shared workspaces.
+	<summary>Notes, workspaces, teams and assignments for Nextcloud</summary>
+	<summary lang="de">Notizen, Workspaces, Teams und Aufgaben für Nextcloud</summary>
+	<description><![CDATA[Next Notes is a native Nextcloud app for notes, folders and tags in private, shared and team workspaces.
+
+- Rich text, Markdown, task lists and Excalidraw drawings, with math, diagrams and code highlighting
+- Share workspaces with single users or with a Nextcloud team
+- Material folders: teachers publish read-only material for a team
+- Assignments: hand out a note with a deadline, students submit their copy, teachers review and return it with feedback
+- Diary, task overview, mentions, reminders, dashboard and note graph
+- Export as HTML, Markdown or ZIP; light and dark mode follow the Nextcloud theme
+
+Requires Nextcloud 35 and background jobs via cron. Teams require the Nextcloud Teams (circles) app.
 
 Based on Poznote by Timothé Poznanski (MIT).]]></description>
-	<version>0.3.3</version>
+	<description lang="de"><![CDATA[Next Notes ist eine native Nextcloud-App für Notizen, Ordner und Tags in privaten, geteilten und Team-Workspaces.
+
+- Richtext, Markdown, Aufgabenlisten und Excalidraw-Zeichnungen, mit Formeln, Diagrammen und Code-Hervorhebung
+- Workspaces mit einzelnen Personen oder einem Nextcloud-Team teilen
+- Material-Ordner: Lehrkräfte stellen einem Team Material zum Lesen bereit
+- Aufgaben: eine Notiz mit Frist austeilen, Schülerinnen und Schüler geben ihre Kopie ab, Lehrkräfte sehen sie durch und geben sie mit Rückmeldung zurück
+- Tagebuch, Aufgabenübersicht, Erwähnungen, Erinnerungen, Dashboard und Notiz-Graph
+- Export als HTML, Markdown oder ZIP; Hell- und Dunkelmodus folgen dem Nextcloud-Design
+
+Benötigt Nextcloud 35 und Hintergrundjobs per Cron. Teams benötigen die Nextcloud-App Teams (circles).
+
+Basiert auf Poznote von Timothé Poznanski (MIT).]]></description>
+	<version>0.9.0</version>
 	<licence>AGPL-3.0-or-later</licence>
 	<author>Thomas Weissel</author>
 	<namespace>NextNotes</namespace>
+	<documentation>
+		<user>https://github.com/valueerrorx/nextnotes/blob/main/docs/app/user.md</user>
+		<admin>https://github.com/valueerrorx/nextnotes/blob/main/docs/app/admin.md</admin>
+	</documentation>
 	<category>office</category>
 	<category>organization</category>
+	<website>https://github.com/valueerrorx/nextnotes</website>
 	<bugs>https://github.com/valueerrorx/nextnotes/issues</bugs>
 	<repository type="git">https://github.com/valueerrorx/nextnotes</repository>
+	<screenshot>https://raw.githubusercontent.com/valueerrorx/nextnotes/main/nextnotes/screenshots/notes-light.png</screenshot>
+	<screenshot>https://raw.githubusercontent.com/valueerrorx/nextnotes/main/nextnotes/screenshots/notes-dark.png</screenshot>
+	<screenshot>https://raw.githubusercontent.com/valueerrorx/nextnotes/main/nextnotes/screenshots/assignments-light.png</screenshot>
+	<screenshot>https://raw.githubusercontent.com/valueerrorx/nextnotes/main/nextnotes/screenshots/team-workspace-light.png</screenshot>
 	<dependencies>
 		<php min-version="8.3" max-version="8.5"/>
 		<nextcloud min-version="35" max-version="35"/>

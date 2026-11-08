@@ -30,6 +30,10 @@ php="$(grep -E '\.php$' <<<"$list" | grep -vE '^nextnotes/(appinfo|lib|templates
 [[ -z "$php" ]] || bad "PHP außerhalb appinfo/lib/templates: $(head -n5 <<<"$php" | tr '\n' ' ')"
 # Build-Ausgabe vorhanden
 grep -qx 'nextnotes/js/nextnotes-app.js' <<<"$list" || bad "Build-Ausgabe js/nextnotes-app.js fehlt"
+# Lizenz- und Begleitdateien (M7c)
+for f in CHANGELOG.md COPYING LICENCE THIRD-PARTY-NOTICES.md LICENSES/MIT.txt; do
+	grep -qx "nextnotes/$f" <<<"$list" || bad "$f fehlt im Paket"
+done
 
 [[ $fail -eq 0 ]] || exit 1
 echo "check-dist: OK $(basename "$tarball") (Version $version, $(wc -l <<<"$list") Einträge, $(stat -c %s "$tarball") Bytes, $(du -h "$tarball" | cut -f1))"
