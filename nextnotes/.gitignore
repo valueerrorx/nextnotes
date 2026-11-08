@@ -9,3 +9,6 @@
 /build/node_modules/
 # Pakete (make dist)
 /dist/
+# Signierschlüssel und CSR nie einchecken (M7f)
+*.key
+*.csr

@@ -2,3 +2,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 .cache/
 node_modules/
+# Signierschlüssel und CSR nie einchecken (M7f)
+*.key
+*.csr
