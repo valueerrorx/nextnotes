@@ -1273,9 +1273,10 @@ body.icon-sidebar-collapsed #content #nextnotes-root #iconSidebarToggle {
 }
 
 #content #nextnotes-root > .nn-page-main :is(.board-filter-row, .diary-actions, .trash-buttons-container, .graph-toolbar, .graph-checks, .graph-options,
-	.filter-search-row, .graph-empty, .trash-no-notes-icon) {
+	.filter-search-row, .graph-empty) {
 	justify-content: flex-start;
 }
+/* Leerer Papierkorb: der Kreis steht links (text-align der .trash-no-notes), das Symbol bleibt im Kreis mittig (Upstream inline-flex center) */
 
 #content #nextnotes-root > .nn-page-main :is(.dashboard-empty, .empty-message, .speed-dial-empty, .trash-no-notes, .trash-page-count, .no-tags, .tags-info,
 	.graph-empty, .mentions-empty) {
