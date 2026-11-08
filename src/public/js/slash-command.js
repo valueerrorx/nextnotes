@@ -3197,6 +3197,7 @@
                             }
                         }
                     },
+                    ...(typeof window.poznoteSlashInsertItems === 'function' ? window.poznoteSlashInsertItems() : []),
                     {
                         id: 'separator',
                         icon: 'lucide-minus',

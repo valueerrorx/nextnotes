@@ -14,6 +14,7 @@ use OCA\NextNotes\Service\Convert\EmbeddedDiagrams;
 use OCA\NextNotes\Service\Convert\HtmlToMarkdown;
 use OCA\NextNotes\Service\Convert\MarkdownRenderer;
 use OCA\NextNotes\Service\Convert\MediaTags;
+use OCA\NextNotes\Service\Convert\NextBlocks;
 use OCA\NextNotes\Service\Exception\BadRequestException;
 use OCA\NextNotes\Service\Exception\TooLargeException;
 use OCA\NextNotes\Service\View\PageTranslator;
@@ -74,17 +75,19 @@ class ConversionService {
 	public function htmlToMarkdown(string $uid, string $html): string {
 		self::checkSize($html);
 		$this->setup($uid);
-		$markdown = HtmlToMarkdown::poznoteHtmlToMarkdown($this->urls->toServer($html));
+		[$html, $blocks] = NextBlocks::toMarkdownPre($this->urls->toServer($html));
+		$markdown = NextBlocks::restore(HtmlToMarkdown::poznoteHtmlToMarkdown($html), $blocks);
 		return $this->urls->toClient($this->sanitizer->sanitizeMarkdown($markdown));
 	}
 
-	/** Ganze HTML-Notiz → Markdown; eingebettete Excalidraw-Diagramme bleiben als HTML-Block (Upstream #1576) */
+	/** Ganze HTML-Notiz → Markdown; eingebettete Excalidraw-Diagramme bleiben als HTML-Block (Upstream #1576), Blöcke über NextBlocks */
 	public static function noteToMarkdown(string $content): string {
-		$markdown = HtmlToMarkdown::poznoteHtmlToMarkdown(EmbeddedDiagrams::aiHideEmbeddedDiagrams($content, false));
+		[$html, $blocks] = NextBlocks::toMarkdownPre(EmbeddedDiagrams::aiHideEmbeddedDiagrams($content, false));
+		$markdown = HtmlToMarkdown::poznoteHtmlToMarkdown($html);
 		if (str_contains($markdown, EmbeddedDiagrams::AI_DIAGRAM_PREFIX)) {
 			$markdown = ltrim(EmbeddedDiagrams::aiRestoreEmbeddedDiagrams(self::diagramBlocks($markdown), $content, true), "\n");
 		}
-		return $markdown;
+		return NextBlocks::restore($markdown, $blocks);
 	}
 
 	// Upstream ~\s*(![…](/poznote-diagram/…))\s*~ → "\n\n$1\n\n", Leerraum ohne Regex entfernt (linear, B46)

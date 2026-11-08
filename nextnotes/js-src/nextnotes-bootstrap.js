@@ -640,6 +640,22 @@
 	window.poznoteEnsureKatex = function () {
 		return typeof window.katex !== 'undefined' ? Promise.resolve() : ensureScript('js/katex/katex.min.js');
 	};
+	// MathLive (M8a): Fonts = KaTeX-Fonts als absolute URL (sonst HEAD-Fetch auf das Skript), keine Sounds, Links nur http/https
+	var mathLive = null;
+	window.poznoteEnsureMathLive = function () {
+		mathLive = mathLive || ensureScript('js/vendor/mathlive/mathlive.min.js').then(function () {
+			var MF = window.MathfieldElement;
+			if (!MF) throw new Error('MathLive missing');
+			MF.fontsDirectory = new URL(assetUrl('css/vendor/katex/fonts/').split('?')[0], window.location.href).href;
+			MF.soundsDirectory = null;
+			MF.openUrl = function (href) {
+				var url;
+				try { url = new URL(String(href)); } catch (e) { return; }
+				if (url.protocol === 'http:' || url.protocol === 'https:') window.open(url.href, '_blank', 'noopener,noreferrer');
+			};
+		}, function (err) { mathLive = null; throw err; });
+		return mathLive;
+	};
 
 	window.NEXTNOTES = {
 		config: config,

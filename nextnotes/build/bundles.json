@@ -347,7 +347,20 @@
 			"rewriteUrls": true
 		}
 	],
+	"npmVendor": [
+		{
+			"_doc": "Formel-Eingabe (M8a); Fonts = KaTeX-Fonts (css/vendor/katex/fonts), Sounds nicht ausgeliefert",
+			"package": "mathlive",
+			"from": "mathlive.min.js",
+			"to": "js/vendor/mathlive/mathlive.min.js"
+		}
+	],
 	"adapterHooks": [
+		{
+			"file": "js/slash-command.js",
+			"text": "window.poznoteSlashInsertItems",
+			"by": "nextnotes-blocks.js"
+		},
 		{
 			"file": "js/globals.js",
 			"text": "window.poznoteAssetUrl = function",

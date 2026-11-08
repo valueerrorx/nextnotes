@@ -88,6 +88,19 @@ for (const id of Object.keys(markers)) {
 	if (markers[id].test(builtCss) && !covered.includes(id)) err(`Kennung ${id} im Build, aber kein vendor.json-Eintrag`);
 }
 
+// npm-Vendor (M8): jedes Paket mit Version aus build/package-lock.json in der Tabelle, Lizenz wie in der Lockfile
+const lock = JSON.parse(read(join(app, 'build/package-lock.json')));
+for (const v of bundles.npmVendor || []) {
+	const pkg = (lock.packages || {})['node_modules/' + v.package];
+	if (!pkg) { err(`npmVendor ${v.package} fehlt in build/package-lock.json`); continue; }
+	const r = row(v.package);
+	if (!r) { err(`${v.package} wird ausgeliefert (npmVendor), fehlt aber in THIRD-PARTY-NOTICES.md`); continue; }
+	if ((r.split('|')[2] || '').trim() !== pkg.version) err(`${v.package}: Version in THIRD-PARTY-NOTICES.md ≠ Lockfile ${pkg.version}`);
+	if (!r.includes(String(pkg.license || '?'))) err(`${v.package}: Lizenz ${pkg.license} nicht in der Tabellenzeile`);
+	if (!r.includes(v.to)) err(`${v.package}: Auslieferungspfad ${v.to} nicht in der Tabellenzeile`);
+	covered.push(v.package);
+}
+
 // Verweise auf Lizenztexte existieren
 for (const m of notices.matchAll(/`(LICENSES\/[^`]+)`/g)) {
 	if (!existsSync(join(app, m[1]))) err(`${m[1]} fehlt`);

@@ -186,6 +186,13 @@ for (const v of bundles.vendor) {
 	}
 }
 
+// 3a. npm-Vendor (M8): gepinnte Pakete aus build/node_modules unverändert (Lockfile mit Integrity)
+for (const v of bundles.npmVendor ?? []) {
+	const from = path.join(here, 'node_modules', v.package, v.from);
+	if (!fs.existsSync(from)) die(`npm-Vendor fehlt: ${v.package}/${v.from} (npm ci --prefix nextnotes/build)`);
+	write(v.to, fs.readFileSync(from));
+}
+
 // 4. i18n: JSON für /system/i18n und gecachte JS-Datei je Sprache (en eingemischt)
 function merge(base, over) {
 	const out = { ...base };

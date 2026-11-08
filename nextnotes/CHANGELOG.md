@@ -9,6 +9,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+- Math formulas in rich text notes: insert inline or as a block from the toolbar or with `/Formel`, edit them in a visual formula editor (MathLive, loaded on first use, on-screen keyboard on touch devices).
+
+### Fixed
+- Saving a rich text note with rendered math no longer stores the KaTeX output; only the LaTeX source is kept (B69).
+
 ## 0.9.0 – 2026-11-08
 
 First public beta. Earlier versions (0.1.x to 0.3.x) were internal test releases; they upgrade to 0.9.0 with `occ upgrade`.

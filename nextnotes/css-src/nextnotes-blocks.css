@@ -1,0 +1,177 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Thomas Weissel
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+/* Blöcke in Richtext-Notizen (SPEC §4.7): Formel-Hosts im Editor, Werkzeugleisten-Menü, Formel-Popover.
+   Nur NC-Variablen (hell/dunkel), Selektoren ≥ 1,1,0 (ADR 0017). */
+
+/* Formel im schreibbaren Editor: anklickbar; leerer Platzhalter sichtbar */
+#nextnotes-root .noteentry[contenteditable="true"]:not([data-nextnotes-readonly]) [data-math] {
+	cursor: pointer;
+	border-radius: var(--border-radius-element, 8px);
+}
+
+#nextnotes-root .noteentry[contenteditable="true"]:not([data-nextnotes-readonly]) [data-math]:hover {
+	background-color: var(--color-background-hover);
+}
+
+#nextnotes-root .noteentry [data-math=""] {
+	display: inline-block;
+	min-width: 2em;
+	min-height: 1.2em;
+	vertical-align: middle;
+	border: 1px dashed var(--color-border-dark, var(--color-border));
+}
+
+#nextnotes-root .noteentry div[data-math=""] {
+	display: block;
+	min-height: 2em;
+}
+
+/* Menü der Werkzeugleiste */
+#body-user .nn-blocks-menu {
+	position: fixed;
+	z-index: 10050;
+	display: flex;
+	flex-direction: column;
+	min-width: 180px;
+	padding: 4px;
+	background: var(--color-main-background);
+	color: var(--color-main-text);
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-large, 12px);
+	box-shadow: 0 2px 12px var(--color-box-shadow, rgba(0, 0, 0, 0.2));
+}
+
+#body-user .nn-blocks-menu .nn-blocks-menu-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-height: var(--default-clickable-area, 34px);
+	margin: 0;
+	padding: 0 12px;
+	border: 0;
+	border-radius: var(--border-radius-element, 8px);
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	text-align: start;
+	cursor: pointer;
+}
+
+#body-user .nn-blocks-menu .nn-blocks-menu-item:is(:hover, :focus-visible) {
+	background: var(--color-background-hover);
+}
+
+/* Formel-Popover */
+#body-user .nn-formula-popover {
+	position: fixed;
+	z-index: 10050;
+	box-sizing: border-box;
+	width: min(560px, calc(100vw - 16px));
+	padding: 12px;
+	background: var(--color-main-background);
+	color: var(--color-main-text);
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-large, 12px);
+	box-shadow: 0 2px 16px var(--color-box-shadow, rgba(0, 0, 0, 0.25));
+	overflow: hidden;
+	contain: paint;
+}
+
+#body-user .nn-formula-popover.is-sheet {
+	top: auto;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	width: 100%;
+	border-radius: var(--border-radius-large, 12px) var(--border-radius-large, 12px) 0 0;
+}
+
+#body-user .nn-formula-popover .nn-formula-field {
+	display: block;
+	box-sizing: border-box;
+	width: 100%;
+	min-height: 48px;
+	padding: 8px;
+	font-size: 1.3em;
+	color: var(--color-main-text);
+	background: var(--color-main-background);
+	border: 2px solid var(--color-border-maxcontrast, var(--color-border));
+	border-radius: var(--border-radius-element, 8px);
+	overflow-x: auto;
+	--caret-color: var(--color-main-text);
+	--primary: var(--color-primary-element);
+	--selection-background-color: var(--color-primary-element-light, var(--color-background-hover));
+	--selection-color: var(--color-main-text);
+	--contains-highlight-background-color: var(--color-background-hover);
+	--placeholder-color: var(--color-text-maxcontrast);
+}
+
+#body-user .nn-formula-popover .nn-formula-field:focus-within {
+	border-color: var(--color-primary-element);
+}
+
+#body-user .nn-formula-popover .nn-formula-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	margin-top: 12px;
+}
+
+#body-user .nn-formula-popover .nn-formula-spacer {
+	flex: 1 1 auto;
+}
+
+#body-user .nn-formula-popover .nn-formula-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-height: var(--default-clickable-area, 34px);
+	cursor: pointer;
+}
+
+#body-user .nn-formula-popover .nn-formula-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-height: var(--default-clickable-area, 34px);
+	margin: 0;
+	padding: 0 14px;
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-element, 8px);
+	background: var(--color-main-background);
+	color: var(--color-main-text);
+	font: inherit;
+	cursor: pointer;
+}
+
+#body-user .nn-formula-popover .nn-formula-btn:hover {
+	background: var(--color-background-hover);
+}
+
+#body-user .nn-formula-popover .nn-formula-btn.primary {
+	border-color: var(--color-primary-element);
+	background: var(--color-primary-element);
+	color: var(--color-primary-element-text);
+}
+
+#body-user .nn-formula-popover .nn-formula-delete {
+	color: var(--color-error-text, var(--color-error));
+}
+
+/* Bildschirmtastatur von MathLive in NC-Farben */
+#body-user .ML__keyboard {
+	--keyboard-background: var(--color-background-dark);
+	--keyboard-toolbar-text: var(--color-main-text);
+	--keyboard-toolbar-background-hover: var(--color-background-hover);
+	--keycap-background: var(--color-main-background);
+	--keycap-background-hover: var(--color-background-hover);
+	--keycap-text: var(--color-main-text);
+	--keycap-secondary-background: var(--color-background-hover);
+	--keycap-secondary-text: var(--color-main-text);
+	--keycap-border: var(--color-border);
+	--keycap-border-bottom: var(--color-border-dark, var(--color-border));
+	z-index: 10060;
+}

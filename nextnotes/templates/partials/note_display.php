@@ -62,6 +62,7 @@ $item = static function (string $action, string $icon, string $label, array $dat
 	</div>
 	<?php endif; ?>
 	<?php $btn('btn-checklist note-action-btn', 'insert-checklist', 'lucide-list-check', $tr->t('editor.toolbar.insert_checklist'), false); ?>
+	<?php if ($type === 'note' && $note['canWrite']): ?><button type="button" class="toolbar-btn btn-nn-blocks note-action-btn" title="<?php p($l->t('Insert math')); ?>" aria-haspopup="menu" data-action="nn-blocks-menu"><i class="lucide lucide-sigma"></i></button><?php endif; ?>
 	<?php $btn('btn-save note-action-btn', 'save-note', 'lucide-save', $tr->t('editor.toolbar.save_now', [], 'Save now')); ?>
 	<?php $btn('btn-favorite note-action-btn' . ($note['favorite'] ? ' is-favorite' : ''), 'toggle-favorite', 'lucide-star', $note['favorite'] ? $tr->t('index.toolbar.favorite_remove', [], 'Remove from favorites') : $tr->t('index.toolbar.favorite_add', [], 'Add to favorites')); ?>
 	<?php $btn('btn-attachment note-action-btn' . ($note['attachments'] > 0 ? ' has-attachments' : ''), 'show-attachment-dialog', 'lucide-paperclip', $tr->t('index.toolbar.attachments_with_count', ['count' => $note['attachments']], 'Attachments ({{count}})')); ?>
@@ -81,6 +82,7 @@ $item = static function (string $action, string $icon, string $label, array $dat
 			<?php $item('show-snapshot', 'lucide-history', $tr->t('snapshot.menu_item', [], 'Revisions'), ['note-id' => $id]); ?>
 			<?php if (!$note['showDates']): ?><?php $item('show-note-info', 'lucide-info', $tr->t('common.information', [], 'Information'), ['note-id' => $id]); ?><?php endif; ?>
 			<?php if ($prose): ?><?php $item('trigger-mobile-action', 'lucide-search', $tr->t('editor.toolbar.search_replace', [], 'Search and replace'), ['selector' => '.btn-search-replace']); ?><?php endif; ?>
+			<?php if ($type === 'note' && $note['canWrite']): ?><?php $item('trigger-mobile-action', 'lucide-sigma', $l->t('Insert math'), ['selector' => '.btn-nn-blocks']); ?><?php endif; ?>
 			<?php if ($type === 'tasklist'): ?>
 			<?php $item('clear-completed-tasks', 'lucide-check-square', $tr->t('tasklist.clear_completed', [], 'Clear completed tasks'), ['note-id' => $id]); ?>
 			<?php $item('uncheck-all-tasks', 'lucide-square', $tr->t('tasklist.uncheck_all', [], 'Uncheck all tasks'), ['note-id' => $id]); ?>

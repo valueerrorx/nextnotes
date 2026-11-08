@@ -20,6 +20,7 @@ use OCA\NextNotes\Service\Exception\NotFoundException;
 use OCA\NextNotes\Service\SettingsService;
 use OCA\NextNotes\Service\SnapshotService;
 use OCA\NextNotes\Service\View\AssignmentsViewService;
+use OCA\NextNotes\Service\View\BlocksUiConfig;
 use OCA\NextNotes\Service\View\DashboardViewService;
 use OCA\NextNotes\Service\View\DiaryViewService;
 use OCA\NextNotes\Service\View\IndexViewService;
@@ -76,6 +77,7 @@ class PageController extends Controller {
 		private TeamService $teams,
 		private TeamsUiConfig $teamsUi,
 		private AssignmentsViewService $assignmentsView,
+		private BlocksUiConfig $blocksUi,
 	) {
 		parent::__construct(Application::APP_ID, $request);
 	}
@@ -133,6 +135,7 @@ class PageController extends Controller {
 			'globalHiddenUiElements' => $view['hiddenUiElements']['forced'],
 			'prefetchedSettings' => $view['prefetchedSettings'] + [$opacityKey => (string)$this->backgrounds->readOpacity($uid, $opacityKey)],
 			'background' => $this->backgrounds->status($uid, $view['workspaceKey'], 'background'),
+			'blocks' => $this->blocksUi->config(),
 		]);
 		return $this->page('index', 'index', [
 			'tr' => $this->translator,

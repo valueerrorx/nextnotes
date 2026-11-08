@@ -64,3 +64,10 @@ Reihenfolge M8a → M8b → M8c (Thomas: Tabellenblock wichtiger als Rechenblock
 - Drei neue Vendor-Bibliotheken (MathLive, HyperFormula, math.js, optional function-plot) mit Lizenzhinweisen im Repo; Updates wie andere Vendor-Bibliotheken.
 - Neuer Markup-Vertrag in Notizen (Block-Elemente mit JSON + statischem Fallback) – stabil halten, sonst Migration nötig.
 - Kein Upstream-Feature: Poznote-Updates können Sanitizer/Toolbar berühren; Patches klein halten.
+
+## Nachtrag M8a (2026-11-08, Lead-Entscheidungen aus M8-Plan r2, gilt für M8b/M8c)
+- (a) Leser des Rechenblocks sehen die gespeicherten, statischen Ergebnisse, keine Neuberechnung; nur der Graph wird bei Lesern gezeichnet, unter denselben Aufwandsgrenzen (M8-Plan §4).
+- (b) `VERSION` und `BEREICH.VERSCHIEBEN` sind in HyperFormula geschützt, nicht entfernbar und harmlos; sie bleiben aktiv, die Whitelist gilt sonst unverändert.
+- (c) Ein Zirkelbezug zeigt den Engine-Code `#CYCLE!` (nicht `#ZYKLUS!`), Klartext im Tooltip.
+- (d) Der Tabellenblock ist fest deutsch (Funktionsnamen, `;`, Dezimalkomma), unabhängig von der NC-Sprache.
+- Formel (M8a): MathLive 0.111.4 (MIT) lokal unter `js/vendor/mathlive/`, lazy beim ersten Öffnen; keine CSP-Ausnahme (Laden per `strict-dynamic`, keine Sounds, Fonts aus dem KaTeX-Vendor). Markup-Vertrag und Sanitizer-Regeln: SPEC §4.7.

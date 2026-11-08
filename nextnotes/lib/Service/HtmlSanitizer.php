@@ -39,7 +39,7 @@ class HtmlSanitizer {
 		'td' => ['colspan', 'rowspan', 'data-formula'],
 		'th' => ['colspan', 'rowspan', 'scope'],
 		'ol' => ['type', 'start'],
-		'div' => ['class', 'data-tasklist-json', 'data-markdown-content', 'data-excalidraw', 'data-diagram-id', 'data-task-embed', 'contenteditable'],
+		'div' => ['class', 'data-tasklist-json', 'data-markdown-content', 'data-excalidraw', 'data-diagram-id', 'data-task-embed', 'contenteditable', 'data-math'],
 		'span' => ['class', 'data-math'],
 		'input' => ['type', 'checked', 'disabled'],
 		'time' => ['datetime'],
@@ -257,6 +257,8 @@ class HtmlSanitizer {
 		if ($unwrap) {
 			self::unwrapUnknown($dom, $body);
 		}
+		// Block-Hosts (Formel, ab M8b Tabelle/Rechnen) nach Vertrag (SPEC §4.7)
+		BlockMarkup::normalize($body);
 		$out = '';
 		for ($child = $body->firstChild; $child !== null; $child = $child->nextSibling) {
 			$out .= $dom->saveHTML($child);
@@ -370,8 +372,8 @@ class HtmlSanitizer {
 			}
 			// href/src: Whitespace/Steuerzeichen (nach Entity-Decoding durch DOM) vor der Schema-Prüfung entfernen (B19)
 			$probe = ($name === 'href' || $name === 'src') && !ctype_graph($value) ? Pcre::replace('/[\x00-\x20\x7F\p{Z}]+/u', '', $value) : $value;
-			// data-excalidraw ist Diagramm-JSON, keine URL: Text wie „data:“ darin entfernte sonst das Diagramm (B35)
-			if ($name !== 'data-excalidraw' && (self::isDangerous($value) || ($probe !== $value && self::isDangerous($probe)))) {
+			// data-excalidraw ist Diagramm-JSON, keine URL: Text wie „data:“ darin entfernte sonst das Diagramm (B35); Block-Attribute ebenso
+			if ($name !== 'data-excalidraw' && !BlockMarkup::isBlockAttr($name) && (self::isDangerous($value) || ($probe !== $value && self::isDangerous($probe)))) {
 				$remove[] = $attr->name;
 				continue;
 			}
