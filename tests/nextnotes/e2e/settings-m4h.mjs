@@ -202,7 +202,7 @@ await runSpec(import.meta.url, async (ctx, page) => {
 	// 9. Über: Icon-Leiste hebt „Über“ hervor, Abschnitt sichtbar
 	m = await open(page, ctx.appUrl(`settings.php?${wqNew}&open=about`), 'Über');
 	ctx.info(`Über-URL: ${page.url()}`);
-	ctx.ok(await page.locator('#iconSidebarAboutBtn.icon-sidebar-btn-active').count() === 1, 'Icon-Leiste: Über aktiv');
+	ctx.ok(await page.locator('#iconSidebarAboutBtn').count() === 0 && await page.locator('#iconSidebarSettingsBtn.icon-sidebar-btn-active').count() === 1, 'Icon-Leiste: kein Über, Einstellungen aktiv');
 	await ctx.screenshot(page, 'settings-about');
 	ctx.ok(await page.locator('#check-updates-card').isVisible(), 'Über: Version sichtbar', await page.evaluate(() => document.querySelector('.settings-nav-item.is-active')?.dataset.section ?? '-'));
 	ctx.assertClean('Über', m);

@@ -7,7 +7,7 @@
 // Icon-Leiste: App-Symbol „Next Notes“ als Startseiten-Link (Dashboard), Einträge der portierten Seiten (M4e: Notizen, Ordner,
 // Tags, Anhänge, Papierkorb; M4f: Aufgaben, Tagebuch; M4g: Dashboard, Graph, Speed Dial, Erwähnungen nur mit geteiltem Workspace und Zähler).
 // UI-rail: oben Dashboard, Hauptansicht (#iconSidebarHomeBtn, href pflegen tabs.js/icon-sidebar-toggle.js), Aufgaben, Tagebuch; Erstellen-Seite entfernt.
-// Unten Einstellungen und Über (M4h, beide settings.php, Über mit ?open=about); gestrichen: Teilen-Seite, Offline, Theme-Umschalter,
+// Unten Einstellungen (M4h; „Über“ entfernt, Thomas 2026-11-08: in den Einstellungen erreichbar); gestrichen: Teilen-Seite, Offline, Theme-Umschalter,
 // Abmelden, Konten, Git, Profil-/Farb-/Reihenfolge-Modals (gespeicherte icon_sidebar_order wird nicht angewendet).
 /** @var array $_ */
 /** @var \OCA\NextNotes\Service\View\PageTranslator $tr */
@@ -30,10 +30,8 @@ $railItems = [
 	['id' => 'iconSidebarAttachmentsBtn', 'group' => 'collections', 'page' => 'attachments_list.php', 'icon' => 'lucide-paperclip', 'label' => $tr->t('notes_list.system_folders.attachments', [], 'Attachments')],
 	['id' => 'iconSidebarTrashBtn', 'group' => 'utility', 'page' => 'trash.php', 'icon' => 'lucide-trash-2', 'label' => $tr->t('notes_list.system_folders.trash', [], 'Trash')],
 ];
-$railAbout = $railPage === 'settings.php' && ($_['railAbout'] ?? false);
 $railBottom = [
-	['id' => 'iconSidebarSettingsBtn', 'href' => $_['baseUrl'] . 'settings.php' . $railQuery, 'icon' => 'lucide-settings', 'label' => $tr->t('sidebar.settings', [], 'Settings'), 'active' => $railPage === 'settings.php' && !$railAbout],
-	['id' => 'iconSidebarAboutBtn', 'href' => $_['baseUrl'] . 'settings.php' . $railQuery . '&open=about', 'icon' => 'lucide-info-circle', 'label' => $tr->t('settings.categories.documentation', [], 'About'), 'active' => $railAbout],
+	['id' => 'iconSidebarSettingsBtn', 'href' => $_['baseUrl'] . 'settings.php' . $railQuery, 'icon' => 'lucide-settings', 'label' => $tr->t('sidebar.settings', [], 'Settings'), 'active' => $railPage === 'settings.php'],
 ];
 $railGroup = null;
 ?>

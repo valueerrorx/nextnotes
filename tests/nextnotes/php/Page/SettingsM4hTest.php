@@ -48,7 +48,7 @@ final class SettingsM4hTest extends ApiTestCase {
 		self::assertStringContainsString('id="settings-workspaces-list"', $r->body);
 		self::assertStringContainsString('data-ws="' . htmlspecialchars($ws) . '"', $r->body, 'eigener Workspace in der Liste');
 		self::assertStringContainsString('id="iconSidebarSettingsBtn"', $r->body, 'Icon-Leiste: Einstellungen');
-		self::assertStringContainsString('id="iconSidebarAboutBtn"', $r->body, 'Icon-Leiste: Über');
+		self::assertStringNotContainsString('id="iconSidebarAboutBtn"', $r->body, 'Icon-Leiste: Über entfernt');
 		foreach (self::GONE as $id) {
 			self::assertStringNotContainsString('id="' . $id . '"', $r->body, "gestrichen: $id");
 		}

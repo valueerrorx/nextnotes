@@ -517,7 +517,6 @@ class PageController extends Controller {
 				'settingsPage' => $page,
 				'uid' => $uid,
 				'appVersion' => $this->appManager->getAppVersion(Application::APP_ID),
-				'railAbout' => $this->request->getParam('open') === 'about',
 				'contactsUrl' => $this->teamsUi->contactsUrl(),
 			];
 		});
