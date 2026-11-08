@@ -1255,6 +1255,27 @@ body.icon-sidebar-collapsed #content #nextnotes-root #iconSidebarToggle {
 	margin-block-start: 0;
 }
 
+/* Dashboard-Karten (Thomas 2026-11-08): Theme-Farbe wie die aktive Seitenleisten-Zeile statt Grau; Hover ohne Anheben/Schatten
+   (Upstream translateY(-2px) ließ den Inhalt springen), Rahmen bleibt gleich breit, nur Farbe wechselt. Notizfarben bleiben. */
+#nextnotes-root #dashboardGrid .dash-card:not(.has-note-color) {
+	background: var(--color-primary-element-light);
+	border-color: transparent;
+	color: var(--color-primary-element-light-text);
+}
+
+#nextnotes-root #dashboardGrid .dash-card:not(.has-note-color):hover {
+	background: var(--color-primary-element-light-hover);
+	border-color: var(--color-primary-element);
+}
+
+#nextnotes-root #dashboardGrid .dash-card:hover {
+	transform: none;
+}
+
+#nextnotes-root #dashboardGrid .dash-card:not(.is-selected):hover {
+	box-shadow: none;
+}
+
 #content #nextnotes-root > .nn-page-main .poznote-page-title {
 	padding-block-start: 0;
 	margin-block-start: 0;
