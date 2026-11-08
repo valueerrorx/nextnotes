@@ -174,7 +174,7 @@ final class SubmissionStateTest extends AssignmentTestCase {
 		self::assertSame([409, 'submitted'], [$r->status, self::row('nextnotes_submissions', $sx)['status']], 'geschlossen');
 	}
 
-	// Review M6g2-r1: ausgetretener Schüler zieht nicht zurück (403)
+	// Review M6g2-r1: ausgetretener Schüler zieht nicht zurück (seit M7h 404: Abgabe nicht mehr erreichbar)
 	public function testUnsubmitAfterLeaving(): void {
 		$fx = $this->distributedFixture();
 		['l' => $l, 's1' => $s1] = $fx;
@@ -182,6 +182,6 @@ final class SubmissionStateTest extends AssignmentTestCase {
 		self::ok($s1->call('POST', "/submissions/$sid/submit"), 'abgeben');
 		$this->teams->remove($l->uid, $fx['memberS1']);
 		$r = $s1->call('POST', "/submissions/$sid/unsubmit");
-		self::assertSame([403, 'submission_locked', 'submitted'], [$r->status, $r->json()['code'] ?? null, self::row('nextnotes_submissions', $sid)['status']], 'ausgetreten');
+		self::assertSame([404, 'submitted'], [$r->status, self::row('nextnotes_submissions', $sid)['status']], 'ausgetreten');
 	}
 }

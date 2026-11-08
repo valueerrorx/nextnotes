@@ -37,8 +37,8 @@ final class AssignmentLifecycleTest extends AssignmentTestCase {
 		self::loadNotifications();
 	}
 
-	// Done 1 / Krit. 7: Austritt → Austrittsmarke, L liest vollständig, S1 liest eigene, schreibt und gibt nicht ab
-	public function testLeaveKeepsSubmissionReadOnly(): void {
+	// Done 1 / Krit. 7: Austritt → Austrittsmarke, L liest vollständig; S1 erreicht die eigene Abgabe nicht mehr (M7h, 404)
+	public function testLeaveKeepsSubmissionForTeacher(): void {
 		$fx = $this->distributedFixture();
 		['l' => $l, 's1' => $s1] = $fx;
 		$sid = (int)$fx['subs'][$s1->uid]['id'];
@@ -56,12 +56,14 @@ final class AssignmentLifecycleTest extends AssignmentTestCase {
 		self::assertNotNull($view['left_team_at']);
 		self::assertSame([], self::readPaths($l, $note, $att, 200), 'L liest Inhalt, Anhang, Snapshots');
 		self::assertStringContainsString('vor dem Austritt', (string)self::ok($l->call('GET', "/notes/$note"), 'Inhalt')['note']['content']);
-		self::assertSame([], self::readPaths($s1, $note, $att, 200), 'S1 liest eigene Abgabe');
-		$r = $s1->call('PATCH', "/notes/$note", ['content' => '<p>nach dem Austritt</p>']);
-		self::assertSame([403, 'submission_locked'], [$r->status, $r->json()['code'] ?? null], 'S1 schreibt nicht');
-		self::assertSame(403, $s1->call('POST', "/submissions/$sid/submit")->status, 'S1 gibt nicht ab');
+		self::assertSame([], self::readPaths($s1, $note, $att, 404), 'S1 liest eigene Abgabe nicht mehr');
+		self::assertSame(404, $s1->call('PATCH', "/notes/$note", ['content' => '<p>nach dem Austritt</p>'])->status, 'S1 schreibt nicht');
+		self::assertSame(404, $s1->call('POST', "/submissions/$sid/submit")->status, 'S1 gibt nicht ab');
+		self::assertSame(404, $s1->call('GET', "/assignments/{$fx['aid']}")->status, 'S1 liest die Aufgabe nicht');
 		$ids = array_map(static fn ($a) => (int)$a['id'], self::ok($s1->call('GET', '/assignments'), 'Liste S1')['assignments']);
-		self::assertContains($fx['aid'], $ids, 'S1 sieht die Aufgabe weiter');
+		self::assertNotContains($fx['aid'], $ids, 'S1 sieht die Aufgabe nicht mehr');
+		self::assertStringContainsString('vor dem Austritt', (string)self::ok($l->call('GET', "/notes/$note"), 'L liest weiter')['note']['content']);
+		self::assertSame('assigned', (string)self::row('nextnotes_submissions', $sid)['status'], 'Abgabe erhalten');
 	}
 
 	// Review M6e2-r1 (1): Nachzügler aus dem eigenen GET ohne Meldung; Austeilen/Job mit Meldung

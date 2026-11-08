@@ -33,7 +33,7 @@ Im Team-Workspace über **Aufgaben** in der Icon-Leiste.
 2. **Austeilen:** Jeder Schüler des Teams bekommt eine eigene Kopie und eine Benachrichtigung. Später beigetretene Schüler erhalten ihre Kopie automatisch. Fehlen Kopien (z. B. Speicher des Teams voll), erscheint *An fehlende austeilen (n)*.
 3. **Abgaben ansehen:** Die Tabelle zeigt den Stand je Schüler. Öffne eine Abgabe zum Lesen, gib **Feedback** und **Punkte**, dann *Zurückgeben*. Erst dann sieht der Schüler Feedback und Punkte. *Wieder öffnen* gibt die Abgabe zur Überarbeitung frei.
 4. *Frist ändern*, *Aufgabe schließen* (offene Abgaben gelten dann als verpasst), *Exportieren* (ZIP aller Abgaben).
-5. **Aufgabe löschen** löscht die Aufgabe mit allen Abgaben endgültig. Exportiere vorher, wenn die Schule eine Aufbewahrung vorgibt. Abgaben bleiben sonst erhalten, auch wenn Schüler das Team verlassen oder ihr Konto gelöscht wird.
+5. **Aufgabe löschen** löscht die Aufgabe mit allen Abgaben endgültig. Exportiere vorher, wenn die Schule eine Aufbewahrung vorgibt. Abgaben bleiben sonst erhalten, auch wenn Schüler das Team verlassen (sie sehen sie dann selbst nicht mehr) oder ihr Konto gelöscht wird.
 
 Nach Fristende bekommst du eine Sammelmeldung, wie viele abgegeben haben.
 
@@ -42,7 +42,7 @@ Nach Fristende bekommst du eine Sammelmeldung, wie viele abgegeben haben.
 2. Bearbeite deine **Kopie**. Nur du und die Lehrkräfte des Teams sehen sie.
 3. *Abgeben* vor der Frist. Danach ist die Kopie schreibgeschützt. Bis zur Frist kannst du mit *Abgabe zurückziehen* weiterarbeiten, solange noch kein Feedback da ist. Gibst du nicht erneut ab, gilt die Aufgabe als nicht abgegeben.
 4. Nach der Rückgabe siehst du **Feedback** und **Punkte** bei der Aufgabe. Deine Abgabe kannst du als ZIP herunterladen.
-5. Verlässt du das Team, kannst du deine Abgabe weiter lesen, aber nicht mehr ändern.
+5. Verlässt du das Team, siehst du seine Aufgaben und deine Abgaben nicht mehr. Du behältst nur, was du vorher heruntergeladen oder abgeschrieben hast. Die Lehrkraft sieht deine Abgabe weiter. Trittst du wieder ein, sind deine Abgaben wieder da.
 
 ## To-dos
 **To-dos** sammelt die Einträge aller Aufgabenlisten (Notiztyp *Aufgabenliste*) im gewählten Workspace an einer Stelle. Fälligkeit und Erinnerungen setzt du an den Einträgen. In schreibgeschützten Listen (z. B. Material) kannst du nichts abhaken, aber Erinnerungen setzen.

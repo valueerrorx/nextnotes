@@ -244,8 +244,8 @@ class Notifier implements INotifier {
 				}
 			}
 			$a = $sub === null ? null : $this->assignmentOrNull((int)$sub->getAssignmentId());
-			// nur eigene Abgabe: kein Weg über review oder die Aufgabe (Invariante SPEC §3)
-			if ($sub === null || $a === null || $sub->getStudentUid() !== $uid || $a->getStatus() === 'draft') {
+			// nur eigene, erreichbare Abgabe: kein Weg über review oder die Aufgabe (Invariante SPEC §3); nach Austritt weg (M7h)
+			if ($sub === null || $a === null || $a->getStatus() === 'draft' || !$this->access->studentAccess($uid, $sub, $a)) {
 				throw new AlreadyProcessedException();
 			}
 			return $this->studentNotice($notification, $languageCode, $a, $sub->getNoteId() === null ? null : (int)$sub->getNoteId(), (int)$sub->getId());

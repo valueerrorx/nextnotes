@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OCA\NextNotes\Tests\Admin;
 
 use OCA\NextNotes\Command\ExportUser;
+use OCA\NextNotes\Service\AccessService;
 use OCA\NextNotes\Service\WorkspaceService;
 use OCA\NextNotes\UserMigration\NextNotesMigrator;
 use OCP\Files\Folder;
@@ -134,6 +135,29 @@ final class UserExportTest extends AdminTestCase {
 		$fx = $this->scenario();
 		$uid = $fx['s1']->uid;
 		$cli = $this->exportOf($uid);
+		$migrator = Server::get(NextNotesMigrator::class);
+		$user = Server::get(IUserManager::class)->get($uid);
+		$mig = self::migratorExport($uid);
+		// ZIP-Bytes enthalten Zeitstempel: Teile und Einträge vergleichen, nicht die äußeren Bytes
+		$strip = static fn (array $z): array => array_filter($z, static fn ($k) => str_contains($k, '!'), ARRAY_FILTER_USE_KEY);
+		self::assertSame(array_keys(array_diff_key($cli, $strip($cli))), array_keys(array_diff_key($mig, $strip($mig))), 'gleiche Teile');
+		$norm = static fn (array $z): array => array_map(static fn (string $v): string => (string)preg_replace('/\d{4}-\d\d-\d\d[ _]\d\d:?\d\d:?\d\d/', 'DATE', $v), $strip($z));
+		$a = $norm($cli);
+		$b = $norm($mig);
+		ksort($a);
+		ksort($b);
+		self::assertSame($a, $b, 'gleiche Inhalte');
+		self::assertGreaterThan(0, $migrator->getEstimatedExportSize($user), 'Größenschätzung');
+
+		$source = $this->createStub(IImportSource::class);
+		self::assertTrue($migrator->canImport($source), 'canImport');
+		$out = new BufferedOutput();
+		$migrator->import($user, $source, $out);
+		self::assertStringContainsString('import not supported, skipped', $out->fetch());
+	}
+
+	/** @return array<string, string> Migrator-Export: Teile relativ zu nextnotes/, Einträge als Teil!Eintrag */
+	private static function migratorExport(string $uid): array {
 		$dest = new class implements IExportDestination {
 			/** @var array<string, string> */
 			public array $files = [];
@@ -151,9 +175,7 @@ final class UserExportTest extends AdminTestCase {
 			public function close(): void {
 			}
 		};
-		$migrator = Server::get(NextNotesMigrator::class);
-		$user = Server::get(IUserManager::class)->get($uid);
-		$migrator->export($user, $dest, new BufferedOutput());
+		Server::get(NextNotesMigrator::class)->export(Server::get(IUserManager::class)->get($uid), $dest, new BufferedOutput());
 		$mig = [];
 		foreach ($dest->files as $path => $bytes) {
 			self::assertStringStartsWith(NextNotesMigrator::PATH, $path);
@@ -163,22 +185,22 @@ final class UserExportTest extends AdminTestCase {
 				$mig[$rel . '!' . $inner] = $content;
 			}
 		}
-		// ZIP-Bytes enthalten Zeitstempel: Teile und Einträge vergleichen, nicht die äußeren Bytes
-		$strip = static fn (array $z): array => array_filter($z, static fn ($k) => str_contains($k, '!'), ARRAY_FILTER_USE_KEY);
-		self::assertSame(array_keys(array_diff_key($cli, $strip($cli))), array_keys(array_diff_key($mig, $strip($mig))), 'gleiche Teile');
-		$norm = static fn (array $z): array => array_map(static fn (string $v): string => (string)preg_replace('/\d{4}-\d\d-\d\d[ _]\d\d:?\d\d:?\d\d/', 'DATE', $v), $strip($z));
-		$a = $norm($cli);
-		$b = $norm($mig);
-		ksort($a);
-		ksort($b);
-		self::assertSame($a, $b, 'gleiche Inhalte');
-		self::assertGreaterThan(0, $migrator->getEstimatedExportSize($user), 'Größenschätzung');
+		return $mig;
+	}
 
-		$source = $this->createStub(IImportSource::class);
-		self::assertTrue($migrator->canImport($source), 'canImport');
-		$out = new BufferedOutput();
-		$migrator->import($user, $source, $out);
-		self::assertStringContainsString('import not supported, skipped', $out->fetch());
+	// M7h: nach Austritt enthält export-user (Admin) die eigene Abgabe weiter, der Kontoumzug des Benutzers nicht
+	public function testLeftStudentExport(): void {
+		$fx = $this->scenario();
+		['s1' => $s1, 'l' => $l, 'mk' => $mk, 'sid1' => $sid1] = $fx;
+		$this->teams->remove($l->uid, $fx['memberS1']);
+		Server::get(AccessService::class)->resetCache();
+		$cli = self::text($this->exportOf($s1->uid));
+		self::assertStringContainsString("eigene-abgabe-$mk", $cli, 'export-user: Abgabe nach Austritt');
+		self::assertStringContainsString("submissions/{$sid1}_", $cli, 'export-user: Abgabe-Teil');
+		$mig = self::migratorExport($s1->uid);
+		self::assertStringNotContainsString("eigene-abgabe-$mk", self::text($mig), 'Kontoumzug: keine unerreichbare Abgabe');
+		self::assertSame([], array_filter(array_keys($mig), static fn ($p) => str_starts_with($p, 'submissions/')), 'Kontoumzug: kein Abgabe-Teil');
+		self::assertStringContainsString("eigene-notiz-$mk", self::text($mig), 'Kontoumzug: eigene Notizen bleiben');
 	}
 
 	// Review r1 Blocker 2: abweichende Schreibweise findet das Konto, Export unter der echten UID

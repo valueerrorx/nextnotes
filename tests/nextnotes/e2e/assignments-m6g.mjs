@@ -8,9 +8,10 @@
 // M6i: Seite folgt dem Team-Workspace (Chip statt Team-Filter, Team fest im Dialog), privat nur Hinweis ohne Leisten-Eintrag, Banner-Link mit Workspace,
 // verwaistes Team: S1 sieht die Aufgabe im eigenen Workspace unter „ohne Team-Workspace“.
 // M6i-fix: Wechsel Team → privat → Team ohne Reload (Leisten-Eintrag, Link, Austeilen-Menü), „Neue Aufgabe“ per Klick bis in die Liste, kein Austeilen-Knopf nach vollständigem Austeilen.
+// M7h: S2 tritt aus → sieht Aufgabe und Abgabe nicht mehr (404), L sieht sie markiert weiter.
 import { runSpec } from './lib/harness.mjs';
 import { apiClient } from './lib/api.mjs';
-import { createTeam, ensureUser, orphanTeam, setAssignmentDue } from './lib/docker.mjs';
+import { createTeam, ensureUser, orphanTeam, removeTeamMember, setAssignmentDue } from './lib/docker.mjs';
 
 const RUN = `${process.argv[3]}${Date.now().toString(36)}`;
 const A = process.env.NN_USER;
@@ -295,6 +296,15 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	await page.locator('.nn-asg-back').first().click();
 	ctx.ok(await page.locator(`.nn-asg-item[data-assignment-id="${aid2}"]`).waitFor({ timeout: 10000 }).then(() => true, () => false), '„Neue Aufgabe“: erscheint in der Liste');
 	ctx.assertClean('Wechsel ohne Reload / Neue Aufgabe', m);
+
+	// ---------- 7c. M7h: S2 tritt aus → keine Aufgabe, keine Abgabe (404); L sieht die Abgabe markiert ----------
+	removeTeamMember(ctx.base, A, teamId, C);
+	ctx.ok(!(await apiC.must('GET', '/assignments')).assignments.some((a) => a.id === aid), 'S2 ausgetreten: Aufgabe nicht in der Liste');
+	ctx.ok((await apiC.call('GET', `/assignments/${aid}`)).status === 404, 'S2 ausgetreten: Aufgabe 404');
+	ctx.ok((await apiC.call('GET', `/submissions/${s2.id}`)).status === 404, 'S2 ausgetreten: eigene Abgabe 404');
+	ctx.ok((await apiC.call('GET', `/notes/${s2.note_id}`)).status === 404, 'S2 ausgetreten: eigene Kopie 404');
+	const leftRow = (await api.must('GET', `/assignments/${aid}/submissions`)).submissions.find((x) => x.id === s2.id);
+	ctx.ok(!!leftRow && !!leftRow.left_team_at, 'L: Abgabe von S2 bleibt, markiert ausgetreten', JSON.stringify(leftRow ?? null).slice(0, 200));
 
 	// ---------- 8. Verwaistes Team: Löschdatum, nur Export/Löschen; Lösch-Dialog mit Zahl und „Erst exportieren“ ----------
 	m = ctx.mark();

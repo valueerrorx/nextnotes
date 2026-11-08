@@ -23,6 +23,7 @@ use OCA\NextNotes\Service\Exception\ConflictException;
 use OCA\NextNotes\Service\Exception\NotFoundException;
 use OCA\NextNotes\Service\Exception\TooLargeException;
 use OCP\AppFramework\Db\DoesNotExistException;
+use OCP\App\IAppManager;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\DB\Exception as DbException;
 use OCP\IUserManager;
@@ -55,6 +56,7 @@ class DistributionService {
 		private IUserManager $users,
 		private IFactory $l10nFactory,
 		private AssignmentNotifications $notify,
+		private IAppManager $apps,
 	) {
 	}
 
@@ -113,7 +115,7 @@ class DistributionService {
 	}
 
 	/**
-	 * Schüler (Level 1) ohne Abgabe mit aktivem Konto; deaktivierte erhalten nichts und zählen nicht als ausstehend (SPEC §8, M7b)
+	 * Schüler (Level 1) ohne Abgabe mit aktivem Konto und App-Freigabe; andere erhalten nichts und zählen nicht als ausstehend (SPEC §8, M7b, M7h)
 	 * @param array<string, string>|null $students uid → Name, null = alle Schüler des Teams
 	 * @return array<string, string>
 	 */
@@ -123,7 +125,13 @@ class DistributionService {
 			return [];
 		}
 		$missing = array_diff_key($students, $this->submissions->studentsOf((int)$a->getId()));
-		return array_filter($missing, fn ($uid): bool => $this->users->get((string)$uid)?->isEnabled() === true, ARRAY_FILTER_USE_KEY);
+		return array_filter($missing, fn ($uid): bool => $this->canReceive((string)$uid), ARRAY_FILTER_USE_KEY);
+	}
+
+	// Konto aktiv und Next Notes für das Konto freigegeben (Gruppenbeschränkung, M7h); später freigeschaltet → Nachzügler
+	private function canReceive(string $uid): bool {
+		$user = $this->users->get($uid);
+		return $user !== null && $user->isEnabled() && $this->apps->isEnabledForUser(Application::APP_ID, $user);
 	}
 
 	// §2.3a (1): Anhänge der Vorlage × Schüler ohne Abgabe gegen den Rest der Team-Quote
@@ -221,8 +229,8 @@ class DistributionService {
 				if ($a->getStatus() !== 'distributed' || $now > (int)$a->getDueAt() || $team === null || $team->getState() !== TeamStateService::ACTIVE) {
 					return self::STOP;
 				}
-				// Konto gelöscht (Rennen mit UserDeletedListener) oder deaktiviert (occ delete-user-data, M7b): nichts mit der UID anlegen (SPEC §8)
-				if ($this->submissions->existsFor($id, $uid) || $this->users->get($uid)?->isEnabled() !== true) {
+				// Konto gelöscht (Rennen mit UserDeletedListener), deaktiviert (occ delete-user-data, M7b) oder ohne App-Freigabe (M7h): nichts anlegen (SPEC §8)
+				if ($this->submissions->existsFor($id, $uid) || !$this->canReceive($uid)) {
 					return self::EXISTS;
 				}
 				$ws = $this->workspaces->ensureAssignmentWorkspace($uid, $teamId, $this->workspaceName($uid, (string)$team->getTeamNameSnapshot()), $now);

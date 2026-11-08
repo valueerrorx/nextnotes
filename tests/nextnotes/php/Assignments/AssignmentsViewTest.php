@@ -76,7 +76,7 @@ final class AssignmentsViewTest extends AssignmentTestCase {
 		self::assertStringNotContainsString($mark, $p->body, 'Fremder: keine Aufgabe');
 		self::assertStringNotContainsString($t, $p->body, 'Fremder: keine Team-ID');
 
-		// ohne lesbaren Team-Workspace (Austritt): Aufgabe erscheint im eigenen Workspace unter „ohne Team-Workspace“
+		// ohne lesbaren Team-Workspace (Austritt): Team ohne Heimat; die Aufgabe liefert die API seit M7h nicht mehr (AssignmentIsolationTest)
 		$wsRow = static fn (string $uid) => Server::get(WorkspaceService::class)->defaultWorkspace($uid);
 		self::assertContains($t, $view()->page($s1->uid, $wsRow($s1->uid), null)['homeTeams'], 'S1 Mitglied: Team hat Heimat');
 		$this->teams->remove($l->uid, $fx['memberS1']);

@@ -59,6 +59,10 @@ final class MaterialAccessTest extends MaterialTestCase {
 		Teams::reset();
 		self::assertSame('not_a_team_workspace', $s->call('PUT', "/folders/$pf/material", ['material' => true])->json()['code'] ?? null, 'geteilt');
 		$asg = $this->rawWorkspace('user', $l->uid, $l->uid, 'assignments');
+		// Schüler-Workspace ist nur mit Team-Mitgliedschaft lesbar (M7h)
+		$qb = self::db()->getQueryBuilder();
+		$qb->update('nextnotes_workspaces')->set('linked_team_id', $qb->createNamedParameter($x['t']))
+			->where($qb->expr()->eq('id', $qb->createNamedParameter((int)$asg, \OCP\DB\QueryBuilder\IQueryBuilder::PARAM_INT)))->executeStatement();
 		$qb = self::db()->getQueryBuilder();
 		$qb->insert('nextnotes_folders')->values(['workspace_id' => $qb->createNamedParameter($asg), 'name' => $qb->createNamedParameter('A'),
 			'created_at' => $qb->createNamedParameter(time()), 'updated_at' => $qb->createNamedParameter(time())])->executeStatement();

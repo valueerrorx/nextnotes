@@ -108,9 +108,12 @@ class WorkspaceService {
 	/** @return Workspace[] sichtbare Workspaces: eigene (Reihenfolge), dann geteilte und Team-Workspaces (eigene Reihenfolge des Benutzers, sonst Name) */
 	public function listVisible(string $uid): array {
 		if (!isset($this->visible[$uid])) {
-			$own = $this->workspaces->findOwned($uid);
+			// eigene nur, wenn erreichbar (Schüler-Workspace nach Austritt nicht, M7h)
+			$visibleIds = $this->access->visibleWorkspaceIds($uid);
+			$reachable = array_flip($visibleIds);
+			$own = array_values(array_filter($this->workspaces->findOwned($uid), static fn (Workspace $w) => isset($reachable[(int)$w->getId()])));
 			$ownIds = array_map(static fn (Workspace $w) => (int)$w->getId(), $own);
-			$shared = $this->workspaces->findByIds(array_values(array_diff($this->access->visibleWorkspaceIds($uid), $ownIds)));
+			$shared = $this->workspaces->findByIds(array_values(array_diff($visibleIds, $ownIds)));
 			$order = array_flip($this->foreignOrder($uid));
 			usort($shared, static fn (Workspace $a, Workspace $b) => ($order[(int)$a->getId()] ?? PHP_INT_MAX) <=> ($order[(int)$b->getId()] ?? PHP_INT_MAX)
 				?: strnatcasecmp($a->getName(), $b->getName()) ?: $a->getId() <=> $b->getId());

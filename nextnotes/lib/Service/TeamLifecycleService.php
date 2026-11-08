@@ -63,9 +63,27 @@ class TeamLifecycleService {
 		if (!$this->teamState->markOrphaned($teamId, $name)) {
 			return;
 		}
+		$this->clearLeftOfMembers($teamId);
 		$this->workspaceService->reset();
 		$this->logger->info('nextnotes: team deleted, team workspaces and assignments orphaned', ['team' => $teamId]);
 		$this->notifyOwners($teamId, $wsList, 'team_orphaned', $name);
+	}
+
+	// Wiedereintritt vor dem Abgleich: Marke aktueller Mitglieder löschen, solange das Team noch abfragbar ist (DestroyingCircleEvent); sonst bleibt sie (restriktiv)
+	private function clearLeftOfMembers(string $teamId): void {
+		$ids = array_map(static fn ($a) => (int)$a->getId(), $this->assignments->findByTeam($teamId));
+		if ($ids === []) {
+			return;
+		}
+		try {
+			$uids = array_map('strval', array_keys($this->teams->members($teamId)));
+		} catch (\Throwable $e) {
+			$this->logger->warning('nextnotes: team members not available on deletion, leave marks kept', ['team' => $teamId, 'exception' => $e]);
+			return;
+		}
+		if ($uids !== []) {
+			$this->submissions->clearLeftFor($ids, $uids, $this->time->getTime());
+		}
 	}
 
 	// Hinweis vor der Löschung (CleanupJob Schritt 2)

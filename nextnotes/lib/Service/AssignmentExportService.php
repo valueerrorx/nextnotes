@@ -9,10 +9,13 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Service;
 
+use OCA\NextNotes\Db\Assignment;
+use OCA\NextNotes\Db\AssignmentMapper;
 use OCA\NextNotes\Db\Note;
 use OCA\NextNotes\Db\NoteMapper;
 use OCA\NextNotes\Db\Submission;
 use OCA\NextNotes\Db\SubmissionMapper;
+use OCA\NextNotes\Service\Exception\NotFoundException;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IDateTimeZone;
 use OCP\IL10N;
@@ -33,6 +36,7 @@ class AssignmentExportService {
 		private ZipExportService $zipExport,
 		private IDateTimeZone $timeZone,
 		private IL10N $l,
+		private AssignmentMapper $assignments,
 	) {
 	}
 
@@ -65,8 +69,27 @@ class AssignmentExportService {
 	 */
 	public function submission(string $uid, int $id): array {
 		[$s, $a] = $this->access->requireSubmission($uid, $id, 'read');
-		$s = $this->states->materialize($s, $a);
-		$teacher = $this->access->assignmentAllows($uid, $a, 'review');
+		return $this->buildSubmission($uid, $this->states->materialize($s, $a), $a, $this->access->assignmentAllows($uid, $a, 'review'));
+	}
+
+	/**
+	 * Admin-Auskunft (occ export-user, ADR 0008 Nachtrag M7h): eigene Abgabe ohne Zugriffsprüfung, auch nach Austritt; Feedback erst ab returned
+	 * @return array<string, mixed>
+	 */
+	public function ownSubmission(string $uid, Submission $s): array {
+		if ($s->getStudentUid() === null || $s->getStudentUid() !== $uid) {
+			throw new NotFoundException('Submission not found');
+		}
+		try {
+			$a = $this->assignments->find((int)$s->getAssignmentId());
+		} catch (DoesNotExistException) {
+			throw new NotFoundException('Submission not found');
+		}
+		return $this->buildSubmission($uid, $this->states->materialize($s, $a), $a, false);
+	}
+
+	/** @return array<string, mixed> */
+	private function buildSubmission(string $uid, Submission $s, Assignment $a, bool $teacher): array {
 		return $this->zipExport->locked($uid, function () use ($uid, $s, $a, $teacher): array {
 			$notes = $this->load([$s]);
 			$name = ExportFormatter::fileName((string)$a->getTitle() . ' ' . (string)$s->getStudentName()) . '.zip';

@@ -47,6 +47,8 @@ class AccessService {
 	private array $material = [];
 	/** @var array<string, array<int, true>> Cache uid → eigene Schüler-Workspaces (kind=assignments) */
 	private array $assignmentWs = [];
+	/** @var array<string, bool> Cache uid|teamId → Schüler-Workspace des Teams erreichbar (M7h) */
+	private array $studentTeam = [];
 
 	public function __construct(
 		private WorkspaceMapper $workspaces,
@@ -72,8 +74,11 @@ class AccessService {
 	private function computeLevel(string $uid, Workspace $ws): int {
 		if ($ws->getOwnerType() === 'user') {
 			if ($ws->getOwnerId() === $uid) {
-				// Schüler-Workspace: nur lesen, Abgaben schreibt man über die Notiz-Regeln (Plan M6 §2.3)
-				return $ws->getKind() === 'normal' ? self::MANAGE : self::READ;
+				// Schüler-Workspace: nur lesen, Abgaben schreibt man über die Notiz-Regeln (Plan M6 §2.3); nach Austritt unerreichbar (M7h)
+				if ($ws->getKind() === 'normal') {
+					return self::MANAGE;
+				}
+				return $this->studentTeamOpen($uid, (string)$ws->getLinkedTeamId()) ? self::READ : self::NONE;
 			}
 			$share = $this->shares->findUserShare((int)$ws->getId(), $uid);
 			if ($share === null) {
@@ -103,6 +108,7 @@ class AccessService {
 		$this->visibility = [];
 		$this->material = [];
 		$this->assignmentWs = [];
+		$this->studentTeam = [];
 		$this->teams->resetCache();
 		$this->teamState->resetCache();
 	}
@@ -118,8 +124,10 @@ class AccessService {
 		$map = [];
 		$this->assignmentWs[$uid] = [];
 		foreach ($this->workspaces->findOwned($uid) as $w) {
-			$map[(int)$w->getId()] = $w->getKind() === 'normal' ? self::MANAGE : self::READ;
-			if ($w->getKind() === 'assignments') {
+			if ($w->getKind() === 'normal') {
+				$map[(int)$w->getId()] = self::MANAGE;
+			} elseif ($this->studentTeamOpen($uid, (string)$w->getLinkedTeamId())) {
+				$map[(int)$w->getId()] = self::READ;
 				$this->assignmentWs[$uid][(int)$w->getId()] = true;
 			}
 		}
@@ -139,9 +147,11 @@ class AccessService {
 		return array_keys($this->visibility($uid));
 	}
 
-	/** @return int[] eigene Workspaces (owner_type=user), ohne Freigaben (ADR 0008: „alle“-Exporte) */
+	/** @return int[] eigene erreichbare Workspaces (owner_type=user), ohne Freigaben (ADR 0008: „alle“-Exporte); Schüler-Workspaces nur nach studentTeamOpen (M7h) */
 	public function ownWorkspaceIds(string $uid): array {
-		return array_map(static fn (Workspace $w) => (int)$w->getId(), $this->workspaces->findOwned($uid));
+		$visible = $this->visibility($uid);
+		return array_values(array_filter(array_map(static fn (Workspace $w) => (int)$w->getId(), $this->workspaces->findOwned($uid)),
+			static fn (int $id) => isset($visible[$id])));
 	}
 
 	/** @return int[] Workspaces mit Schreibrecht */
@@ -290,12 +300,34 @@ class AccessService {
 		if ($sub === null || $assignment === null) {
 			return self::NONE;
 		}
-		if ($this->ownSubmissionNote($uid, $sub, $note)) {
+		if ($this->ownSubmissionNote($uid, $sub, $note) && $this->studentAccess($uid, $sub, $assignment)) {
 			// Frist vor jedem Zugriff materialisieren (eigenes UPDATE, letzte Sperre)
 			$sub = $this->states->materialize($sub, $assignment);
 			return $this->states->studentCanEdit($uid, $sub, $assignment) ? self::WRITE : self::READ;
 		}
 		return $this->assignmentAllows($uid, $assignment, 'review') ? self::READ : self::NONE;
+	}
+
+	/**
+	 * Schüler erreicht die eigene Abgabe (M7h, Thomas 2026-11-08): aktives Team nur als Mitglied (Level ≥ 1, Marke egal: Wiedereintritt wirkt sofort);
+	 * verwaist/eingefroren nur ohne Austrittsmarke (Mitgliedschaft nicht prüfbar); sonst 404 wie fremde Daten
+	 */
+	public function studentAccess(string $uid, Submission $sub, Assignment $a): bool {
+		if ($sub->getStudentUid() === null || $sub->getStudentUid() !== $uid) {
+			return false;
+		}
+		$teamId = (string)$a->getTeamId();
+		if ($this->teamState->stateOf($teamId) === TeamStateService::ACTIVE) {
+			return isset($this->teams->memberTeams($uid)[$teamId]);
+		}
+		return $sub->getLeftTeamAt() === null;
+	}
+
+	// Schüler-Workspace (kind=assignments) eines Teams: dieselbe Regel je Team; Marke nur bei verwaistem/eingefrorenem Team abgefragt
+	private function studentTeamOpen(string $uid, string $teamId): bool {
+		return $this->studentTeam[$uid . '|' . $teamId] ??= $this->teamState->stateOf($teamId) === TeamStateService::ACTIVE
+			? isset($this->teams->memberTeams($uid)[$teamId])
+			: !$this->submissions->hasLeftIn($uid, $teamId);
 	}
 
 	private function ownSubmissionNote(string $uid, Submission $sub, Note $note): bool {
@@ -352,12 +384,18 @@ class AccessService {
 		$owner = !$active && $a->getOwnerUid() !== null && $a->getOwnerUid() === $uid;
 		$teacher = fn (): bool => $active && $this->teams->getLevel($teamId, $uid) >= self::TEAM_MANAGE_LEVEL;
 		return match ($action) {
-			'read' => $owner || $teacher() || $this->submissions->existsFor((int)$a->getId(), $uid),
+			'read' => $owner || $teacher() || $this->ownReadable($uid, $a),
 			'review', 'export' => $owner || $teacher(),
 			'delete' => ($owner && $state === TeamStateService::ORPHANED) || $teacher(),
 			'edit', 'distribute', 'close', 'feedback', 'return', 'reopen' => $teacher(),
 			default => false,
 		};
+	}
+
+	// eigene Abgabe zur Aufgabe, nur solange der Schüler sie erreicht (M7h)
+	private function ownReadable(string $uid, Assignment $a): bool {
+		$sub = $this->submissions->findOwn($uid, [(int)$a->getId()])[(int)$a->getId()] ?? null;
+		return $sub !== null && $this->studentAccess($uid, $sub, $a);
 	}
 
 	/** Ohne Leserecht 404, sonst 403; review ohne Recht immer 404 (keine Existenz-Auskunft fremder Abgaben) */
@@ -378,7 +416,7 @@ class AccessService {
 	}
 
 	/**
-	 * §9.6: (a) Aufgaben aktiver Teams mit Level ≥ 4, (b) owner_uid in verwaisten/eingefrorenen Teams, (c) eigene Abgabe; eine Circles-Probe, je Teil ein SQL
+	 * §9.6: (a) Aufgaben aktiver Teams mit Level ≥ 4, (b) owner_uid in verwaisten/eingefrorenen Teams, (c) eigene Abgabe nach studentAccess; eine Circles-Probe, je Teil ein SQL
 	 * @return int[]
 	 */
 	public function visibleAssignmentIds(string $uid): array {
@@ -397,8 +435,12 @@ class AccessService {
 		foreach ($this->assignments->idsOwnedInactive($uid, !$available) as $id) {
 			$ids[$id] = true;
 		}
-		foreach ($this->submissions->assignmentIdsOf($uid) as $id) {
-			$ids[$id] = true;
+		$member = array_flip($memberTeams);
+		foreach ($this->submissions->ownWithTeam($uid) as $row) {
+			$open = $this->teamState->stateOf($row['team']) === TeamStateService::ACTIVE ? isset($member[$row['team']]) : !$row['left'];
+			if ($open) {
+				$ids[$row['assignment']] = true;
+			}
 		}
 		$out = array_keys($ids);
 		sort($out);
@@ -416,8 +458,7 @@ class AccessService {
 			throw new NotFoundException('Submission not found');
 		}
 		$a = $this->assignmentOrNull((int)$sub->getAssignmentId()) ?? throw new NotFoundException('Submission not found');
-		$own = $sub->getStudentUid() !== null && $sub->getStudentUid() === $uid;
-		if ($perm === 'read' && $own) {
+		if ($perm === 'read' && $this->studentAccess($uid, $sub, $a)) {
 			return [$sub, $a];
 		}
 		if (!$this->assignmentAllows($uid, $a, 'review')) {

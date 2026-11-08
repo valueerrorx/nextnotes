@@ -45,7 +45,7 @@ class NextNotesMigrator implements IMigrator, ISizeEstimationMigrator {
 	}
 
 	public function getEstimatedExportSize(IUser $user): int|float {
-		return (int)ceil($this->export->estimateBytes($user->getUID()) / 1024);
+		return (int)ceil($this->export->estimateBytes($user->getUID(), true) / 1024);
 	}
 
 	public function export(IUser $user, IExportDestination $exportDestination, OutputInterface $output): void {
@@ -59,7 +59,7 @@ class NextNotesMigrator implements IMigrator, ISizeEstimationMigrator {
 						fclose($stream);
 					}
 				}
-			});
+			}, true);
 		} catch (UserMigrationException $e) {
 			throw $e;
 		} catch (\Throwable $e) {

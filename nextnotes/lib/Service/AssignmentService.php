@@ -55,8 +55,10 @@ class AssignmentService {
 		$ids = array_map(static fn (Assignment $a) => (int)$a->getId(), $list);
 		$own = $this->submissions->findOwn($uid, $ids);
 		foreach ($own as $aid => $s) {
-			$own[$aid] = $this->states->materialize($s, $this->byId($list, $aid));
+			// eigene Abgabe nur, solange der Schüler sie erreicht (M7h; z. B. ausgetretener owner_uid eines verwaisten Teams)
+			$own[$aid] = $this->access->studentAccess($uid, $s, $this->byId($list, $aid)) ? $this->states->materialize($s, $this->byId($list, $aid)) : null;
 		}
+		$own = array_filter($own);
 		$reviewable = array_values(array_filter($ids, fn (int $id) => $this->access->assignmentAllows($uid, $this->byId($list, $id), 'review')));
 		$counts = $reviewable === [] ? [] : $this->submissions->counts($reviewable);
 		$out = [];
@@ -117,6 +119,7 @@ class AssignmentService {
 		$review = $this->access->assignmentAllows($uid, $a, 'review');
 		$counts = $review ? ($this->submissions->counts([$id])[$id] ?? ['total' => 0, 'submitted' => 0, 'by_status' => []]) : null;
 		$own = $this->submissions->findOwn($uid, [$id])[$id] ?? null;
+		$own = $own !== null && $this->access->studentAccess($uid, $own, $a) ? $own : null;
 		return $this->view($uid, $a, $own === null ? null : $this->states->materialize($own, $a), $counts);
 	}
 

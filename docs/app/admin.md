@@ -29,7 +29,8 @@ Next Notes lässt sich wie jede App auf Gruppen beschränken: *Apps → Next Not
 occ app:enable nextnotes --groups lehrkraefte --groups schueler
 ```
 - Die Beschränkung regelt nur, wer die App öffnen kann.
-- Teilen-Dialog, Erwähnungen und das Austeilen von Aufgaben prüfen die Gruppen **nicht**: Ein Team-Mitglied außerhalb der Gruppen erhält beim Austeilen trotzdem eine Kopie (belegt Speicher des Teams), kann sie aber nicht öffnen und nicht abgeben. Deshalb alle Lehrkräfte und Schüler, die Teams mit Next Notes nutzen, in die freigegebenen Gruppen aufnehmen.
+- Beim Austeilen von Aufgaben erhalten Team-Mitglieder außerhalb der freigegebenen Gruppen **keine Kopie** und zählen nicht als „noch nicht ausgeteilt“. Werden sie später freigeschaltet, bekommen sie ihre Kopie nachträglich, solange die Frist läuft.
+- Teilen-Dialog und Erwähnungen prüfen die Gruppen **nicht**. Deshalb alle Lehrkräfte und Schüler, die Teams mit Next Notes nutzen, in die freigegebenen Gruppen aufnehmen.
 
 ## 4. Webserver
 - **Apache:** Die von Nextcloud erzeugte `.htaccess` genügt. Für Adressen ohne `/index.php/` (`htaccess.RewriteBase`) gilt die normale Nextcloud-Einrichtung.
@@ -107,7 +108,8 @@ Auskunft und Datenübertragbarkeit (DSGVO Art. 15/20) für ein Konto.
 - `<ziel.zip>` darf nicht existieren. Ohne Daten: Hinweis, Exit 0, keine Datei.
 - Überschreitet ein Teil die Exportgrenze von 1 GiB, bricht der Befehl ab (Exit 1, keine Datei).
 - Für bereits gelöschte Konten liefert der Befehl nichts: Abgaben gelöschter Konten sind nur noch über die frühere UID gekennzeichnet und gehören den Lehrkräften.
-- Ist die App **User migration** installiert, enthält deren Export dieselben Teile unter `nextnotes/`. Der Import überspringt Next Notes (kein Import in Next Notes).
+- Der Befehl enthält auch Abgaben aus Teams, die der Schüler verlassen hat (er selbst sieht sie nicht mehr).
+- Ist die App **User migration** installiert, enthält deren Export dieselben Teile unter `nextnotes/`, aber nur Abgaben, die der Benutzer selbst noch öffnen kann. Der Import überspringt Next Notes (kein Import in Next Notes).
 
 ### `occ nextnotes:delete-user-data <uid> [--user-deleted]`
 Löscht die Next-Notes-Daten eines Kontos **genau wie eine Kontolöschung**, ohne das Konto selbst zu löschen.
@@ -143,7 +145,7 @@ Löscht **alle** Daten der App aller Benutzer und Teams. Nur für die Deinstalla
 
 **Aufbewahrung von Abgaben:**
 - Abgaben bestehen aus der Kopie-Notiz des Schülers mit Anhängen und Versionen, Status, Abgabezeit, Feedback und Punkten.
-- Sie bleiben vollständig erhalten, wenn der Schüler das Team verlässt (er kann seine Abgabe weiter lesen), wenn das Schülerkonto gelöscht wird (dann nur noch mit Anzeigename und früherer UID, nur für die Lehrkräfte lesbar) und wenn das Konto der Lehrkraft gelöscht wird (die Aufgabe geht an eine andere Lehrkraft des Teams oder wird gesperrt).
+- Sie bleiben vollständig erhalten, wenn der Schüler das Team verlässt (die Lehrkräfte sehen und exportieren sie weiter; der Schüler selbst sieht seine Aufgaben und Abgaben nicht mehr, nach einem Wiedereintritt wieder), wenn das Schülerkonto gelöscht wird (dann nur noch mit Anzeigename und früherer UID, nur für die Lehrkräfte lesbar) und wenn das Konto der Lehrkraft gelöscht wird (die Aufgabe geht an eine andere Lehrkraft des Teams oder wird gesperrt).
 - Gelöscht werden Abgaben nur auf drei Wegen:
   1. **Die Lehrkraft löscht die Aufgabe.** Das löscht die Aufgabe mit allen Abgaben, Kopien und Anhängen. Einzelne Abgaben lassen sich nicht löschen.
   2. **Das Team wird gelöscht.** 30 Tage danach löscht die App alle Aufgaben und Abgaben des Teams (Abschnitt 6).

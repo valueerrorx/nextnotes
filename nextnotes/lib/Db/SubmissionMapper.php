@@ -85,6 +85,38 @@ class SubmissionMapper extends QBMapper {
 		return array_map('intval', $qb->executeQuery()->fetchFirstColumn());
 	}
 
+	/** @return list<array{assignment: int, team: string, left: bool}> eigene Abgaben mit Team und Austrittsmarke (§9.6 c, M7h) */
+	public function ownWithTeam(string $uid): array {
+		$qb = $this->db->getQueryBuilder();
+		$expr = $qb->expr();
+		$qb->select('s.assignment_id', 's.left_team_at', 'a.team_id')->from(self::TABLE, 's')
+			->innerJoin('s', AssignmentMapper::TABLE, 'a', $expr->eq('a.id', 's.assignment_id'))
+			->where($expr->eq('s.student_uid', $qb->createNamedParameter($uid)));
+		$out = [];
+		$res = $qb->executeQuery();
+		while ($row = $res->fetch()) {
+			$out[] = ['assignment' => (int)$row['assignment_id'], 'team' => (string)$row['team_id'], 'left' => $row['left_team_at'] !== null];
+		}
+		$res->closeCursor();
+		return $out;
+	}
+
+	// Austrittsmarke des Schülers in einer Aufgabe dieses Teams (Schüler-Workspace bei verwaistem/eingefrorenem Team, M7h)
+	public function hasLeftIn(string $uid, string $teamId): bool {
+		$qb = $this->db->getQueryBuilder();
+		$expr = $qb->expr();
+		$qb->select('s.id')->from(self::TABLE, 's')
+			->innerJoin('s', AssignmentMapper::TABLE, 'a', $expr->eq('a.id', 's.assignment_id'))
+			->where($expr->eq('s.student_uid', $qb->createNamedParameter($uid)))
+			->andWhere($expr->eq('a.team_id', $qb->createNamedParameter($teamId)))
+			->andWhere($expr->isNotNull('s.left_team_at'))
+			->setMaxResults(1);
+		$res = $qb->executeQuery();
+		$found = $res->fetchOne() !== false;
+		$res->closeCursor();
+		return $found;
+	}
+
 	public function existsFor(int $assignmentId, string $uid): bool {
 		$qb = $this->db->getQueryBuilder();
 		$qb->select('id')->from(self::TABLE)
@@ -229,6 +261,30 @@ class SubmissionMapper extends QBMapper {
 			->where($qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT)))
 			->andWhere($qb->expr()->isNotNull('left_team_at'))
 			->executeStatement();
+	}
+
+	/**
+	 * Austrittsmarken aktueller Mitglieder löschen (Team-Löschung, M7h-fix): wer beim Verwaisen Mitglied ist, behält den Zugriff
+	 * @param int[] $assignmentIds
+	 * @param string[] $uids
+	 */
+	public function clearLeftFor(array $assignmentIds, array $uids, int $now): int {
+		$n = 0;
+		$uids = array_values(array_unique($uids));
+		foreach (array_chunk(array_values(array_unique($assignmentIds)), 500) as $aChunk) {
+			foreach (array_chunk($uids, 500) as $uChunk) {
+				$qb = $this->db->getQueryBuilder();
+				$expr = $qb->expr();
+				$n += $qb->update(self::TABLE)
+					->set('left_team_at', $qb->createNamedParameter(null, IQueryBuilder::PARAM_NULL))
+					->set('updated_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT))
+					->where($expr->in('assignment_id', $qb->createNamedParameter($aChunk, IQueryBuilder::PARAM_INT_ARRAY)))
+					->andWhere($expr->in('student_uid', $qb->createNamedParameter($uChunk, IQueryBuilder::PARAM_STR_ARRAY)))
+					->andWhere($expr->isNotNull('left_team_at'))
+					->executeStatement();
+			}
+		}
+		return $n;
 	}
 
 	/** @return int[] Notiz-IDs der Kopien eines Schülers */

@@ -243,7 +243,7 @@
 		});
 	}
 
-	// Team-Workspace: nur dieses Team; sonst nur Teams ohne lesbaren Team-Workspace (Austritt, verwaist, eingefroren, Team ohne Workspace)
+	// Team-Workspace: nur dieses Team; sonst nur Teams ohne lesbaren Team-Workspace (verwaist, eingefroren, Team ohne Workspace; Ausgetretene liefert die API nicht, M7h)
 	function inScope(a) {
 		return scopeTeam !== null ? a.team === scopeTeam : homeTeams.indexOf(String(a.team)) === -1;
 	}

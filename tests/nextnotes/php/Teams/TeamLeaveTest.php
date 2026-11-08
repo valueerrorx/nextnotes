@@ -219,7 +219,8 @@ final class TeamLeaveTest extends TeamTestCase {
 		[$pa2, $pa2Id] = self::newWorkspace($a, 'PA2');
 		$asg = $this->rawWorkspace('user', $a->uid, $a->uid, 'assignments');
 		$qb = self::db()->getQueryBuilder();
-		$qb->update('nextnotes_workspaces')->set('linked_team_id', $qb->createNamedParameter('team-' . bin2hex(random_bytes(4))))
+		// Schüler-Workspace ist nur mit Team-Mitgliedschaft lesbar (M7h): echtes Team mit A als Mitglied
+		$qb->update('nextnotes_workspaces')->set('linked_team_id', $qb->createNamedParameter($this->teams->create($a->uid, 'Sys ' . bin2hex(random_bytes(3)))))
 			->where($qb->expr()->eq('id', $qb->createNamedParameter($asg, IQueryBuilder::PARAM_INT)))->executeStatement();
 		$sub = self::rawNote($asg, 'Abgabe', $a->uid, 'submission');
 		$plain = self::rawNote($asg, 'Notiz im Schüler-Workspace', $a->uid);

@@ -10,8 +10,14 @@ declare(strict_types=1);
 namespace OCA\NextNotes\Tests\Assignments;
 
 use OCA\NextNotes\Db\AssignmentMapper;
+use OCA\NextNotes\Service\AccessService;
+use OCA\NextNotes\Service\AssignmentDeadlineService;
 use OCA\NextNotes\Service\DistributionService;
+use OCA\NextNotes\Service\TeamService;
 use OCA\NextNotes\Tests\Support\Teams;
+use OCP\App\IAppManager;
+use OCP\IGroupManager;
+use OCP\IUserManager;
 use OCP\Server;
 
 // Done M6e1 2, 4, 6 (SPEC §9.1/§9.4, Plan M6 §2.4): Austeilen vollständig je Schüler, idempotent, Nachzügler, Frist, Rennen mit Löschen/Schließen; Quelle (Lead 2026-11-08)
@@ -143,5 +149,46 @@ final class DistributeTest extends AssignmentTestCase {
 	private static function sorted(array $list): array {
 		sort($list);
 		return $list;
+	}
+
+	// M7h: Mitglied außerhalb der App-Gruppen bekommt keine Kopie und zählt nicht als fehlend; nach Freischaltung Nachzügler
+	public function testGroupRestrictedMemberSkipped(): void {
+		$fx = $this->fixture(false);
+		['l' => $l, 'x' => $x, 'aid' => $aid] = $fx;
+		$gid = 'nnallow' . bin2hex(random_bytes(3));
+		$users = Server::get(IUserManager::class);
+		$group = Server::get(IGroupManager::class)->createGroup($gid);
+		self::assertNotNull($group);
+		$apps = Server::get(IAppManager::class);
+		try {
+			foreach (['l', 'm', 's1', 's2'] as $k) {
+				$group->addUser($users->get($fx[$k]->uid));
+			}
+			$apps->enableAppForGroups('nextnotes', [$gid]);
+			// lokaler AppConfig-Cache des Webservers (TTL 3 s)
+			sleep(4);
+			self::assertNotSame(200, $x->call('GET', '/assignments')->status, 'Kontrolle: X ohne App-Freigabe');
+			self::ok($l->call('POST', "/assignments/$aid/distribute"), 'Austeilen');
+			$subs = self::submissionsOf($aid);
+			self::assertArrayHasKey($fx['s1']->uid, $subs);
+			self::assertArrayHasKey($fx['s2']->uid, $subs);
+			self::assertArrayNotHasKey($x->uid, $subs, 'X ohne App-Freigabe: keine Kopie');
+			self::assertSame([], self::ownedWorkspaceIds($x->uid), 'X: kein Schüler-Workspace');
+			$list = self::ok($l->call('GET', "/assignments/$aid/submissions"), 'Abgabenliste');
+			self::assertSame(0, $list['not_distributed'], 'X zählt nicht als noch nicht ausgeteilt');
+			Server::get(AccessService::class)->resetCache();
+			Server::get(TeamService::class)->resetCache();
+			Server::get(AssignmentDeadlineService::class)->run(120);
+			self::assertArrayNotHasKey($x->uid, self::submissionsOf($aid), 'Job teilt X nicht aus');
+
+			// Freischaltung: X bekommt die Kopie als Nachzügler (eigener Zugriff)
+			$group->addUser($users->get($x->uid));
+			self::ok($x->call('GET', '/assignments'), 'X öffnet Aufgaben');
+			self::assertArrayHasKey($x->uid, self::submissionsOf($aid), 'X: Nachzügler-Kopie nach Freischaltung');
+		} finally {
+			$apps->enableApp('nextnotes');
+			$group->delete();
+			sleep(4);
+		}
 	}
 }
