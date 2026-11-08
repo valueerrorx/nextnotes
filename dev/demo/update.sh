@@ -9,10 +9,10 @@ repo="$(cd "$here/../.." && pwd)"
 dc() { docker compose -f "$here/compose.yaml" "$@"; }
 occ() { dc exec -T -u www-data nc php occ "$@"; }
 
-# Nur den committeten Stand (HEAD) einspielen, nie halbfertige Änderungen aus dem Arbeitsbaum.
+# Nur einen committeten Stand einspielen (Standard HEAD, sonst NN_DEMO_REF, z. B. ein Vorschau-Snapshot), nie den Arbeitsbaum direkt.
 src="$(mktemp -d)"
 trap 'git -C "$repo" worktree remove --force "$src" >/dev/null 2>&1 || rm -rf "$src"' EXIT
-git -C "$repo" worktree add --detach --force "$src" HEAD >/dev/null 2>&1
+git -C "$repo" worktree add --detach --force "$src" "${NN_DEMO_REF:-HEAD}" >/dev/null 2>&1
 [[ -d "$repo/nextnotes/build/node_modules" ]] && ln -s "$repo/nextnotes/build/node_modules" "$src/nextnotes/build/node_modules"
 make -C "$src/nextnotes" build >/dev/null
 dc up -d
@@ -110,5 +110,5 @@ if [[ $apps == *'"circles"'* ]]; then
 else
 	echo "Hinweis: Teams-App (circles) nicht aktiv, Beispiel-Teams übersprungen" >&2
 fi
-echo "Demo bereit: http://localhost:8090  (admin/admin, thomas/thomas-demo-2026, schueler1 und schueler2/schueler-demo-2026), Stand $(git -C "$repo" log --oneline -1)"
+echo "Demo bereit: http://localhost:8090  (admin/admin, thomas/thomas-demo-2026, schueler1 und schueler2/schueler-demo-2026), Stand $(git -C "$repo" log --oneline -1 "${NN_DEMO_REF:-HEAD}")"
 echo "Teams: „Klasse 4a“ (Owner thomas, Mitglieder schueler1, schueler2; Team-Workspace „Klasse 4a“ mit Material-Ordner), „Fachgruppe Mathe“ (Owner admin, thomas Moderator)"
