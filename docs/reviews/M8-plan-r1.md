@@ -1,0 +1,20 @@
+# Review M8-plan r1 (speccritic)
+
+VERDICT: BLOCKER
+
+Gelesen: docs/slices/M8-plan.md (r1), ADR 0018/0005/0006/0012/0017, SPEC §4.3, §4.6, §11.1; Stichproben HtmlSanitizer.php, ConversionService/NoteService::applyContent, math-renderer.js, note-edit-lock.js, note_display.php, MathLive 0.111.4 (`mathlive.js`, Attribut-Escaping).
+
+## Blocker
+1. **M8c §4 „Grenzen gegen Einfrieren“ / Done M8c 3 – exponentieller Aufwand über Funktionskomposition.** Erlaubt ist, dass Rümpfe in früheren Zeilen definierte Funktionen aufrufen (`f(x)=x+1`, `g(x)=f(x)+f(x)`, `h(x)=g(x)+g(x)` …). Bei 200 Zeilen sind das bis 2^200 Aufrufe in **einer** Zeile; das 200-ms-Budget wird nur zwischen Zeilen geprüft und kann eine laufende Auswertung nicht abbrechen. Folge: eingefrorener Tab bei jedem schreibenden Team-Mitglied bzw. Schüler (ausgeteilte Vorlage) und bei Lesern über den Graph-Pfad (function-plot ruft `fn` hundertfach). Rekursionsverbot allein reicht nicht. Fehlt: harte Grenze je Auswertung (z. B. Zähler in jedem Wrapper benutzerdefinierter Funktionen, Abbruch nach N Aufrufen; gilt auch für die an function-plot übergebene `fn`) und ein Done-Kriterium mit genau diesem Fall (Kompositionskette, Abbruch ≤ X ms, Fehlerzeile, Graph-Pfad für Leser).
+2. **M8c §4 math.js-Schicht 2/3 – Aufruf-Whitelist nicht festgelegt.** Schicht 3 erlaubt `FunctionNode` mit „Name ∈ Whitelist“, Schicht 1 enthält aber `evaluate`, `unit`, `number`, `format`, `to`. Welche Namen aus Ausdrücken aufrufbar sind, steht nirgends; zudem ist nicht verlangt, dass `FunctionNode.fn` ein `SymbolNode` ist (math.js erlaubt beliebige Knoten als Aufrufziel, z. B. `f(1)(2)` oder Klammerausdrücke). Ebenso offen: Schicht 2 überschreibt `parse`/`compile`/`evaluate` in der Instanz, Schicht 3 und der Graph brauchen genau diese – die Referenzen müssen vor dem `import` gesichert werden. Fehlt: explizite Liste der aus Ausdrücken aufrufbaren Funktionen (ohne `evaluate`, `parse`, `compile`, `import`, `config`, `createUnit`), Regel „Aufrufziel nur `SymbolNode`“, Reihenfolge „Referenzen sichern → `import` mit Stubs“, und je ein Testfall (`f(1)(2)`, `(sin)(1)`, `evaluate("1")` trotz AST-Prüfung → Stub).
+
+## Hinweise
+- MathLive (M8a): `data-math` wird von Fremd-Autoren (Team, Austeilen) in `<math-field>` geladen. Stichprobe 0.111.4: Attributwerte werden escaped, `\htmlData{href=…}` nur http/https, `\htmlStyle` über `validateInlineStyle`. Trotzdem Testfälle mit `\htmlData`, `\cssId`, `\class`, `\htmlStyle`, `\href{javascript:…}` in Done M8a aufnehmen; `openUrl` für `file:` abschalten.
+- Konverter HTML→Markdown: LaTeX mit `$`/Leerzeilen und Rechenblock-`src` mit ``` brechen aus `$…$` bzw. dem Codezaun aus. Kein XSS (Ausgabe geht durch `sanitizeMarkdown`), aber Strukturbruch: Zaun länger als längste Backtick-Folge, `$` im LaTeX behandeln, Testfall.
+- R2/Done M8b 6: Die Sperre wird beim Laden der Notiz erworben (`note-edit-lock.js` `handleCurrentNoteLoaded` → `acquireLock`), nicht bei Eingabe. Kriterium entsprechend formulieren („A öffnet Notiz → B sieht Banner, Block statisch“), sonst prüft der Test ein Verhalten, das es nicht gibt.
+- Modus zusätzlich an `data-nextnotes-readonly` koppeln (Abwehr, falls Upstream `contenteditable` an `.noteentry` zurücksetzt).
+- Sanitizer: `data-nn-sheet`/`data-nn-calc` unabhängig von der Klasse validieren; verschachtelte Block-Hosts im Fallback (Block im Block) ausschließen oder festlegen.
+- `json_decode` liefert für `1e999` `INF` – „endlich“ per `is_finite` prüfen (steht im Vertrag, im Test explizit aufnehmen).
+- ADR-Abweichungen per Nachtrag festhalten: Rechenblock-Leser sehen statische Ergebnisse statt Neuberechnung (ADR 0018 Block 3), geschützte HF-Funktionen `VERSION`/`BEREICH.VERSCHIEBEN` erweitern faktisch die Whitelist („nur mit Thomas erweitern“), Fehlercode `#CYCLE!` statt `#ZYKLUS!`.
+- Done M8b 3: `HEUTE` hat keinen festen LibreOffice-Referenzwert – im Fixture gesondert prüfen.
+- P38 einziger `src/`-Patch, B69-Fix serverseitig mit PHPUnit + E2E (Done M8a 2): in Ordnung. CSP: keine neue Ausnahme, Zählung je Ansicht vorgesehen: in Ordnung.
