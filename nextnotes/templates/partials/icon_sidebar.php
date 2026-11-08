@@ -11,7 +11,6 @@
 // Abmelden, Konten, Git, Profil-/Farb-/Reihenfolge-Modals (gespeicherte icon_sidebar_order wird nicht angewendet).
 /** @var array $_ */
 /** @var \OCA\NextNotes\Service\View\PageTranslator $tr */
-$homeLabel = $tr->t('common.home', [], 'Home');
 $railToggleLabel = $tr->t('sidebar.toggle_icon_sidebar', [], 'Hide/Show icon sidebar');
 $overflowLabel = $tr->t('sidebar.show_hidden_icons', [], 'Show hidden icons');
 $railPage = $_['currentPage'] ?? 'index.php';
@@ -39,9 +38,6 @@ $railBottom = [
 $railGroup = null;
 ?>
 <nav id="icon_sidebar">
-	<a href="<?php p($_['baseUrl'] . 'dashboard.php' . $railQuery); ?>" id="iconSidebarLogo" class="icon-sidebar-logo" title="<?php p($homeLabel); ?>" aria-label="<?php p($homeLabel); ?>">
-		<span class="poznote-logo nextnotes-logo" aria-hidden="true"></span>
-	</a>
 	<div class="icon-sidebar-scroll">
 	<?php foreach ($railItems as $railItem): ?>
 		<?php if ($railGroup !== null && $railGroup !== $railItem['group']): ?>
