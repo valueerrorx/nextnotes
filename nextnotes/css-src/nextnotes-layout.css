@@ -508,6 +508,11 @@ body#body-user.excalidraw-editor-page {
 	margin: 0;
 }
 
+/* Bestätigungsdialoge: Upstream verlässt sich auf den Browser-Abstand von <p> (NC-Kern setzt ihn auf 0) → Knöpfe klebten am Text */
+#nextnotes-root .modal-content > p:has(+ .modal-buttons) {
+	margin-block-end: calc(var(--default-grid-baseline) * 5);
+}
+
 @media (max-width: 768px) {
 	#nextnotes-root .folder-inline-actions {
 		display: none;
