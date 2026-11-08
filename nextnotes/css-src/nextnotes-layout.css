@@ -1272,6 +1272,8 @@ body.icon-sidebar-collapsed #content #nextnotes-root #iconSidebarToggle {
 	#content #nextnotes-root > .nn-page-main .graph-head {
 		margin-inline: 0 auto;
 		padding-inline-start: 0;
+		/* Thomas 2026-11-08: kein grauer Kasten hinter Titel/Knöpfen (Upstream --graph-page-bg) */
+		background: transparent;
 	}
 }
 
