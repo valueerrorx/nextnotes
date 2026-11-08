@@ -125,6 +125,9 @@ final class ViewsM4gTest extends ApiTestCase {
 		[$ws2] = self::newWorkspace($a, 'Zwei');
 		self::get($a, 'dashboard.php?scope=all');
 		self::assertSame('', (string)(self::ok($a->call('GET', '/settings/dashboard_scope'), 'scope')['value'] ?? ''), 'B63: GET schreibt dashboard_scope nicht');
+		self::assertMatchesRegularExpression('/"mode":"all"/', self::get($a, "dashboard.php?$wq")->body, 'ohne gespeicherte Wahl: Alle Workspaces (Thomas 2026-11-08)');
+		self::ok($a->call('PUT', '/settings/dashboard_scope', ['value' => json_encode(['scope' => 'single', 'workspace' => $ws])]), 'Einzelwahl speichern');
+		self::assertMatchesRegularExpression('/"mode":"single"/', self::get($a, "dashboard.php?$wq")->body, 'gespeicherte Einzelwahl folgt dem Workspace');
 		self::ok($a->call('PUT', '/settings/dashboard_scope', ['value' => json_encode(['scope' => 'list', 'ws' => [$ws, $ws2]])]), 'Bereich speichern');
 		self::assertMatchesRegularExpression('/"mode":"list"/', self::get($a, 'dashboard.php')->body, 'gespeicherte Mehrfach-Wahl');
 		self::assertMatchesRegularExpression('/"mode":"single"/', self::get($a, "dashboard.php?scope=single&$wq")->body, 'scope=single');

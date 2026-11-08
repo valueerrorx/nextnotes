@@ -113,10 +113,12 @@ class DashboardViewService {
 			}
 		}
 		$requested = is_string($params['scope'] ?? null) ? strtolower(trim($params['scope'])) : '';
-		// ohne scope= (Icon-Leiste, Lesezeichen) gilt eine gespeicherte Mehrfach-Wahl; eine gespeicherte Einzelwahl folgt dem Workspace der Seite
+		// ohne scope= (Icon-Leiste, Lesezeichen) gilt eine gespeicherte Mehrfach-Wahl; eine gespeicherte Einzelwahl folgt dem Workspace der Seite;
+		// ohne gespeicherte Wahl „Alle Workspaces“ (Thomas 2026-11-08)
 		if (!in_array($requested, ['all', 'tag', 'list', 'single'], true)) {
 			$saved = json_decode($this->settings->get($uid, 'dashboard_scope', ''), true);
-			if (is_array($saved) && in_array($saved['scope'] ?? null, ['all', 'tag', 'list'], true)) {
+			$saved = is_array($saved) && in_array($saved['scope'] ?? null, ['all', 'tag', 'list', 'single'], true) ? $saved : ['scope' => 'all'];
+			if ($saved['scope'] !== 'single') {
 				$restored = $this->resolve($saved, $ids, $tags);
 				if ($restored['workspaces'] !== []) {
 					return $restored + ['ids' => $ids, 'tags' => $tags, 'colors' => $colors];
