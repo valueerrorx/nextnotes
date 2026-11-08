@@ -10,12 +10,16 @@ declare(strict_types=1);
 namespace OCA\NextNotes\Service\View;
 
 use OCA\NextNotes\Db\AssignmentMapper;
+use OCA\NextNotes\Db\Note;
 use OCA\NextNotes\Db\SubmissionMapper;
 use OCA\NextNotes\Service\AccessService;
 use OCA\NextNotes\Service\Exception\ApiException;
 use OCA\NextNotes\Service\QuotaService;
+use OCA\NextNotes\Service\SubmissionStateService;
 use OCA\NextNotes\Service\TeamService;
 use OCA\NextNotes\Service\TeamStateService;
+use OCP\AppFramework\Db\DoesNotExistException;
+use OCP\IDateTimeFormatter;
 use OCP\IL10N;
 
 /** Seite „Aufgaben“ (assignments.php, SPEC §9.6): Icon-Leiste, Teams zum Anlegen mit Belegung, Texte für nextnotes-assignments.js; Liste lädt die API */
@@ -38,6 +42,8 @@ class AssignmentsViewService {
 		private QuotaService $quota,
 		private IL10N $l,
 		private AccessService $access,
+		private SubmissionStateService $states,
+		private IDateTimeFormatter $dates,
 	) {
 	}
 
@@ -97,6 +103,82 @@ class AssignmentsViewService {
 		}
 		$team = $ws->getOwnerType() === 'team' ? (string)$ws->getOwnerId() : null;
 		return $team !== null && in_array($team, array_column($teacherTeams, 'id'), true) ? $team : null;
+	}
+
+	/**
+	 * Editor-Banner (M6g2, SPEC §9.5): eigene Abgabe-Kopie (Status, Frist, Abgeben/Zurückziehen, Grund der Sperre) oder Vorlage; sonst null.
+	 * Aufruf erst nach requireNote(read).
+	 * @return array{kind: string, tone: string, title: string, statusLabel: string, text: string, due: string, submissionId: ?int, canSubmit: bool, canUnsubmit: bool, url: string, linkLabel: string}|null
+	 */
+	public function noteBanner(string $uid, Note $note): ?array {
+		$role = $note->getRole();
+		if (($role !== 'submission' && $role !== 'template') || $note->getAssignmentId() === null) {
+			return null;
+		}
+		try {
+			$a = $this->assignments->find((int)$note->getAssignmentId());
+		} catch (DoesNotExistException) {
+			return null;
+		}
+		$l = $this->l;
+		$base = ['title' => (string)$a->getTitle(), 'url' => 'assignments.php?' . http_build_query(['assignment' => (int)$a->getId()]),
+			'submissionId' => null, 'canSubmit' => false, 'canUnsubmit' => false, 'linkLabel' => $l->t('Open assignment')];
+		if ($role === 'template') {
+			if ((int)$a->getTemplateNoteId() !== (int)$note->getId()) {
+				return null;
+			}
+			$draft = $a->getStatus() === 'draft' && $this->teamState->stateOf((string)$a->getTeamId()) === TeamStateService::ACTIVE;
+			return $base + ['kind' => 'template', 'tone' => $draft ? 'info' : 'neutral',
+				'statusLabel' => $draft ? $l->t('Template – draft') : $l->t('Template – read only'),
+				'text' => $draft ? $l->t('Students get a copy of this template when you hand out the assignment.') : $l->t('The assignment was handed out; the template can no longer be changed.'),
+				'due' => $this->dueText((int)$a->getDueAt())];
+		}
+		try {
+			$s = $note->getSubmissionId() === null ? null : $this->submissions->find((int)$note->getSubmissionId());
+		} catch (DoesNotExistException) {
+			$s = null;
+		}
+		// nur die eigene Kopie; Lehrkräfte sehen Abgaben auf der Aufgaben-Seite
+		if ($s === null || (int)$s->getNoteId() !== (int)$note->getId() || $s->getStudentUid() === null || $s->getStudentUid() !== $uid) {
+			return null;
+		}
+		$s = $this->states->materialize($s, $a);
+		$lock = $this->states->studentLock($uid, $s, $a);
+		$canUnsubmit = $this->states->studentCanUnsubmit($uid, $s, $a);
+		$text = match ($lock) {
+			null => $l->t('Work on this copy and hand it in before the deadline. After handing in, it is read-only.'),
+			'submitted' => $l->t('Handed in on %s – read only.', [$this->date($s->getSubmittedAt())])
+				. ($canUnsubmit ? ' ' . $l->t('Until the deadline you can withdraw it to keep working.') : ''),
+			'returned' => $l->t('Returned by %s – read only. The feedback is shown with your assignment.', [(string)($s->getFeedbackByName() ?? '')]),
+			'missed' => $l->t('The deadline has passed – read only.'),
+			'closed' => $l->t('The assignment was closed – read only.'),
+			'team' => $l->t('The team is no longer active – read only.'),
+			default => $l->t('You are no longer a student of this team – read only.'),
+		};
+		return array_merge($base, ['kind' => 'submission',
+			'tone' => $lock === null ? 'info' : (in_array($lock, ['submitted', 'returned'], true) ? 'success' : 'warning'),
+			'statusLabel' => $this->statusLabel((string)$s->getStatus()), 'text' => $text,
+			'due' => $this->dueText(SubmissionStateService::effectiveDue($s, $a)),
+			'submissionId' => (int)$s->getId(), 'canSubmit' => $lock === null, 'canUnsubmit' => $canUnsubmit,
+			'linkLabel' => $lock === 'returned' ? $l->t('Show feedback') : $l->t('Open assignment')]);
+	}
+
+	private function statusLabel(string $status): string {
+		return match ($status) {
+			'submitted' => $this->l->t('Handed in'),
+			'returned' => $this->l->t('Returned'),
+			'missed' => $this->l->t('Missed'),
+			'reopened' => $this->l->t('Reopened'),
+			default => $this->l->t('Assigned'),
+		};
+	}
+
+	private function dueText(?int $due): string {
+		return $due === null ? $this->l->t('No deadline') : $this->l->t('Due %s', [$this->date($due)]);
+	}
+
+	private function date(?int $ts): string {
+		return $ts === null ? '' : $this->dates->formatDateTime($ts, 'medium', 'short');
 	}
 
 	/** @return array<string, string> Texte der Seite (NC-l10n) */
@@ -186,6 +268,35 @@ class AssignmentsViewService {
 			'sourceNotAllowed' => $l->t('Only your own notes or notes of this team can become an assignment.'),
 			'studentDeleted' => $l->t('The account of this student was deleted; the submission can no longer be reopened.'),
 			'invalidTransition' => $l->t('This is not possible in the current state.'),
+			// Schüler-Sicht, Löschen, verwaiste Teams (M6g2)
+			'noDeadline' => $l->t('No deadline'),
+			'from' => $l->t('From {name}'),
+			'editCopy' => $l->t('Edit'),
+			'viewCopy' => $l->t('View'),
+			'handIn' => $l->t('Hand in'),
+			'handInConfirm' => $l->t('Hand in "{title}"? Afterwards your copy is read-only.'),
+			'handedIn' => $l->t('Handed in.'),
+			'withdraw' => $l->t('Withdraw'),
+			'withdrawConfirm' => $l->t('Withdraw your submission? Until the deadline you can keep working and hand it in again. If you do not hand it in again before the deadline, the assignment counts as not handed in.'),
+			'withdrawn' => $l->t('Submission withdrawn. You can keep working.'),
+			'downloadOwn' => $l->t('Download'),
+			'submissionLocked' => $l->t('This submission can no longer be changed. Reload the page.'),
+			'lockOpen' => $l->t('Work on your copy and hand it in before the deadline. After handing in, it is read-only.'),
+			'lockSubmitted' => $l->t('Handed in on {date}. Your teacher sees your work.'),
+			'lockReturned' => $l->t('Your teacher returned your work.'),
+			'lockMissed' => $l->t('The deadline has passed. Your copy is read-only.'),
+			'lockClosed' => $l->t('The assignment was closed. Your copy is read-only.'),
+			'lockTeam' => $l->t('The team is no longer active. Your copy is read-only.'),
+			'lockLeft' => $l->t('You are no longer a student of this team. Your copy is read-only.'),
+			'noFeedbackText' => $l->t('No written feedback.'),
+			'deleteAssignment' => $l->t('Delete assignment'),
+			'deleteConfirm' => $l->t('Delete "{title}"? {n} submissions with the copies and attachments of the students are deleted permanently.'),
+			'deleteNone' => $l->t('Delete "{title}"? It has no submissions.'),
+			'exportFirst' => $l->t('Export first (ZIP)'),
+			'assignmentDeleted' => $l->t('"{title}" was deleted.'),
+			'orphanedHint' => $l->t('The team was deleted. The assignment and all submissions are deleted on {date}. Download them before.'),
+			'orphanedHintStudent' => $l->t('The team was deleted. Your submission is deleted on {date}. Download it before.'),
+			'frozenHint' => $l->t('The Teams app is not available. The assignment is read-only.'),
 		];
 	}
 }

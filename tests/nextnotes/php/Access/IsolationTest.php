@@ -175,10 +175,13 @@ final class IsolationTest extends ApiTestCase {
 			'DELETE /assignments/{}' => ['excluded', 'path' => '/assignments/999999999', 'body' => ['confirm' => true], 'status' => 404, 'reason' => 'A hat keine Aufgaben; Rechte in Assignments/'],
 			'GET /assignments/{}/submissions' => ['excluded', 'path' => '/assignments/999999999/submissions', 'status' => 404, 'reason' => 'A hat keine Aufgaben; Rechte in Assignments/'],
 			'GET /submissions/{}' => ['excluded', 'path' => '/submissions/999999999', 'status' => 404, 'reason' => 'A hat keine Abgaben; Rechte in Assignments/'],
+			'GET /assignments/{}/export' => ['excluded', 'path' => '/assignments/999999999/export', 'status' => 404, 'reason' => 'A hat keine Aufgaben; Rechte in Assignments/AssignmentExportTest'],
+			'GET /submissions/{}/export' => ['excluded', 'path' => '/submissions/999999999/export', 'status' => 404, 'reason' => 'A hat keine Abgaben; Rechte in Assignments/AssignmentExportTest'],
 			// M6e1: Austeilen und Abgabe-Aktionen; Rechte und Zustände in Assignments/SubmissionStateTest, DistributeTest
 			'POST /assignments/{}/distribute' => ['excluded', 'path' => '/assignments/999999999/distribute', 'body' => [], 'status' => 404, 'reason' => 'A hat keine Aufgaben; Rechte in Assignments/'],
 			'POST /assignments/{}/close' => ['excluded', 'path' => '/assignments/999999999/close', 'body' => [], 'status' => 404, 'reason' => 'A hat keine Aufgaben; Rechte in Assignments/'],
 			'POST /submissions/{}/submit' => ['excluded', 'path' => '/submissions/999999999/submit', 'body' => [], 'status' => 404, 'reason' => 'A hat keine Abgaben; Rechte in Assignments/'],
+			'POST /submissions/{}/unsubmit' => ['excluded', 'path' => '/submissions/999999999/unsubmit', 'body' => [], 'status' => 404, 'reason' => 'A hat keine Abgaben; Rechte in Assignments/'],
 			'POST /submissions/{}/return' => ['excluded', 'path' => '/submissions/999999999/return', 'body' => [], 'status' => 404, 'reason' => 'A hat keine Abgaben; Rechte in Assignments/'],
 			'POST /submissions/{}/reopen' => ['excluded', 'path' => '/submissions/999999999/reopen', 'body' => [], 'status' => 404, 'reason' => 'A hat keine Abgaben; Rechte in Assignments/'],
 			'PUT /submissions/{}/feedback' => ['excluded', 'path' => '/submissions/999999999/feedback', 'body' => ['feedback' => 'x'], 'status' => 404, 'reason' => 'A hat keine Abgaben; Rechte in Assignments/'],
@@ -465,7 +468,7 @@ final class IsolationTest extends ApiTestCase {
 			}
 		}
 		self::assertSame([], $errors);
-		self::assertCount(136, $table);
+		self::assertCount(139, $table);
 	}
 
 	public function testDetectorsObject(): void {

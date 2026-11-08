@@ -238,9 +238,19 @@ class IndexViewService {
 	 * @throws NotFoundException Workspace für uid nicht erreichbar
 	 */
 	private function shownView(string $uid, Note $note, ?int $pageWsId, string $pageKey, ?array $pageRights, array $byId): array {
+		// Banner für Abgabe-Kopie bzw. Vorlage (M6g2), sonst null
+		$banner = ['assignment' => $this->assignmentsView->noteBanner($uid, $note)];
+		// Vorlage ohne Workspace (M6g2): requireNote hat review geprüft, Schreibrecht je Notiz (nur Entwurf)
+		if ($note->getRole() === 'template' && $note->getWorkspaceId() === null) {
+			return $this->noteView($uid, $note, '', $this->access->noteLevel($uid, $note) >= AccessService::WRITE, []) + ['materialCopy' => false] + $banner;
+		}
+		// Abgabe-Kopie im Schüler-Workspace: Workspace gibt kein Schreibrecht, nur studentCanEdit je Notiz (M6g2)
+		if ($note->getRole() === 'submission' && $pageWsId !== null && (int)$note->getWorkspaceId() === $pageWsId) {
+			return $this->noteView($uid, $note, $pageKey, $this->access->noteLevel($uid, $note) >= AccessService::WRITE, $byId) + ['materialCopy' => false] + $banner;
+		}
 		if ($pageWsId !== null && $pageRights !== null && (int)$note->getWorkspaceId() === $pageWsId) {
 			$copy = self::materialCopy($pageRights, $note);
-			return $this->noteView($uid, $note, $pageKey, $pageRights['canWrite'] && !$copy, $byId) + ['materialCopy' => $copy];
+			return $this->noteView($uid, $note, $pageKey, $pageRights['canWrite'] && !$copy, $byId) + ['materialCopy' => $copy] + $banner;
 		}
 		// kein Schlüssel = Workspace für uid nicht erreichbar, kein Rückfall auf den Standard-Workspace
 		$key = $this->workspaces->keyFor($uid, (int)$note->getWorkspaceId());
@@ -251,7 +261,7 @@ class IndexViewService {
 		// Notiz außerhalb der Seite: Schreibrecht je Notiz (Material, Plan M6 §2.6)
 		$canWrite = $this->access->noteLevel($uid, $note) >= AccessService::WRITE;
 		$copy = !$canWrite && $this->access->isMaterialReadOnly($uid, $note);
-		return $this->noteView($uid, $note, $key, $canWrite, $this->folders->byId((int)$ws->getId())) + ['materialCopy' => $copy];
+		return $this->noteView($uid, $note, $key, $canWrite, $this->folders->byId((int)$ws->getId())) + ['materialCopy' => $copy] + $banner;
 	}
 
 	/**

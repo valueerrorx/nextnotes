@@ -31,6 +31,10 @@ class LinkService {
 	/** @return array{backlinks: list<array<string, mixed>>, count: int} GET /notes/{id}/backlinks */
 	public function backlinks(string $uid, int $id, mixed $wsKey, bool $allWorkspaces): array {
 		$target = $this->access->requireNote($uid, $id, 'read');
+		// Vorlage/Abgabe: nie verlinkbar (nur Direktzugriff), Editor fragt mit Seiten-Workspace (M6g2)
+		if ($target->getRole() !== 'note') {
+			return ['backlinks' => [], 'count' => 0];
+		}
 		$ws = $this->workspaces->resolveOptional($uid, $wsKey);
 		if ($ws !== null && $ws->getId() !== $target->getWorkspaceId()) {
 			throw new NotFoundException('Note not found');

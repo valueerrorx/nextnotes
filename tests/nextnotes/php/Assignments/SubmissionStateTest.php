@@ -13,6 +13,7 @@ namespace OCA\NextNotes\Tests\Assignments;
 final class SubmissionStateTest extends AssignmentTestCase {
 	private const ALLOWED = [
 		'submit' => ['assigned' => 'submitted', 'reopened' => 'submitted'],
+		'unsubmit' => ['submitted' => 'assigned'],
 		'return' => ['submitted' => 'returned', 'missed' => 'returned'],
 		'reopen' => ['submitted' => 'reopened', 'missed' => 'reopened', 'returned' => 'reopened'],
 		'feedback' => ['submitted' => 'submitted', 'missed' => 'missed', 'returned' => 'returned'],
@@ -23,6 +24,7 @@ final class SubmissionStateTest extends AssignmentTestCase {
 		$sid = (int)$fx['subs'][$fx['s1']->uid]['id'];
 		$calls = [
 			'submit' => fn () => $fx['s1']->call('POST', "/submissions/$sid/submit"),
+			'unsubmit' => fn () => $fx['s1']->call('POST', "/submissions/$sid/unsubmit"),
 			'return' => fn () => $fx['l']->call('POST', "/submissions/$sid/return", ['feedback' => 'gut', 'points' => 3]),
 			'reopen' => fn () => $fx['l']->call('POST', "/submissions/$sid/reopen", ['due_override_at' => time() + 600]),
 			'feedback' => fn () => $fx['m']->call('PUT', "/submissions/$sid/feedback", ['feedback' => 'neu']),
@@ -112,5 +114,74 @@ final class SubmissionStateTest extends AssignmentTestCase {
 		$r = $fx['s2']->call('POST', "/submissions/$s2/submit");
 		self::assertSame([403, 'submission_locked'], [$r->status, $r->json()['code'] ?? null], 'submit im verwaisten Team');
 		self::setTeamState($fx['t'], 'active');
+	}
+
+	// M6g2: Abgabe zurückziehen nur eigene, abgegeben, Frist läuft, Aufgabe ausgeteilt; eigene Frist bleibt (reopened); Felder für die Schüler-Ansicht
+	public function testUnsubmit(): void {
+		$fx = $this->distributedFixture();
+		['l' => $l, 's1' => $s1, 's2' => $s2] = $fx;
+		$sid = (int)$fx['subs'][$s1->uid]['id'];
+		$own = self::ok($s1->call('GET', "/submissions/$sid"), 'S1 liest')['submission'];
+		self::assertSame([true, false, null], [$own['can_submit'], $own['can_unsubmit'], $own['lock']], 'offen');
+		$own = self::ok($s1->call('POST', "/submissions/$sid/submit"), 'abgeben')['submission'];
+		self::assertSame([false, true, 'submitted'], [$own['can_submit'], $own['can_unsubmit'], $own['lock']], 'abgegeben');
+		self::assertSame(404, $s2->call('POST', "/submissions/$sid/unsubmit")->status, 'S2 fremd');
+		self::assertContains($l->call('POST', "/submissions/$sid/unsubmit")->status, [403, 404], 'Lehrkraft nicht');
+		$own = self::ok($s1->call('POST', "/submissions/$sid/unsubmit"), 'zurückziehen')['submission'];
+		self::assertSame(['assigned', null, true], [$own['status'], $own['submitted_at'], $own['can_submit']], 'wieder offen');
+		self::ok($s1->call('PATCH', '/notes/' . $fx['subs'][$s1->uid]['note_id'], ['content' => '<p>weiter</p>']), 'S1 schreibt wieder');
+
+		// Review M6g2-r1: Feedback/Punkte in submitted → kein Zurückziehen (403), Status bleibt
+		self::ok($s1->call('POST', "/submissions/$sid/submit"), 'abgeben (Bewertung)');
+		self::ok($l->call('PUT', "/submissions/$sid/feedback", ['points' => 1]), 'Punkte vor Rückgabe');
+		self::assertFalse(self::ok($s1->call('GET', "/submissions/$sid"), 'S1 liest')['submission']['can_unsubmit'], 'can_unsubmit nach Punkten');
+		$r = $s1->call('POST', "/submissions/$sid/unsubmit");
+		self::assertSame([403, 'submission_locked', 'submitted'], [$r->status, $r->json()['code'] ?? null, self::row('nextnotes_submissions', $sid)['status']], 'nach Punkten');
+		self::setColumn('nextnotes_submissions', $sid, 'points', null);
+		self::setColumn('nextnotes_submissions', $sid, 'feedback_at', null);
+		self::setColumn('nextnotes_submissions', $sid, 'feedback_by', null);
+		self::setColumn('nextnotes_submissions', $sid, 'feedback_by_name', null);
+		self::ok($l->call('PUT', "/submissions/$sid/feedback", ['feedback' => 'Notiz der Lehrkraft']), 'Feedback vor Rückgabe');
+		$r = $s1->call('POST', "/submissions/$sid/unsubmit");
+		self::assertSame([403, 'submission_locked', 'submitted'], [$r->status, $r->json()['code'] ?? null, self::row('nextnotes_submissions', $sid)['status']], 'nach Feedback');
+		foreach (['feedback', 'feedback_at', 'feedback_by', 'feedback_by_name'] as $col) {
+			self::setColumn('nextnotes_submissions', $sid, $col, null);
+		}
+		self::ok($s1->call('POST', "/submissions/$sid/unsubmit"), 'ohne Feedback wieder möglich');
+
+		// eigene Frist: reopened → submitted → zurück nach reopened mit derselben Frist
+		self::ok($s1->call('POST', "/submissions/$sid/submit"), 'abgeben 2');
+		$due = time() + 900;
+		self::ok($l->call('POST', "/submissions/$sid/reopen", ['due_override_at' => $due]), 'wiederöffnen');
+		self::ok($s1->call('POST', "/submissions/$sid/submit"), 'abgeben 3');
+		$own = self::ok($s1->call('POST', "/submissions/$sid/unsubmit"), 'zurückziehen 2')['submission'];
+		self::assertSame(['reopened', $due], [$own['status'], $own['due_override_at']], 'eigene Frist bleibt');
+
+		// Frist abgelaufen → 403, Status bleibt abgegeben
+		self::ok($s1->call('POST', "/submissions/$sid/submit"), 'abgeben 4');
+		self::setColumn('nextnotes_submissions', $sid, 'due_override_at', time() - 5);
+		$r = $s1->call('POST', "/submissions/$sid/unsubmit");
+		self::assertSame([403, 'submission_locked', 'submitted'], [$r->status, $r->json()['code'] ?? null, self::row('nextnotes_submissions', $sid)['status']], 'nach Frist');
+		// zurückgegeben → 409
+		self::ok($l->call('POST', "/submissions/$sid/return", ['feedback' => 'ok']), 'zurückgeben');
+		self::assertSame(409, $s1->call('POST', "/submissions/$sid/unsubmit")->status, 'nach Rückgabe');
+
+		// geschlossene Aufgabe → 409, Status bleibt
+		$sx = (int)$fx['subs'][$fx['x']->uid]['id'];
+		self::ok($fx['x']->call('POST', "/submissions/$sx/submit"), 'X abgeben');
+		self::ok($l->call('POST', "/assignments/{$fx['aid']}/close"), 'schließen');
+		$r = $fx['x']->call('POST', "/submissions/$sx/unsubmit");
+		self::assertSame([409, 'submitted'], [$r->status, self::row('nextnotes_submissions', $sx)['status']], 'geschlossen');
+	}
+
+	// Review M6g2-r1: ausgetretener Schüler zieht nicht zurück (403)
+	public function testUnsubmitAfterLeaving(): void {
+		$fx = $this->distributedFixture();
+		['l' => $l, 's1' => $s1] = $fx;
+		$sid = (int)$fx['subs'][$s1->uid]['id'];
+		self::ok($s1->call('POST', "/submissions/$sid/submit"), 'abgeben');
+		$this->teams->remove($l->uid, $fx['memberS1']);
+		$r = $s1->call('POST', "/submissions/$sid/unsubmit");
+		self::assertSame([403, 'submission_locked', 'submitted'], [$r->status, $r->json()['code'] ?? null, self::row('nextnotes_submissions', $sid)['status']], 'ausgetreten');
 	}
 }

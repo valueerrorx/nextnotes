@@ -70,6 +70,13 @@ class TeamsUiConfig {
 				'openCopy' => $l->t('Open copy'),
 				'copyFailed' => $l->t('The note could not be copied.'),
 				'assignNote' => $l->t('Hand out as assignment…'),
+				'submitTitle' => $l->t('Hand in'),
+				'submitConfirm' => $l->t('Hand in "{title}"? Afterwards your copy is read-only.'),
+				'unsubmitTitle' => $l->t('Withdraw'),
+				'unsubmitConfirm' => $l->t('Withdraw your submission? Until the deadline you can keep working and hand it in again. If you do not hand it in again before the deadline, the assignment counts as not handed in.'),
+				'submitFailed' => $l->t('The action failed.'),
+				'submissionLocked' => $l->t('This submission can no longer be changed. Reload the page.'),
+				'saveFirstFailed' => $l->t('Your latest changes could not be saved. Try again.'),
 			],
 		];
 	}

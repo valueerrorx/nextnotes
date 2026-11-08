@@ -15,6 +15,7 @@ use OCA\NextNotes\Db\Submission;
 use OCA\NextNotes\Db\SubmissionMapper;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IDateTimeZone;
+use OCP\IL10N;
 
 /**
  * ZIP der Abgaben (SPEC §9.1.6, Plan M6 §2.6): je Schüler Ordner <Name>_<uid> mit Notiz, Anhängen und feedback.txt, dazu status.csv.
@@ -31,6 +32,7 @@ class AssignmentExportService {
 		private ExportArchive $archive,
 		private ZipExportService $zipExport,
 		private IDateTimeZone $timeZone,
+		private IL10N $l,
 	) {
 	}
 
@@ -105,10 +107,11 @@ class AssignmentExportService {
 		if ($withFeedback && ($s->getFeedback() !== null || $s->getPoints() !== null)) {
 			$lines = [];
 			if ($s->getPoints() !== null) {
-				$lines[] = 'Points: ' . $s->getPoints();
+				$lines[] = $this->l->t('Points: %s', [(string)$s->getPoints()]);
 			}
 			if ((string)$s->getFeedbackByName() !== '') {
-				$lines[] = 'By: ' . $s->getFeedbackByName() . ($s->getFeedbackAt() !== null ? ' (' . $this->time($s->getFeedbackAt()) . ')' : '');
+				// Sprache des Herunterladenden (M6g1-Risiko)
+				$lines[] = $this->l->t('Feedback by %s', [(string)$s->getFeedbackByName()]) . ($s->getFeedbackAt() !== null ? ' (' . $this->time($s->getFeedbackAt()) . ')' : '');
 			}
 			$lines[] = '';
 			$lines[] = (string)$s->getFeedback();

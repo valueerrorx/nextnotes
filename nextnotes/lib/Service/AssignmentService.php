@@ -140,7 +140,7 @@ class AssignmentService {
 			'distributed_at' => $a->getDistributedAt(),
 			'created_at' => (int)$a->getCreatedAt(),
 			'updated_at' => (int)$a->getUpdatedAt(),
-			'submission' => $own === null ? null : $this->submissionView($own, false),
+			'submission' => $own === null ? null : $this->ownView($uid, $own, $a),
 		];
 		if ($counts !== null) {
 			$out['template_note_id'] = (int)$a->getTemplateNoteId();
@@ -190,6 +190,19 @@ class AssignmentService {
 		return $out;
 	}
 
+	/**
+	 * Eigene Abgabe mit Schüler-Aktionen (M6g2): effektive Frist, Abgeben, Zurückziehen, Grund der Sperre
+	 * @return array<string, mixed>
+	 */
+	public function ownView(string $uid, Submission $s, Assignment $a): array {
+		return $this->submissionView($s, false) + [
+			'effective_due' => SubmissionStateService::effectiveDue($s, $a),
+			'can_submit' => $this->states->studentCanEdit($uid, $s, $a),
+			'can_unsubmit' => $this->states->studentCanUnsubmit($uid, $s, $a),
+			'lock' => $this->states->studentLock($uid, $s, $a),
+		];
+	}
+
 	/** @return array{submissions: list<array<string, mixed>>, not_distributed: int, quota_full: bool} GET /assignments/{id}/submissions (review) */
 	public function submissions(string $uid, int $id): array {
 		$a = $this->access->requireAssignment($uid, $id, 'review');
@@ -202,6 +215,9 @@ class AssignmentService {
 	public function submission(string $uid, int $id): array {
 		[$s, $a] = $this->access->requireSubmission($uid, $id, 'read');
 		$s = $this->states->materialize($s, $a);
+		if ($s->getStudentUid() === $uid && !$this->access->assignmentAllows($uid, $a, 'review')) {
+			return ['submission' => $this->ownView($uid, $s, $a)];
+		}
 		return ['submission' => $this->submissionView($s, $this->access->assignmentAllows($uid, $a, 'review'))];
 	}
 

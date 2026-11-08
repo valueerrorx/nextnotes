@@ -1540,3 +1540,95 @@ body.icon-sidebar-collapsed #content #nextnotes-root #iconSidebarToggle {
 .poznote-page-title-workspace-menu .lucide-check {
 	margin-inline-start: auto;
 }
+
+/* Abgabe-/Vorlagen-Banner über dem Notiztitel (M6g2): NC-Farben, Hell/Dunkel, Knöpfe umbrechend (mobil) */
+#nextnotes-root .nn-asg-banner {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px 16px;
+	margin: 8px 0 12px;
+	padding: 10px 12px;
+	border: 1px solid var(--color-border-maxcontrast);
+	border-inline-start-width: 4px;
+	border-radius: var(--border-radius-large, 8px);
+	background-color: var(--color-main-background);
+	color: var(--color-main-text);
+}
+
+#nextnotes-root .nn-asg-banner-info {
+	border-color: var(--color-primary-element);
+	background-color: var(--color-primary-element-light);
+	color: var(--color-primary-element-light-text);
+}
+
+#nextnotes-root .nn-asg-banner-success {
+	border-color: var(--color-success);
+	background-color: color-mix(in srgb, var(--color-success) 12%, var(--color-main-background));
+}
+
+#nextnotes-root .nn-asg-banner-warning {
+	border-color: var(--color-warning);
+	background-color: color-mix(in srgb, var(--color-warning) 14%, var(--color-main-background));
+}
+
+#nextnotes-root .nn-asg-banner-main {
+	display: flex;
+	flex: 1 1 280px;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 0;
+}
+
+#nextnotes-root .nn-asg-banner-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 10px;
+}
+
+#nextnotes-root .nn-asg-banner-chip {
+	padding: 0 8px;
+	border-radius: var(--border-radius-pill, 100px);
+	background-color: var(--color-background-dark);
+	color: var(--color-main-text);
+	font-size: var(--font-size-small, 13px);
+	font-weight: bold;
+	line-height: 20px;
+}
+
+#nextnotes-root .nn-asg-banner-due,
+#nextnotes-root .nn-asg-banner-text {
+	font-size: 0.95em;
+}
+
+#nextnotes-root .nn-asg-banner-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+#nextnotes-root .nn-asg-banner-actions .btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-height: var(--default-clickable-area, 34px);
+	margin: 0;
+	padding: 0 12px;
+	border-radius: var(--border-radius-element, 8px);
+	font-weight: bold;
+	text-decoration: none;
+}
+
+#nextnotes-root .nn-asg-banner-actions .btn-secondary {
+	border: 1px solid var(--color-border-maxcontrast);
+	background-color: var(--color-main-background);
+	color: var(--color-main-text);
+}
+
+#nextnotes-root .nn-asg-banner-actions .btn-primary {
+	border: 0;
+	background-color: var(--color-primary-element);
+	color: var(--color-primary-element-text);
+}

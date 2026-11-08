@@ -432,6 +432,10 @@ class NoteService {
 		// Vorlagen/Abgaben ohne eigenen Ort: kein Umzug, kein Ordner, kein Tagebuch (Review M6-Plan r2 Hinweis 8)
 		$system = $writable->getRole() !== 'note';
 		if ($system) {
+			// Upstream-Speichern (notes.js) schickt folder_id immer mit: unveränderter Ordner ist kein Umzug (M6g2)
+			if (isset($in['folder_id']) && is_scalar($in['folder_id']) && (int)$in['folder_id'] === (int)$writable->getFolderId()) {
+				unset($in['folder_id']);
+			}
 			foreach (['workspace', 'folder_id', 'folder', 'folder_name'] as $key) {
 				if (($in[$key] ?? null) !== null) {
 					throw new BadRequestException('This note cannot be moved');

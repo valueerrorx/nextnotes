@@ -31,6 +31,8 @@ class SubmissionStateService {
 	// Übergänge der Aktionen (von → nach); alles andere 409 invalid_transition
 	public const TRANSITIONS = [
 		'submit' => ['assigned' => 'submitted', 'reopened' => 'submitted'],
+		// Schüler zieht zurück (M6g2): Ziel reopened, wenn eine eigene Frist besteht (unsubmitTarget)
+		'unsubmit' => ['submitted' => 'assigned'],
 		'return' => ['submitted' => 'returned', 'missed' => 'returned'],
 		'reopen' => ['submitted' => 'reopened', 'missed' => 'reopened', 'returned' => 'reopened'],
 		// Feedback ändern ohne Statuswechsel
@@ -91,15 +93,59 @@ class SubmissionStateService {
 		return $this->teamState->stateOf($teamId) === TeamStateService::ACTIVE && $this->teams->getLevel($teamId, $uid) === self::STUDENT_LEVEL;
 	}
 
+	/** Abgabe zurückziehen (M6g2): eigene, abgegeben, ohne Feedback/Punkte, sonst wie studentCanEdit; Frist = eigene Frist, sonst Aufgabenfrist */
+	public function studentCanUnsubmit(string $uid, Submission $s, Assignment $a): bool {
+		if ($s->getStudentUid() === null || $s->getStudentUid() !== $uid || $s->getStatus() !== 'submitted' || $a->getStatus() !== 'distributed') {
+			return false;
+		}
+		// sobald die Lehrkraft Feedback oder Punkte gibt, ist die Abgabe in Bewertung (Review M6g2-r1)
+		if ($s->getFeedbackAt() !== null || $s->getFeedback() !== null || $s->getPoints() !== null) {
+			return false;
+		}
+		if ($this->now() > ($s->getDueOverrideAt() ?? (int)$a->getDueAt())) {
+			return false;
+		}
+		$teamId = (string)$a->getTeamId();
+		return $this->teamState->stateOf($teamId) === TeamStateService::ACTIVE && $this->teams->getLevel($teamId, $uid) === self::STUDENT_LEVEL;
+	}
+
+	// Ziel von unsubmit: mit eigener Frist zurück nach reopened, sonst assigned
+	public static function unsubmitTarget(Submission $s): string {
+		return $s->getDueOverrideAt() !== null ? 'reopened' : 'assigned';
+	}
+
+	/** Grund, warum der Schüler seine Abgabe nicht bearbeiten kann (Banner, Liste); null = bearbeitbar */
+	public function studentLock(string $uid, Submission $s, Assignment $a): ?string {
+		$status = (string)$s->getStatus();
+		if (in_array($status, ['submitted', 'returned', 'missed'], true)) {
+			return $status;
+		}
+		if ($a->getStatus() !== 'distributed') {
+			return 'closed';
+		}
+		$teamId = (string)$a->getTeamId();
+		if ($this->teamState->stateOf($teamId) !== TeamStateService::ACTIVE) {
+			return 'team';
+		}
+		if ($s->getStudentUid() !== $uid || $this->teams->getLevel($teamId, $uid) !== self::STUDENT_LEVEL) {
+			return 'left';
+		}
+		return $this->studentCanEdit($uid, $s, $a) ? null : 'missed';
+	}
+
 	/**
 	 * Übergang als bedingtes UPDATE (WHERE status = alt); 0 Zeilen oder nicht erlaubt → 409 invalid_transition
 	 * @param array<string, int|string|null> $values zusätzliche Spalten
 	 */
-	public function transition(Submission $s, string $action, array $values = []): Submission {
+	public function transition(Submission $s, string $action, array $values = [], ?string $target = null): Submission {
 		$from = (string)$s->getStatus();
 		$to = self::TRANSITIONS[$action][$from] ?? null;
 		if ($to === null) {
 			throw new ConflictException('This change is not possible in the current state', ['code' => 'invalid_transition', 'status' => $from]);
+		}
+		// abweichendes Ziel nur für unsubmit (eigene Frist bleibt reopened)
+		if ($target !== null && $action === 'unsubmit' && $target === 'reopened') {
+			$to = $target;
 		}
 		$values = ['status' => $to, 'updated_at' => $this->now()] + $values;
 		if (!$this->submissions->updateIfStatus((int)$s->getId(), $from, $values)) {

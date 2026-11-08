@@ -385,7 +385,7 @@ final class CoreScenarioTest extends ApiTestCase {
 			}
 		}
 		// Port-eigene Routen ohne Upstream-Gegenstück (RouteDiffTest::PORT_ONLY)
-		self::assertSame([], array_values(array_diff($missing, ['GET /teams', 'POST /workspaces/{}/make-private', 'GET /users/search', 'PUT /folders/{}/material', 'GET /assignments', 'POST /assignments', 'GET /assignments/{}', 'PATCH /assignments/{}', 'DELETE /assignments/{}', 'GET /assignments/{}/submissions', 'GET /submissions/{}', 'POST /assignments/{}/distribute', 'POST /assignments/{}/close', 'POST /submissions/{}/submit', 'POST /submissions/{}/return', 'POST /submissions/{}/reopen', 'PUT /submissions/{}/feedback', 'GET /assignments/{}/export', 'GET /submissions/{}/export', 'GET /notes/{}/task-reminder'])), 'Routen ohne Upstream-Fixture');
+		self::assertSame([], array_values(array_diff($missing, ['GET /teams', 'POST /workspaces/{}/make-private', 'GET /users/search', 'PUT /folders/{}/material', 'GET /assignments', 'POST /assignments', 'GET /assignments/{}', 'PATCH /assignments/{}', 'DELETE /assignments/{}', 'GET /assignments/{}/submissions', 'GET /submissions/{}', 'POST /assignments/{}/distribute', 'POST /assignments/{}/close', 'POST /submissions/{}/submit', 'POST /submissions/{}/unsubmit', 'POST /submissions/{}/return', 'POST /submissions/{}/reopen', 'PUT /submissions/{}/feedback', 'GET /assignments/{}/export', 'GET /submissions/{}/export', 'GET /notes/{}/task-reminder'])), 'Routen ohne Upstream-Fixture');
 	}
 
 	// Detektor-Selbsttest: fehlende/zusätzliche Schlüssel werden erkannt, Zahlen-Schlüssel ignoriert

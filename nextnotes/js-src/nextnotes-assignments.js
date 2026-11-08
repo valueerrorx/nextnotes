@@ -4,7 +4,9 @@
  */
 // Aufgaben-Seite (M6g, SPEC §9.6, Plan M6 §2.6): Liste mit Status und Frist, Erstellen-Dialog (Notiz-Suche, ?create=<Notiz> aus dem Notiz-Menü),
 // Lehrkraft-Ansicht mit Austeilen, Frist, Schließen, ZIP, Abgabenliste und Lesemodus (Druckansicht im iFrame) mit Feedback, Rückgabe, Wiederöffnen.
-// Daten nur über die Aufgaben-API (Rechte serverseitig); Texte aus der Insel nextnotes-assignments (NC-l10n). Schüler-Ansicht folgt M6g2.
+// Schüler (M6g2): eigene Aufgaben mit Status, Frist, Öffnen der Kopie, Abgeben/Zurückziehen, Feedback ab Rückgabe, eigener Download.
+// Löschen mit Zahl der Abgaben und „Erst exportieren“, verwaiste Teams mit Löschdatum (M6g2).
+// Daten nur über die Aufgaben-API (Rechte serverseitig); Texte aus der Insel nextnotes-assignments (NC-l10n).
 (function () {
 	'use strict';
 
@@ -127,8 +129,39 @@
 
 	function assignmentChip(a) {
 		if (a.team_state === 'orphaned' || a.team_state === 'frozen') return chip('warning', a.team_state === 'orphaned' ? t('orphaned', { date: fmtDate(a.deletion_at) }) : t('frozen'));
-		if (!a.can.review && a.submission) return chip(a.submission.status, t(SUB_LABEL[a.submission.status] || 'stAssigned'));
+		if (isStudent(a)) return chip(a.submission.status, t(SUB_LABEL[a.submission.status] || 'stAssigned'));
 		return chip(a.status, t(a.status));
+	}
+
+	// Schüler-Sicht: eigene Abgabe ohne review (Lehrkräfte sehen die Aufgabe, nie eine eigene Abgabe)
+	function isStudent(a) {
+		return !a.can.review && !!a.submission;
+	}
+
+	function subStatusChip(s) {
+		return chip(s.status, t(SUB_LABEL[s.status] || 'stAssigned'));
+	}
+
+	function dueOf(a) {
+		return isStudent(a) ? a.submission.effective_due : a.due_at;
+	}
+
+	function dueSpan(a) {
+		var due = dueOf(a);
+		var open = isStudent(a) ? a.submission.lock === null : a.status !== 'closed';
+		if (due === null || due === undefined) return el('span', 'nn-asg-due', t('noDeadline'));
+		return el('span', 'nn-asg-due' + (due < now() && open ? ' nn-asg-due-passed' : ''), t('due', { date: fmtDate(due) }));
+	}
+
+	function pointsText(points, max) {
+		return max !== null && max !== undefined ? t('pointsOf', { max: max }).replace(/^/, points + ' ') : String(points);
+	}
+
+	// Hinweis verwaistes/eingefrorenes Team (Restfrist, Export)
+	function teamHint(a) {
+		if (a.team_state === 'orphaned') return el('div', 'nn-asg-hint', t(isStudent(a) ? 'orphanedHintStudent' : 'orphanedHint', { date: a.deletion_at ? fmtDate(a.deletion_at) : '…' }));
+		if (a.team_state === 'frozen') return el('div', 'nn-asg-hint', t('frozenHint'));
+		return null;
 	}
 
 	// ---------- Modal (Upstream-Stil .modal/.modal-content) ----------
@@ -222,6 +255,7 @@
 	}
 
 	function rank(a) {
+		if (isStudent(a)) return a.submission.lock === null ? 0 : (a.submission.status === 'submitted' ? 1 : 2);
 		return a.status === 'draft' ? 0 : (a.status === 'distributed' ? 1 : 2);
 	}
 
@@ -229,7 +263,9 @@
 		listEl.textContent = '';
 		var items = state.list.filter(function (a) { return !state.team || a.team === state.team; });
 		items.sort(function (x, y) {
-			return rank(x) - rank(y) || (rank(x) === 2 ? y.due_at - x.due_at : x.due_at - y.due_at) || x.title.localeCompare(y.title);
+			var dx = dueOf(x) === null ? Infinity : dueOf(x);
+			var dy = dueOf(y) === null ? Infinity : dueOf(y);
+			return rank(x) - rank(y) || (rank(x) === 2 ? (dy > dx ? 1 : (dy < dx ? -1 : 0)) : (dx > dy ? 1 : (dx < dy ? -1 : 0))) || x.title.localeCompare(y.title);
 		});
 		if (!items.length) {
 			listEl.appendChild(el('p', 'empty-message nn-asg-empty', teacherTeams.length ? t('emptyTeacher') : t('empty')));
@@ -243,19 +279,20 @@
 	function row(a) {
 		var li = el('li', 'nn-asg-item');
 		li.setAttribute('data-assignment-id', String(a.id));
-		var main = el(a.can.review ? 'button' : 'div', 'nn-asg-item-main');
-		if (a.can.review) {
+		var clickable = a.can.review || isStudent(a);
+		var main = el(clickable ? 'button' : 'div', 'nn-asg-item-main');
+		if (clickable) {
 			main.type = 'button';
-			main.addEventListener('click', function () { openDetail(a.id, true); });
+			main.addEventListener('click', function () { openItem(a, true); });
 		}
 		var head = el('div', 'nn-asg-item-head');
 		head.appendChild(el('span', 'nn-asg-item-title', a.title));
 		head.appendChild(assignmentChip(a));
 		main.appendChild(head);
 		var meta = el('div', 'nn-asg-item-meta');
-		var due = el('span', 'nn-asg-due' + (a.due_at < now() && a.status !== 'closed' ? ' nn-asg-due-passed' : ''), t('due', { date: fmtDate(a.due_at) }));
-		meta.appendChild(due);
+		meta.appendChild(dueSpan(a));
 		meta.appendChild(el('span', 'nn-asg-item-team', a.team_name));
+		if (isStudent(a) && a.submission.status === 'returned' && a.submission.points !== null) meta.appendChild(el('span', '', t('points') + ': ' + pointsText(a.submission.points, a.max_points)));
 		if (a.can.review && a.status !== 'draft') {
 			var by = a.submissions_by_status || {};
 			var open = (by.assigned || 0) + (by.reopened || 0);
@@ -263,6 +300,8 @@
 		}
 		main.appendChild(meta);
 		if (a.not_distributed > 0) main.appendChild(el('div', 'nn-asg-hint', t(a.quota_full ? 'notDistributedQuota' : 'notDistributed', { n: a.not_distributed })));
+		var hint = teamHint(a);
+		if (hint) main.appendChild(hint);
 		li.appendChild(main);
 		return li;
 	}
@@ -347,7 +386,10 @@
 		if (a.can.edit && open) bar.appendChild(button(t('extend'), 'btn-secondary', function () { extend(a); }, 'lucide-calendar'));
 		if (a.can.close && a.status === 'distributed') bar.appendChild(button(t('closeAssignment'), 'btn-secondary', function () { closeAssignment(a); }, 'lucide-lock'));
 		if (a.can.export && a.status !== 'draft') bar.appendChild(link(t('export'), apiBase + '/assignments/' + a.id + '/export', 'lucide-download', true));
+		if (a.can.delete) bar.appendChild(button(t('deleteAssignment'), 'btn-secondary nn-asg-delete', function () { removeAssignment(a); }, 'lucide-trash-2'));
 		detailEl.appendChild(bar);
+		var hint = teamHint(a);
+		if (hint) detailEl.appendChild(hint);
 		if (state.pending && state.pending.n > 0) detailEl.appendChild(el('div', 'nn-asg-hint', t(state.pending.quota ? 'notDistributedQuota' : 'notDistributed', { n: state.pending.n })));
 
 		var body = el('div', 'nn-asg-detail-body');
@@ -556,6 +598,103 @@
 		} }]);
 	}
 
+	// Löschen (§9.5): Dialog nennt die Zahl der Abgaben und bietet zuerst den ZIP-Export an; DELETE mit confirm
+	function removeAssignment(a) {
+		var n = a.submissions_total || 0;
+		var body = el('div', 'nn-asg-delete-body');
+		body.appendChild(el('p', '', n > 0 ? t('deleteConfirm', { title: a.title, n: n }) : t('deleteNone', { title: a.title })));
+		if (n > 0 && a.can.export && a.status !== 'draft') {
+			var first = link(t('exportFirst'), apiBase + '/assignments/' + a.id + '/export', 'lucide-download', true);
+			first.id = 'nnAsgExportFirst';
+			body.appendChild(first);
+		}
+		modal(t('deleteAssignment'), body, [{ label: t('deleteAssignment'), danger: true, id: 'nnAsgDeleteOk', run: function () {
+			return api('DELETE', 'assignments/' + a.id, { confirm: true }).then(function (r) {
+				if (!r.ok) return errorText(r);
+				closeDetail();
+				say(t('assignmentDeleted', { title: a.title }));
+				return true;
+			});
+		} }]);
+	}
+
+	// ---------- Schüler: eigene Aufgabe ----------
+
+	function openItem(a, push) {
+		return a.can.review ? openDetail(a.id, push) : openStudent(a.id, push);
+	}
+
+	function openStudent(id, push) {
+		if (push) setQuery('assignment', String(id));
+		return api('GET', 'assignments/' + id).then(function (r) {
+			if (!r.ok || !r.data.assignment || !r.data.assignment.submission) {
+				say(t('loadFailed'), true);
+				return;
+			}
+			say('');
+			state.current = r.data.assignment;
+			listEl.hidden = true;
+			detailEl.hidden = false;
+			renderStudent();
+		});
+	}
+
+	var LOCK_TEXT = { submitted: 'lockSubmitted', returned: 'lockReturned', missed: 'lockMissed', closed: 'lockClosed', team: 'lockTeam', left: 'lockLeft' };
+
+	function renderStudent() {
+		var a = state.current;
+		var s = a.submission;
+		detailEl.textContent = '';
+		detailEl.appendChild(button(t('back'), 'nn-asg-back', closeDetail, 'lucide-arrow-left'));
+		var head = el('div', 'nn-asg-detail-head');
+		head.appendChild(el('h2', 'nn-asg-detail-title', a.title));
+		head.appendChild(assignmentChip(a));
+		if (a.team_state !== 'active') head.appendChild(subStatusChip(s));
+		detailEl.appendChild(head);
+		var meta = el('div', 'nn-asg-item-meta');
+		meta.appendChild(dueSpan(a));
+		meta.appendChild(el('span', '', a.team_name));
+		if (a.created_by_name) meta.appendChild(el('span', '', t('from', { name: a.created_by_name })));
+		if (a.max_points !== null) meta.appendChild(el('span', '', t('points') + ': ' + a.max_points));
+		detailEl.appendChild(meta);
+		var hint = teamHint(a);
+		if (hint) detailEl.appendChild(hint);
+		var info = s.lock === null ? t('lockOpen') : t(LOCK_TEXT[s.lock] || 'lockLeft', { date: fmtDate(s.submitted_at) });
+		detailEl.appendChild(el('p', 'nn-asg-student-text', info));
+
+		var bar = el('div', 'nn-asg-actions');
+		if (s.note_id) {
+			var edit = link(s.can_submit ? t('editCopy') : t('viewCopy'), baseUrl + 'index.php?note=' + encodeURIComponent(s.note_id), s.can_submit ? 'lucide-pencil' : 'lucide-eye');
+			edit.classList.add('nn-asg-open-copy');
+			bar.appendChild(edit);
+		}
+		if (s.can_submit) bar.appendChild(button(t('handIn'), 'btn-primary nn-asg-handin', function () { studentAction(a, 'submit'); }, 'lucide-send'));
+		if (s.can_unsubmit) bar.appendChild(button(t('withdraw'), 'btn-secondary nn-asg-withdraw', function () { studentAction(a, 'unsubmit'); }, 'lucide-undo-2'));
+		bar.appendChild(link(t('downloadOwn'), apiBase + '/submissions/' + s.id + '/export', 'lucide-download', true));
+		detailEl.appendChild(bar);
+
+		// Feedback erst ab Rückgabe (Server liefert es vorher nicht); Name der Lehrkraft (Q5)
+		if (s.status === 'returned') {
+			var fb = el('section', 'nn-asg-student-feedback');
+			fb.appendChild(el('h3', 'nn-asg-section', t('feedback')));
+			if (s.feedback_by_name) fb.appendChild(el('p', 'nn-asg-muted nn-asg-returned-by', t('returnedBy', { name: s.feedback_by_name }) + (s.feedback_at ? ' · ' + fmtDate(s.feedback_at) : '')));
+			if (s.points !== null) fb.appendChild(el('p', 'nn-asg-student-points', t('points') + ': ' + pointsText(s.points, a.max_points)));
+			fb.appendChild(el('p', 'nn-asg-feedback-view', s.feedback || t('noFeedbackText')));
+			detailEl.appendChild(fb);
+		}
+	}
+
+	function studentAction(a, action) {
+		var undo = action === 'unsubmit';
+		modal(undo ? t('withdraw') : t('handIn'), el('p', '', undo ? t('withdrawConfirm') : t('handInConfirm', { title: a.title })), [{ label: undo ? t('withdraw') : t('handIn'), id: undo ? 'nnAsgWithdrawOk' : 'nnAsgHandInOk', run: function () {
+			return api('POST', 'submissions/' + a.submission.id + '/' + action).then(function (r) {
+				if (!r.ok) return r.data && r.data.code === 'submission_locked' ? t('submissionLocked') : errorText(r);
+				openStudent(a.id, false).then(function () { say(undo ? t('withdrawn') : t('handedIn')); });
+				return true;
+			});
+		} }]);
+	}
+
 	// ---------- Erstellen ----------
 
 	function openCreate(noteId) {
@@ -690,6 +829,10 @@
 		var create = params.get('create');
 		var id = params.get('assignment');
 		if (create && /^\d+$/.test(create)) openCreate(create);
-		else if (id && /^\d+$/.test(id)) openDetail(Number(id), false);
+		else if (id && /^\d+$/.test(id)) {
+			var known = state.list.filter(function (x) { return String(x.id) === id; })[0];
+			if (known) openItem(known, false);
+			else openDetail(Number(id), false);
+		}
 	});
 })();

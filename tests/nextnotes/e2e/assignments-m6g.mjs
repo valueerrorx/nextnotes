@@ -3,9 +3,11 @@
 // M6g1 (Plan M6 Done M6g, Done-Tabelle 3/6/8): Lehrkraft L legt über das Notiz-Menü eine Aufgabe aus einer Notiz mit Anhang an, teilt aus;
 // S1 gibt ab (API), S2 verpasst die Frist; L sieht Status-Chips, liest die Abgabe im Lesemodus, gibt Feedback/Punkte und zurück,
 // öffnet S2 erneut, lädt das ZIP. Icon-Leiste mit „Aufgaben (Team)“; Fremder ohne Eintrag. 0 CSP/Konsole.
+// M6g2: Vorlagen-Banner (Entwurf); S1 in der Oberfläche: „Meine Aufgaben“, Kopie öffnen, Banner, schreiben, abgeben → nur lesen,
+// zurückziehen und erneut abgeben, Feedback „Zurückgegeben von“ nach Rückgabe; S2 sieht S1 nie; verwaistes Team mit Löschdatum, Lösch-Dialog.
 import { runSpec } from './lib/harness.mjs';
 import { apiClient } from './lib/api.mjs';
-import { createTeam, ensureUser, setAssignmentDue } from './lib/docker.mjs';
+import { createTeam, ensureUser, orphanTeam, setAssignmentDue } from './lib/docker.mjs';
 
 const RUN = `${process.argv[3]}${Date.now().toString(36)}`;
 const A = process.env.NN_USER;
@@ -63,6 +65,19 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	ctx.ok(new URL(page.url()).searchParams.get('assignment') === String(aid), 'URL ?assignment=');
 	ctx.assertClean('Anlegen', m);
 
+	// ---------- 1b. Vorlage im Editor: Banner „Vorlage – Entwurf“, bearbeitbar ----------
+	m = ctx.mark();
+	const tplHref = await page.locator('.nn-asg-actions a[href*="index.php?note="]').first().getAttribute('href');
+	await page.goto(new URL(tplHref, page.url()).href, { waitUntil: 'networkidle' });
+	const tplBanner = page.locator('.nn-asg-banner[data-nn-asg-kind="template"]');
+	ctx.ok(await tplBanner.isVisible().catch(() => false), 'Vorlage: Banner sichtbar');
+	ctx.ok(/Vorlage – Entwurf/.test(await tplBanner.innerText().catch(() => '')), 'Vorlage: „Vorlage – Entwurf“', await tplBanner.innerText().catch(() => ''));
+	ctx.ok(await page.locator('.noteentry[data-nextnotes-readonly]').count() === 0, 'Vorlage: bearbeitbar (Entwurf)');
+	await ctx.screenshot(page, 'template-banner');
+	await tplBanner.locator('.nn-asg-banner-link').click();
+	await page.locator('.nn-asg-detail-title').waitFor({ state: 'visible', timeout: 10000 });
+	ctx.assertClean('Vorlage', m);
+
 	// ---------- 2. Austeilen ----------
 	m = ctx.mark();
 	await page.getByRole('button', { name: /^(Austeilen|Hand out)$/ }).first().click();
@@ -75,11 +90,74 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	await ctx.screenshot(page, 'distributed');
 	ctx.assertClean('Austeilen', m);
 
-	// ---------- 3. S1 gibt ab, S2 verpasst (Frist per Test-Hook in die Vergangenheit) ----------
 	const subs = (await api.must('GET', `/assignments/${aid}/submissions`)).submissions;
 	const s1 = subs.find((s) => s.student_uid === B);
 	const s2 = subs.find((s) => s.student_uid === C);
-	await apiB.must('POST', `/submissions/${s1.id}/submit`);
+
+	// ---------- 2b. S1 in der Oberfläche: Meine Aufgaben → Kopie → Banner → schreiben → abgeben → nur lesen ----------
+	const ctxS1 = await browser.newContext({ viewport: { width: 1400, height: 900 }, locale: 'de-DE' });
+	await ctx.attach(ctxS1);
+	const p1 = await ctxS1.newPage();
+	await ctx.login(p1, B, process.env.NN_PASS2);
+	m = ctx.mark();
+	await p1.goto(ctx.appUrl('assignments.php'), { waitUntil: 'networkidle' });
+	ctx.ok(await p1.locator('#iconSidebarAssignmentsBtn').count() === 1, 'S1: Leisten-Eintrag');
+	ctx.ok(await p1.locator('#nnAsgNew').count() === 0, 'S1: kein „Neue Aufgabe“');
+	const s1Row = p1.locator(`.nn-asg-item[data-assignment-id="${aid}"]`);
+	await s1Row.waitFor({ timeout: 10000 });
+	ctx.ok(await s1Row.locator('.nn-asg-chip-assigned').count() === 1, 'S1: Chip „Zugewiesen“');
+	ctx.ok(/Fällig/.test(await s1Row.innerText()), 'S1: Frist sichtbar', await s1Row.innerText());
+	await ctx.screenshot(p1, 'student-list');
+	await s1Row.locator('.nn-asg-item-main').click();
+	await p1.locator('.nn-asg-open-copy').waitFor({ state: 'visible', timeout: 10000 });
+	ctx.ok(/Bearbeiten/.test(await p1.locator('.nn-asg-open-copy').innerText()), 'S1: „Bearbeiten“');
+	ctx.ok(await p1.locator('.nn-asg-handin').count() === 1, 'S1: Abgeben auf der Aufgaben-Seite');
+	ctx.ok(await p1.locator('.nn-asg-student-feedback').count() === 0, 'S1: kein Feedback vor Rückgabe');
+	await ctx.screenshot(p1, 'student-detail');
+	await Promise.all([p1.waitForURL(/index\.php\?note=/, { timeout: 15000 }), p1.locator('.nn-asg-open-copy').click()]);
+	await p1.waitForLoadState('networkidle');
+	const banner = p1.locator('.nn-asg-banner[data-nn-asg-kind="submission"]');
+	ctx.ok(await banner.isVisible().catch(() => false), 'S1: Banner im Editor');
+	ctx.ok((await banner.innerText()).includes(`Aufgabe ${RUN}`) && /Fällig/.test(await banner.innerText()), 'S1: Banner mit Titel und Frist', await banner.innerText());
+	ctx.ok(await p1.locator('#iconSidebarAssignmentsBtn').count() === 1, 'S1: Editor mit Aufgaben-Eintrag');
+	const entry = p1.locator(`#entry${s1.note_id}`);
+	await entry.click();
+	await p1.keyboard.press('End');
+	await p1.keyboard.type(` Lösung ${RUN}`);
+	await ctx.screenshot(p1, 'student-banner');
+	await banner.locator('.nn-asg-submit').click();
+	await p1.locator('.alert-modal-button.primary').last().waitFor({ state: 'visible', timeout: 5000 });
+	await Promise.all([p1.waitForEvent('load', { timeout: 20000 }), p1.locator('.alert-modal-button.primary').last().click()]);
+	await p1.waitForLoadState('networkidle');
+	ctx.ok(await p1.locator('.noteentry[data-nextnotes-readonly]').count() === 1, 'S1: nach Abgabe nur lesen');
+	ctx.ok(/Abgegeben am/.test(await p1.locator('.nn-asg-banner').innerText()), 'S1: Banner „Abgegeben am … – nur lesen“', await p1.locator('.nn-asg-banner').innerText());
+	ctx.ok(await p1.locator('.nn-asg-banner .nn-asg-unsubmit').count() === 1, 'S1: „Abgabe zurückziehen“ im Banner');
+	const saved = await apiB.must('GET', `/notes/${s1.note_id}`);
+	ctx.ok(String(saved.note?.content ?? '').includes(`Lösung ${RUN}`), 'S1: Änderung vor dem Abgeben gespeichert');
+	ctx.ok((await apiB.must('GET', `/submissions/${s1.id}`)).submission.status === 'submitted', 'S1: Status abgegeben');
+	await ctx.screenshot(p1, 'student-submitted');
+	ctx.assertClean('S1 abgeben', m);
+
+	// zurückziehen und erneut abgeben (Aufgaben-Seite)
+	m = ctx.mark();
+	await p1.goto(ctx.appUrl(`assignments.php?assignment=${aid}`), { waitUntil: 'networkidle' });
+	await p1.locator('.nn-asg-withdraw').click();
+	await p1.locator('#nnAsgWithdrawOk').click();
+	await p1.locator('.nn-asg-handin').waitFor({ state: 'visible', timeout: 10000 });
+	ctx.ok((await apiB.must('GET', `/submissions/${s1.id}`)).submission.status === 'assigned', 'S1: zurückgezogen');
+	await p1.locator('.nn-asg-handin').click();
+	await p1.locator('#nnAsgHandInOk').click();
+	await p1.locator('.nn-asg-withdraw').waitFor({ state: 'visible', timeout: 10000 });
+	ctx.ok((await apiB.must('GET', `/submissions/${s1.id}`)).submission.status === 'submitted', 'S1: erneut abgegeben');
+	ctx.assertClean('S1 zurückziehen', m);
+
+	// S2 sieht S1 nie
+	ctx.ok((await apiC.call('GET', `/submissions/${s1.id}`)).status === 404, 'S2: Abgabe S1 → 404');
+	ctx.ok((await apiC.call('GET', `/notes/${s1.note_id}`)).status === 404, 'S2: Kopie S1 → 404');
+	const listC = (await apiC.must('GET', '/assignments')).assignments;
+	ctx.ok(listC.length === 1 && listC[0].submission?.id === s2.id && !JSON.stringify(listC).includes(`"id":${s1.id},`), 'S2: nur eigene Abgabe');
+
+	// ---------- 3. S2 verpasst (Frist per Test-Hook in die Vergangenheit) ----------
 	ctx.ok((await apiC.call('GET', `/assignments/${aid}/export`)).status === 403, 'S2: kein Lehrkraft-ZIP (403, Aufgabe sichtbar)');
 	setAssignmentDue(ctx.base, aid, Math.floor(Date.now() / 1000) - 60);
 	m = ctx.mark();
@@ -108,6 +186,19 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	ctx.ok(back.submission.feedback === `Gut gemacht ${RUN}` && back.submission.points === 8, 'S1 sieht Feedback und Punkte', JSON.stringify(back.submission).slice(0, 200));
 	ctx.assertClean('Rückgabe', m);
 
+	// S1: Feedback mit Name der Lehrkraft (Q5) auf der Aufgaben-Seite, Banner „Zurückgegeben“
+	m = ctx.mark();
+	await p1.goto(ctx.appUrl(`assignments.php?assignment=${aid}`), { waitUntil: 'networkidle' });
+	const fbBox = p1.locator('.nn-asg-student-feedback');
+	await fbBox.waitFor({ state: 'visible', timeout: 10000 });
+	ctx.ok((await fbBox.innerText()).includes(`Gut gemacht ${RUN}`), 'S1: Feedback sichtbar');
+	ctx.ok(/Zurückgegeben von/.test(await fbBox.innerText()) && /8/.test(await fbBox.innerText()), 'S1: „Zurückgegeben von“ und Punkte', await fbBox.innerText());
+	ctx.ok(/Ansehen/.test(await p1.locator('.nn-asg-open-copy').innerText()) && await p1.locator('.nn-asg-handin').count() === 0, 'S1: nur Ansehen');
+	await ctx.screenshot(p1, 'student-feedback');
+	await p1.goto(ctx.appUrl(`index.php?note=${s1.note_id}`), { waitUntil: 'networkidle' });
+	ctx.ok(/Zurückgegeben/.test(await p1.locator('.nn-asg-banner').innerText()), 'S1: Banner „Zurückgegeben“');
+	ctx.assertClean('S1 Feedback', m);
+
 	// ---------- 5. S2 (verpasst) erneut öffnen ----------
 	m = ctx.mark();
 	await page.locator('.nn-asg-review-nav .nn-asg-back').click();
@@ -131,6 +222,41 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	ctx.ok(zip.status() === 200 && /application\/zip/.test(zip.headers()['content-type'] ?? ''), 'ZIP → 200 application/zip', String(zip.status()));
 	const bytes = (await zip.body()).toString('latin1');
 	ctx.ok(bytes.startsWith('PK') && bytes.includes('status.csv') && bytes.includes('feedback.txt') && bytes.includes('attachments/'), 'ZIP: status.csv, feedback.txt, Anhänge');
+
+	// ---------- 8. Verwaistes Team: Löschdatum, nur Export/Löschen; Lösch-Dialog mit Zahl und „Erst exportieren“ ----------
+	m = ctx.mark();
+	orphanTeam(ctx.base, A, teamId);
+	await page.goto(ctx.appUrl('assignments.php'), { waitUntil: 'networkidle' });
+	const orphRow = page.locator(`.nn-asg-item[data-assignment-id="${aid}"]`);
+	await orphRow.waitFor({ timeout: 10000 });
+	ctx.ok(/Team gelöscht/.test(await orphRow.innerText()) && /Lade sie vorher herunter/.test(await orphRow.innerText()), 'L: verwaist mit Löschdatum', await orphRow.innerText());
+	await orphRow.locator('.nn-asg-item-main').click();
+	await page.locator('.nn-asg-delete').waitFor({ state: 'visible', timeout: 10000 });
+	ctx.ok(await page.getByRole('button', { name: /^(Austeilen|Hand out|Frist ändern|Aufgabe schließen)$/ }).count() === 0, 'L: verwaist ohne Austeilen/Frist/Schließen');
+	ctx.ok(await page.locator(`a[href*="assignments/${aid}/export"]`).count() >= 1, 'L: verwaist mit Export');
+	await p1.goto(ctx.appUrl('assignments.php'), { waitUntil: 'networkidle' });
+	const s1Orph = p1.locator(`.nn-asg-item[data-assignment-id="${aid}"]`);
+	await s1Orph.waitFor({ timeout: 10000 });
+	ctx.ok(/Deine Abgabe wird am/.test(await s1Orph.innerText()), 'S1: Hinweis Löschdatum', await s1Orph.innerText());
+	await ctx.screenshot(p1, 'student-orphaned');
+	await page.locator('.nn-asg-delete').click();
+	const delModal = page.locator('.nn-asg-modal');
+	await delModal.waitFor({ state: 'visible', timeout: 5000 });
+	ctx.ok(/2 Abgaben/.test(await delModal.innerText()), 'Lösch-Dialog nennt 2 Abgaben', await delModal.innerText());
+	const firstHref = await page.locator('#nnAsgExportFirst').getAttribute('href').catch(() => null);
+	ctx.ok(!!firstHref && firstHref.includes(`assignments/${aid}/export`), 'Lösch-Dialog: „Erst exportieren“');
+	const firstZip = await page.request.get(new URL(firstHref ?? 'x', page.url()).href, { failOnStatusCode: false });
+	ctx.ok(firstZip.status() === 200, '„Erst exportieren“ lädt das ZIP', String(firstZip.status()));
+	await ctx.screenshot(page, 'delete-dialog');
+	const del = page.waitForResponse((r) => r.url().includes(`/assignments/${aid}`) && r.request().method() === 'DELETE');
+	await page.locator('#nnAsgDeleteOk').click();
+	ctx.ok((await del).status() === 200, 'Löschen → 200');
+	await page.locator('.nn-asg-list:not([hidden])').waitFor({ timeout: 10000 });
+	await page.locator(`.nn-asg-item[data-assignment-id="${aid}"]`).waitFor({ state: 'detached', timeout: 10000 }).catch(() => {});
+	ctx.ok(await page.locator(`.nn-asg-item[data-assignment-id="${aid}"]`).count() === 0, 'Aufgabe aus der Liste');
+	ctx.ok((await apiB.call('GET', `/submissions/${s1.id}`)).status === 404, 'S1: Abgabe gelöscht');
+	ctx.assertClean('Verwaist/Löschen', m);
+	await ctxS1.close();
 
 	// ---------- 7. Fremder: kein Leisten-Eintrag, Aufgabe nicht sichtbar ----------
 	const ctxN = await browser.newContext({ viewport: { width: 1400, height: 900 }, locale: 'de-DE' });

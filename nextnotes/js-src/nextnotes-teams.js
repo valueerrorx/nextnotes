@@ -5,7 +5,7 @@
 // Teams-Oberfläche (M5d, Plan M5 §2.7) nach nextnotes-app.js: Freigabe-Dialog mit Suche, Team-Auswahl beim Anlegen,
 // Team-Kennzeichen im Workspace-Menü, Löschen eines Team-Workspace (Q2), Umwandeln aus dem Banner.
 // Material (M6b, Plan M6 §2.6): Kennzeichen im Ordner-Menü, Schreibaktionen ohne Recht ausgeblendet, Drop-Abwehr, Duplikat (Q1).
-// Aufgaben (M6g): Notiz-Menü „Als Aufgabe austeilen…“ für Lehrkräfte im Team-Workspace.
+// Aufgaben (M6g): Notiz-Menü „Als Aufgabe austeilen…“ für Lehrkräfte im Team-Workspace; Editor-Banner Abgeben/Zurückziehen (M6g2).
 // Ersetzt bzw. umhüllt Upstream-Globals (bundles.json adapterHooks); Texte aus NC-l10n (config.teams.txt).
 (function () {
 	'use strict';
@@ -429,6 +429,69 @@
 					button.disabled = false;
 					if (window.modalAlert) window.modalAlert.alert(t('convertFailed'), 'error');
 				});
+		});
+	});
+
+	// ---------- Abgabe-Banner (M6g2): erst ungespeicherte Änderungen sichern, dann abgeben bzw. zurückziehen, Seite neu laden (Server rendert Nur-Lesen) ----------
+
+	function flushSave(noteId) {
+		return new Promise(function (resolve) {
+			var dirty = typeof window.hasUnsavedChangesOnScreen === 'function' && window.hasUnsavedChangesOnScreen(noteId);
+			if (!dirty || typeof window.saveNoteImmediately !== 'function') {
+				resolve(true);
+				return;
+			}
+			var done = false;
+			var finish = function (ok) {
+				if (done) return;
+				done = true;
+				clearTimeout(timer);
+				resolve(ok);
+			};
+			var timer = setTimeout(function () { finish(false); }, 10000);
+			window.saveNoteImmediately({ onSaved: function () { finish(true); } });
+		});
+	}
+
+	document.addEventListener('click', function (e) {
+		var button = e.target && e.target.closest ? e.target.closest('.nn-asg-submit, .nn-asg-unsubmit') : null;
+		if (!button || button.disabled) return;
+		var sid = button.getAttribute('data-submission-id') || '';
+		if (!/^\d+$/.test(sid)) return;
+		var undo = button.classList.contains('nn-asg-unsubmit');
+		var titleEl = button.closest('.nn-asg-banner') && button.closest('.nn-asg-banner').querySelector('.nn-asg-banner-title');
+		var message = undo ? t('unsubmitConfirm') : t('submitConfirm', { title: titleEl ? titleEl.textContent : '' });
+		var ask = window.modalAlert && typeof window.modalAlert.confirm === 'function'
+			? window.modalAlert.confirm(message, undo ? t('unsubmitTitle') : t('submitTitle'), { confirmText: undo ? t('unsubmitTitle') : t('submitTitle') })
+			: Promise.resolve(window.confirm(message));
+		ask.then(function (ok) {
+			if (!ok) return;
+			button.disabled = true;
+			(undo ? Promise.resolve(true) : flushSave(button.getAttribute('data-note-id') || '')).then(function (saved) {
+				if (!saved) {
+					button.disabled = false;
+					alertError(t('saveFirstFailed'));
+					return;
+				}
+				fetch('api/v1/submissions/' + sid + '/' + (undo ? 'unsubmit' : 'submit'), {
+					method: 'POST',
+					credentials: 'same-origin',
+					headers: { 'Accept': 'application/json' }
+				})
+					.then(readJson)
+					.then(function (r) {
+						if (r.status === 200 && r.data.success !== false) {
+							window.location.reload();
+							return;
+						}
+						button.disabled = false;
+						alertError(r.data && r.data.code === 'submission_locked' ? t('submissionLocked') : t('submitFailed'));
+					})
+					.catch(function () {
+						button.disabled = false;
+						alertError(t('submitFailed'));
+					});
+			});
 		});
 	});
 

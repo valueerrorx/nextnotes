@@ -52,4 +52,47 @@ final class AssignmentsViewTest extends AssignmentTestCase {
 		self::assertStringNotContainsString($t, $p->body, 'Fremder: keine Team-ID');
 		self::assertStringNotContainsString('iconSidebarAssignmentsBtn', self::page($n, 'index.php')->body, 'Fremder: Hauptansicht ohne Eintrag');
 	}
+
+	// M6g2: Editor-Banner der eigenen Kopie (Abgeben, Nur-Lesen mit Grund, Zurückziehen), Vorlage für Lehrkraft lesbar mit Banner, Upstream-Speichern mit folder_id
+	public function testEditorBannerAndTemplatePage(): void {
+		$fx = $this->distributedFixture();
+		['l' => $l, 's1' => $s1, 's2' => $s2, 'aid' => $aid, 'tpl' => $tpl] = $fx;
+		$sub = $fx['subs'][$s1->uid];
+		$note = (int)$sub['note_id'];
+		$folder = (int)self::row('nextnotes_notes', $note)['folder_id'];
+		self::assertGreaterThan(0, $folder, 'Kopie liegt im Aufgaben-Ordner');
+
+		$p = self::page($s1, "index.php?note=$note");
+		self::assertSame(200, $p->status, $p->describe());
+		self::assertStringContainsString('nn-asg-banner', $p->body, 'S1: Banner');
+		self::assertStringContainsString('nn-asg-submit', $p->body, 'S1: Abgeben');
+		self::assertStringContainsString('assignments.php?assignment=' . $aid, $p->body, 'S1: Link zur Aufgabe');
+		self::assertStringNotContainsString('data-nextnotes-readonly', $p->body, 'S1: bearbeitbar');
+		// Upstream-Speichern (notes.js) mit unverändertem folder_id
+		self::ok($s1->call('PATCH', "/notes/$note", ['content' => '<p>mit Ordner</p>', 'folder_id' => $folder, 'tags' => '']), 'Speichern mit folder_id');
+		self::assertSame(400, $s1->call('PATCH', "/notes/$note", ['content' => '<p>x</p>', 'folder_id' => $folder + 999999])->status, 'anderer Ordner bleibt 400');
+
+		self::ok($s1->call('POST', "/submissions/{$sub['id']}/submit"), 'abgeben');
+		$p = self::page($s1, "index.php?note=$note");
+		self::assertStringContainsString('data-nextnotes-readonly', $p->body, 'S1: nach Abgabe nur lesen');
+		self::assertStringContainsString('nn-asg-unsubmit', $p->body, 'S1: Zurückziehen');
+		self::assertStringNotContainsString('nn-asg-submit"', $p->body, 'S1: kein Abgeben');
+		self::assertSame(404, self::page($s2, "index.php?note=$note")->status, 'S2: fremde Kopie 404');
+		self::setColumn('nextnotes_assignments', $aid, 'due_at', time() - 5);
+		$p = self::page($s1, "index.php?note=$note");
+		self::assertStringNotContainsString('nn-asg-unsubmit', $p->body, 'nach Frist kein Zurückziehen');
+		self::setColumn('nextnotes_assignments', $aid, 'due_at', time() + 3600);
+
+		// Vorlage: Lehrkraft 200 mit Banner (ausgeteilt → nur lesen), Schüler 404
+		$p = self::page($l, "index.php?note=$tpl");
+		self::assertSame(200, $p->status, 'L: Vorlage öffnen ' . $p->describe());
+		self::assertStringContainsString('data-nn-asg-kind="template"', $p->body, 'L: Vorlagen-Banner');
+		self::assertStringContainsString('data-nextnotes-readonly', $p->body, 'L: ausgeteilt → nur lesen');
+		self::assertSame(404, self::page($s1, "index.php?note=$tpl")->status, 'S1: Vorlage 404');
+		$draft = $this->createAssignment($l, $fx['t'], $fx['src'], 'Entwurf');
+		$p = self::page($l, 'index.php?note=' . (int)$draft['template_note_id']);
+		self::assertSame(200, $p->status);
+		self::assertStringNotContainsString('data-nextnotes-readonly', $p->body, 'L: Entwurf bearbeitbar');
+		self::ok($l->call('PATCH', '/notes/' . (int)$draft['template_note_id'], ['content' => '<p>Vorlage neu</p>', 'folder_id' => null]), 'L speichert Vorlage');
+	}
 }

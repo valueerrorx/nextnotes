@@ -179,6 +179,7 @@ return [
 		['name' => 'assignments_api#distribute', 'url' => '/api/v1/assignments/{id}/distribute', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 		['name' => 'assignments_api#close', 'url' => '/api/v1/assignments/{id}/close', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 		['name' => 'assignments_api#submit', 'url' => '/api/v1/submissions/{id}/submit', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+		['name' => 'assignments_api#unsubmit', 'url' => '/api/v1/submissions/{id}/unsubmit', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 		['name' => 'assignments_api#giveBack', 'url' => '/api/v1/submissions/{id}/return', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 		['name' => 'assignments_api#reopen', 'url' => '/api/v1/submissions/{id}/reopen', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 		['name' => 'assignments_api#feedback', 'url' => '/api/v1/submissions/{id}/feedback', 'verb' => 'PUT', 'requirements' => ['id' => '\d+']],

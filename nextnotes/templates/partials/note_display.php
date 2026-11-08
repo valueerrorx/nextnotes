@@ -136,11 +136,25 @@ $item = static function (string $action, string $icon, string $label, array $dat
 		<span class="lucide lucide-tag icon_tag cursor-pointer" data-action="show-tag-edit-modal" data-note-id="<?php p($id); ?>" title="<?php p($tr->t('tags.manage_note_tags', [], 'Manage note tags')); ?>"></span>
 	</div>
 	<span class="name_tags"><input type="hidden" id="tags<?php p($id); ?>" value="<?php p($note['tags']); ?>"/></span>
-	<?php if (!$note['canWrite']): ?><span class="nn-readonly-badge" role="status"><i class="lucide <?php p($note['materialCopy'] ? 'lucide-book-open' : 'lucide-eye'); ?>" aria-hidden="true"></i><?php p($note['materialCopy'] ? $l->t('Material – read only') : $l->t('Read only')); ?></span><?php endif; ?>
+	<?php if (!$note['canWrite'] && ($note['assignment'] ?? null) === null): ?><span class="nn-readonly-badge" role="status"><i class="lucide <?php p($note['materialCopy'] ? 'lucide-book-open' : 'lucide-eye'); ?>" aria-hidden="true"></i><?php p($note['materialCopy'] ? $l->t('Material – read only') : $l->t('Read only')); ?></span><?php endif; ?>
 </div>
 <?php if (!$note['attachmentsAtBottom']) { $attachmentsRow(); } ?>
 <input type="hidden" id="folder<?php p($id); ?>" value="<?php p($note['folderName']); ?>"/>
 <input type="hidden" id="folderId<?php p($id); ?>" value="<?php p($note['folderId'] !== null ? (string)$note['folderId'] : ''); ?>"/>
+<?php if (($note['assignment'] ?? null) !== null): $nnAsg = $note['assignment']; ?>
+<?php // Abgabe/Vorlage (M6g2): Status, Frist, Abgeben/Zurückziehen (nextnotes-teams.js), Link zur Aufgabe ?>
+<div class="nn-asg-banner nn-asg-banner-<?php p($nnAsg['tone']); ?>" role="status" data-nn-asg-kind="<?php p($nnAsg['kind']); ?>">
+	<div class="nn-asg-banner-main">
+		<div class="nn-asg-banner-head"><i class="lucide lucide-graduation-cap" aria-hidden="true"></i><strong class="nn-asg-banner-title"><?php p($nnAsg['title']); ?></strong><span class="nn-asg-banner-chip"><?php p($nnAsg['statusLabel']); ?></span><span class="nn-asg-banner-due"><?php p($nnAsg['due']); ?></span></div>
+		<div class="nn-asg-banner-text"><?php p($nnAsg['text']); ?></div>
+	</div>
+	<div class="nn-asg-banner-actions">
+		<?php if ($nnAsg['canSubmit']): ?><button type="button" class="btn btn-primary nn-asg-submit" data-submission-id="<?php p((string)$nnAsg['submissionId']); ?>" data-note-id="<?php p($id); ?>"><i class="lucide lucide-send" aria-hidden="true"></i> <?php p($l->t('Hand in')); ?></button><?php endif; ?>
+		<?php if ($nnAsg['canUnsubmit']): ?><button type="button" class="btn btn-secondary nn-asg-unsubmit" data-submission-id="<?php p((string)$nnAsg['submissionId']); ?>"><i class="lucide lucide-undo-2" aria-hidden="true"></i> <?php p($l->t('Withdraw')); ?></button><?php endif; ?>
+		<a class="btn btn-secondary nn-asg-banner-link" href="<?php p($nnAsg['url']); ?>"><?php p($nnAsg['linkLabel']); ?></a>
+	</div>
+</div>
+<?php endif; ?>
 <h4 class="note-title-heading"<?php if ($note['titleColor'] !== ''): ?> data-title-color="<?php p($note['titleColorRaw']); ?>"<?php endif; ?><?php if ($note['titleSize'] !== null): ?> data-title-size="<?php p((string)$note['titleSize']); ?>" style="--note-title-size: <?php p((string)$note['titleSize']); ?>px;"<?php endif; ?>>
 	<?php if ($note['showIcon']): ?><i class="<?php p($note['iconClass'] . ' note-icon note-title-icon'); ?>" data-custom-icon="<?php p($note['iconCustom'] ? 'true' : 'false'); ?>" data-action="open-note-icon-picker" data-note-id="<?php p($id); ?>" data-note-title="<?php p($note['heading']); ?>"<?php if ($note['iconColorRaw'] !== ''): ?> data-icon-color="<?php p($note['iconColorRaw']); ?>"<?php endif; ?> data-default-icon="<?php p($note['iconDefault']); ?>" title="<?php p($tr->t('notes_list.folder_actions.change_note_icon', [], 'Change note icon')); ?>" aria-label="<?php p($tr->t('notes_list.folder_actions.change_note_icon', [], 'Change note icon')); ?>"<?php if ($note['iconColor'] !== ''): ?> style="color: <?php p($note['iconColor']); ?> !important;"<?php endif; ?>></i><?php endif; ?>
 	<input class="css-title" autocomplete="off" autocapitalize="off" spellcheck="false" id="inp<?php p($id); ?>" type="text" placeholder="<?php p($note['titlePlaceholder']); ?>" value="<?php p($note['titleValue']); ?>"<?php if ($note['titleColor'] !== ''): ?> style="color: <?php p($note['titleColor']); ?> !important;"<?php endif; ?>/>

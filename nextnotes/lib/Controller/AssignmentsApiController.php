@@ -84,6 +84,11 @@ class AssignmentsApiController extends ApiController {
 	}
 
 	#[NoAdminRequired]
+	public function unsubmit(int $id): JSONResponse {
+		return $this->ok($this->submissionActions->unsubmit($this->uid(), $id));
+	}
+
+	#[NoAdminRequired]
 	public function giveBack(int $id): JSONResponse {
 		return $this->ok($this->submissionActions->giveBack($this->uid(), $id, $this->input()));
 	}

@@ -54,7 +54,25 @@ class SubmissionService {
 			}
 			return $this->states->transition($s, 'submit', ['submitted_at' => $this->states->now()]);
 		});
-		return ['submission' => $this->assignmentService->submissionView($s, false)];
+		return ['submission' => $this->assignmentService->ownView($uid, $s, $this->assignments->find((int)$s->getAssignmentId()))];
+	}
+
+	/** @return array{submission: array<string, mixed>} POST /submissions/{id}/unsubmit (M6g2): eigene Abgabe zurückziehen, solange die Frist läuft */
+	public function unsubmit(string $uid, int $id): array {
+		[$s] = $this->access->requireSubmission($uid, $id, 'read');
+		if ($s->getStudentUid() !== $uid) {
+			throw new NotFoundException('Submission not found');
+		}
+		$s = $this->locked($s, function (Submission $s, Assignment $a) use ($uid): Submission {
+			if ($s->getStatus() !== 'submitted') {
+				throw new ConflictException('Only a handed-in submission can be withdrawn', ['code' => 'invalid_transition', 'status' => $s->getStatus()]);
+			}
+			if (!$this->states->studentCanUnsubmit($uid, $s, $a)) {
+				throw new ForbiddenException('This submission can no longer be withdrawn', ['code' => 'submission_locked']);
+			}
+			return $this->states->transition($s, 'unsubmit', ['submitted_at' => null], SubmissionStateService::unsubmitTarget($s));
+		});
+		return ['submission' => $this->assignmentService->ownView($uid, $s, $this->assignments->find((int)$s->getAssignmentId()))];
 	}
 
 	/** @return array{submission: array<string, mixed>} POST /submissions/{id}/return {feedback?, points?} */
