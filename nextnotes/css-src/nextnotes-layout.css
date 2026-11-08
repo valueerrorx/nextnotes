@@ -1263,7 +1263,8 @@ body.icon-sidebar-collapsed #content #nextnotes-root #iconSidebarToggle {
 #content #nextnotes-root > .nn-page-main :is(.home-container, .tasks-container, .speed-dial-container, .notes-manager-container, .tags-container, .trash-container,
 	.trash-content, .favorites-container, .shared-container, .tasks-progress-section, .tasks-filter-bar, .mentions-toolbar, .nm-filter-bar, .nm-content, .trash-filter-bar,
 	.shared-filter-bar, .attachments-list-container, .shared-notes-list, .tags-info, .dashboard-grid-container,
-	.tasks-note-group, .diary-month, .diary-journal) {
+	.tasks-note-group, .diary-month, .diary-journal, .nm-bulk-bar, .dashboard-selection-bar, .dashboard-topbar-filter, .dashboard-breadcrumb,
+	#dashboardGrid.dash-grid-sectioned, .attachments-filter-bar, .favorites-notes-list) {
 	margin-inline: 0 auto;
 	padding-inline-start: 0;
 }
