@@ -72,7 +72,7 @@ class TrashService {
 	}
 
 	public function destroy(string $uid, int $id, mixed $wsKey): void {
-		$note = $this->access->requireNote($uid, $id, 'write', true);
+		$note = $this->access->requireNote($uid, $id, 'manage', true);
 		$ws = $this->workspaces->resolveOptional($uid, $wsKey);
 		if ($ws !== null && $ws->getId() !== $note->getWorkspaceId()) {
 			throw new Exception\NotFoundException('Note not found');

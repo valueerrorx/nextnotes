@@ -150,7 +150,7 @@ class ConversionService {
 		$content = (string)$note->getContent();
 		$images = null;
 		if ($target === 'markdown') {
-			$images = $this->images->prepare($content, (int)$note->getWorkspaceId());
+			$images = $this->images->prepare($content, $note);
 		} else {
 			self::checkSize($content);
 		}

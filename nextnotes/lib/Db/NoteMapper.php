@@ -556,6 +556,14 @@ class NoteMapper extends QBMapper {
 		return $out;
 	}
 
+	/** @return int[] Vorlage und Kopien einer Aufgabe (jede Rolle, auch ohne Workspace und im Papierkorb) */
+	public function idsForAssignment(int $assignmentId): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('id')->from(self::TABLE)
+			->where($qb->expr()->eq('assignment_id', $qb->createNamedParameter($assignmentId, IQueryBuilder::PARAM_INT)));
+		return array_map('intval', $qb->executeQuery()->fetchFirstColumn());
+	}
+
 	/** @return int[] alle Notiz-IDs eines Workspace (jede Rolle, auch Papierkorb) */
 	public function idsInWorkspace(int $workspaceId): array {
 		$qb = $this->db->getQueryBuilder();

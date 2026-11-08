@@ -1,6 +1,6 @@
 {
   "_comment": "SPDX-License-Identifier: AGPL-3.0-or-later. Erwartung abgeleitet aus docs/SPEC.md §2.1 (nicht aus der Migration). Spalte: [typ, notnull, default, length, autoincrement]. Typen: int=integer. Index: [unique, [spalten]]. Ohne Tabellenpräfix.",
-  "absent": ["nextnotes_assignments", "nextnotes_submissions"],
+  "absent": [],
   "tables": {
     "nextnotes_workspaces": {
       "primary": ["id"],
@@ -224,6 +224,60 @@
       "indexes": {
         "nn_men_uniq": [true, ["note_id", "user_id"]],
         "nn_men_user": [false, ["user_id"]]
+      }
+    },
+    "nextnotes_assignments": {
+      "primary": ["id"],
+      "columns": {
+        "id": ["bigint", true, null, null, true],
+        "team_id": ["string", true, null, 64, false],
+        "title": ["string", true, null, 255, false],
+        "source_note_id": ["bigint", false, null, null, false],
+        "template_note_id": ["bigint", true, null, null, false],
+        "due_at": ["bigint", true, null, null, false],
+        "status": ["string", true, "draft", 16, false],
+        "max_points": ["integer", false, null, null, false],
+        "created_by": ["string", false, null, 64, false],
+        "created_by_name": ["string", false, null, 255, false],
+        "owner_uid": ["string", false, null, 64, false],
+        "distributed_at": ["bigint", false, null, null, false],
+        "deadline_notified_at": ["bigint", false, null, null, false],
+        "created_at": ["bigint", true, null, null, false],
+        "updated_at": ["bigint", true, null, null, false]
+      },
+      "indexes": {
+        "nn_asg_team": [false, ["team_id", "status"]],
+        "nn_asg_due": [false, ["status", "due_at"]],
+        "nn_asg_owner": [false, ["owner_uid"]]
+      }
+    },
+    "nextnotes_submissions": {
+      "primary": ["id"],
+      "columns": {
+        "id": ["bigint", true, null, null, true],
+        "assignment_id": ["bigint", true, null, null, false],
+        "student_uid": ["string", false, null, 64, false],
+        "student_name": ["string", true, null, 255, false],
+        "student_uid_former": ["string", false, null, 64, false],
+        "student_deleted_at": ["bigint", false, null, null, false],
+        "note_id": ["bigint", false, null, null, false],
+        "status": ["string", true, "assigned", 16, false],
+        "due_override_at": ["bigint", false, null, null, false],
+        "submitted_at": ["bigint", false, null, null, false],
+        "returned_at": ["bigint", false, null, null, false],
+        "feedback": ["text", false, null, null, false],
+        "points": ["integer", false, null, null, false],
+        "feedback_by": ["string", false, null, 64, false],
+        "feedback_by_name": ["string", false, null, 255, false],
+        "feedback_at": ["bigint", false, null, null, false],
+        "left_team_at": ["bigint", false, null, null, false],
+        "created_at": ["bigint", true, null, null, false],
+        "updated_at": ["bigint", true, null, null, false]
+      },
+      "indexes": {
+        "nn_sub_uniq": [true, ["assignment_id", "student_uid"]],
+        "nn_sub_student": [false, ["student_uid", "status"]],
+        "nn_sub_due": [false, ["status", "due_override_at"]]
       }
     }
   }

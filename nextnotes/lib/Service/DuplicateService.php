@@ -64,15 +64,18 @@ class DuplicateService {
 	 * Eine Notiz kopieren (läuft in einer Transaktion des Aufrufers)
 	 * @param int[] $created neue Notiz-IDs (Aufräumen bei Rollback)
 	 */
-	private function cloneNote(Note $src, int $wsId, ?int $folderId, string $uid, array &$created): Note {
+	private function cloneNote(Note $src, ?int $wsId, ?int $folderId, string $uid, array &$created, ?int $assignmentId = null): Note {
 		$now = $this->time->getTime();
 		$n = new Note();
 		$n->setWorkspaceId($wsId);
 		$n->setFolderId($folderId);
-		$n->setHeading($this->uniqueHeading($wsId, $folderId, (string)$src->getHeading()));
+		$heading = (string)$src->getHeading();
+		$n->setHeading($wsId === null ? ($heading === '' ? $this->l->t('New note') : $heading) : $this->uniqueHeading($wsId, $folderId, $heading));
 		$n->setContent($src->getContent());
 		$n->setType($src->getType() ?: 'note');
-		$n->setRole('note');
+		// Vorlage einer Aufgabe: ohne Workspace, trägt assignment_id (Quote beim Team, Plan M6 §2.3a)
+		$n->setRole($assignmentId === null ? 'note' : 'template');
+		$n->setAssignmentId($assignmentId);
 		foreach (['Icon', 'IconColor', 'Color', 'ContentWidth', 'TitleColor', 'TitleSize'] as $f) {
 			$n->{'set' . $f}($src->{'get' . $f}());
 		}
@@ -102,6 +105,15 @@ class DuplicateService {
 			$this->notes->update($n);
 		}
 		return $n;
+	}
+
+	/**
+	 * Vorlage einer Aufgabe (Plan M6 §2.3): eingefrorene Kopie ohne Workspace, Anhänge physisch kopiert, Inhalts-URLs umgeschrieben,
+	 * Verweise auf andere Notizen bleiben (Q2). Läuft in der Transaktion des Aufrufers; Rechte und Quote prüft der Aufrufer
+	 * @param int[] $created neue Notiz-IDs (Dateien bei Rollback über discardFiles entfernen)
+	 */
+	public function copyAsTemplate(Note $src, int $assignmentId, string $uid, array &$created): Note {
+		return $this->cloneNote($src, null, null, $uid, $created, $assignmentId);
 	}
 
 	/** @param int[] $created */

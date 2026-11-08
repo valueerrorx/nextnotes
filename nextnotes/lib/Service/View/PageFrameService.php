@@ -34,14 +34,18 @@ class PageFrameService {
 			$candidates[] = $default;
 		}
 		$candidates[] = $this->settings->get($uid, 'last_opened_workspace', '');
-		foreach ($candidates as $candidate) {
+		foreach ($candidates as $i => $candidate) {
 			if ($candidate === '' || $candidate === '__last_opened__') {
 				continue;
 			}
 			try {
-				return $this->workspaces->resolveKey($uid, $candidate);
+				$ws = $this->workspaces->resolveKey($uid, $candidate);
 			} catch (NotFoundException) {
-				// nächster Kandidat
+				continue;
+			}
+			// Schüler-Workspace nur ausdrücklich angefragt, nie als Startseite (Q3)
+			if ($i === 0 || $ws->getKind() === 'normal') {
+				return $ws;
 			}
 		}
 		return $this->workspaces->defaultWorkspace($uid);

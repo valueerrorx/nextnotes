@@ -181,7 +181,7 @@ class ExcalidrawService {
 	 */
 	private function write(string $uid, int $id, ?string $preview, string $previewName, callable $place): void {
 		$note = $this->notes->find($id);
-		$quota = $preview !== null ? $this->attachments->quotaFor((int)$note->getWorkspaceId(), strlen($preview)) : null;
+		$quota = $preview !== null ? $this->attachments->quotaForNote($note, strlen($preview)) : null;
 		// neue Vorschau-Datei entfernt Transaction::onRollback (createFromString)
 		$this->tx->run(function () use ($uid, $id, $preview, $previewName, $place, $quota) {
 			$this->attachments->enforceQuota($quota);

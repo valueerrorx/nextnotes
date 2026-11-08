@@ -2,6 +2,18 @@
 	"description": "Bewusste Abweichungen der JSON-Schlüssel von tests/nextnotes/fixtures/upstream (Plan M2 §3.4). Eintrag: {route, kind: missing|extra|status, path (bei status: Upstream-Status), reason}. Ungenutzte Einträge lassen CoreScenarioTest scheitern.",
 	"entries": [
 		{
+			"route": "GET /tasks",
+			"kind": "extra",
+			"path": "checklists[].readonly",
+			"reason": "M6b (SPEC §3 Material-Oberfläche, P34): readonly für schreibgeschützte Tasklisten (Material, Lesefreigabe)"
+		},
+		{
+			"route": "GET /tasks",
+			"kind": "extra",
+			"path": "notes[].readonly",
+			"reason": "M6b (SPEC §3 Material-Oberfläche, P34): readonly für schreibgeschützte Tasklisten (Material, Lesefreigabe)"
+		},
+		{
 			"route": "GET /workspaces",
 			"kind": "extra",
 			"path": "workspaces[].team",

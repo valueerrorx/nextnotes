@@ -815,8 +815,9 @@ class IndexViewService {
 	/** @return array<string, string> Schlüssel → Anzeigename (Upstream generateWorkspaceDisplayMap) */
 	private function workspaceMap(string $uid): array {
 		$map = [];
-		foreach ($this->workspaces->keys($uid) as $key) {
-			$map[$key] = $key;
+		$keys = $this->workspaces->keys($uid);
+		foreach ($this->workspaces->listMenu($uid) as $ws) {
+			$map[$keys[(int)$ws->getId()]] = $keys[(int)$ws->getId()];
 		}
 		return $map;
 	}

@@ -151,21 +151,25 @@ class AttachmentService {
 		return $this->quota->quotaFor($workspaceId, $bytes);
 	}
 
+	/**
+	 * Quote der Notiz: Vorlagen/Kopien beim Team der Aufgabe, sonst beim Workspace-Besitzer (Plan M6 §2.3a)
+	 * @return array{type: string, id: string, ws: int, bytes: int}|null
+	 */
+	public function quotaForNote(Note $note, int $bytes): ?array {
+		return $this->quota->quotaForNote($note, $bytes);
+	}
+
 	/** @param array{type: string, id: string, ws: int, bytes: int}|null $quota */
 	public function enforceQuota(?array $quota): void {
 		$this->quota->enforce($quota);
 	}
 
 	/**
-	 * Belegung und Quote des Benutzers (Einstellungen → Speicher): Anhänge aller eigenen Workspaces, Freigaben zählen beim Besitzer
+	 * Belegung und Quote des Benutzers (Einstellungen → Speicher): Anhänge der eigenen Workspaces ohne Schüler-Workspaces (Plan M6 §2.3a), Freigaben zählen beim Besitzer
 	 * @return array{used: int, limit: int}
 	 */
 	public function usage(string $uid): array {
-		$wsIds = array_map(static fn ($w) => (int)$w->getId(), $this->workspaceMapper->findOwned($uid));
-		return [
-			'used' => $wsIds === [] ? 0 : $this->attachments->sizeInWorkspaces($wsIds),
-			'limit' => $this->quota->limit(),
-		];
+		return ['used' => $this->quota->used('user', $uid), 'limit' => $this->quota->limit()];
 	}
 
 	// Upstream poznoteValidateAttachmentFilename
@@ -309,7 +313,7 @@ class AttachmentService {
 		$original = (string)$file['name'];
 		$name = self::cleanName($original);
 		$mime = $this->mimeOf($tmp, $name);
-		$quota = $this->quotaFor((int)$note->getWorkspaceId(), $size);
+		$quota = $this->quotaForNote($note, $size);
 		$a = $this->tx->run(function () use ($quota, $noteId, $name, $mime, $size, $uid, $tmp) {
 			$this->enforceQuota($quota);
 			$a = $this->newRow($noteId, $name, $mime, $size, $uid);
@@ -404,7 +408,7 @@ class AttachmentService {
 		$keep = self::referenced((string)$source->getContent(), $noteId, $attachmentId);
 		$needsQuota = $keep || $target->getWorkspaceId() !== $source->getWorkspaceId();
 		$srcFile = $this->fileOf($a);
-		$quota = $needsQuota ? $this->quotaFor((int)$target->getWorkspaceId(), (int)$a->getSize()) : null;
+		$quota = $needsQuota ? $this->quotaForNote($target, (int)$a->getSize()) : null;
 		$new = $this->tx->run(function () use ($a, $target, $srcFile, $keep, $uid, $quota) {
 			$this->enforceQuota($quota);
 			$new = $this->newRow((int)$target->getId(), (string)$a->getOriginalName(), (string)$a->getMime(), (int)$a->getSize(), $uid);

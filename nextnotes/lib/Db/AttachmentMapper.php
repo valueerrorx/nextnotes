@@ -89,6 +89,20 @@ class AttachmentMapper extends QBMapper {
 		return $sum;
 	}
 
+	// Team-Quote (Plan M6 §2.3a): Anhänge aller Notizen mit assignment_id einer Aufgabe des Teams (Vorlagen, Kopien, abgelöste Kopien)
+	public function sizeForTeamAssignments(string $teamId): int {
+		$qb = $this->db->getQueryBuilder();
+		$expr = $qb->expr();
+		$qb->select($qb->func()->sum('a.size'))->from(self::TABLE, 'a')
+			->innerJoin('a', NoteMapper::TABLE, 'n', $expr->eq('n.id', 'a.note_id'))
+			->innerJoin('n', AssignmentMapper::TABLE, 'g', $expr->eq('g.id', 'n.assignment_id'))
+			->where($expr->eq('g.team_id', $qb->createNamedParameter($teamId)));
+		$res = $qb->executeQuery();
+		$sum = (int)$res->fetchOne();
+		$res->closeCursor();
+		return $sum;
+	}
+
 	/**
 	 * Anhangsgröße der Notizen, die einen Workspace verlassen (Auswahl wie NoteMapper::leaveRows; Quote bei Besitzerwechsel)
 	 * @param int[]|null $folderIds null = ganzer Workspace

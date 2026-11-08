@@ -180,4 +180,12 @@ class FolderMapper extends QBMapper {
 			$qb->executeStatement();
 		}
 	}
+
+	/** @return Folder[] Aufgaben-Ordner einer Aufgabe in den Schüler-Workspaces */
+	public function findByAssignment(int $assignmentId): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')->from(self::TABLE)
+			->where($qb->expr()->eq('assignment_id', $qb->createNamedParameter($assignmentId, IQueryBuilder::PARAM_INT)));
+		return $this->findEntities($qb);
+	}
 }

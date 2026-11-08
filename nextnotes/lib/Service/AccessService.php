@@ -9,10 +9,14 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Service;
 
+use OCA\NextNotes\Db\Assignment;
+use OCA\NextNotes\Db\AssignmentMapper;
 use OCA\NextNotes\Db\Folder;
 use OCA\NextNotes\Db\FolderMapper;
 use OCA\NextNotes\Db\Note;
 use OCA\NextNotes\Db\NoteMapper;
+use OCA\NextNotes\Db\Submission;
+use OCA\NextNotes\Db\SubmissionMapper;
 use OCA\NextNotes\Db\Workspace;
 use OCA\NextNotes\Db\WorkspaceMapper;
 use OCA\NextNotes\Db\WsShareMapper;
@@ -32,6 +36,8 @@ class AccessService {
 
 	// Team-Level ab Moderator = verwalten (ADR 0003)
 	private const TEAM_MANAGE_LEVEL = 4;
+	// Aufgaben-Aktionen (SPEC §9.7); review = fremde Abgaben und Vorlage lesen (Plan M6 §2.3)
+	private const ASSIGNMENT_ACTIONS = ['read', 'review', 'edit', 'distribute', 'close', 'feedback', 'return', 'reopen', 'export', 'delete'];
 
 	/** @var array<string, int> Cache uid|wsId → Stufe für diesen Request */
 	private array $levels = [];
@@ -39,6 +45,8 @@ class AccessService {
 	private array $visibility = [];
 	/** @var array<int, array<int, true>> Cache wsId → Ordner im Material-Zweig (M6a) */
 	private array $material = [];
+	/** @var array<string, array<int, true>> Cache uid → eigene Schüler-Workspaces (kind=assignments) */
+	private array $assignmentWs = [];
 
 	public function __construct(
 		private WorkspaceMapper $workspaces,
@@ -47,6 +55,8 @@ class AccessService {
 		private FolderMapper $folders,
 		private TeamService $teams,
 		private TeamStateService $teamState,
+		private AssignmentMapper $assignments,
+		private SubmissionMapper $submissions,
 	) {
 	}
 
@@ -61,7 +71,8 @@ class AccessService {
 	private function computeLevel(string $uid, Workspace $ws): int {
 		if ($ws->getOwnerType() === 'user') {
 			if ($ws->getOwnerId() === $uid) {
-				return self::MANAGE;
+				// Schüler-Workspace: nur lesen, Abgaben schreibt man über die Notiz-Regeln (Plan M6 §2.3)
+				return $ws->getKind() === 'normal' ? self::MANAGE : self::READ;
 			}
 			$share = $this->shares->findUserShare((int)$ws->getId(), $uid);
 			if ($share === null) {
@@ -90,6 +101,7 @@ class AccessService {
 		$this->levels = [];
 		$this->visibility = [];
 		$this->material = [];
+		$this->assignmentWs = [];
 		$this->teams->resetCache();
 		$this->teamState->resetCache();
 	}
@@ -103,8 +115,12 @@ class AccessService {
 			return $this->visibility[$uid];
 		}
 		$map = [];
+		$this->assignmentWs[$uid] = [];
 		foreach ($this->workspaces->findOwned($uid) as $w) {
-			$map[(int)$w->getId()] = self::MANAGE;
+			$map[(int)$w->getId()] = $w->getKind() === 'normal' ? self::MANAGE : self::READ;
+			if ($w->getKind() === 'assignments') {
+				$this->assignmentWs[$uid][(int)$w->getId()] = true;
+			}
 		}
 		foreach ($this->workspaces->findSharedWith($uid) as $id => $permission) {
 			$map[$id] ??= $permission === 'write' ? self::WRITE : self::READ;
@@ -241,7 +257,13 @@ class AccessService {
 
 	// $write = false: nur Leserecht gefragt, Material-Prüfung entfällt (Lesepfade ohne Zusatzabfrage)
 	private function noteLevelFor(string $uid, Note $note, bool $write): int {
-		// Vorlagen/Abgaben ab M6, bis dahin deny by default
+		if ($note->getRole() === 'submission') {
+			return $this->submissionNoteLevel($uid, $note);
+		}
+		if ($note->getRole() === 'template') {
+			return $this->templateNoteLevel($uid, $note);
+		}
+		// unbekannte Rollen und Notizen ohne Workspace: deny by default
 		if ($note->getRole() !== 'note' || $note->getWorkspaceId() === null) {
 			return self::NONE;
 		}
@@ -256,6 +278,150 @@ class AccessService {
 			return self::READ;
 		}
 		return $level;
+	}
+
+	// ---------- Aufgaben, Vorlagen, Abgaben (M6d, SPEC §9.7, Plan M6 §2.3) ----------
+
+	// Abgabe-Notiz: eigener Schüler im eigenen Schüler-Workspace liest (schreiben ab M6e1); sonst nur review (Lehrkraft bzw. owner_uid), nie über Aufgabe read
+	private function submissionNoteLevel(string $uid, Note $note): int {
+		$sub = $this->submissionOfNote($note);
+		if ($sub === null) {
+			return self::NONE;
+		}
+		if ($sub->getStudentUid() !== null && $sub->getStudentUid() === $uid && $note->getWorkspaceId() !== null) {
+			try {
+				$ws = $this->workspaces->find((int)$note->getWorkspaceId());
+			} catch (DoesNotExistException) {
+				$ws = null;
+			}
+			if ($ws !== null && $ws->getOwnerType() === 'user' && $ws->getOwnerId() === $uid && $ws->getKind() === 'assignments') {
+				return self::READ;
+			}
+		}
+		$assignment = $this->assignmentOrNull((int)$sub->getAssignmentId());
+		return $assignment !== null && $this->assignmentAllows($uid, $assignment, 'review') ? self::READ : self::NONE;
+	}
+
+	// Vorlage: review liest; schreiben nur Lehrkraft bei Aufgabe draft und Team active; Schüler nie
+	private function templateNoteLevel(string $uid, Note $note): int {
+		$assignment = $note->getAssignmentId() === null ? null : $this->assignmentOrNull((int)$note->getAssignmentId());
+		if ($assignment === null || (int)$assignment->getTemplateNoteId() !== (int)$note->getId() || !$this->assignmentAllows($uid, $assignment, 'review')) {
+			return self::NONE;
+		}
+		return $assignment->getStatus() === 'draft' && $this->teamState->stateOf((string)$assignment->getTeamId()) === TeamStateService::ACTIVE
+			? self::WRITE : self::READ;
+	}
+
+	// Abgabe zur Notiz nur bei übereinstimmender Verknüpfung (submission_id, assignment_id, note_id)
+	private function submissionOfNote(Note $note): ?Submission {
+		if ($note->getSubmissionId() === null || $note->getAssignmentId() === null) {
+			return null;
+		}
+		try {
+			$sub = $this->submissions->find((int)$note->getSubmissionId());
+		} catch (DoesNotExistException) {
+			return null;
+		}
+		return (int)$sub->getAssignmentId() === (int)$note->getAssignmentId() && (int)$sub->getNoteId() === (int)$note->getId() ? $sub : null;
+	}
+
+	// Aufgaben werden nie gecacht: Status und Besitzer gelten unter Sperre immer frisch
+	private function assignmentOrNull(int $id): ?Assignment {
+		try {
+			return $this->assignments->find($id);
+		} catch (DoesNotExistException) {
+			return null;
+		}
+	}
+
+	/**
+	 * Matrix SPEC §9.7: L = aktuelle Lehrkraft (aktives Team, Level ≥ 4), O = owner_uid (nur verwaist/eingefroren), S = eigene Abgabe (nur read)
+	 */
+	public function assignmentAllows(string $uid, Assignment $a, string $action): bool {
+		$teamId = (string)$a->getTeamId();
+		$state = $this->teamState->stateOf($teamId);
+		$active = $state === TeamStateService::ACTIVE;
+		$owner = !$active && $a->getOwnerUid() !== null && $a->getOwnerUid() === $uid;
+		$teacher = fn (): bool => $active && $this->teams->getLevel($teamId, $uid) >= self::TEAM_MANAGE_LEVEL;
+		return match ($action) {
+			'read' => $owner || $teacher() || $this->submissions->existsFor((int)$a->getId(), $uid),
+			'review', 'export' => $owner || $teacher(),
+			'delete' => ($owner && $state === TeamStateService::ORPHANED) || $teacher(),
+			'edit', 'distribute', 'close', 'feedback', 'return', 'reopen' => $teacher(),
+			default => false,
+		};
+	}
+
+	/** Ohne Leserecht 404, sonst 403; review ohne Recht immer 404 (keine Existenz-Auskunft fremder Abgaben) */
+	public function requireAssignment(string $uid, int|Assignment $a, string $action): Assignment {
+		if (!in_array($action, self::ASSIGNMENT_ACTIONS, true)) {
+			throw new \InvalidArgumentException('Unknown assignment action ' . $action);
+		}
+		if (is_int($a)) {
+			$a = $this->assignmentOrNull($a) ?? throw new NotFoundException('Assignment not found');
+		}
+		if ($this->assignmentAllows($uid, $a, $action)) {
+			return $a;
+		}
+		if ($action !== 'read' && $action !== 'review' && $this->assignmentAllows($uid, $a, 'read')) {
+			throw new ForbiddenException('Permission denied');
+		}
+		throw new NotFoundException('Assignment not found');
+	}
+
+	/**
+	 * §9.6: (a) Aufgaben aktiver Teams mit Level ≥ 4, (b) owner_uid in verwaisten/eingefrorenen Teams, (c) eigene Abgabe; eine Circles-Probe, je Teil ein SQL
+	 * @return int[]
+	 */
+	public function visibleAssignmentIds(string $uid): array {
+		$ids = [];
+		$available = $this->teams->isAvailable();
+		$memberTeams = $available ? array_map('strval', array_keys($this->teams->memberTeams($uid))) : [];
+		if ($memberTeams !== []) {
+			$teacherOf = [];
+			foreach ($this->assignments->idsInActiveTeams($memberTeams) as $id => $teamId) {
+				$teacherOf[$teamId] ??= $this->teams->getLevel($teamId, $uid) >= self::TEAM_MANAGE_LEVEL;
+				if ($teacherOf[$teamId]) {
+					$ids[$id] = true;
+				}
+			}
+		}
+		foreach ($this->assignments->idsOwnedInactive($uid, !$available) as $id) {
+			$ids[$id] = true;
+		}
+		foreach ($this->submissions->assignmentIdsOf($uid) as $id) {
+			$ids[$id] = true;
+		}
+		$out = array_keys($ids);
+		sort($out);
+		return $out;
+	}
+
+	/**
+	 * read = eigene Abgabe oder review; feedback/return/reopen = Lehrkraft-Aktion der Aufgabe; nicht berechtigt → 404
+	 * @return array{0: Submission, 1: Assignment}
+	 */
+	public function requireSubmission(string $uid, int $id, string $perm): array {
+		try {
+			$sub = $this->submissions->find($id);
+		} catch (DoesNotExistException) {
+			throw new NotFoundException('Submission not found');
+		}
+		$a = $this->assignmentOrNull((int)$sub->getAssignmentId()) ?? throw new NotFoundException('Submission not found');
+		$own = $sub->getStudentUid() !== null && $sub->getStudentUid() === $uid;
+		if ($perm === 'read' && $own) {
+			return [$sub, $a];
+		}
+		if (!$this->assignmentAllows($uid, $a, 'review')) {
+			throw new NotFoundException('Submission not found');
+		}
+		if ($perm !== 'read') {
+			if (!in_array($perm, ['feedback', 'return', 'reopen'], true)) {
+				throw new \InvalidArgumentException('Unknown submission permission ' . $perm);
+			}
+			$this->requireAssignment($uid, $a, $perm);
+		}
+		return [$sub, $a];
 	}
 
 	// ---------- Material-Ordner (M6a, Plan M6 §2.1) ----------
@@ -379,12 +545,31 @@ class AccessService {
 	}
 
 	/**
-	 * Lesbare Notizen ohne Einzelabfrage je Workspace (gleiche Regel wie noteLevel ≥ READ)
+	 * Lesbare Notizen ohne Einzelabfrage je Workspace: role=note ≡ noteLevel ≥ READ; dazu nur eigene Abgaben (eine Abfrage), nie Vorlagen,
+	 * fremde Abgaben nur per Direktzugriff (requireNote/requireSubmission, SPEC §3 Invariante)
 	 * @param Note[] $notes
 	 * @return Note[]
 	 */
 	public function filterReadable(string $uid, array $notes): array {
-		return self::inWorkspaces($notes, $this->visibleWorkspaceIds($uid));
+		$visible = $this->visibleWorkspaceIds($uid);
+		$keep = [];
+		foreach (self::inWorkspaces($notes, $visible) as $n) {
+			$keep[(int)$n->getId()] = true;
+		}
+		$own = $this->assignmentWs[$uid] ?? [];
+		$candidates = array_filter($notes, static fn (Note $n) => $n->getRole() === 'submission' && $n->getSubmissionId() !== null
+			&& $n->getWorkspaceId() !== null && isset($own[(int)$n->getWorkspaceId()]));
+		if ($candidates !== []) {
+			$subs = $this->submissions->findByIds(array_map(static fn (Note $n) => (int)$n->getSubmissionId(), $candidates));
+			foreach ($candidates as $n) {
+				$sub = $subs[(int)$n->getSubmissionId()] ?? null;
+				if ($sub !== null && $sub->getStudentUid() === $uid && (int)$sub->getNoteId() === (int)$n->getId()
+					&& (int)$sub->getAssignmentId() === (int)$n->getAssignmentId()) {
+					$keep[(int)$n->getId()] = true;
+				}
+			}
+		}
+		return array_values(array_filter($notes, static fn (Note $n) => isset($keep[(int)$n->getId()])));
 	}
 
 	/**
@@ -418,6 +603,10 @@ class AccessService {
 		}
 		$level = $this->noteLevelFor($uid, $note, $perm !== 'read');
 		$this->check($level, $perm === 'manage' ? 'write' : $perm, 'Note not found');
+		// manage = Löschen, Papierkorb, Verschieben, Archiv: Vorlagen/Abgaben nie (nur mit der Aufgabe, SPEC §3)
+		if ($perm === 'manage' && $note->getRole() !== 'note') {
+			throw new ForbiddenException('This content is managed by the system');
+		}
 		if ($trashed === false && $note->getTrashedAt() !== null) {
 			throw new NotFoundException('Note not found');
 		}
@@ -460,7 +649,7 @@ class AccessService {
 		}
 		$level = min($this->workspaceLevel($uid, $ws), self::WRITE);
 		$this->check($level, $perm === 'manage' ? 'write' : $perm, 'Folder not found');
-		if ($perm === 'manage' && $folder->getAssignmentId() !== null) {
+		if ($perm !== 'read' && $folder->getAssignmentId() !== null) {
 			throw new ForbiddenException('This folder is managed by the system');
 		}
 		// Material-Zweig: schreiben und verwalten nur Lehrkraft (Plan M6 §2.1)

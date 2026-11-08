@@ -167,6 +167,14 @@ final class IsolationTest extends ApiTestCase {
 			'GET /workspaces' => ['scoped', 'path' => '/workspaces', 'sees' => 'ws'],
 			// M5a: Teams des Aufrufers (ohne Objekt-ID); Team-Rechte prüfen Teams/TeamAccessTest
 			'GET /teams' => ['scoped', 'path' => '/teams', 'sees' => null],
+			// M6d: Aufgaben hängen an Teams; A hat hier keine. Rechte-Matrix und Schüler↔Schüler in Assignments/AssignmentAccessTest
+			'GET /assignments' => ['scoped', 'path' => '/assignments', 'sees' => null],
+			'POST /assignments' => ['excluded', 'path' => '/assignments', 'body' => ['team' => 'keinTeam', 'title' => 'x', 'due_at' => 4102444800, 'source_note_id' => 1], 'status' => 404, 'reason' => 'nur mit Team; Rechte in Assignments/'],
+			'GET /assignments/{}' => ['excluded', 'path' => '/assignments/999999999', 'status' => 404, 'reason' => 'A hat keine Aufgaben; Rechte in Assignments/'],
+			'PATCH /assignments/{}' => ['excluded', 'path' => '/assignments/999999999', 'body' => ['title' => 'x'], 'status' => 404, 'reason' => 'A hat keine Aufgaben; Rechte in Assignments/'],
+			'DELETE /assignments/{}' => ['excluded', 'path' => '/assignments/999999999', 'body' => ['confirm' => true], 'status' => 404, 'reason' => 'A hat keine Aufgaben; Rechte in Assignments/'],
+			'GET /assignments/{}/submissions' => ['excluded', 'path' => '/assignments/999999999/submissions', 'status' => 404, 'reason' => 'A hat keine Aufgaben; Rechte in Assignments/'],
+			'GET /submissions/{}' => ['excluded', 'path' => '/submissions/999999999', 'status' => 404, 'reason' => 'A hat keine Abgaben; Rechte in Assignments/'],
 			'POST /workspaces' => ['scoped-write', 'path' => '/workspaces', 'body' => ['name' => 'Neu Iso'], 'reason' => 'keine Objekt-ID; legt nur bei B an'],
 			'PATCH /workspaces/{}' => ['owned', 'cases' => [['path' => '/workspaces/{ws}', 'body' => ['new_name' => 'Umbenannt Iso']]]],
 			'DELETE /workspaces/{}' => ['owned', 'cases' => [['path' => '/workspaces/{ws}', 'body' => []]]],
@@ -448,7 +456,7 @@ final class IsolationTest extends ApiTestCase {
 			}
 		}
 		self::assertSame([], $errors);
-		self::assertCount(122, $table);
+		self::assertCount(129, $table);
 	}
 
 	public function testDetectorsObject(): void {

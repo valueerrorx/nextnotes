@@ -81,6 +81,11 @@ class WorkspaceMapper extends QBMapper {
 		return $this->findEntities($qb);
 	}
 
+	/** @return Workspace[] eigene Workspaces für die Benutzer-Quote: ohne Schüler-Workspaces (kind=assignments zählt beim Team, Plan M6 §2.3a) */
+	public function findQuotaOwned(string $uid): array {
+		return array_values(array_filter($this->findOwned($uid), static fn (Workspace $w) => $w->getKind() !== 'assignments'));
+	}
+
 	// IDs der Workspaces mit Benutzerfreigabe an $uid, nur bei Besitzer owner_type=user
 	/** @return array<int, string> workspace_id => permission */
 	public function findSharedWith(string $uid): array {

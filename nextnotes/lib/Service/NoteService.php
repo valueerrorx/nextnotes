@@ -22,6 +22,7 @@ use OCA\NextNotes\Db\SnapshotMapper;
 use OCA\NextNotes\Db\Workspace;
 use OCA\NextNotes\Service\Exception\BadRequestException;
 use OCA\NextNotes\Service\Exception\ConflictException;
+use OCA\NextNotes\Service\Exception\ForbiddenException;
 use OCA\NextNotes\Service\Exception\NotFoundException;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Utility\ITimeFactory;
@@ -428,6 +429,16 @@ class NoteService {
 	/** @return array<string, mixed> PATCH /notes/{id}; $diary: Datumstitel verschiebt in den Datumsordner (M4f) */
 	public function update(string $uid, int $id, array $in, string $ifMatch, string $session, ?DiaryService $diary = null): array {
 		$writable = $this->access->requireNote($uid, $id, 'write');
+		// Vorlagen/Abgaben ohne eigenen Ort: kein Umzug, kein Ordner, kein Tagebuch (Review M6-Plan r2 Hinweis 8)
+		$system = $writable->getRole() !== 'note';
+		if ($system) {
+			foreach (['workspace', 'folder_id', 'folder', 'folder_name'] as $key) {
+				if (($in[$key] ?? null) !== null) {
+					throw new BadRequestException('This note cannot be moved');
+				}
+			}
+			$diary = null;
+		}
 		// ADR 0005: gültige Sperre einer anderen Sitzung → 423, danach Versionsprüfung → 409
 		$this->locks->assertCanSave($uid, $id, $session);
 		$expected = trim((string)($in['if_version'] ?? ''));
@@ -445,7 +456,7 @@ class NoteService {
 		$targetWsId = $target !== null ? (int)$target->getId() : (int)$writable->getWorkspaceId();
 		$images = null;
 		if (is_scalar($content) && $writable->getType() === 'note') {
-			$images = $this->images->prepare((string)$content, $targetWsId);
+			$images = $this->images->prepare((string)$content, $writable, $target !== null ? $targetWsId : null);
 		}
 		// Besitzerwechsel: vorhandene Anhänge zählen beim Ziel-Besitzer, zusammen mit neuen Bildern (H1 M5a)
 		$moveQuota = $target !== null && $targetWsId !== (int)$writable->getWorkspaceId()
@@ -481,6 +492,12 @@ class NoteService {
 		// Versionsprüfung und Schreiben unter Zeilensperre (wie Aufgaben): keine verlorene Änderung
 		$this->notes->lockRow($id);
 		$note = $this->notes->find($id);
+		// Vorlage: Aufgabenstatus unter der Notizsperre neu prüfen (draft, Review M6-Plan r2 Hinweis 1)
+		if ($note->getRole() !== 'note') {
+			if ($this->access->noteLevel($uid, $note) < AccessService::WRITE) {
+				throw new ForbiddenException('Permission denied');
+			}
+		}
 		$current = NoteSerializer::version($note);
 		if ($expected !== '' && $expected !== '*' && !hash_equals($current, $expected)) {
 			throw new ConflictException('Version conflict: the note was modified since the version you provided', [
@@ -540,15 +557,17 @@ class NoteService {
 		if ($diary !== null && $heading !== $oldHeading && !$pathApplied && $wsId === $sourceWs && $folderId === $note->getFolderId()) {
 			$folderId = $diary->dateFolder($uid, $ws ?? $this->access->requireWorkspace($uid, $wsId, 'write'), $folderId, $heading) ?? $folderId;
 		}
-		if ($heading !== $oldHeading || $folderId !== $note->getFolderId() || $wsId !== $sourceWs) {
+		if ($note->getWorkspaceId() !== null && ($heading !== $oldHeading || $folderId !== $note->getFolderId() || $wsId !== $sourceWs)) {
 			$heading = $this->notes->headingExists($wsId, $folderId, $heading, (int)$note->getId())
 				? $this->uniqueHeading($wsId, $folderId, $heading, (int)$note->getId())
 				: $heading;
 		}
 		$now = $this->now();
 		$note->setHeading($heading);
-		$note->setWorkspaceId($wsId);
-		$note->setFolderId($folderId);
+		if ($note->getWorkspaceId() !== null) {
+			$note->setWorkspaceId($wsId);
+			$note->setFolderId($folderId);
+		}
 		$note->setUpdatedAt($now);
 		$note->setUpdatedBy($uid);
 		$adopted = [];
@@ -653,7 +672,7 @@ class NoteService {
 
 	/** @return array<string, mixed> DELETE /notes/{id} */
 	public function delete(string $uid, int $id, bool $permanent, mixed $wsKey): array {
-		$note = $this->access->requireNote($uid, $id, 'write', null);
+		$note = $this->access->requireNote($uid, $id, 'manage', null);
 		$ws = $this->workspaces->resolveOptional($uid, $wsKey);
 		if ($ws !== null && $ws->getId() !== $note->getWorkspaceId()) {
 			throw new NotFoundException('Note not found');
@@ -692,7 +711,7 @@ class NoteService {
 
 	/** @return array<string, mixed> */
 	public function restore(string $uid, int $id, mixed $wsKey): array {
-		$note = $this->access->requireNote($uid, $id, 'write', true);
+		$note = $this->access->requireNote($uid, $id, 'manage', true);
 		$ws = $this->workspaces->resolveOptional($uid, $wsKey);
 		if ($ws !== null && $ws->getId() !== $note->getWorkspaceId()) {
 			throw new NotFoundException('Note not found');
@@ -912,7 +931,7 @@ class NoteService {
 
 	/** @return array<string, mixed> POST /notes/{id}/folder */
 	public function moveToFolder(string $uid, int $id, array $in): array {
-		$note = $this->access->requireNote($uid, $id, 'write', null);
+		$note = $this->access->requireNote($uid, $id, 'manage', null);
 		$sourceWs = (int)$note->getWorkspaceId();
 		$ws = $this->workspaces->resolveOptional($uid, $in['workspace'] ?? null, 'write');
 		$targetWs = $ws !== null ? (int)$ws->getId() : $sourceWs;
@@ -975,7 +994,7 @@ class NoteService {
 	}
 
 	public function removeFromFolder(string $uid, int $id, mixed $wsKey): void {
-		$note = $this->access->requireNote($uid, $id, 'write', null);
+		$note = $this->access->requireNote($uid, $id, 'manage', null);
 		$ws = $this->workspaces->resolveOptional($uid, $wsKey);
 		if ($ws !== null && $ws->getId() !== $note->getWorkspaceId()) {
 			throw new NotFoundException('Note not found');
@@ -993,7 +1012,7 @@ class NoteService {
 
 	/** @return array<string, mixed> POST /notes/{id}/archive */
 	public function archive(string $uid, int $id): array {
-		$note = $this->access->requireNote($uid, $id, 'write');
+		$note = $this->access->requireNote($uid, $id, 'manage');
 		// Benutzer-Quelle: verwalten (B17); Team-Quelle: Archiv desselben Teams über requireLeave
 		$source = $this->access->requireWorkspace($uid, (int)$note->getWorkspaceId(), 'write');
 		$sourceKey = $this->workspaces->keyFor($uid, (int)$source->getId());

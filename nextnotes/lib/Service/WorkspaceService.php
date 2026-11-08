@@ -68,7 +68,8 @@ class WorkspaceService {
 
 	// Erster Zugriff ohne eigenen Workspace: „Notizen“ in Benutzersprache (Thomas, O5)
 	public function ensureDefault(string $uid): void {
-		if ($this->workspaces->findOwned($uid) !== []) {
+		// Schüler-Workspace (kind=assignments) zählt nicht als eigener Workspace
+		if ($this->workspaces->findOwned($uid, 'normal') !== []) {
 			return;
 		}
 		$name = $this->defaultName($uid);
@@ -120,6 +121,11 @@ class WorkspaceService {
 			$this->visible[$uid] = $list;
 		}
 		return array_values($this->visible[$uid]);
+	}
+
+	/** @return Workspace[] Workspace-Menü und Ziele: ohne Schüler-Workspaces (Q3, nur über „Meine Aufgaben“; Schlüssel bleiben auflösbar) */
+	public function listMenu(string $uid): array {
+		return array_values(array_filter($this->listVisible($uid), static fn (Workspace $ws) => $ws->getKind() === 'normal'));
 	}
 
 	/** @return array<int, string> wsId → Schlüssel (deterministisch, eindeutig) */
@@ -227,7 +233,7 @@ class WorkspaceService {
 	public function index(string $uid): array {
 		$keys = $this->keys($uid);
 		$out = [];
-		foreach ($this->listVisible($uid) as $ws) {
+		foreach ($this->listMenu($uid) as $ws) {
 			$color = ($ws->getColor() ?? '') !== '' ? $ws->getColor() : null;
 			$out[] = [
 				'name' => $keys[(int)$ws->getId()],
@@ -274,7 +280,7 @@ class WorkspaceService {
 	}
 
 	// Nicht Mitglied → 404; Team zählt nicht (versteckt, Backend …), nicht aktiv oder Level < 4 → 403
-	private function requireTeamForCreate(string $uid, mixed $team): string {
+	public function requireTeamForCreate(string $uid, mixed $team): string {
 		if (!is_string($team) || strlen($team) > 64 || !$this->teams->isAvailable()) {
 			throw new NotFoundException('Team not found');
 		}

@@ -10,12 +10,18 @@ declare(strict_types=1);
 namespace OCA\NextNotes\Service;
 
 use OCA\NextNotes\AppInfo\Application;
+use OCA\NextNotes\Db\AssignmentMapper;
 use OCA\NextNotes\Db\AttachmentMapper;
+use OCA\NextNotes\Db\Note;
+use OCA\NextNotes\Db\TeamMapper;
 use OCA\NextNotes\Db\WorkspaceMapper;
+use OCA\NextNotes\Service\Exception\NotFoundException;
 use OCA\NextNotes\Service\Exception\TooLargeException;
+use OCP\AppFramework\Db\DoesNotExistException;
+use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\IAppConfig;
 
-// Speicherquote je Besitzer (SPEC §2.2): Benutzer = alle eigenen Workspaces, Team = alle Workspaces des Teams (M5a)
+// Speicherquote je Besitzer (SPEC §2.2): Benutzer = eigene Workspaces ohne kind=assignments; Team = Team-Workspaces (M5a) + Vorlagen/Kopien seiner Aufgaben (M6d)
 class QuotaService {
 	private const MB = 1048576;
 
@@ -23,6 +29,9 @@ class QuotaService {
 		private WorkspaceMapper $workspaceMapper,
 		private AttachmentMapper $attachments,
 		private IAppConfig $appConfig,
+		private TeamMapper $teams,
+		private AssignmentMapper $assignments,
+		private ITimeFactory $time,
 	) {
 	}
 
@@ -36,8 +45,52 @@ class QuotaService {
 		}
 		$ws = $this->workspaceMapper->find($workspaceId);
 		$quota = ['type' => (string)$ws->getOwnerType(), 'id' => (string)$ws->getOwnerId(), 'ws' => (int)$ws->getId(), 'bytes' => $bytes];
+		if ($quota['type'] === 'team') {
+			$this->ensureTeamRow($quota['id']);
+		}
 		$this->checkSum($quota);
 		return $quota;
+	}
+
+	/**
+	 * Quote der Notiz: mit assignment_id (Vorlage, Kopie, abgelöste Kopie) beim Team der Aufgabe, sonst beim Workspace-Besitzer (Plan M6 §2.3a)
+	 * @return array{type: string, id: string, ws: int, bytes: int}|null
+	 */
+	public function quotaForNote(Note $note, int $bytes): ?array {
+		if ($note->getAssignmentId() === null) {
+			return $note->getWorkspaceId() === null ? null : $this->quotaFor((int)$note->getWorkspaceId(), $bytes);
+		}
+		return $this->quotaForAssignment((int)$note->getAssignmentId(), $bytes);
+	}
+
+	/** @return array{type: string, id: string, ws: int, bytes: int}|null Vorlage/Austeilen einer bestehenden Aufgabe */
+	public function quotaForAssignment(int $assignmentId, int $bytes): ?array {
+		if ($bytes <= 0) {
+			return null;
+		}
+		try {
+			$teamId = (string)$this->assignments->find($assignmentId)->getTeamId();
+		} catch (DoesNotExistException) {
+			throw new NotFoundException('Assignment not found');
+		}
+		return $this->quotaForTeam($teamId, $bytes);
+	}
+
+	/** @return array{type: string, id: string, ws: int, bytes: int}|null Team-Quote; Team-Zeile legt der Aufrufer an (Aufgabe anlegen) */
+	public function quotaForTeam(string $teamId, int $bytes): ?array {
+		if ($bytes <= 0) {
+			return null;
+		}
+		$quota = ['type' => 'team', 'id' => $teamId, 'ws' => 0, 'bytes' => $bytes];
+		$this->checkSum($quota);
+		return $quota;
+	}
+
+	// Team-Workspace ohne Zeile (Altbestand): Zeile vor der Transaktion anlegen; nie für ein Team ohne Workspace (Review M6-Plan r2 Hinweis 7)
+	private function ensureTeamRow(string $teamId): void {
+		if ($this->teams->findByTeamId($teamId) === null) {
+			$this->teams->insertIgnore($teamId, null, $this->time->getTime());
+		}
 	}
 
 	/**
@@ -88,6 +141,12 @@ class QuotaService {
 			$owners[$src->getOwnerType() . "\0" . $src->getOwnerId()] = [(string)$src->getOwnerType(), (string)$src->getOwnerId()];
 		}
 		ksort($owners, SORT_STRING);
+		// Team-Zeile vor allen Workspace-Zeilen (Sperr-Reihenfolge Team → Aufgabe → Workspace → Notiz, Plan M6 §2.4); fehlt sie, gibt es das Team nicht mehr
+		foreach ($owners as [$type, $id]) {
+			if ($type === 'team' && $this->teams->lockRow($id) === 0) {
+				throw new NotFoundException('Team not found');
+			}
+		}
 		foreach ($owners as [$type, $id]) {
 			$this->workspaceMapper->lockOwner($type, $id);
 		}
@@ -116,12 +175,19 @@ class QuotaService {
 		if ($bytes <= 0) {
 			return;
 		}
-		$wsIds = [$quota['ws']];
-		if ($quota['type'] === 'user' || $quota['type'] === 'team') {
-			$wsIds = array_map(static fn ($w) => (int)$w->getId(), $this->workspaceMapper->findByOwner($quota['type'], $quota['id']));
-		}
-		if ($this->attachments->sizeInWorkspaces($wsIds) + $bytes > $this->limit()) {
+		if ($this->used($quota['type'], $quota['id'], $quota['ws']) + $bytes > $this->limit()) {
 			throw new TooLargeException('Storage quota exceeded');
 		}
+	}
+
+	// Belegung eines Besitzers (Einstellungen → Speicher nutzt denselben Weg für Benutzer)
+	public function used(string $type, string $id, int $wsId = 0): int {
+		$wsIds = match ($type) {
+			'user' => array_map(static fn ($w) => (int)$w->getId(), $this->workspaceMapper->findQuotaOwned($id)),
+			'team' => array_map(static fn ($w) => (int)$w->getId(), $this->workspaceMapper->findByOwner('team', $id)),
+			default => [$wsId],
+		};
+		$used = $wsIds === [] ? 0 : $this->attachments->sizeInWorkspaces($wsIds);
+		return $type === 'team' ? $used + $this->attachments->sizeForTeamAssignments($id) : $used;
 	}
 }

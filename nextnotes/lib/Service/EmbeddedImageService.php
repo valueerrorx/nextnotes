@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Service;
 
+use OCA\NextNotes\Db\Note;
 use OCA\NextNotes\Service\Exception\TooLargeException;
 
 /**
@@ -30,7 +31,7 @@ class EmbeddedImageService {
 	 * @return array{images: array<string, array{data: string, mime: string, ext: string, alt: string}>, quota: ?array}|null null = keine Base64-Bilder
 	 * @throws TooLargeException Bild über attachment_max_file_mb oder Quote überschritten (nichts geändert)
 	 */
-	public function prepare(string $html, int $workspaceId): ?array {
+	public function prepare(string $html, Note $note, ?int $targetWorkspaceId = null): ?array {
 		if (stripos($html, 'data:image/') === false) {
 			return null;
 		}
@@ -61,7 +62,9 @@ class EmbeddedImageService {
 		if ($images === []) {
 			return null;
 		}
-		return ['images' => $images, 'quota' => $this->attachments->quotaFor($workspaceId, $bytes)];
+		// Umzug beim Speichern: Ziel-Workspace; sonst Quote der Notiz (Vorlagen/Kopien beim Team, Plan M6 §2.3a)
+		$quota = $targetWorkspaceId !== null ? $this->attachments->quotaFor($targetWorkspaceId, $bytes) : $this->attachments->quotaForNote($note, $bytes);
+		return ['images' => $images, 'quota' => $quota];
 	}
 
 	/**

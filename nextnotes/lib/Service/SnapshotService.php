@@ -53,6 +53,10 @@ class SnapshotService {
 
 	// Aufbewahrung nach Einstellung des Workspace-Besitzers (Team-Workspaces: Standard)
 	private function keepDaysFor(Note $note): int {
+		// Vorlage/abgelöste Kopie ohne Workspace: Standard
+		if ($note->getWorkspaceId() === null) {
+			return self::DEFAULT_KEEP_DAYS;
+		}
 		$ws = $this->workspaces->find((int)$note->getWorkspaceId());
 		return $ws->getOwnerType() === 'user' ? $this->keepDays((string)$ws->getOwnerId()) : self::DEFAULT_KEEP_DAYS;
 	}
