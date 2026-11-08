@@ -1,0 +1,23 @@
+VERDICT: BLOCKER
+
+Review M7-plan r1 (Basis 1378e5d8) gegen SPEC §1.2, §8, §13 M7, ADR 0001, ADR 0008, STATUS.
+
+M7-Kriterien: Krit. 1 (M7a), 2 (M7a), 3 (M7c/M7d/M7f), 4 (M7f) sind abgedeckt. [THOMAS]-Trennung sauber: kein Agentenschritt pusht, lädt hoch oder veröffentlicht; Signieren mit echtem Schlüssel, Registrierung, Repo öffentlich, Release nur Thomas; Demo/gftest ausgeschlossen.
+
+## Blocker
+1. M7b `delete-user-data` bei weiter bestehendem Konto ist nicht festgelegt (Plan §1 M7b Scope/Done; SPEC §8 „Zusätzlich“; ADR 0008 „Admin“). „Dieselbe Logik wie Kontolöschung“ hat bei einem lebenden Konto Folgen, die weder Plan noch SPEC beschreiben:
+   a) Schüler: `student_uid` = NULL → er verliert den Lesezugriff auf die eigenen Abgaben, obwohl er weiter Mitglied ist (ADR 0008 e sichert Austretenden dauerhaften Lesezugriff zu); danach teilt das Nachzügler-Austeilen (§9.4, GET /assignments, AssignmentDeadlineJob) ihm vor Fristende neue Kopien aus. Ist das gewollt?
+   b) Lehrkraft: `AssignmentOwnership::releaseDeleted` überträgt `owner_uid` weg oder setzt ihn ohne Co-Lehrkraft auf NULL (gesperrt), obwohl die Lehrkraft aktiv im Team bleibt.
+   c) Nicht im Ablauf genannt: BeforeUserDeletedListener (Hintergrundbilder in Team-/geteilten Workspaces), `rememberTeams`, Benutzerwerte der App in `IUserConfig`, offene Benachrichtigungen (`markProcessed`). Bei echter Kontolöschung räumt der Kern sie auf, hier nicht.
+   d) Gleichzeitige Nutzung: Das Konto kann während des Laufs schreiben. Bedeutung von `--force` ist nicht beschrieben (der Plan nennt es nur in der Signatur).
+   Nötig: festlegen, was die Löschung bei einem bestehenden Konto bewirkt. Vorschlag: ohne `--force` nur bei deaktiviertem oder gelöschtem Konto, sonst Exit ≠ 0; Verhalten zu a–c in SPEC §8 und ADR 0008 eintragen; Done-Fälle für a, b und c ergänzen (Schüler bzw. Lehrkraft mit bestehendem Konto, Prüfung von IUserConfig und Notifications).
+2. `occ nextnotes:purge` widerspricht ADR 0008 (Plan M7b; ADR 0008 „Grundsatz Abgaben“: „nur auf zwei Wegen“; Datenschutzhinweis: „Kein zusätzlicher Admin-Löschbefehl geplant“). SPEC §8 führt purge, ADR 0008 schließt ihn aus. Laut Leitlinie in CLAUDE.md entfernen nur die Team-Löschung und das manuelle Löschen durch die Lehrkraft Abgaben. Nötig: ADR-0008-Nachtrag in M7b (Dateien), der purge als dritten, ausdrücklichen Admin-Weg bei Deinstallation festhält. Q2 muss ausdrücklich nennen, dass purge alle Abgaben trotz Aufbewahrungsfrist löscht (Datenschutzfrage für Thomas).
+
+## Hinweise
+1. IMigrator: `canImport()` = false lässt in user_migration nach meiner Kenntnis den gesamten Kontoimport scheitern, sobald der Export Daten dieses Migrators enthält. Das ließ sich hier nicht in `.ref` prüfen, weil user_migration nicht im Server-Repo liegt. Sicherer ist `canImport` = true mit `import()` als No-op samt Ausgabe. Gegen user_migration stable35 prüfen. `export` schreibt in `IExportDestination`, nicht in ein ZIP. „Wie export-user“ heißt deshalb gleicher Inhalt, nicht gleiche Datei. Done (4) entsprechend formulieren.
+2. purge: occ-Befehle einer deaktivierten oder entfernten App sind nicht verfügbar. Die Reihenfolge purge → `app:remove` muss in Doku und Q2 stehen. Den Umfang um App-Werte in `IUserConfig` aller Benutzer und um Benachrichtigungen der App ergänzen. Purge möglichst nur im Wartungsmodus oder mit Warnung bei aktiven Sitzungen.
+3. `export-user` für bereits gelöschte UID: Festlegen, dass nicht über `student_uid_former` exportiert wird (keine Rechtewirkung, ADR 0008 a), oder es ausdrücklich begründen.
+4. `delete-user-data`: Inhaltslöschung synchron im Befehl ausführen und nicht nur den `UserDataDeletionJob` einplanen. Sonst ist Done (2) erst nach einem Cron-Lauf prüfbar. Doku-Warnung: Bei neu vergebener UID (Restrisiko §8) löscht der Befehl auch Daten des neuen Kontos.
+5. M7e: Startpunkt `0.1.0` hat keine Daten (M1 ohne REST). Die Index- und Default-Migrationen 0.2.0–0.3.0 laufen damit nie auf gefüllten Tabellen. Empfehlung: zusätzlich ein früher Stand mit API, z. B. 0.1.2 (M4d), mit Beispieldaten. Außerdem prüfen, dass nach dem Upgrade die Hintergrundjobs aus `info.xml` registriert sind.
+6. M7a: Ein frischer `git worktree` hat nie `build/node_modules`. Der Plan sagt „bricht ab“. Festlegen, dass `node_modules` aus dem Hauptbaum per Symlink oder Kopie (Lockfile-Prüfung) genutzt wird, sonst bricht `dist` immer ab. Zur Reproduzierbarkeit tar-, gzip- und esbuild-Versionen ausgeben (steht unter Risiken). Das ist realistisch nachweisbar.
+7. M7c/M7d: `validate-info.sh` darf die URLs aus `<website>`, `<documentation>` und `<screenshot>` vor dem Push nicht abrufen (offline, Thomas-Gate).
