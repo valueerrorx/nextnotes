@@ -7,3 +7,5 @@
 # Root-.gitignore (Upstream) ignoriert build/; Build-Quellen der App sind eingecheckt
 !/build/
 /build/node_modules/
+# Pakete (make dist)
+/dist/

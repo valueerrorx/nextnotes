@@ -12,7 +12,8 @@ Die App wird in den Container **kopiert**, nie gemountet: `occ app:remove` lösc
 |---|---|
 | `validate-info.sh` | `info.xml` gegen App-Store-XSD (Cache in `.cache/`) |
 | `up.sh <env\|all>` / `down.sh <env\|all>` | Umgebung starten (inkl. Testnutzer `alice`) / Container und Volumes löschen |
-| `install-app.sh <env>` | `nextnotes/` nach `custom_apps/nextnotes` kopieren (ohne `build/`, `Makefile`, `js-src/`, `css-src/`; vorher `make -C nextnotes build`) |
+| `install-app.sh <env>` | `nextnotes/` nach `custom_apps/nextnotes` kopieren (Ausschlüsse aus `nextnotes/build/dist-exclude.txt`, wie `make dist`; vorher `make -C nextnotes build`); `NN_APP_TARBALL=<paket>` entpackt stattdessen ein Paket aus `make -C nextnotes dist` (vorher `check-dist.sh`) |
+| `check-dist.sh <tarball>` | Paketprüfung: genau eine Wurzel `nextnotes/`, `appinfo/info.xml` mit `<id>nextnotes</id>`, Version = Dateiname, keine verbotenen Pfade (`.git`, `node_modules`, `tests`, `.ref`; in der Wurzel `build/`, `dist/`, `*-src/`, `Makefile`, `.gitignore`), PHP nur in `appinfo/`/`lib/`/`templates/`; gibt Einträge und Größe aus. `make dist` ruft es selbst auf |
 | `lifecycle.sh <env>` | frisch → enable → Schema-Export (`.cache/schema-<env>.json`) → disable → remove; `CHECK_PAGE`/`CHECK_SPIKE`/`CHECK_CSP=1` rufen die Prüfungen bei aktivierter App |
 | `check-page.sh <env>` | leere Seite angemeldet (200) und Login-Redirect abgemeldet (303) |
 | `spike-urls.sh <env>` | `.php`-Routen über `/index.php/apps/…` und `/apps/…` (200), ADR 0004 |
