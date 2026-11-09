@@ -8,6 +8,13 @@ html[data-theme] {
 	background-color: var(--color-background-plain, var(--color-main-background));
 }
 
+/* UI-sidebar (Thomas 2026-11-09): Seitenleiste der Hauptansicht ein Drittel schmaler als Upstream (370 px, tokens.css);
+   html:root schlägt :root unabhängig von der Ladereihenfolge. Gezogene Breite (localStorage, Inline-Stil) gilt weiter,
+   Doppelklick auf den Rand setzt auf diesen Wert zurück. */
+html:root {
+	--left-col-width: 248px;
+}
+
 body {
 	display: block;
 	height: calc(100vh - env(safe-area-inset-bottom));

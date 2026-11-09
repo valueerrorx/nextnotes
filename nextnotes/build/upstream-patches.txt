@@ -42,3 +42,4 @@ src/public/js/mention-autocomplete.js
 src/public/js/tasks-page.js
 src/public/js/font-size-settings.js
 src/i18n/de.json
+src/i18n/en.json
