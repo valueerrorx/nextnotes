@@ -363,9 +363,9 @@ class Notifier implements INotifier {
 	}
 
 	// Lehrkraft-Meldungen öffnen die Aufgabe auf der Aufgaben-Seite (M6g)
-	// Aufgaben-Seite im ersten Team-Workspace des Teams, sonst im eigenen Workspace (M6i, WorkspaceService::assignmentsKey)
+	// Aufgaben-Seite im Workspace der Aufgabe, sonst im eigenen Workspace (ADR 0021, WorkspaceService::assignmentKey)
 	private function assignmentLink(string $uid, Assignment $a): string {
-		$key = $this->workspaces->assignmentsKey($uid, (string)$a->getTeamId());
+		$key = $this->workspaces->assignmentKey($uid, $a);
 		return $this->urls->linkToRouteAbsolute('nextnotes.page.assignments') . '?' . http_build_query(($key !== null ? ['workspace' => $key] : []) + ['assignment' => (int)$a->getId()]);
 	}
 

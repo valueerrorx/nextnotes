@@ -229,7 +229,7 @@ final class MaterialIsolationTest extends MaterialTestCase {
 		$x = $this->fixture();
 		['l' => $l, 's' => $s, 'm' => $m, 'n1' => $n1, 'ws' => $ws, 't' => $t, 'att' => $att] = $x;
 		$matBefore = [self::note($n1), self::folderRow($m), self::attachments($n1), self::tags($n1)];
-		$body = ['team' => $t, 'title' => 'Aus Material', 'due_at' => time() + 7200, 'source_note_id' => $n1];
+		$body = ['workspace' => $ws, 'title' => 'Aus Material', 'due_at' => time() + 7200, 'source_note_id' => $n1];
 		self::assertContains($s->call('POST', '/assignments', $body)->status, [403, 404], 'S legt aus Material keine Aufgabe an');
 		$r = $l->call('POST', '/assignments', $body);
 		self::assertSame(201, $r->status, 'L legt Aufgabe aus Material an: ' . $r->describe());

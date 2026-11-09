@@ -24,12 +24,12 @@ Neuer Workspace: Workspace-Menü → *Neuer Arbeitsbereich*. Umbenennen, Farbe, 
 - Teams legst du in der App **Kontakte** an (Link *Teams verwalten*, wenn verfügbar). Wer im Team **Moderator oder höher** ist, gilt in Next Notes als **Lehrkraft**, einfache Mitglieder als **Schüler**.
 - Lehrkräfte legen Team-Workspaces an: *Neuer Arbeitsbereich* → *Arbeitsbereich für* → *Team: …*. Alle Team-Mitglieder sehen ihn und können darin schreiben. Zugriff folgt der Mitgliedschaft: Wer das Team verlässt, verliert den Zugriff.
 - **Material:** Eine Lehrkraft kennzeichnet einen obersten Ordner im Team-Workspace über das Ordnermenü → *Als Material kennzeichnen*. Darin (mit allen Unterordnern) bearbeiten nur Lehrkräfte, Schüler lesen (Buch-Symbol, Hinweis „Material – nur lesen“). Schüler können eine Material-Notiz in ihren privaten Workspace duplizieren und dort weiterbearbeiten.
-- Umbenennen und Löschen eines Team-Workspace dürfen nur Lehrkräfte. Beim Löschen wandern die Notizen in einen anderen Workspace desselben Teams; beim letzten Team-Workspace werden sie gelöscht.
-- Wird das Team gelöscht, löscht Next Notes seine Workspaces und Aufgaben nach 30 Tagen. Vorher kommt eine Benachrichtigung. Wer den Team-Workspace angelegt hat, kann ihn in der Frist in einen privaten umwandeln.
+- Umbenennen und Löschen eines Team-Workspace dürfen nur Lehrkräfte. Beim Löschen wandern die Notizen und Aufgaben in einen anderen Workspace desselben Teams; beim letzten Team-Workspace werden sie gelöscht, die Aufgaben mit allen Abgaben (der Dialog nennt ihre Zahl, exportiere vorher).
+- Wird das Team gelöscht, löscht Next Notes seine Workspaces und Aufgaben nach 30 Tagen. Vorher kommt eine Benachrichtigung. Wer den Team-Workspace angelegt hat, kann ihn in der Frist in einen privaten umwandeln. Die Aufgaben des Teams findest du bis dahin unter **Aufgaben** in deinem eigenen Workspace.
 
 ## Aufgaben für Lehrkräfte
-Im Team-Workspace über **Aufgaben** in der Icon-Leiste.
-1. **Anlegen:** *Neue Aufgabe* (Quelle: eine Notiz aus den Workspaces dieses Teams) oder im Notiz-Menü *Als Aufgabe austeilen…*, mit Titel, **Frist** und optional Höchstpunktzahl. Die Aufgabe bekommt eine eingefrorene Kopie der Notiz samt Anhängen als Vorlage. Bis zum Austeilen kannst du die Vorlage noch bearbeiten.
+Im Team-Workspace über **Aufgaben** in der Icon-Leiste. Eine Aufgabe gehört fest zu dem Team-Workspace, in dem du sie anlegst, und erscheint nur dort.
+1. **Anlegen:** *Neue Aufgabe* (Quelle: eine Notiz aus diesem Workspace) oder im Notiz-Menü *Als Aufgabe austeilen…*, mit Titel, **Frist** und optional Höchstpunktzahl. Die Aufgabe bekommt eine eingefrorene Kopie der Notiz samt Anhängen als Vorlage. Bis zum Austeilen kannst du die Vorlage noch bearbeiten.
 2. **Austeilen:** Jeder Schüler des Teams bekommt eine eigene Kopie und eine Benachrichtigung. Später beigetretene Schüler erhalten ihre Kopie automatisch. Fehlen Kopien (z. B. Speicher des Teams voll), erscheint *An fehlende austeilen (n)*.
 3. **Abgaben ansehen:** Die Tabelle zeigt den Stand je Schüler. Öffne eine Abgabe zum Lesen, gib **Feedback** und **Punkte**, dann *Zurückgeben*. Erst dann sieht der Schüler Feedback und Punkte. *Wieder öffnen* gibt die Abgabe zur Überarbeitung frei.
 4. *Frist ändern*, *Aufgabe schließen* (offene Abgaben gelten dann als verpasst), *Exportieren* (ZIP aller Abgaben).
@@ -38,7 +38,7 @@ Im Team-Workspace über **Aufgaben** in der Icon-Leiste.
 Nach Fristende bekommst du eine Sammelmeldung, wie viele abgegeben haben.
 
 ## Aufgaben für Schüler
-1. Bei einer neuen Aufgabe kommt eine Benachrichtigung. Im Team-Workspace öffnest du **Aufgaben** und dort die Aufgabe.
+1. Bei einer neuen Aufgabe kommt eine Benachrichtigung. Im Team-Workspace der Aufgabe öffnest du **Aufgaben** und dort die Aufgabe (der Link in der Benachrichtigung führt direkt hin).
 2. Bearbeite deine **Kopie**. Nur du und die Lehrkräfte des Teams sehen sie.
 3. *Abgeben* vor der Frist. Danach ist die Kopie schreibgeschützt. Bis zur Frist kannst du mit *Abgabe zurückziehen* weiterarbeiten, solange noch kein Feedback da ist. Gibst du nicht erneut ab, gilt die Aufgabe als nicht abgegeben.
 4. Nach der Rückgabe siehst du **Feedback** und **Punkte** bei der Aufgabe. Deine Abgabe kannst du als ZIP herunterladen.

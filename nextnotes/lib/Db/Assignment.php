@@ -16,6 +16,8 @@ use OCP\DB\Schema\ColumnType;
 /**
  * @method ?string getTeamId()
  * @method void setTeamId(?string $v)
+ * @method ?int getWorkspaceId()
+ * @method void setWorkspaceId(?int $v)
  * @method ?string getTitle()
  * @method void setTitle(?string $v)
  * @method ?int getSourceNoteId()
@@ -45,6 +47,7 @@ use OCP\DB\Schema\ColumnType;
  */
 class Assignment extends Entity {
 	protected $teamId;
+	protected $workspaceId;
 	protected $title;
 	protected $sourceNoteId;
 	protected $templateNoteId;
@@ -61,6 +64,7 @@ class Assignment extends Entity {
 
 	public function __construct() {
 		$this->addType('teamId', ColumnType::String);
+		$this->addType('workspaceId', ColumnType::Integer);
 		$this->addType('title', ColumnType::String);
 		$this->addType('sourceNoteId', ColumnType::Integer);
 		$this->addType('templateNoteId', ColumnType::Integer);

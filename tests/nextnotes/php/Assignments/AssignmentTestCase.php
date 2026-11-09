@@ -66,13 +66,29 @@ abstract class AssignmentTestCase extends TeamTestCase {
 		return $fx;
 	}
 
-	/** @return array<string, mixed> Aufgabe als JSON */
+	/**
+	 * Aufgabe im Workspace der Quelle (ADR 0021: Quelle muss dort liegen), prüft das Team
+	 * @return array<string, mixed> Aufgabe als JSON
+	 */
 	protected function createAssignment(ApiClient $c, string $team, int $source, string $title, array $extra = []): array {
-		$r = $c->call('POST', '/assignments', ['team' => $team, 'title' => $title, 'due_at' => time() + 7200, 'source_note_id' => $source] + $extra);
+		$r = $c->call('POST', '/assignments', ['workspace' => self::wsKeyOfNote($source), 'title' => $title, 'due_at' => time() + 7200, 'source_note_id' => $source] + $extra);
 		self::assertSame(201, $r->status, 'Aufgabe anlegen: ' . $r->describe());
 		$a = $r->json()['assignment'];
 		$this->assignmentIds[] = (int)$a['id'];
+		self::assertSame($team, $a['team'], 'Team der Aufgabe');
 		return $a;
+	}
+
+	// Langform „Name (…, #id)“ des Workspace einer Notiz (verknüpfte Notiz: Ziel); resolveKey akzeptiert sie für jeden sichtbaren Workspace
+	protected static function wsKeyOfNote(int $noteId): string {
+		$note = self::row('nextnotes_notes', $noteId);
+		self::assertNotNull($note, "Notiz $noteId");
+		if (($note['linked_note_id'] ?? null) !== null) {
+			$note = self::row('nextnotes_notes', (int)$note['linked_note_id']) ?? $note;
+		}
+		$ws = self::row('nextnotes_workspaces', (int)$note['workspace_id']);
+		self::assertNotNull($ws, "Workspace der Notiz $noteId");
+		return $ws['name'] . ' (x, #' . $ws['id'] . ')';
 	}
 
 	/**

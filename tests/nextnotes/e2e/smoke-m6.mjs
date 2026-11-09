@@ -61,7 +61,7 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 
 	// 3. Q2: Aufgabe aus Material (L), Austeilen in der Oberfläche
 	m = ctx.mark();
-	const a = (await api.must('POST', '/assignments', { team: teamId, title: `Aufgabe ${RUN}`, due_at: Math.floor(Date.now() / 1000) + 7200, source_note_id: src, max_points: 10 })).assignment;
+	const a = (await api.must('POST', '/assignments', { workspace: TW, title: `Aufgabe ${RUN}`, due_at: Math.floor(Date.now() / 1000) + 7200, source_note_id: src, max_points: 10 })).assignment;
 	await page.goto(ctx.appUrl(`assignments.php?workspace=${encodeURIComponent(TW)}&assignment=${a.id}`), { waitUntil: 'networkidle' });
 	await page.getByRole('button', { name: /^(Austeilen|Hand out)$/ }).first().click();
 	const dist = page.waitForResponse((r) => r.url().includes(`/assignments/${a.id}/distribute`));

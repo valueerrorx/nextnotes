@@ -325,7 +325,7 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 
 	// Austeilen: Kopie enthält dieselben Formeln
 	m = ctx.mark();
-	const asg = (await api.must('POST', '/assignments', { team: teamId, title: `Formel ${RUN}`, due_at: Math.floor(Date.now() / 1000) + 7200, source_note_id: shared })).assignment;
+	const asg = (await api.must('POST', '/assignments', { workspace: TW, title: `Formel ${RUN}`, due_at: Math.floor(Date.now() / 1000) + 7200, source_note_id: shared })).assignment;
 	await api.must('POST', `/assignments/${asg.id}/distribute`, {});
 	const sub = (await api.must('GET', `/assignments/${asg.id}/submissions`)).submissions.find((s) => s.student_uid === B);
 	const copy = sub ? await content(sub.note_id, apiB) : '';

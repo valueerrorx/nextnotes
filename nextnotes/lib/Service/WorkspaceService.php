@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OCA\NextNotes\Service;
 
 use OCA\NextNotes\AppInfo\Application;
+use OCA\NextNotes\Db\Assignment;
 use OCA\NextNotes\Db\Folder;
 use OCA\NextNotes\Db\FolderMapper;
 use OCA\NextNotes\Db\MentionHandledMapper;
@@ -200,12 +201,18 @@ class WorkspaceService {
 		}, $byTeam);
 	}
 
-	// Ziel-Workspace für Links auf assignments.php (M6i): erster Team-Workspace des Teams, sonst erster eigener (Aufgaben ohne Team-Workspace); nie schreibend
+	// Ziel-Workspace für team-weite Links auf assignments.php (Meldung „Team verwaist“, M6i): erster Team-Workspace des Teams, sonst erster eigener; nie schreibend
 	public function assignmentsKey(string $uid, string $teamId): ?string {
-		$team = $this->teamWorkspaceKeys($uid)[$teamId][0] ?? null;
-		if ($team !== null) {
-			return $team;
-		}
+		return $this->teamWorkspaceKeys($uid)[$teamId][0] ?? $this->firstOwnKey($uid);
+	}
+
+	// Link auf eine Aufgabe (ADR 0021): ihr Workspace bei aktivem Team und Leserecht, sonst erster eigener (dort listet sie die Seite, SPEC §9.6)
+	public function assignmentKey(string $uid, Assignment $a): ?string {
+		$key = $this->teamState->stateOf((string)$a->getTeamId()) === TeamStateService::ACTIVE ? $this->keyFor($uid, (int)$a->getWorkspaceId()) : null;
+		return $key ?? $this->firstOwnKey($uid);
+	}
+
+	private function firstOwnKey(string $uid): ?string {
 		foreach ($this->listVisible($uid) as $ws) {
 			if ($ws->getOwnerType() === 'user' && $ws->getOwnerId() === $uid && $ws->getKind() === 'normal') {
 				return $this->keyFor($uid, (int)$ws->getId());

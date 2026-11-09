@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Tests\Assignments;
 
+use OCA\NextNotes\Db\WorkspaceMapper;
 use OCA\NextNotes\Service\View\AssignmentsViewService;
 use OCA\NextNotes\Service\WorkspaceService;
 use OCP\Server;
@@ -28,19 +29,22 @@ final class AssignmentsViewTest extends AssignmentTestCase {
 		$row = $view()->teacherTeam($l->uid, $t);
 		self::assertSame(3, $row['students'], 'S1, S2, X');
 		self::assertGreaterThan(0, $row['used'], 'Belegung mit Kopien');
-		// ?create=: nur Notizen aus Workspaces dieses Teams
-		[$own] = self::newWorkspace($l, 'Privat');
+		// ?create=: nur Notizen aus diesem Team-Workspace
+		[$own, $ownId] = self::newWorkspace($l, 'Privat');
 		$private = self::newNote($l, $own, 'Privat', '<p>p</p>');
-		self::assertSame($fx['src'], $view()->createSource($l->uid, (string)$fx['src'], $t), 'create: Notiz des Teams');
-		self::assertNull($view()->createSource($l->uid, (string)$private, $t), 'create: private Notiz nicht');
-		self::assertNull($view()->createSource($n->uid, (string)$fx['src'], $t), 'create: ohne Leserecht');
-		self::assertNull($view()->createSource($l->uid, '1 OR 1', $t), 'create: ungültig');
+		$frame = Server::get(WorkspaceMapper::class)->find($fx['wsId']);
+		self::assertSame($fx['src'], $view()->createSource($l->uid, (string)$fx['src'], $frame), 'create: Notiz des Workspace');
+		self::assertNull($view()->createSource($l->uid, (string)$private, $frame), 'create: private Notiz nicht');
+		self::assertNull($view()->createSource($l->uid, (string)$private, Server::get(WorkspaceMapper::class)->find($ownId)), 'create: nicht im privaten Workspace');
+		self::assertNull($view()->createSource($n->uid, (string)$fx['src'], $frame), 'create: ohne Leserecht');
+		self::assertNull($view()->createSource($l->uid, '1 OR 1', $frame), 'create: ungültig');
 
 		// Team-Workspace: Bereich fest, Chip statt Team-Filter, Anlegen nur Lehrkraft
 		$p = self::page($l, "assignments.php?$wq&create=" . $fx['src']);
 		self::assertSame(200, $p->status, $p->describe());
 		self::assertStringContainsString('iconSidebarAssignmentsBtn', $p->body, 'L: Eintrag im Team-Workspace');
 		self::assertStringContainsString('"team":"' . $t . '"', $p->body, 'Insel: Team des Workspace');
+		self::assertStringContainsString('"workspaceId":' . $fx['wsId'], $p->body, 'Insel: Workspace der Seite (ADR 0021)');
 		self::assertStringContainsString('"createSource":' . $fx['src'], $p->body, 'Insel: Quelle');
 		self::assertStringContainsString('id="nnAsgNew"', $p->body, 'Lehrkraft: Anlegen');
 		self::assertStringContainsString('data-nn-ws-chip=', $p->body, 'Workspace-Chip');
@@ -56,6 +60,7 @@ final class AssignmentsViewTest extends AssignmentTestCase {
 		self::assertStringNotContainsString('iconSidebarAssignmentsBtn', $p->body, 'privat: kein Eintrag');
 		self::assertStringContainsString('nn-asg-no-team', $p->body, 'privat: Hinweis');
 		self::assertStringContainsString('"team":null', $p->body);
+		self::assertStringContainsString('"workspaceId":null', $p->body);
 		self::assertStringNotContainsString('id="nnAsgNew"', $p->body, 'privat: kein Anlegen');
 		// Hauptansicht: Eintrag immer im DOM, außerhalb von Team-Workspaces ausgeblendet; Marker in #left_col für den Wechsel ohne Reload (M6i-fix)
 		$ownIdx = self::page($l, 'index.php?workspace=' . rawurlencode($own))->body;
@@ -76,12 +81,9 @@ final class AssignmentsViewTest extends AssignmentTestCase {
 		self::assertStringNotContainsString($mark, $p->body, 'Fremder: keine Aufgabe');
 		self::assertStringNotContainsString($t, $p->body, 'Fremder: keine Team-ID');
 
-		// ohne lesbaren Team-Workspace (Austritt): Team ohne Heimat; die Aufgabe liefert die API seit M7h nicht mehr (AssignmentIsolationTest)
-		$wsRow = static fn (string $uid) => Server::get(WorkspaceService::class)->defaultWorkspace($uid);
-		self::assertContains($t, $view()->page($s1->uid, $wsRow($s1->uid), null)['homeTeams'], 'S1 Mitglied: Team hat Heimat');
-		$this->teams->remove($l->uid, $fx['memberS1']);
-		Server::get(WorkspaceService::class)->reset();
-		self::assertNotContains($t, $view()->page($s1->uid, $wsRow($s1->uid), null)['homeTeams'], 'S1 ausgetreten: ohne Team-Workspace');
+		// Bereich der Seite (ADR 0021): Team-Workspace → seine ID, eigener Workspace → null (dort nur Aufgaben nicht aktiver Teams)
+		self::assertSame($fx['wsId'], $view()->page($s1->uid, $frame, null)['workspaceId'], 'S1 im Team-Workspace');
+		self::assertNull($view()->page($s1->uid, Server::get(WorkspaceService::class)->defaultWorkspace($s1->uid), null)['workspaceId'], 'S1 im eigenen Workspace');
 	}
 
 	// M6g2: Editor-Banner der eigenen Kopie (Abgeben, Nur-Lesen mit Grund, Zurückziehen), Vorlage für Lehrkraft lesbar mit Banner, Upstream-Speichern mit folder_id

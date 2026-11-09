@@ -165,6 +165,45 @@ class AssignmentMapper extends QBMapper {
 		return $this->findEntities($qb);
 	}
 
+	/** @return int[] Aufgaben eines Workspace nach ID (Workspace löschen, ADR 0021) */
+	public function idsForWorkspace(int $workspaceId): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('id')->from(self::TABLE)
+			->where($qb->expr()->eq('workspace_id', $qb->createNamedParameter($workspaceId, IQueryBuilder::PARAM_INT)))
+			->orderBy('id', 'ASC');
+		return array_map('intval', $qb->executeQuery()->fetchFirstColumn());
+	}
+
+	/**
+	 * Zahl der Aufgaben je Workspace (Lösch-Dialog, ADR 0021)
+	 * @param int[] $workspaceIds
+	 * @return array<int, int>
+	 */
+	public function countByWorkspace(array $workspaceIds): array {
+		$out = [];
+		foreach (array_chunk(array_values(array_unique($workspaceIds)), 1000) as $chunk) {
+			$qb = $this->db->getQueryBuilder();
+			$qb->select('workspace_id')->selectAlias($qb->func()->count('id'), 'cnt')->from(self::TABLE)
+				->where($qb->expr()->in('workspace_id', $qb->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY)))
+				->groupBy('workspace_id');
+			$res = $qb->executeQuery();
+			while ($row = $res->fetch()) {
+				$out[(int)$row['workspace_id']] = (int)$row['cnt'];
+			}
+			$res->closeCursor();
+		}
+		return $out;
+	}
+
+	// Team-Workspace mit Ziel gelöscht: Aufgaben ziehen mit um (ADR 0021); Rückgabe: Zahl umgehängter Aufgaben
+	public function rebindWorkspace(int $from, int $to): int {
+		$qb = $this->db->getQueryBuilder();
+		return $qb->update(self::TABLE)
+			->set('workspace_id', $qb->createNamedParameter($to, IQueryBuilder::PARAM_INT))
+			->where($qb->expr()->eq('workspace_id', $qb->createNamedParameter($from, IQueryBuilder::PARAM_INT)))
+			->executeStatement();
+	}
+
 	public function existsForTeam(string $teamId): bool {
 		$qb = $this->db->getQueryBuilder();
 		$qb->select('id')->from(self::TABLE)

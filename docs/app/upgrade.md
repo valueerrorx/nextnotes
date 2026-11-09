@@ -23,7 +23,9 @@ Ergänzung zur [Admin-Doku](admin.md).
 `occ app:update nextnotes` lädt die neue Version aus dem App Store und ist eine Alternative zu Weg 1; danach ebenfalls PHP neu starten.
 
 ## Von Testversionen 0.x
-Vor der ersten veröffentlichten Version gab es Testversionen 0.1.0 bis 0.3.3. Getestet ist das Update von 0.1.0, 0.1.2 und 0.3.3 auf die aktuelle Version mit MariaDB, PostgreSQL und SQLite: Schema danach identisch zu einer frischen Installation, vorhandene Notizen, Anhänge, Ordner, Tags, Workspaces, Team-Workspaces, Material, Aufgaben und Abgaben bleiben lesbar, alle Hintergrundjobs sind registriert. Es gilt Weg 2.
+Vor der ersten veröffentlichten Version gab es Testversionen 0.1.0 bis 0.3.3. Getestet ist das Update von 0.1.0, 0.1.2 und 0.3.3 auf die aktuelle Version mit MariaDB, PostgreSQL und SQLite: Schema danach identisch zu einer frischen Installation, vorhandene Notizen, Anhänge, Ordner, Tags, Workspaces, Team-Workspaces und Material bleiben lesbar, alle Hintergrundjobs sind registriert. Es gilt Weg 2.
+
+**Achtung, Update von einer Version vor 0.9.3:** Seit 0.9.3 gehört jede Aufgabe fest zu einem Team-Workspace. Das Update **löscht alle vorhandenen Aufgaben mit allen Abgaben**, Kopien und Anhängen (Testdaten). Wer sie behalten will, exportiert sie vorher in der Ansicht „Aufgaben“ (ZIP je Aufgabe).
 
 ## Nach dem Update
 - Browser laden Skripte und Stile der neuen Version automatisch (Adresse enthält die App-Version). Bleibt eine Seite fehlerhaft, einmal neu laden.

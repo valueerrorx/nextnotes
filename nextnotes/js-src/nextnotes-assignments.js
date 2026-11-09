@@ -7,7 +7,7 @@
 // Schüler (M6g2): eigene Aufgaben mit Status, Frist, Öffnen der Kopie, Abgeben/Zurückziehen, Feedback ab Rückgabe, eigener Download.
 // Löschen mit Zahl der Abgaben und „Erst exportieren“, verwaiste Teams mit Löschdatum (M6g2).
 // Daten nur über die Aufgaben-API (Rechte serverseitig); Texte aus der Insel nextnotes-assignments (NC-l10n).
-// M6i: Bereich = Team des Workspace (island.team); ohne Team-Workspace nur Aufgaben von Teams ohne lesbaren Team-Workspace (island.homeTeams).
+// ADR 0021: Team-Workspace zeigt seine Aufgaben (aktives Team, island.workspaceId); jede andere Seite die Aufgaben nicht aktiver Teams (SPEC §9.6).
 (function () {
 	'use strict';
 
@@ -26,7 +26,7 @@
 	var txt = island.txt || {};
 	var scopeTeam = typeof island.team === 'string' ? island.team : null;
 	var teacher = island.teacher && island.teacher.id === scopeTeam ? island.teacher : null;
-	var teamKeys = Array.isArray(island.teamWorkspaces) ? island.teamWorkspaces : [];
+	var scopeWs = typeof island.workspaceId === 'number' ? island.workspaceId : null;
 	// UI-tplpick (Thomas 2026-11-09): Vorlagen nur aus dem gewählten Workspace (Frame-Insel nextnotes-body)
 	var hereKey = (function () {
 		try {
@@ -36,8 +36,7 @@
 			return null;
 		}
 	})();
-	var sourceKeys = hereKey !== null && teamKeys.indexOf(hereKey) !== -1 ? [hereKey] : [];
-	var homeTeams = Array.isArray(island.homeTeams) ? island.homeTeams : [];
+	var sourceKeys = hereKey !== null && scopeWs !== null ? [hereKey] : [];
 	var listEl = document.getElementById('nnAsgList');
 	var detailEl = document.getElementById('nnAsgDetail');
 	var statusEl = document.getElementById('nnAsgStatus');
@@ -253,9 +252,9 @@
 		});
 	}
 
-	// Team-Workspace: nur dieses Team; sonst nur Teams ohne lesbaren Team-Workspace (verwaist, eingefroren, Team ohne Workspace; Ausgetretene liefert die API nicht, M7h)
+	// Team-Workspace: nur seine Aufgaben im aktiven Team; jede andere Seite: nur nicht aktive Teams (verwaist, eingefroren; Ausgetretene liefert die API nicht, M7h)
 	function inScope(a) {
-		return scopeTeam !== null ? a.team === scopeTeam : homeTeams.indexOf(String(a.team)) === -1;
+		return scopeWs !== null ? a.team_state === 'active' && a.workspace_id === scopeWs : a.team_state !== 'active';
 	}
 
 	function rank(a) {
@@ -817,8 +816,11 @@
 		var renderAll = function (q) {
 			var f = q.toLowerCase();
 			var list = all.list.filter(function (n) { return !f || String(n.heading || '').toLowerCase().indexOf(f) !== -1; });
-			var more = list.length > BROWSE_MAX || all.more;
-			render(list.slice(0, BROWSE_MAX), more ? t('sourceMore', { n: Math.min(list.length, BROWSE_MAX), total: f ? list.length : all.total }) : '');
+			var note = '';
+			// gefiltert über nicht alle Notizen: nur die geladenen (zuletzt geänderten) durchsucht
+			if (f && all.more) note = t('sourceMoreFiltered', { loaded: all.list.length });
+			else if (list.length > BROWSE_MAX || all.more) note = t('sourceMore', { n: Math.min(list.length, BROWSE_MAX), total: f ? list.length : all.total });
+			render(list.slice(0, BROWSE_MAX), note);
 		};
 		var browse = function () {
 			clearTimeout(timer);
@@ -834,9 +836,9 @@
 			}
 			var mine = ++seq;
 			results.setAttribute('aria-busy', 'true');
-			// GET /notes des gewählten Workspace: nur role=note, ohne Papierkorb, Lesezugriff serverseitig (wie die Suche)
+			// GET /notes des gewählten Workspace: nur role=note, ohne Papierkorb, flach nach Änderung (sort=recent), Lesezugriff serverseitig
 			Promise.all(sourceKeys.map(function (key) {
-				return api('GET', 'notes?limit=200&sort=updated_desc&workspace=' + encodeURIComponent(key));
+				return api('GET', 'notes?limit=200&sort=recent&workspace=' + encodeURIComponent(key));
 			})).then(function (rs) {
 				results.removeAttribute('aria-busy');
 				var list = [];
@@ -847,9 +849,6 @@
 					list = list.concat(r.data.notes || []);
 					total += Number(r.data.total) || 0;
 					more = more || !!r.data.has_more;
-				});
-				list.sort(function (a, b) {
-					return String(b.updated || '').localeCompare(String(a.updated || '')) || (b.id - a.id);
 				});
 				all = { list: list, total: total, more: more };
 				if (mine !== seq || !browsing) return;
@@ -899,9 +898,8 @@
 			var ts = fromLocalInput(due.value);
 			if (!title.value.trim() || !source.id) return t('titleRequired');
 			if (ts === null || ts <= now()) return t('invalidDue');
-			var payload = { team: teacher.id, title: title.value.trim(), due_at: ts, source_note_id: source.id };
-			// Server prüft: Quelle liegt in diesem Workspace (UI-tplpick)
-			if (hereKey !== null) payload.workspace = hereKey;
+			// Aufgabe gehört diesem Workspace (ADR 0021); Server prüft Team, Rechte und Quelle
+			var payload = { workspace: hereKey, title: title.value.trim(), due_at: ts, source_note_id: source.id };
 			if (points.value !== '') {
 				var p = Number(points.value);
 				if (!Number.isInteger(p) || p < 0) return t('invalidPoints', { max: '∞' });

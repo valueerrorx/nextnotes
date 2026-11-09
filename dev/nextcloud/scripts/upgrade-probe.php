@@ -11,6 +11,8 @@ declare(strict_types=1);
 // jobs <Klasse…>       oc_jobs der App = genannte TimedJobs (keine fehlenden, keine verwaisten, keine doppelten); Exit 1 bei Abweichung
 // migrations           ausgeführte Migrationen der App, je Zeile eine Version
 // team <owner> <name> <mitglieder-json>   Team über CirclesManager anlegen, gibt die singleId aus
+// note-ws <id>         workspace_id einer Notiz (leer, wenn keine)
+// ws-exists <id>       1/0: Workspace-Zeile vorhanden
 // break-jobs <Klasse>  Gegenprobe: Job entfernen
 // break-schema         Gegenprobe: zusätzliche Spalte in nextnotes_workspaces
 require '/var/www/html/lib/base.php';
@@ -91,6 +93,16 @@ switch ($cmd) {
 			$cm->stopSession();
 		}
 		exit(0);
+	case 'note-ws':
+		$qb = $db->getQueryBuilder();
+		$qb->select('workspace_id')->from('nextnotes_notes')->where($qb->expr()->eq('id', $qb->createNamedParameter((int)($args[0] ?? 0), \OCP\DB\QueryBuilder\IQueryBuilder::PARAM_INT)));
+		echo (string)($qb->executeQuery()->fetchOne() ?: '');
+		exit(0);
+	case 'ws-exists':
+		$qb = $db->getQueryBuilder();
+		$qb->select('id')->from('nextnotes_workspaces')->where($qb->expr()->eq('id', $qb->createNamedParameter((int)($args[0] ?? 0), \OCP\DB\QueryBuilder\IQueryBuilder::PARAM_INT)));
+		echo $qb->executeQuery()->fetchOne() === false ? '0' : '1';
+		exit(0);
 	case 'break-jobs':
 		Server::get(IJobList::class)->remove($args[0] ?? '');
 		echo 'Gegenprobe: Job entfernt: ' . ($args[0] ?? '') . "\n";
@@ -101,6 +113,6 @@ switch ($cmd) {
 		echo "Gegenprobe: Spalte nextnotes_workspaces.nn_upgrade_probe angelegt\n";
 		exit(0);
 	default:
-		fwrite(STDERR, "Aufruf: upgrade-probe.php jobs|migrations|team|break-jobs|break-schema …\n");
+		fwrite(STDERR, "Aufruf: upgrade-probe.php jobs|migrations|team|note-ws|ws-exists|break-jobs|break-schema …\n");
 		exit(2);
 }

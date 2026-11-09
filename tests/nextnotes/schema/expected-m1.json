@@ -231,6 +231,7 @@
       "columns": {
         "id": ["bigint", true, null, null, true],
         "team_id": ["string", true, null, 64, false],
+        "workspace_id": ["bigint", true, null, null, false],
         "title": ["string", true, null, 255, false],
         "source_note_id": ["bigint", false, null, null, false],
         "template_note_id": ["bigint", true, null, null, false],
@@ -248,7 +249,8 @@
       "indexes": {
         "nn_asg_team": [false, ["team_id", "status"]],
         "nn_asg_due": [false, ["status", "due_at"]],
-        "nn_asg_owner": [false, ["owner_uid"]]
+        "nn_asg_owner": [false, ["owner_uid"]],
+        "nn_asg_ws": [false, ["workspace_id"]]
       }
     },
     "nextnotes_submissions": {

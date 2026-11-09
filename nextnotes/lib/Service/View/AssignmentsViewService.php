@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Service\View;
 
+use OCA\NextNotes\Db\Assignment;
 use OCA\NextNotes\Db\AssignmentMapper;
 use OCA\NextNotes\Db\Note;
 use OCA\NextNotes\Db\SubmissionMapper;
@@ -24,7 +25,7 @@ use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IDateTimeFormatter;
 use OCP\IL10N;
 
-/** Seite „Aufgaben“ (assignments.php, SPEC §9.6): folgt dem Team-Workspace (M6i), Team zum Anlegen mit Belegung, Texte für nextnotes-assignments.js; Liste lädt die API */
+/** Seite „Aufgaben“ (assignments.php, SPEC §9.6): Aufgaben des Team-Workspace (M6i, ADR 0021), Team zum Anlegen mit Belegung, Texte für nextnotes-assignments.js; Liste lädt die API */
 class AssignmentsViewService {
 	private const TEACHER_LEVEL = 4;
 	private const STUDENT_LEVEL = 1;
@@ -61,19 +62,17 @@ class AssignmentsViewService {
 	}
 
 	/**
-	 * Daten der Seite (M6i): Team des Frame-Workspace oder kein Bereich (leerer Zustand, nur Aufgaben ohne lesbaren Team-Workspace)
-	 * @return array{team: ?string, teacher: ?array{id: string, name: string, students: int, used: int, limit: int}, teamWorkspaces: list<string>, homeTeams: list<string>, createSource: ?int}
+	 * Daten der Seite (ADR 0021): Team-Workspace → seine Aufgaben (aktives Team); sonst Aufgaben nicht aktiver Teams (SPEC §9.6)
+	 * @return array{team: ?string, workspaceId: ?int, teacher: ?array{id: string, name: string, students: int, used: int, limit: int}, createSource: ?int}
 	 */
 	public function page(string $uid, Workspace $ws, mixed $create): array {
 		$team = self::teamOf($ws);
-		$keys = $this->workspaces->teamWorkspaceKeys($uid);
 		$teacher = $team !== null ? $this->teacherTeam($uid, $team) : null;
 		return [
 			'team' => $team,
+			'workspaceId' => $team !== null ? (int)$ws->getId() : null,
 			'teacher' => $teacher,
-			'teamWorkspaces' => $team !== null ? ($keys[$team] ?? []) : [],
-			'homeTeams' => $team === null ? array_map('strval', array_keys($keys)) : [],
-			'createSource' => $teacher !== null ? $this->createSource($uid, $create, $team, $ws) : null,
+			'createSource' => $teacher !== null ? $this->createSource($uid, $create, $ws) : null,
 		];
 	}
 
@@ -90,24 +89,23 @@ class AssignmentsViewService {
 			'used' => $this->quota->used('team', $teamId), 'limit' => $this->quota->limit()];
 	}
 
-	// ?create=<Notiz>: nur eine lesbare Notiz aus einem Workspace dieses Teams (inkl. Material), mit $here nur aus diesem (UI-tplpick); sonst null
-	public function createSource(string $uid, mixed $noteId, string $teamId, ?Workspace $here = null): ?int {
-		if (!is_string($noteId) || !ctype_digit($noteId)) {
+	// ?create=<Notiz>: nur eine lesbare Notiz aus diesem Team-Workspace (inkl. Material, UI-tplpick, ADR 0021); sonst null
+	public function createSource(string $uid, mixed $noteId, Workspace $here): ?int {
+		if (!is_string($noteId) || !ctype_digit($noteId) || self::teamOf($here) === null) {
 			return null;
 		}
 		try {
 			$note = $this->access->requireNote($uid, (int)$noteId, 'read');
-			$ws = $this->access->requireWorkspace($uid, (int)$note->getWorkspaceId(), 'read');
 		} catch (ApiException) {
 			return null;
 		}
-		return self::teamOf($ws) === $teamId && ($here === null || (int)$here->getId() === (int)$ws->getId()) ? (int)$note->getId() : null;
+		return (int)$note->getWorkspaceId() === (int)$here->getId() ? (int)$note->getId() : null;
 	}
 
-	// Link auf die Aufgabe im Team-Workspace (Banner; Benachrichtigungen bauen ihn absolut im Notifier)
-	public function assignmentUrl(string $uid, string $teamId, int $assignmentId): string {
-		$key = $this->workspaces->assignmentsKey($uid, $teamId);
-		return 'assignments.php?' . http_build_query(($key !== null ? ['workspace' => $key] : []) + ['assignment' => $assignmentId]);
+	// Link auf die Aufgabe in ihrem Workspace (Banner; Benachrichtigungen bauen ihn absolut im Notifier)
+	public function assignmentUrl(string $uid, Assignment $a): string {
+		$key = $this->workspaces->assignmentKey($uid, $a);
+		return 'assignments.php?' . http_build_query(($key !== null ? ['workspace' => $key] : []) + ['assignment' => (int)$a->getId()]);
 	}
 
 	/**
@@ -126,7 +124,7 @@ class AssignmentsViewService {
 			return null;
 		}
 		$l = $this->l;
-		$base = ['title' => (string)$a->getTitle(), 'url' => $this->assignmentUrl($uid, (string)$a->getTeamId(), (int)$a->getId()),
+		$base = ['title' => (string)$a->getTitle(), 'url' => $this->assignmentUrl($uid, $a),
 			'submissionId' => null, 'canSubmit' => false, 'canUnsubmit' => false, 'linkLabel' => $l->t('Open assignment')];
 		if ($role === 'template') {
 			if ((int)$a->getTemplateNoteId() !== (int)$note->getId()) {
@@ -194,7 +192,7 @@ class AssignmentsViewService {
 			'newAssignment' => $l->t('New assignment'),
 			'empty' => $l->t('No assignments yet.'),
 			'noTeamWorkspace' => $l->t('Assignments are available in team workspaces.'),
-			'withoutWorkspace' => $l->t('Assignments of teams without a team workspace you can open'),
+			'withoutWorkspace' => $l->t('Assignments of teams that are no longer active'),
 			'emptyTeacher' => $l->t('No assignments yet. Create one from a note: "Hand out as assignment…" in the note menu, or with "New assignment".'),
 			'loadFailed' => $l->t('The assignments could not be loaded.'),
 			'actionFailed' => $l->t('The action failed.'),
@@ -223,6 +221,7 @@ class AssignmentsViewService {
 			'sourceSearch' => $l->t('Search notes of this workspace'),
 			'sourceAll' => $l->t('Show all notes'),
 			'sourceMore' => $l->t('{n} of {total} notes shown – keep typing to narrow down'),
+			'sourceMoreFiltered' => $l->t('Only the {loaded} most recently changed notes were searched – keep typing to narrow down'),
 			'sourceNone' => $l->t('No matching notes'),
 			'untitled' => $l->t('Untitled note'),
 			'sourceHint' => $l->t('The assignment gets a frozen copy of the note, including attachments.'),

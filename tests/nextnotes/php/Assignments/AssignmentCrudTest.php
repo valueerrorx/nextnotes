@@ -75,21 +75,23 @@ final class AssignmentCrudTest extends AssignmentTestCase {
 		self::assertSame($other, (int)self::row('nextnotes_assignments', (int)$al['id'])['source_note_id'], 'Ziel als Quelle');
 
 		// Ablehnungen: Schüler 403, Nicht-Mitglied 404, versteckter Kreis 403, Quelle nicht lesbar 404, Vorlage als Quelle 400, Frist vorbei 400
-		$body = static fn (string $team, int $source, int $due = 7200) => ['team' => $team, 'title' => 'x', 'due_at' => time() + $due, 'source_note_id' => $source];
+		$body = static fn (string $ws, int $source, int $due = 7200) => ['workspace' => $ws, 'title' => 'x', 'due_at' => time() + $due, 'source_note_id' => $source];
 		$count = self::countRows('nextnotes_assignments', 'team_id', $fx['t']);
-		self::assertSame(403, $fx['s1']->call('POST', '/assignments', $body($fx['t'], $other))->status, 'S1');
-		self::assertSame(404, $fx['n']->call('POST', '/assignments', $body($fx['t'], $other))->status, 'Nicht-Mitglied');
+		self::assertSame(403, $fx['s1']->call('POST', '/assignments', $body($fx['ws'], $other))->status, 'S1');
+		self::assertSame(404, $fx['n']->call('POST', '/assignments', $body($fx['ws'], $other))->status, 'Nicht-Mitglied');
 		[$nWs] = self::newWorkspace($fx['n'], 'Fremd');
 		$foreign = self::newNote($fx['n'], $nWs, 'Fremd', '<p>f</p>');
-		self::assertSame(404, $l->call('POST', '/assignments', $body($fx['t'], $foreign))->status, 'Quelle nicht lesbar');
-		self::assertSame(400, $l->call('POST', '/assignments', $body($fx['t'], $tpl))->status, 'Vorlage als Quelle');
-		self::assertSame(400, $l->call('POST', '/assignments', $body($fx['t'], $other, -10))->status, 'Frist vorbei');
-		self::assertSame(400, $l->call('POST', '/assignments', ['team' => $fx['t'], 'title' => '', 'due_at' => time() + 60, 'source_note_id' => $other])->status, 'ohne Titel');
+		self::assertSame(404, $l->call('POST', '/assignments', $body($fx['ws'], $foreign))->status, 'Quelle nicht lesbar');
+		self::assertSame(400, $l->call('POST', '/assignments', $body($fx['ws'], $tpl))->status, 'Vorlage als Quelle');
+		self::assertSame(400, $l->call('POST', '/assignments', $body($fx['ws'], $other, -10))->status, 'Frist vorbei');
+		self::assertSame(400, $l->call('POST', '/assignments', ['workspace' => $fx['ws'], 'title' => '', 'due_at' => time() + 60, 'source_note_id' => $other])->status, 'ohne Titel');
 		self::assertSame($count, self::countRows('nextnotes_assignments', 'team_id', $fx['t']), 'nichts angelegt');
 		$hidden = $this->teams->create($l->uid, 'Versteckt ' . bin2hex(random_bytes(3)), Teams::HIDDEN);
-		self::assertSame(403, $l->call('POST', '/assignments', $body($hidden, $other))->status, 'versteckter Kreis');
+		// Workspace eines versteckten Kreises ist nicht lesbar (Probe-Regel) → 404
+		$hiddenWs = $this->rawWorkspace('team', $hidden, $l->uid);
+		self::assertSame(404, $l->call('POST', '/assignments', $body(self::row('nextnotes_workspaces', $hiddenWs)['name'] . " (x, #$hiddenWs)", $other))->status, 'versteckter Kreis');
 		self::setTeamState($fx['t'], 'orphaned');
-		self::assertSame(403, $l->call('POST', '/assignments', $body($fx['t'], $other))->status, 'verwaistes Team');
+		self::assertSame(403, $l->call('POST', '/assignments', $body($fx['ws'], $other))->status, 'verwaistes Team');
 		self::setTeamState($fx['t'], 'active');
 	}
 

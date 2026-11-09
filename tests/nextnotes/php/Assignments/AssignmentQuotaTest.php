@@ -58,7 +58,7 @@ final class AssignmentQuotaTest extends AssignmentTestCase {
 		sleep(4);
 		$assignments = self::countRows('nextnotes_assignments', 'team_id', $t);
 		$templates = self::countRows('nextnotes_notes', 'role', 'template');
-		$r = $fx['l']->call('POST', '/assignments', ['team' => $t, 'title' => 'Zu groß', 'due_at' => time() + 600, 'source_note_id' => $bigNote]);
+		$r = $fx['l']->call('POST', '/assignments', ['workspace' => $fx['ws'], 'title' => 'Zu groß', 'due_at' => time() + 600, 'source_note_id' => $bigNote]);
 		self::assertSame(413, $r->status, 'Team-Quote voll: ' . $r->describe());
 		self::assertSame($assignments, self::countRows('nextnotes_assignments', 'team_id', $t), 'keine Aufgabe');
 		self::assertSame($templates, self::countRows('nextnotes_notes', 'role', 'template'), 'keine Vorlage');

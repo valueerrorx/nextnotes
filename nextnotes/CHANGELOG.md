@@ -9,9 +9,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## 0.9.3 – 2026-11-09
+
 ### Added
 - OneNote import completed: images and file attachments of a page become attachments of the imported note (images shown inline, files as download links), with the same type, size and storage quota rules as uploads. Missing or oversized items (more than 100 per page or 256 MiB in total) are replaced by a placeholder and listed in the report. The notebook selection notes when not all notebooks could be loaded.
 - Documentation for the OneNote import: step-by-step Microsoft Entra app registration, account types, operation (cron, Microsoft request limits, duration), error messages, data protection and revoking access at Microsoft (`docs/app/admin.md`); user guide with what is converted and what is not, e.g. ink drawings (`docs/app/user.md`).
+
+### Changed
+- An assignment now belongs to the team workspace it was created in and is listed only there; other workspaces of the same team no longer show it. Assignments of deleted teams (or while the Teams app is unavailable) are listed on the assignments page of your own workspace. Links in notifications and the Teams resources ("Assignments – workspace", one per team workspace) lead to that workspace.
+- Deleting a team workspace moves its assignments to the chosen workspace of the team. Deleting the last workspace of a team also deletes its assignments with all submissions after confirmation; the dialog shows how many.
+- The note picker of "New assignment" lists the most recently changed notes of the workspace first, also in large workspaces.
+
+### Removed
+- **Upgrading to 0.9.3 deletes all existing assignments and submissions** (test versions only). Export them first on the assignments page if needed.
 
 ## 0.9.2 – 2026-11-09
 

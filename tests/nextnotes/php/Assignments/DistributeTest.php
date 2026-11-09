@@ -136,7 +136,7 @@ final class DistributeTest extends AssignmentTestCase {
 		$shared = self::newNote($fx['n'], $nWs, 'Geteilt', '<p>g</p>');
 		self::rawShare($nWsId, $l->uid, 'read');
 		$link = (int)self::ok($l->call('POST', '/notes', ['heading' => 'Link fremd', 'type' => 'linked', 'linked_note_id' => $foreignTeam, 'workspace' => $fx['ws']]), 'Link')['note']['id'];
-		$body = static fn (int $src) => ['team' => $t, 'title' => 'x', 'due_at' => time() + 600, 'source_note_id' => $src];
+		$body = static fn (int $src) => ['workspace' => $fx['ws'], 'title' => 'x', 'due_at' => time() + 600, 'source_note_id' => $src];
 		$count = self::countRows('nextnotes_assignments', 'team_id', $t);
 		foreach (['privat' => $ownNote, 'anderes Team' => $foreignTeam, 'Lesefreigabe' => $shared, 'Verknüpfung auf anderes Team' => $link] as $what => $src) {
 			$r = $l->call('POST', '/assignments', $body($src));

@@ -174,7 +174,8 @@ class NoteService {
 		}
 		$notes = $this->notes->findList($wsIds, $filter);
 		$sort = (string)($q['sort'] ?? '');
-		if (!in_array($sort, ['updated_desc', 'created_desc', 'heading_asc', 'type_asc', 'manual'], true)) {
+		// recent: flach nach Änderung (Vorlagen-Lupe, M6-wsbind), ohne Ordner-Gruppierung; Rest wie Upstream
+		if (!in_array($sort, ['updated_desc', 'created_desc', 'heading_asc', 'type_asc', 'manual', 'recent'], true)) {
 			$sort = $this->settings->noteListSort($uid);
 		}
 		$after = !in_array($this->settings->get($uid, 'notes_without_folders_after_folders', '1'), ['0', 'false'], true);
@@ -196,6 +197,10 @@ class NoteService {
 	 * @param Note[] $notes
 	 */
 	private function sortList(array &$notes, string $sort, bool $rootAfter): void {
+		if ($sort === 'recent') {
+			usort($notes, static fn (Note $a, Note $b) => ((int)$b->getUpdatedAt() <=> (int)$a->getUpdatedAt()) ?: ((int)$b->getId() <=> (int)$a->getId()));
+			return;
+		}
 		$names = [];
 		$folderKey = function (Note $n) use (&$names): array {
 			$fid = $n->getFolderId();

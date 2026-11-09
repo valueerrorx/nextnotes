@@ -309,8 +309,14 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	// ---------- 8. Verwaistes Team: Löschdatum, nur Export/Löschen; Lösch-Dialog mit Zahl und „Erst exportieren“ ----------
 	m = ctx.mark();
 	orphanTeam(ctx.base, A, teamId);
-	// L ist created_by des Team-Workspace und liest ihn weiter
+	// L liest den Team-Workspace weiter (created_by), dort stehen aber nur Aufgaben aktiver Teams (ADR 0021): verwaiste im eigenen Workspace
 	await page.goto(ctx.appUrl(`assignments.php?workspace=${encodeURIComponent(TW)}`), { waitUntil: 'networkidle' });
+	await page.locator('.nn-asg-list[aria-busy="false"]').waitFor({ timeout: 10000 });
+	ctx.ok(await page.locator(`.nn-asg-item[data-assignment-id="${aid}"]`).count() === 0, 'L: verwaiste Aufgabe nicht im (lesbaren) Team-Workspace');
+	// eigener Workspace ausdrücklich (ohne ?workspace= gilt der zuletzt geöffnete, ggf. der Team-Workspace)
+	const ownA = ((await api.must('GET', '/workspaces')).workspaces ?? []).find((w) => w.team === null).name;
+	const ownB = ((await apiB.must('GET', '/workspaces')).workspaces ?? []).find((w) => w.team === null).name;
+	await page.goto(ctx.appUrl(`assignments.php?workspace=${encodeURIComponent(ownA)}`), { waitUntil: 'networkidle' });
 	const orphRow = page.locator(`.nn-asg-item[data-assignment-id="${aid}"]`);
 	await orphRow.waitFor({ timeout: 10000 });
 	ctx.ok(/Team gelöscht/.test(await orphRow.innerText()) && /Lade sie vorher herunter/.test(await orphRow.innerText()), 'L: verwaist mit Löschdatum', await orphRow.innerText());
@@ -318,8 +324,8 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	await page.locator('.nn-asg-delete').waitFor({ state: 'visible', timeout: 10000 });
 	ctx.ok(await page.getByRole('button', { name: /^(Austeilen|Hand out|Frist ändern|Aufgabe schließen)$/ }).count() === 0, 'L: verwaist ohne Austeilen/Frist/Schließen');
 	ctx.ok(await page.locator(`a[href*="assignments/${aid}/export"]`).count() >= 1, 'L: verwaist mit Export');
-	// S1 liest den Team-Workspace nicht mehr: Aufgabe unter „ohne Team-Workspace“ im eigenen Workspace (M6i)
-	await p1.goto(ctx.appUrl('assignments.php'), { waitUntil: 'networkidle' });
+	// S1: Aufgabe des nicht aktiven Teams unter „Aufgaben von Teams, die nicht mehr aktiv sind“ im eigenen Workspace (ADR 0021)
+	await p1.goto(ctx.appUrl(`assignments.php?workspace=${encodeURIComponent(ownB)}`), { waitUntil: 'networkidle' });
 	const s1Orph = p1.locator(`.nn-asg-item[data-assignment-id="${aid}"]`);
 	await s1Orph.waitFor({ timeout: 10000 });
 	ctx.ok(/Deine Abgabe wird am/.test(await s1Orph.innerText()), 'S1: Hinweis Löschdatum', await s1Orph.innerText());

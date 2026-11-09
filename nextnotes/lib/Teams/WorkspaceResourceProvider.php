@@ -21,9 +21,9 @@ use OCP\IURLGenerator;
 use OCP\Teams\ITeamResourceProvider;
 use OCP\Teams\TeamResource;
 
-// Team-Workspaces und „Aufgaben“ als Ressourcen des Teams (Plan M5 §2.3, M6i); Mitgliedschaft prüft der Kern, die Probe-Regel prüfen wir
+// Team-Workspaces und ihre „Aufgaben“ als Ressourcen des Teams (Plan M5 §2.3, ADR 0021); Mitgliedschaft prüft der Kern, die Probe-Regel prüfen wir
 class WorkspaceResourceProvider implements ITeamResourceProvider {
-	// Ressource „Aufgaben“ je Team (M6i): ID-Präfix + Team-ID, Symbol lucide graduation-cap (ISC) in Textfarbe
+	// Ressource „Aufgaben – Workspace“ je Team-Workspace: ID-Präfix + Workspace-ID, Symbol lucide graduation-cap (ISC) in Textfarbe
 	private const ASSIGNMENTS = 'assignments:';
 	private const ASSIGNMENTS_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg>';
 	private ?string $icon = null;
@@ -69,15 +69,13 @@ class WorkspaceResourceProvider implements ITeamResourceProvider {
 			// Langform „Name (Team, #id)“ löst resolveKey für jedes Mitglied auf (SPEC §4.4)
 			. http_build_query(['workspace' => $ws->getName() . ' (' . $team . ', #' . $ws->getId() . ')']);
 		$icon = $this->getIconSvg();
-		$out = array_map(fn (Workspace $ws) => new TeamResource(
-			$this,
-			(string)$ws->getId(),
-			(string)$ws->getName(),
-			$urls('nextnotes.page.indexphp', $ws),
-			$icon !== '' ? $icon : null,
-		), $list);
-		// M6i: Aufgaben des Teams im ersten Team-Workspace (gleiche Regel wie WorkspaceService::assignmentsKey)
-		$out[] = new TeamResource($this, self::ASSIGNMENTS . $teamId, $this->l->t('Assignments'), $urls('nextnotes.page.assignments', $list[0]), self::ASSIGNMENTS_ICON);
+		$out = [];
+		foreach ($list as $ws) {
+			$out[] = new TeamResource($this, (string)$ws->getId(), (string)$ws->getName(), $urls('nextnotes.page.indexphp', $ws), $icon !== '' ? $icon : null);
+			// ADR 0021: Aufgaben je Team-Workspace (ID assignments:<Workspace-ID>)
+			$out[] = new TeamResource($this, self::ASSIGNMENTS . $ws->getId(), $this->l->t('Assignments – %s', [(string)$ws->getName()]),
+				$urls('nextnotes.page.assignments', $ws), self::ASSIGNMENTS_ICON);
+		}
 		return $out;
 	}
 
@@ -87,11 +85,8 @@ class WorkspaceResourceProvider implements ITeamResourceProvider {
 
 	/** @return string[] */
 	public function getTeamsForResource(string $resourceId): array {
-		if (str_starts_with($resourceId, self::ASSIGNMENTS)) {
-			$teamId = substr($resourceId, strlen(self::ASSIGNMENTS));
-			return $teamId !== '' && $this->workspaces->findForTeam($teamId) !== [] ? [$teamId] : [];
-		}
-		$ws = $this->find($resourceId);
+		// assignments:<Workspace-ID> wie der Workspace selbst; nicht numerisch (alte Team-ID) → keine
+		$ws = $this->find(str_starts_with($resourceId, self::ASSIGNMENTS) ? substr($resourceId, strlen(self::ASSIGNMENTS)) : $resourceId);
 		return $ws === null ? [] : [(string)$ws->getOwnerId()];
 	}
 

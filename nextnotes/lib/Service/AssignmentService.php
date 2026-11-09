@@ -11,7 +11,6 @@ namespace OCA\NextNotes\Service;
 
 use OCA\NextNotes\Db\Assignment;
 use OCA\NextNotes\Db\AssignmentMapper;
-use OCA\NextNotes\Db\Note;
 use OCA\NextNotes\Db\Submission;
 use OCA\NextNotes\Db\SubmissionMapper;
 use OCA\NextNotes\Db\WorkspaceMapper;
@@ -129,11 +128,15 @@ class AssignmentService {
 	 */
 	private function view(string $uid, Assignment $a, ?Submission $own, ?array $counts): array {
 		$teamId = (string)$a->getTeamId();
+		$wsKey = $this->workspaces->keyFor($uid, (int)$a->getWorkspaceId());
 		$out = [
 			'id' => (int)$a->getId(),
 			'team' => $teamId,
 			'team_name' => $this->teams->memberTeams($uid)[$teamId] ?? $this->teamState->snapshotName($teamId) ?? '',
 			'team_state' => $this->teamState->stateOf($teamId),
+			// Ort der Aufgabe (ADR 0021): nur mit Leserecht am Workspace, sonst null (keine ID-Preisgabe, SPEC §3)
+			'workspace_id' => $wsKey === null ? null : (int)$a->getWorkspaceId(),
+			'workspace' => $wsKey,
 			'title' => (string)$a->getTitle(),
 			'due_at' => (int)$a->getDueAt(),
 			'status' => (string)$a->getStatus(),
@@ -225,12 +228,21 @@ class AssignmentService {
 	}
 
 	/**
-	 * POST /assignments {team, title, due_at, source_note_id, max_points?, workspace?}: Lehrkraft (aktives Team, Level ≥ 4), Quelle lesbar (auch Material, Q2);
-	 * Vorlage = eingefrorene Kopie ohne Workspace, Anhänge gegen die Team-Quote (Plan M6 §2.3a)
+	 * POST /assignments {workspace, title, due_at, source_note_id, max_points?}: Team = Besitzer des Team-Workspace (ADR 0021); Lehrkraft (aktives Team, Level ≥ 4);
+	 * Quelle genau aus diesem Workspace; Vorlage = eingefrorene Kopie ohne Workspace, Anhänge gegen die Team-Quote (Plan M6 §2.3a)
 	 * @return array{assignment: array<string, mixed>}
 	 */
 	public function create(string $uid, array $in): array {
-		$teamId = $this->workspaces->requireTeamForCreate($uid, $in['team'] ?? null);
+		$wsKey = $in['workspace'] ?? null;
+		if (!is_string($wsKey) || trim($wsKey) === '') {
+			throw new BadRequestException('workspace is required');
+		}
+		$ws = $this->workspaces->requireByKey($uid, trim($wsKey), 'read');
+		if ($ws->getOwnerType() !== 'team' || $ws->getKind() !== 'normal') {
+			throw new BadRequestException('Assignments belong to a team workspace', ['code' => 'not_a_team_workspace']);
+		}
+		$teamId = $this->workspaces->requireTeamForCreate($uid, (string)$ws->getOwnerId());
+		$wsId = (int)$ws->getId();
 		$title = self::title($in['title'] ?? null);
 		$due = $this->dueAt($in['due_at'] ?? null);
 		$maxPoints = self::maxPoints($in['max_points'] ?? null);
@@ -242,18 +254,22 @@ class AssignmentService {
 		if ($source->getRole() !== 'note') {
 			throw new BadRequestException('Only regular notes can be used for an assignment');
 		}
-		$this->requireSourceAllowed($uid, $teamId, $source, $in['workspace'] ?? null);
+		// Quelle nur aus dem Workspace der Aufgabe (UI-tplpick, Thomas 2026-11-09); sonst 403 (Quelle ist lesbar, kein Leck)
+		if ((int)$source->getWorkspaceId() !== $wsId) {
+			throw new ForbiddenException('The note must be in the team workspace of the assignment', ['code' => 'source_not_allowed']);
+		}
 		$this->teamState->ensure($teamId, $this->teams->memberTeams($uid)[$teamId] ?? null);
 		$quota = $this->quota->quotaForTeam($teamId, $this->attachments->bytesOf([(int)$source->getId()]));
 		$now = $this->time->getTime();
 		$name = $this->users->getDisplayName($uid) ?? $uid;
 		$created = [];
 		try {
-			$a = $this->tx->run(function () use ($uid, $teamId, $title, $due, $maxPoints, $source, $quota, $now, $name, &$created): Assignment {
-				// Team-Zeile zuerst (Sperr-Reihenfolge Plan M6 §2.4), dann Aufgabe und Vorlage
+			$a = $this->tx->run(function () use ($uid, $teamId, $wsId, $title, $due, $maxPoints, $source, $quota, $now, $name, &$created): Assignment {
+				// Sperr-Reihenfolge Team → Aufgabe → Workspace (Plan M6 §2.4, ADR 0021), Vorlage erst nach der Nachprüfung
 				$this->attachments->enforceQuota($quota);
 				$a = new Assignment();
 				$a->setTeamId($teamId);
+				$a->setWorkspaceId($wsId);
 				$a->setTitle($title);
 				$a->setSourceNoteId((int)$source->getId());
 				$a->setTemplateNoteId(0);
@@ -266,6 +282,17 @@ class AssignmentService {
 				$a->setCreatedAt($now);
 				$a->setUpdatedAt($now);
 				$a = $this->assignments->insert($a);
+				if ($this->workspaceRows->lockRows([$wsId]) === 0) {
+					throw new NotFoundException('Workspace not found');
+				}
+				try {
+					$ws = $this->workspaceRows->find($wsId);
+				} catch (DoesNotExistException) {
+					throw new NotFoundException('Workspace not found');
+				}
+				if ($ws->getOwnerType() !== 'team' || $ws->getOwnerId() !== $teamId || $ws->getKind() !== 'normal') {
+					throw new NotFoundException('Workspace not found');
+				}
 				$template = $this->duplicates->copyAsTemplate($source, (int)$a->getId(), $uid, $created);
 				$a->setTemplateNoteId((int)$template->getId());
 				return $this->assignments->update($a);
@@ -277,24 +304,6 @@ class AssignmentService {
 			throw $e;
 		}
 		return ['assignment' => $this->viewOne($uid, $a)];
-	}
-
-	/**
-	 * Quelle nur aus dem Team-Workspace der Aufgabe (kind=normal dieses Teams); workspace= legt ihn fest, sonst der Workspace der Quelle.
-	 * Private, fremde, andere Teams und andere Workspaces desselben Teams → 403 (UI-tplpick, Thomas 2026-11-09; vorher Lead 2026-11-08)
-	 */
-	private function requireSourceAllowed(string $uid, string $teamId, Note $source, mixed $wsKey): void {
-		$target = $this->workspaces->resolveOptional($uid, $wsKey);
-		try {
-			$ws = $source->getWorkspaceId() === null ? null : $this->workspaceRows->find((int)$source->getWorkspaceId());
-		} catch (DoesNotExistException) {
-			$ws = null;
-		}
-		$allowed = $ws !== null && $ws->getKind() === 'normal' && $ws->getOwnerType() === 'team' && $ws->getOwnerId() === $teamId
-			&& ($target === null || (int)$target->getId() === (int)$ws->getId());
-		if (!$allowed) {
-			throw new ForbiddenException('The note must be in the team workspace of the assignment', ['code' => 'source_not_allowed']);
-		}
 	}
 
 	/**

@@ -151,10 +151,11 @@ Löscht **alle** Daten der App aller Benutzer und Teams. Nur für die Deinstalla
 **Aufbewahrung von Abgaben:**
 - Abgaben bestehen aus der Kopie-Notiz des Schülers mit Anhängen und Versionen, Status, Abgabezeit, Feedback und Punkten.
 - Sie bleiben vollständig erhalten, wenn der Schüler das Team verlässt (die Lehrkräfte sehen und exportieren sie weiter; der Schüler selbst sieht seine Aufgaben und Abgaben nicht mehr, nach einem Wiedereintritt wieder), wenn das Schülerkonto gelöscht wird (dann nur noch mit Anzeigename und früherer UID, nur für die Lehrkräfte lesbar) und wenn das Konto der Lehrkraft gelöscht wird (die Aufgabe geht an eine andere Lehrkraft des Teams oder wird gesperrt).
-- Gelöscht werden Abgaben nur auf drei Wegen:
+- Gelöscht werden Abgaben nur auf vier Wegen:
   1. **Die Lehrkraft löscht die Aufgabe.** Das löscht die Aufgabe mit allen Abgaben, Kopien und Anhängen. Einzelne Abgaben lassen sich nicht löschen.
-  2. **Das Team wird gelöscht.** 30 Tage danach löscht die App alle Aufgaben und Abgaben des Teams (Abschnitt 6).
-  3. **Die Administration führt `occ nextnotes:purge` aus** (nur bei Deinstallation).
+  2. **Die Lehrkraft löscht den letzten Workspace eines Teams** und bestätigt das. Das löscht auch die Aufgaben dieses Workspace mit allen Abgaben (der Dialog nennt ihre Zahl). Gibt es einen anderen Workspace des Teams, ziehen die Aufgaben dorthin um.
+  3. **Das Team wird gelöscht.** 30 Tage danach löscht die App alle Aufgaben und Abgaben des Teams (Abschnitt 6).
+  4. **Die Administration führt `occ nextnotes:purge` aus** (nur bei Deinstallation).
 - Die App setzt **keine Aufbewahrungsfrist** durch. Die Aufbewahrung nach Kontolöschung oder Austritt schränkt das Recht auf Löschung ein. Sie braucht eine Rechtsgrundlage, z. B. eine schulrechtliche Aufbewahrungspflicht nach Landesrecht (DSGVO Art. 17 Abs. 3 lit. b) oder die Geltendmachung von Rechtsansprüchen (lit. e). Die **Schule legt die Frist fest** und dokumentiert sie im **Verzeichnis von Verarbeitungstätigkeiten**. Nach Ablauf der Frist löschen die Lehrkräfte die Aufgaben selbst. Die Schule sollte das den Lehrkräften vorgeben, z. B. zum Schuljahresende.
 
 **Weitere Aufbewahrung:**

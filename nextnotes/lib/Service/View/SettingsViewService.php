@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Service\View;
 
+use OCA\NextNotes\Db\AssignmentMapper;
 use OCA\NextNotes\Db\FolderMapper;
 use OCA\NextNotes\Db\NoteMapper;
 use OCA\NextNotes\Db\Workspace;
@@ -42,6 +43,7 @@ class SettingsViewService {
 		private InputValidator $validator,
 		private NotePalette $palette,
 		private AccessService $access,
+		private AssignmentMapper $assignments,
 	) {
 	}
 
@@ -60,11 +62,15 @@ class SettingsViewService {
 		$shares = $this->workspaces->shareStates(array_map(static fn (Workspace $ws) => (int)$ws->getId(), $own));
 		// Löschziele je Team: andere Workspaces desselben Teams, kleinste ID zuerst (Standard des Servers, Q2)
 		$byTeam = [];
+		$teamIds = [];
 		foreach ($listed as $ws) {
 			if ($ws->getOwnerType() === 'team') {
 				$byTeam[(string)$ws->getOwnerId()][(int)$ws->getId()] = $keys[(int)$ws->getId()] ?? (string)$ws->getName();
+				$teamIds[] = (int)$ws->getId();
 			}
 		}
+		// Aufgaben je Team-Workspace: Lösch-Dialog nennt sie (ADR 0021)
+		$assignmentCounts = $teamIds === [] ? [] : $this->assignments->countByWorkspace($teamIds);
 		$rows = [];
 		foreach ($listed as $ws) {
 			$id = (int)$ws->getId();
@@ -87,6 +93,7 @@ class SettingsViewService {
 				'manage' => !$team || $this->access->canManageTeam($uid, $ws),
 				'share' => $shares[$id] ?? null,
 				'teamTargets' => array_values($targets),
+				'teamAssignments' => $assignmentCounts[$id] ?? 0,
 			];
 		}
 		$settings = [];

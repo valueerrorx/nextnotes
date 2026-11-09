@@ -152,7 +152,6 @@
   "The note has large attachments; every student gets a copy.": "Die Notiz hat große Anhänge; jeder Schüler erhält eine Kopie.",
   "The storage of the team is not sufficient for all copies.": "Der Speicher des Teams reicht nicht für alle Kopien.",
   "Assignments are available in team workspaces.": "Aufgaben gibt es in Team-Workspaces.",
-  "Assignments of teams without a team workspace you can open": "Aufgaben aus Teams ohne erreichbaren Team-Workspace",
   "Search notes of this workspace": "Notizen dieses Arbeitsbereichs suchen",
   "Show all notes": "Alle Notizen anzeigen",
   "{n} of {total} notes shown – keep typing to narrow down": "{n} von {total} Notizen angezeigt – weiter tippen zum Eingrenzen",
@@ -414,7 +413,14 @@
   "%1$d pages imported, %2$d skipped, %3$d not imported (see report).": "%1$d Seiten importiert, %2$d übersprungen, %3$d nicht importiert (siehe Bericht).",
   "The notebook library is too large for Microsoft Graph (more than 5000 OneNote items).": "Die Notizbuch-Bibliothek ist zu groß für Microsoft Graph (mehr als 5000 OneNote-Elemente).",
   "Microsoft did not respond repeatedly. Please start the import again later; pages already imported are skipped.": "Microsoft hat wiederholt nicht geantwortet. Starte den Import später erneut; bereits importierte Seiten werden übersprungen.",
-  "The import made no progress for 7 days and was stopped.": "Der Import kam 7 Tage lang nicht voran und wurde beendet."
+  "The import made no progress for 7 days and was stopped.": "Der Import kam 7 Tage lang nicht voran und wurde beendet.",
+  "Assignments of teams that are no longer active": "Aufgaben von Teams, die nicht mehr aktiv sind",
+  "Only the {loaded} most recently changed notes were searched – keep typing to narrow down": "Nur die {loaded} zuletzt geänderten Notizen durchsucht – weiter tippen zum Eingrenzen",
+  "This also deletes {n} assignments with all submissions permanently. Export them first on the assignments page.": "Löscht auch {n} Aufgaben samt aller Abgaben endgültig. Exportieren Sie sie vorher auf der Aufgabenseite.",
+  "Its {n} assignments move along.": "Die {n} Aufgaben ziehen mit um.",
+  "The workspace has changed, please try again.": "Der Workspace hat sich geändert, bitte erneut versuchen.",
+  "This also deletes 1 assignment with all submissions permanently. Export it first on the assignments page.": "Löscht auch 1 Aufgabe samt aller Abgaben endgültig. Exportieren Sie sie vorher auf der Aufgabenseite.",
+  "Its assignment moves along.": "Die Aufgabe zieht mit um."
  },
  "pluralForm": "nplurals=2; plural=(n != 1);"
 }

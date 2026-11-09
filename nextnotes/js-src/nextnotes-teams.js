@@ -352,6 +352,8 @@
 			}
 			info.innerHTML = '';
 			var select = null;
+			// Aufgaben des Workspace (ADR 0021): ziehen mit um bzw. werden mit gelöscht
+			var assignments = Number(button.getAttribute('data-team-assignments')) || 0;
 			if (targets.length > 0) {
 				info.appendChild(el('p', '', t('deleteMoveTo')));
 				select = el('select', 'nn-delete-team-target');
@@ -362,8 +364,10 @@
 					select.appendChild(opt);
 				});
 				info.appendChild(select);
+				if (assignments > 0) info.appendChild(el('p', 'nn-delete-team-assignments', t(assignments === 1 ? 'deleteMoveAssignment' : 'deleteMoveAssignments', { n: assignments })));
 			} else {
 				info.appendChild(el('p', 'text-danger', t('deleteLast')));
+				if (assignments > 0) info.appendChild(el('p', 'text-danger nn-delete-team-assignments', t(assignments === 1 ? 'deleteLastAssignment' : 'deleteLastAssignments', { n: assignments })));
 			}
 			var name = button.getAttribute('data-ws') || '';
 			var input = document.getElementById('confirmDeleteInput');
@@ -388,11 +392,11 @@
 							return;
 						}
 						confirmBtn.disabled = false;
-						if (typeof window.showAjaxAlert === 'function') window.showAjaxAlert(upstream('workspaces.alerts.delete_error', 'Error deleting workspace'), 'danger');
+						if (typeof window.showAjaxAlert === 'function') window.showAjaxAlert(r.status === 409 ? t('deleteChanged') : upstream('workspaces.alerts.delete_error', 'Error deleting workspace'), 'danger');
 					})
 					.catch(function () {
 						confirmBtn.disabled = false;
-						if (typeof window.showAjaxAlert === 'function') window.showAjaxAlert(upstream('workspaces.alerts.delete_error', 'Error deleting workspace'), 'danger');
+						if (typeof window.showAjaxAlert === 'function') window.showAjaxAlert(r.status === 409 ? t('deleteChanged') : upstream('workspaces.alerts.delete_error', 'Error deleting workspace'), 'danger');
 					});
 			};
 			return result;

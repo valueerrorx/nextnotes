@@ -20,6 +20,7 @@ fail() { echo "FAIL $*" >&2; fails+=("$*"); }
 xmlver() { sed -n 's:.*<version>\([^<]*\)</version>.*:\1:p' "$1" | head -n1; }
 nnprobe() { dc "$env" exec -T -u www-data "$(svc_for "$env")" php -- "$@" < "$dir/scripts/upgrade-probe.php"; }
 appver() { occ "$env" app:list --output=json | jq -r '.enabled.nextnotes // empty'; }
+ver_lt() { [[ "$1" != "$2" && "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ]]; }
 
 # Paket (M7a)
 pkg="${NN_APP_TARBALL:-$NN_REPO_ROOT/nextnotes/dist/nextnotes-$(xmlver "$NN_REPO_ROOT/nextnotes/appinfo/info.xml").tar.gz}"
@@ -73,6 +74,9 @@ if [[ -f "$wt/nextnotes/Makefile" ]] && grep -q '^build:' "$wt/nextnotes/Makefil
 	fi
 fi
 echo "alter Stand: $(git -C "$wt" log -1 --format='%h %s' | cut -c1-70), Version $fromver, Assets $assets"
+# ADR 0021: Upgrade über 0.9.3 löscht alle Aufgaben samt Abgaben (Migration Version000800)
+wsbind=0
+ver_lt "$fromver" 0.9.3 && ! ver_lt "$pkgver" 0.9.3 && wsbind=1
 
 step "alten Stand installieren"
 "$dir/down.sh" "$env" >/dev/null 2>&1 || true
@@ -102,6 +106,10 @@ api() {
 	[[ "$code" =~ ^2 ]] || { echo "API $u $m $path → $code ${out:0:300}" >&2; return 1; }
 	printf '%s' "${out%$'\n'*}"
 }
+# nur HTTP-Status (Erwartung 404 nach dem wsbind-Purge)
+api_status() {
+	"${NN_CURL[@]}" -sS -o /dev/null -w '%{http_code}' -u "$1:$2" -H 'OCS-APIRequest: true' -H 'Accept: application/json' -X "$3" "$(base_url "$env")/index.php/apps/nextnotes/api/v1$4" || echo 000
+}
 A=("$NN_TEST_USER" "$NN_TEST_PASS")
 B=("$NN_TEST_USER2" "$NN_TEST_PASS2")
 routes="$wt/nextnotes/appinfo/routes.php"
@@ -129,13 +137,14 @@ if [[ $seed_team == 1 ]]; then
 	MF="$(api "${A[@]}" POST /folders "$(jq -nc --arg w "$TW" '{folder_name:"Material", workspace:$w}')" | jq -r .folder_id)"
 	api "${A[@]}" PUT "/folders/$MF/material" '{"material":true}' >/dev/null
 	SRC="$(api "${A[@]}" POST /notes "$(jq -nc --arg w "$TW" --argjson f "$MF" '{heading:"Arbeitsblatt Upgrade", content:"<p>Arbeitsblatt Upgrade</p>", workspace:$w, folder_id:$f}')" | jq -r .note.id)"
-	AID="$(api "${A[@]}" POST /assignments "$(jq -nc --arg t "$TEAM" --argjson s "$SRC" --argjson d "$(( $(date +%s) + 604800 ))" '{team:$t, title:"Aufgabe Upgrade", due_at:$d, source_note_id:$s, max_points:10}')" | jq -r .assignment.id)"
+	AID="$(api "${A[@]}" POST /assignments "$(jq -nc --arg t "$TEAM" --arg w "$TW" --argjson s "$SRC" --argjson d "$(( $(date +%s) + 604800 ))" '{team:$t, workspace:$w, title:"Aufgabe Upgrade", due_at:$d, source_note_id:$s, max_points:10}')" | jq -r .assignment.id)"
 	api "${A[@]}" POST "/assignments/$AID/distribute" '{}' >/dev/null
 	sub="$(api "${A[@]}" GET "/assignments/$AID/submissions" | jq -c --arg u "${B[0]}" '.submissions[] | select(.student_uid == $u)')"
 	SID="$(jq -r .id <<<"$sub")"; SNOTE="$(jq -r .note_id <<<"$sub")"
 	api "${B[@]}" POST "/submissions/$SID/submit" '{}' >/dev/null
 	SSTATUS="$(api "${A[@]}" GET "/assignments/$AID/submissions" | jq -r --arg u "${B[0]}" '.submissions[] | select(.student_uid == $u) | .status')"
 	[[ "$MF" =~ ^[0-9]+$ && "$AID" =~ ^[0-9]+$ && "$SID" =~ ^[0-9]+$ && -n "$SSTATUS" ]] || die "Team-Beispieldaten unvollständig"
+	SWS="$(nnprobe note-ws "$SNOTE" 2>/dev/null || true)"
 	echo "Daten: Team $TEAM, Team-Workspace „$TW“, Material-Ordner $MF, Aufgabe $AID, Abgabe $SID ($SSTATUS, Notiz $SNOTE)"
 fi
 
@@ -160,6 +169,8 @@ done
 if [[ -s "$work/rows-before" ]]; then
 	rowcounts > "$work/rows-after"
 	missing="$(comm -23 "$work/rows-before" "$work/rows-after")"
+	# wsbind: Aufgaben-Purge darf nur diese Tabellen verkleinern (Aufgaben, Abgaben, Vorlagen/Kopien samt Anhängen/Snapshots, Aufgaben-Ordner, Schüler-Workspaces)
+	[[ $wsbind == 1 ]] && missing="$(grep -Ev '^nextnotes_(assignments|submissions|notes|folders|workspaces|attachments|snapshots) ' <<<"$missing" || true)"
 	[[ -z "$missing" ]] && echo "Zeilenzahlen unverändert ($(wc -l < "$work/rows-before") Tabellen vorher, $(wc -l < "$work/rows-after") nachher)" \
 		|| fail "Zeilenzahlen nach Upgrade abweichend: ${missing//$'\n'/; }"
 fi
@@ -204,11 +215,22 @@ if [[ $seed_team == 1 ]]; then
 	tw="$(jq -rn --arg w "$TW" '$w|@uri')"
 	api "${A[@]}" GET /workspaces | jq -e --arg w "$TW" '[.workspaces[] | select(.name == $w and .team == "Upgrade Klasse")] | length == 1' >/dev/null || fail "Team-Workspace fehlt"
 	api "${A[@]}" GET "/folders?workspace=$tw" | jq -e --argjson f "$MF" '[.. | objects | select((.id? | tostring) == ($f | tostring)) | .material | tostring | select(test("^(1|true|own)$"))] | length > 0' >/dev/null || fail "Material-Kennzeichen fehlt"
-	api "${A[@]}" GET "/assignments/$AID" | jq -e '.assignment.title == "Aufgabe Upgrade"' >/dev/null || fail "Aufgabe $AID nicht lesbar"
-	got="$(api "${A[@]}" GET "/assignments/$AID/submissions" | jq -r --arg u "${B[0]}" '.submissions[] | select(.student_uid == $u) | .status' || true)"
-	[[ "$got" == "$SSTATUS" ]] || fail "Abgabe $SID: Status '$got' statt '$SSTATUS'"
-	api "${B[@]}" GET "/submissions/$SID" >/dev/null || fail "Abgabe $SID für ${B[0]} nicht lesbar"
-	api "${B[@]}" GET "/notes/$SNOTE" | jq -e '.note.content | contains("Arbeitsblatt Upgrade")' >/dev/null || fail "Abgabe-Notiz $SNOTE nicht lesbar"
+	if [[ $wsbind == 1 ]]; then
+		# ADR 0021: Aufgabe, Abgabe, Abgabe-Notiz und Schüler-Workspace gelöscht; Team-Workspace und Material (oben) unverändert
+		[[ "$(api_status "${A[@]}" GET "/assignments/$AID")" == 404 ]] || fail "Aufgabe $AID nach Upgrade nicht gelöscht"
+		[[ "$(api_status "${B[@]}" GET "/submissions/$SID")" == 404 ]] || fail "Abgabe $SID nach Upgrade nicht gelöscht"
+		[[ "$(api_status "${B[@]}" GET "/notes/$SNOTE")" == 404 ]] || fail "Abgabe-Notiz $SNOTE nach Upgrade nicht gelöscht"
+		api "${B[@]}" GET /assignments | jq -e '.assignments | length == 0' >/dev/null || fail "Aufgabenliste von ${B[0]} nicht leer"
+		[[ -z "$SWS" || "$(nnprobe ws-exists "$SWS")" == 0 ]] || fail "Schüler-Workspace $SWS nach Upgrade nicht gelöscht"
+		api "${A[@]}" GET "/notes/$SRC" | jq -e '.note.content | contains("Arbeitsblatt Upgrade")' >/dev/null || fail "Quelle $SRC im Team-Workspace fehlt"
+		echo "Aufgaben vor 0.9.3 gelöscht (ADR 0021), Team-Workspace und Material unverändert"
+	else
+		api "${A[@]}" GET "/assignments/$AID" | jq -e '.assignment.title == "Aufgabe Upgrade"' >/dev/null || fail "Aufgabe $AID nicht lesbar"
+		got="$(api "${A[@]}" GET "/assignments/$AID/submissions" | jq -r --arg u "${B[0]}" '.submissions[] | select(.student_uid == $u) | .status' || true)"
+		[[ "$got" == "$SSTATUS" ]] || fail "Abgabe $SID: Status '$got' statt '$SSTATUS'"
+		api "${B[@]}" GET "/submissions/$SID" >/dev/null || fail "Abgabe $SID für ${B[0]} nicht lesbar"
+		api "${B[@]}" GET "/notes/$SNOTE" | jq -e '.note.content | contains("Arbeitsblatt Upgrade")' >/dev/null || fail "Abgabe-Notiz $SNOTE nicht lesbar"
+	fi
 fi
 [[ $seed == 1 && ${#fails[@]} -eq 0 ]] && echo "Beispieldaten vollständig lesbar"
 

@@ -30,7 +30,7 @@ await runSpec(import.meta.url, async (ctx, page) => {
 	const gone = await api.note(TW, `Weg ${RUN}`, null, '<p>w</p>');
 	await api.must('DELETE', `/notes/${gone}`);
 	// Server: Quelle aus anderem Workspace desselben Teams → 403 (vor der Oberfläche, damit der 403 nicht im Seitenabschnitt zählt)
-	const denied = await api.call('POST', '/assignments', { team: teamId, title: 'x', due_at: Math.floor(Date.now() / 1000) + 3600, source_note_id: sibling, workspace: TW });
+	const denied = await api.call('POST', '/assignments', { title: 'x', due_at: Math.floor(Date.now() / 1000) + 3600, source_note_id: sibling, workspace: TW });
 	ctx.ok(denied.status === 403 && denied.body?.code === 'source_not_allowed', 'Server: anderer Workspace desselben Teams → 403', `${denied.status} ${JSON.stringify(denied.body).slice(0, 120)}`);
 
 	const titles = async () => page.locator('.nn-asg-source-result .nn-asg-source-title').allInnerTexts();

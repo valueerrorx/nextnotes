@@ -9,16 +9,19 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Service;
 
+use OCA\NextNotes\Db\AssignmentMapper;
 use OCA\NextNotes\Db\FolderMapper;
 use OCA\NextNotes\Db\NoteMapper;
+use OCA\NextNotes\Db\TeamMapper;
 use OCA\NextNotes\Db\Workspace;
 use OCA\NextNotes\Db\WorkspaceMapper;
 use OCA\NextNotes\Db\WsShareMapper;
 use OCA\NextNotes\Service\Exception\BadRequestException;
+use OCA\NextNotes\Service\Exception\ConflictException;
 use OCA\NextNotes\Service\Exception\ForbiddenException;
 use Psr\Log\LoggerInterface;
 
-// Workspace löschen (DELETE /workspaces, workspaces.php delete) und endgültiger Löschpfad (Team-Workspace ohne Ziel, M5c-Purge)
+// Workspace löschen (DELETE /workspaces, workspaces.php delete; Aufgaben ADR 0021) und endgültiger Löschpfad (Team-Workspace ohne Ziel, M5c-Purge)
 class WorkspaceDeletion {
 	public function __construct(
 		private WorkspaceService $workspaceService,
@@ -31,12 +34,16 @@ class WorkspaceDeletion {
 		private BackgroundFiles $backgrounds,
 		private Transaction $tx,
 		private LoggerInterface $logger,
+		private AssignmentMapper $assignments,
+		private AssignmentDeletion $assignmentDeletion,
+		private TeamMapper $teams,
 	) {
 	}
 
 	/**
 	 * Benutzer-Workspace: wie bisher (B18). Team-Workspace (Q2, Thomas 2026-11-07): verwalten; Inhalte in einen Workspace desselben Teams
 	 * (Ziel wählbar, sonst kleinste ID); gibt es keinen, nur mit confirm endgültig löschen; nie in einen privaten Workspace.
+	 * Aufgaben (ADR 0021): ziehen mit ins Ziel um; ohne Ziel werden sie samt Abgaben gelöscht (ADR 0008). Ziel unter der Sperre geändert → 409.
 	 */
 	public function delete(string $uid, string $key, mixed $targetKey = null, bool $confirm = false): void {
 		$ws = $this->workspaceService->requireByKey($uid, $key, 'manage');
@@ -55,27 +62,48 @@ class WorkspaceDeletion {
 			}
 		}
 		$teamId = (string)$ws->getOwnerId();
-		$this->tx->run(function () use ($uid, $ws, $chosen, $teamId, $confirm) {
-			// alle Workspaces des Teams sperren, dann Quelle und Ziel neu lesen
+		$sourceId = (int)$ws->getId();
+		$others = fn (): array => array_values(array_filter(
+			$this->workspaces->findByOwner('team', $teamId, 'normal'),
+			static fn (Workspace $w) => (int)$w->getId() !== $sourceId,
+		));
+		$first = $others()[0] ?? null;
+		$plannedId = $chosen !== null ? (int)$chosen->getId() : ($first === null ? null : (int)$first->getId());
+		if ($plannedId === null) {
+			if (!$confirm) {
+				throw new BadRequestException('Deleting the last workspace of a team removes all its notes and assignments; confirmation required', ['code' => 'confirmation_required']);
+			}
+			// Aufgaben samt Abgaben endgültig, je eine Transaktion (Recht delete = verwalten im aktiven Team); Teilabbruch zulässig, Wiederholung setzt fort
+			foreach ($this->assignments->idsForWorkspace($sourceId) as $id) {
+				$this->assignmentDeletion->purge($id);
+			}
+		}
+		$this->tx->run(function () use ($uid, $teamId, $sourceId, $chosen, $plannedId, $others) {
+			// Sperr-Reihenfolge Team → Aufgaben → Workspaces des Teams (wie AssignmentService::create), dann Quelle und Ziel neu lesen
+			$this->teams->lockRow($teamId);
+			if ($plannedId !== null) {
+				$this->assignments->rebindWorkspace($sourceId, $plannedId);
+			}
 			$this->workspaces->lockOwner('team', $teamId);
-			$source = $this->access->requireWorkspace($uid, (int)$ws->getId(), 'manage');
-			$candidates = array_values(array_filter(
-				$this->workspaces->findByOwner('team', $teamId, 'normal'),
-				static fn (Workspace $w) => $w->getId() !== $source->getId(),
-			));
-			$target = $chosen !== null ? $this->access->requireWorkspace($uid, (int)$chosen->getId(), 'write') : ($candidates[0] ?? null);
+			$source = $this->access->requireWorkspace($uid, $sourceId, 'manage');
+			$candidates = $others();
+			$target = $candidates[0] ?? null;
+			if ($chosen !== null) {
+				$target = array_values(array_filter($candidates, static fn (Workspace $w) => $w->getId() === $chosen->getId()))[0] ?? null;
+			}
+			if (($target === null ? null : (int)$target->getId()) !== $plannedId || ($target === null && $this->assignments->idsForWorkspace($sourceId) !== [])) {
+				throw new ConflictException('The workspace has changed; try again', ['code' => 'workspace_changed']);
+			}
 			if ($target !== null) {
+				$target = $this->access->requireWorkspace($uid, $target, 'write');
 				$this->access->requireLeave($uid, new LeaveRequest($source, $target, LeaveRequest::WORKSPACE));
 				$this->workspaceService->moveContents($source, $target);
-				$this->shares->deleteForWorkspace((int)$source->getId());
-				$this->workspaces->deleteById((int)$source->getId());
-				$this->backgrounds->queueWorkspace((int)$source->getId());
+				$this->shares->deleteForWorkspace($sourceId);
+				$this->workspaces->deleteById($sourceId);
+				$this->backgrounds->queueWorkspace($sourceId);
 				return;
 			}
-			if (!$confirm) {
-				throw new BadRequestException('Deleting the last workspace of a team removes all its notes; confirmation required', ['code' => 'confirmation_required']);
-			}
-			$this->purge((int)$source->getId());
+			$this->purge($sourceId);
 		});
 		$this->workspaceService->reset();
 	}

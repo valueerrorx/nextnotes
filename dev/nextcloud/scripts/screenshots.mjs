@@ -76,7 +76,7 @@ const fLess = await folder(T.uid, TW, 'Lessons');
 await note(T.uid, TW, 'Lesson 1 – Microscope basics', '<p>Handling the microscope, first slides.</p>', fLess);
 
 const due = Math.floor(Date.now() / 1000) + 3 * 86400;
-const asg = (await api(T.uid, 'POST', '/assignments', { team: teamId, title: 'Photosynthesis worksheet', due_at: due, source_note_id: sheetId, max_points: 10 })).assignment;
+const asg = (await api(T.uid, 'POST', '/assignments', { workspace: TW, title: 'Photosynthesis worksheet', due_at: due, source_note_id: sheetId, max_points: 10 })).assignment;
 await api(T.uid, 'POST', `/assignments/${asg.id}/distribute`, {});
 const subs = (await api(T.uid, 'GET', `/assignments/${asg.id}/submissions`)).submissions;
 const sub = (uid) => subs.find((s) => s.student_uid === uid);

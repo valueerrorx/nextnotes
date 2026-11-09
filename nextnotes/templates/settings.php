@@ -217,7 +217,7 @@ $jsonAttr = static fn (mixed $v): string => json_encode($v, JSON_UNESCAPED_UNICO
 										<i class="lucide lucide-info"></i><span class="ws-icon-btn-text"><?php p($rowLabels['info']); ?></span>
 									</button>
 									<?php if ($row['team'] !== null ? $row['manage'] : $severalOwn): ?>
-									<button type="button" class="ws-icon-btn ws-icon-btn-danger btn-delete" data-ws="<?php p($row['name']); ?>"<?php if ($row['team'] !== null): ?> data-team-targets="<?php p($jsonAttr($row['teamTargets'])); ?>"<?php endif; ?> title="<?php p($rowLabels['delete']); ?>" aria-label="<?php p($rowLabels['delete']); ?>">
+									<button type="button" class="ws-icon-btn ws-icon-btn-danger btn-delete" data-ws="<?php p($row['name']); ?>"<?php if ($row['team'] !== null): ?> data-team-targets="<?php p($jsonAttr($row['teamTargets'])); ?>" data-team-assignments="<?php p((string)$row['teamAssignments']); ?>"<?php endif; ?> title="<?php p($rowLabels['delete']); ?>" aria-label="<?php p($rowLabels['delete']); ?>">
 										<i class="lucide lucide-trash-2"></i><span class="ws-icon-btn-text"><?php p($rowLabels['delete']); ?></span>
 									</button>
 									<?php endif; ?>

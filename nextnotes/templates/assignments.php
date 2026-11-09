@@ -15,7 +15,7 @@ $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_
 $asg = $_['asg'];
 $islands = [
 	'nextnotes-body' => ['data' => ['workspace' => $frame['workspaceKey']], 'replaceWorkspace' => $frame['replaceWorkspace']],
-	'nextnotes-assignments' => ['team' => $asg['team'], 'teacher' => $asg['teacher'], 'teamWorkspaces' => $asg['teamWorkspaces'], 'homeTeams' => $asg['homeTeams'],
+	'nextnotes-assignments' => ['team' => $asg['team'], 'teacher' => $asg['teacher'], 'workspaceId' => $asg['workspaceId'],
 		'createSource' => $asg['createSource'], 'txt' => $txt, 'hintBytes' => $_['hintBytes']],
 ];
 $titleIcon = 'lucide-graduation-cap';
@@ -29,7 +29,7 @@ $titleText = $txt['title'];
 	<?php include __DIR__ . '/partials/icon_sidebar.php'; ?>
 	<main class="nn-page-main" inert>
 	<div class="tasks-container nn-asg">
-		<?php // M6i: Bereich = Team des Workspace, Wechsel über den Workspace-Chip wie auf den anderen Seiten ?>
+		<?php // M6i/ADR 0021: Bereich = Workspace, Wechsel über den Workspace-Chip wie auf den anderen Seiten ?>
 		<?php include __DIR__ . '/partials/page_title.php'; ?>
 		<?php if ($asg['team'] === null): ?>
 		<p class="empty-message nn-asg-empty nn-asg-no-team"><?php p($txt['noTeamWorkspace']); ?></p>

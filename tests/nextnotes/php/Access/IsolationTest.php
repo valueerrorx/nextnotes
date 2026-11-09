@@ -176,7 +176,7 @@ final class IsolationTest extends ApiTestCase {
 			'GET /onenote/imports/{}/tree' => ['excluded', 'path' => '/onenote/imports/999999999/tree', 'status' => 403, 'reason' => 'ohne Admin-Konfiguration gesperrt; Rechte in OneNote/'],
 			'POST /onenote/imports/{}/start' => ['excluded', 'path' => '/onenote/imports/999999999/start', 'body' => ['selection' => []], 'status' => 403, 'reason' => 'ohne Admin-Konfiguration gesperrt; Rechte in OneNote/'],
 			'GET /assignments' => ['scoped', 'path' => '/assignments', 'sees' => null],
-			'POST /assignments' => ['excluded', 'path' => '/assignments', 'body' => ['team' => 'keinTeam', 'title' => 'x', 'due_at' => 4102444800, 'source_note_id' => 1], 'status' => 404, 'reason' => 'nur mit Team; Rechte in Assignments/'],
+			'POST /assignments' => ['excluded', 'path' => '/assignments', 'body' => ['workspace' => 'kein Workspace', 'title' => 'x', 'due_at' => 4102444800, 'source_note_id' => 1], 'status' => 404, 'reason' => 'nur im Team-Workspace (ADR 0021); Rechte in Assignments/'],
 			'GET /assignments/{}' => ['excluded', 'path' => '/assignments/999999999', 'status' => 404, 'reason' => 'A hat keine Aufgaben; Rechte in Assignments/'],
 			'PATCH /assignments/{}' => ['excluded', 'path' => '/assignments/999999999', 'body' => ['title' => 'x'], 'status' => 404, 'reason' => 'A hat keine Aufgaben; Rechte in Assignments/'],
 			'DELETE /assignments/{}' => ['excluded', 'path' => '/assignments/999999999', 'body' => ['confirm' => true], 'status' => 404, 'reason' => 'A hat keine Aufgaben; Rechte in Assignments/'],
