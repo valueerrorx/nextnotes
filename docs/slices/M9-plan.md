@@ -232,19 +232,19 @@ UNIQUE `nn_oni_src`(uid, source_hash); `nn_oni_tgt`(kind, target_id).
 | Abschnittsgruppe, Abschnitt | Ordner, verschachtelt wie im Notizbuch; Name gekürzt auf 255 |
 | Seite | Notiz `type=note`, `heading` = Titel (leer → l10n „Ohne Titel“), `created_at`/`updated_at` = `createdDateTime`/`lastModifiedDateTime` (UTC → Unix), `created_by`/`updated_by` = uid, `display_order` = `order` |
 | Unterseite (`level` 1, 2) | bleibt flach direkt hinter der Elternseite, Titelpräfix „› “ je Ebene |
-| `body`-Kinder absolut positioniert | stabil sortiert nach (top, left) in px (fehlend = 0), dann nacheinander ausgegeben. `position/left/top/width` entfallen. |
-| `data-tag="to-do"`, `"to-do:completed"`, `to-do-priority-1/2` | aufeinanderfolgende Elemente → eine Upstream-Checkliste (`ul.checklist`…, `checked` und `checklist-item-checked`) |
+| `body`-Kinder absolut positioniert | stabil sortiert nach (top, left) in px (fehlend = 120/48 wie OneNote-Standardlage, Learn abs-pos; M9c), dann nacheinander ausgegeben. `position/left/top/width` entfallen. |
+| `data-tag="to-do"`, `"to-do:completed"`, `to-do-priority-1/2` und alle weiteren Kontrollkästchen-Kennzeichen (`discuss-with-*`, `schedule-meeting`, `call-back`, `client-request`; M9c) | aufeinanderfolgende Elemente → eine Upstream-Checkliste (`ul.checklist`…, `checked` und `checklist-item-checked`) |
 | andere Tags `important`, `question`, `critical`, `idea` | Präfix ⭐ ❓ ❗ 💡. Übrige Tags entfallen, Text bleibt. |
 | Stile | erlaubt: `color`, `background-color`, `font-weight`, `font-style`, `text-decoration`, `text-align`, `list-style-type`. Alles andere entfällt (Calibri 11pt, Ränder, Positionen). |
 | Tabellen | `table/tr/td/th` mit `colspan`/`rowspan`. Rahmen und Breiten entfallen, Upstream-CSS übernimmt. |
-| `img` | Ressourcen-ID aus `data-fullres-src`, sonst aus `src` → Anhang (§6), `src="/api/v1/notes/{n}/attachments/{a}"`, `width`/`height`/`alt` bleiben. Geteilte Bilder nach `data-index`. Fehler → Platzhalter „[Bild nicht übernommen]“. |
+| `img` | Ressourcen-ID aus `data-fullres-src`, sonst aus `src` → Anhang (§6), `src="/api/v1/notes/{n}/attachments/{a}"`, `width`/`height`/`alt` bleiben. Geteilte Bilder in Lage-/Dokumentreihenfolge (`data-index` laut Learn unzuverlässig; M9c). Fehler → Platzhalter „[Bild nicht übernommen]“. |
 | `object` | Anhang + Link `<a href="/api/v1/notes/{n}/attachments/{a}">{data-attachment}</a>`. Fehler → Platzhalter mit Dateinamen. |
 | `iframe` (Video) | Link auf `data-original-src` (nur `https:`), Text „Video: …“ |
 | Links | `http/https/mailto` bleiben. `onenote:` und andere Schemata → nur Text. |
 | Freihand | nicht im HTML (F10). Bericht und Doku nennen es, Platzhalter nur mit M9f. |
 | Ergebnis | `HtmlSanitizer::sanitizeHtml`, `search_text` wie `NoteService`. Über 16 MiB: Notiz mit Hinweis statt Inhalt, Bericht. |
 
-Der Konverter erzeugt das HTML ausschließlich per DOM (`loadHtmlQuiet`), kein `preg_*` direkt (`Pcre`, `check-upstream` g/h). Er liefert zusätzlich die Liste der Ressourcen-IDs in Dokumentreihenfolge (für §4.5).
+Der Konverter erzeugt das HTML ausschließlich per DOM (`HtmlSanitizer::loadHtmlComplete`, nie still gekürzt; Umsetzung SPEC §4.8), kein `preg_*` direkt (`Pcre`, `check-upstream` g/h). Er liefert zusätzlich die Liste der Ressourcen-IDs in Dokumentreihenfolge (für §4.5).
 
 ## 6. Sicherheit
 - **Hosts fest** (Konstanten): `https://login.microsoftonline.com/{authority}/oauth2/v2.0/{authorize|token}` und `https://graph.microsoft.com/v1.0/`. Die Authority ist geprüft (GUID, Hostname, `organizations`, `common`).

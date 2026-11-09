@@ -54,6 +54,8 @@ return [
 		['name' => 'one_note_api#index', 'url' => '/api/v1/onenote/imports', 'verb' => 'GET'],
 		['name' => 'one_note_api#show', 'url' => '/api/v1/onenote/imports/{id}', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
 		['name' => 'one_note_api#cancel', 'url' => '/api/v1/onenote/imports/{id}/cancel', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+		['name' => 'one_note_api#tree', 'url' => '/api/v1/onenote/imports/{id}/tree', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
+		['name' => 'one_note_api#start', 'url' => '/api/v1/onenote/imports/{id}/start', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 		// Kompatibilitätsrouten (SPEC §4.2): Upstream-Einzeldateien unter gleichem Namen
 		['name' => 'compat#noteInfo', 'url' => '/api_note_info.php', 'verb' => 'GET'],
 		['name' => 'compat#downloadNote', 'url' => '/api_download_note.php', 'verb' => 'GET'],

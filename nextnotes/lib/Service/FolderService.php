@@ -126,6 +126,20 @@ class FolderService {
 		return $this->folders->insert($f);
 	}
 
+	// OneNote-Import (Plan M9 §5): Ordner mit gültigem, freiem Namen; ohne Sitzung, in der Transaktion des Aufrufers (Workspace gesperrt)
+	public function createImported(int $workspaceId, ?int $parentId, string $name, int $order): Folder {
+		$base = trim(Pcre::replace('/\s+/u', ' ', Pcre::replace('/[\x00-\x1F\x7F]/u', ' ', str_replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], '-', $name))));
+		$base = mb_substr($base, 0, 240);
+		if ($base === '' || $base === '.' || $base === '..' || in_array($base, InputValidator::RESERVED_FOLDER_NAMES, true)) {
+			$base = trim($base . ' OneNote');
+		}
+		$candidate = $base;
+		for ($i = 2; $this->folders->findSibling($workspaceId, $parentId, $candidate) !== null; $i++) {
+			$candidate = $base . ' (' . $i . ')';
+		}
+		return $this->insertFolder($workspaceId, $parentId, $candidate, ['display_order' => max(0, $order)]);
+	}
+
 	/**
 	 * Material-Zweig aus schon geladenen Ordnern (Anzeige, ohne Abfrage)
 	 * @param array<int, Folder> $byId

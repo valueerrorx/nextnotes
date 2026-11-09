@@ -232,6 +232,17 @@ $jsonAttr = static fn (mixed $v): string => json_encode($v, JSON_UNESCAPED_UNICO
 				</div>
 			</div>
 
+			<?php if (($_['oneNoteUrl'] ?? null) !== null): ?>
+			<div class="settings-group">
+				<a href="<?php p($_['oneNoteUrl']); ?>" class="home-card" id="onenote-import-card">
+					<div class="home-card-icon"><i class="lucide lucide-arrow-up-down"></i></div>
+					<div class="home-card-content">
+						<span class="home-card-title"><?php p($l->t('Import from OneNote')); ?></span>
+					</div>
+				</a>
+			</div>
+			<?php endif; ?>
+
 			<div class="settings-group-title"><?php p($t('settings.groups.preferences', 'Preferences')); ?></div>
 			<div class="settings-group">
 				<!-- „Zuletzt auf diesem Gerät“ entfällt: der Port merkt sich den zuletzt geöffneten Workspace nur serverseitig -->

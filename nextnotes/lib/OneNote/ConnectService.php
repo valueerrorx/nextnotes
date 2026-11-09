@@ -288,7 +288,7 @@ class ConnectService {
 	}
 
 	// invalid_grant: reauth mit Benachrichtigung; in select gibt es nichts fortzusetzen → Zeile löschen (§4.6)
-	private function toReauth(OneNoteImport $import, string $code, ?string $leaseToken): void {
+	public function toReauth(OneNoteImport $import, string $code, ?string $leaseToken): void {
 		$id = (int)$import->getId();
 		$uid = (string)$import->getUid();
 		if ($import->getStatus() === 'select') {
@@ -302,7 +302,7 @@ class ConnectService {
 		}
 	}
 
-	private function fail(OneNoteImport $import, string $code, ?string $leaseToken = null): bool {
+	public function fail(OneNoteImport $import, string $code, ?string $leaseToken = null): bool {
 		$now = $this->time->getTime();
 		$n = $this->imports->updateWhere((int)$import->getId(), (string)$import->getUid(), self::cleared() + ['status' => 'failed',
 			'error_code' => $code, 'finished_at' => $now, 'updated_at' => $now], $this->guard($import, $leaseToken));
@@ -421,11 +421,22 @@ class ConnectService {
 			'resources_done' => (int)$i->getResourcesDone(),
 			'resources_failed' => (int)$i->getResourcesFailed(),
 			'report' => self::report($i->getReport()),
+			'eta_seconds' => self::eta($i),
 			'next_run_at' => $i->getNextRunAt(),
 			'created_at' => (int)$i->getCreatedAt(),
 			'updated_at' => (int)$i->getUpdatedAt(),
 			'finished_at' => $i->getFinishedAt(),
 		];
+	}
+
+	// Restzeit (§4.9): offene bekannte Seiten × mittlere Anfragen je Seite / 350 je h, auf 10 min gerundet; null ohne offene Seiten
+	private static function eta(OneNoteImport $i): ?int {
+		$open = (int)$i->getPagesTotal() - (int)$i->getPagesDone() - (int)$i->getPagesSkipped();
+		if ($open <= 0 || !in_array($i->getStatus(), ['queued', 'running'], true)) {
+			return null;
+		}
+		$perPage = 1 + ((int)$i->getResourcesDone() + (int)$i->getResourcesFailed()) / max(1, (int)$i->getPagesDone());
+		return (int)(ceil($open * $perPage / RateBudget::MAX * 3600 / 600) * 600);
 	}
 
 	/** @return list<mixed> */

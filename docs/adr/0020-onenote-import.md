@@ -48,3 +48,10 @@ Option 1, dazu Option 3 nur als Doku.
 - App-Version 0.9.1 mit Migration `Version000700Date20261111000000`.
 - Gleichzeitiges `connect`: eine `auth`-Zeile jünger als 5 s wird nicht ersetzt (409 `connect_pending`), sonst ersetzt; Nachzählen nach dem INSERT bleibt.
 - Test-Mock: Dienst `ms-mock` (Profil `msmock`, `dev/nextcloud/msmock.sh`) als PHP unter Apache aus dem vorhandenen NC-Image, kein weiteres Image.
+
+## Nachtrag M9b (Umsetzung)
+- Routen `GET /api/v1/onenote/imports/{id}/tree` (`teams_offset` je 20 Teams) und `POST …/start` (`selection`: Liste `{root, notebook, name, items: null | [{kind: section|section_group, id}]}`, höchstens 200 Einträge); App-Version 0.9.2 (Job-Registrierung beim Upgrade).
+- Workspace-Namen erlauben keine Klammern (InputValidator): Kollision → „Name OneNote“, dann „Name OneNote 2“ statt „Name (OneNote)“. Ordner: verbotene Zeichen → „-“, Kollision „Name (2)“.
+- Laufbudget je Import (50 Anfragen), Zeit je Lauf 120 s; Lauf-Ende setzt `queued` und gibt die Lease frei. Ziel-Workspace/-Ordner während des Imports gelöscht → Notizbuch wird neu aufgebaut (Items verhindern Duplikate).
+- Zusätzliche `error_code`: `graph_unavailable` (10 Fehlversuche), `stalled` (7 Tage ohne Fortschritt). Bericht: Liste `{t, r}` mit `r` ∈ `not_found|forbidden|too_large|error|invalid_id`, ab 200 ein Sammeleintrag `more`.
+- Konverter: `OneNote\Convert\PageConverter` (M9c) direkt; Ressourcen bleiben bis M9d Platzhalter und zählen als `resources_failed`.

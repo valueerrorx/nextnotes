@@ -9,6 +9,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## 0.9.2 – 2026-11-09
+
+### Added
+- OneNote import: after connecting a Microsoft account, users choose notebooks or single sections (own notebooks are preselected, team and class notebooks only if the administrator allows them and nothing there is preselected). A background job imports them into new own workspaces with folders for section groups and sections, continues after interruptions and skips pages that were already imported. Progress, an estimate of the remaining time and a report are shown on the import page; a notification reports the end. Images and file attachments follow in a later version.
+
 ## 0.9.1 – 2026-11-09
 
 ### Added

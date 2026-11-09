@@ -1,0 +1,20 @@
+/* SPDX-FileCopyrightText: 2026 Thomas Weissel */
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* OneNote-Import (templates/onenote.php): nur NC-Variablen, damit Hell/Dunkel dem Nextcloud-Theme folgt */
+#nextnotes-onenote { max-width: 760px; }
+#nextnotes-onenote .nn-onenote-hint { color: var(--color-text-maxcontrast); }
+#nextnotes-onenote .nn-onenote-message { padding: 8px 12px; border-radius: var(--border-radius-large); background: var(--color-primary-element-light); color: var(--color-primary-element-light-text); }
+#nextnotes-onenote-error:empty { display: none; }
+#nextnotes-onenote-error { color: var(--color-error-text); }
+.nn-onenote-group { margin: 12px 0; }
+.nn-onenote-group h3 { margin: 8px 0 4px; font-weight: bold; }
+.nn-onenote-group ul, .nn-onenote-items { list-style: none; margin: 0; padding: 0; }
+.nn-onenote-notebook { padding: 4px 0; border-bottom: 1px solid var(--color-border); }
+.nn-onenote-check { display: inline-flex; align-items: center; min-height: var(--default-clickable-area); }
+.nn-onenote-group .nn-onenote-items { padding-inline-start: 28px; }
+.nn-onenote-toggle { margin-inline-start: 8px; min-height: var(--default-clickable-area); }
+.nn-onenote-progress { margin: 12px 0; border-collapse: collapse; }
+.nn-onenote-progress th { padding: 4px 16px 4px 0; font-weight: normal; text-align: start; color: var(--color-text-maxcontrast); }
+.nn-onenote-progress td { padding: 4px 0; font-variant-numeric: tabular-nums; font-weight: bold; }
+.nn-onenote-report { list-style: disc; padding-inline-start: 20px; }
+.nn-onenote-title { font-weight: bold; overflow-wrap: anywhere; }

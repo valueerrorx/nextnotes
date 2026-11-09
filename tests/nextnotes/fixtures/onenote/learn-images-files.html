@@ -1,0 +1,25 @@
+<!-- Quelle: Microsoft Learn „Input and output HTML on OneNote pages“ (img, Split images, iframe, object; Output HTML) und „Get OneNote content and structure“ (Ressourcen-URL mit www.onenote.com), https://learn.microsoft.com/en-us/graph/onenote-input-output-html, https://learn.microsoft.com/en-us/graph/onenote-get-content; Code-Beispiele MIT. Platzhalter der Doku ({image-id} …) durch gültige IDs ersetzt. -->
+<html lang="en-US">
+<head><title>Images and files</title></head>
+<body data-absolute-enabled="true" style="font-family:Calibri;font-size:11pt">
+<div data-id="_default" style="position:absolute;left:48px;top:120px;width:624px">
+<p>Web-ready und Originalbild:</p>
+<img src="https://graph.microsoft.com/v1.0/me/onenote/resources/0-web!1-IMG!1/$value" data-src-type="image/png" data-fullres-src="https://graph.microsoft.com/v1.0/me/onenote/resources/0-full!1-IMG!1/$value" data-fullres-src-type="image/png" alt="Diagramm" width="345" height="180" />
+<p>Dasselbe Bild noch einmal:</p>
+<img src="https://graph.microsoft.com/v1.0/me/onenote/resources/0-web!1-IMG!1/$value" data-fullres-src="https://graph.microsoft.com/v1.0/me/onenote/resources/0-full!1-IMG!1/$value" data-fullres-src-type="image/png" />
+<p>Team-Notizbuch:</p>
+<img src="https://graph.microsoft.com/v1.0/groups/0f2c4e1a-1111-2222-3333-444455556666/onenote/resources/0-grp!1-IMG!7/$value" data-src-type="image/jpeg" />
+<object data="https://graph.microsoft.com/v1.0/me/onenote/resources/0-file!1-PDF!2/$value" data-attachment="Arbeitsblatt Woche 3.pdf" type="application/pdf" />
+<iframe width="340" height="280" data-original-src="https://www.youtube.com/watch?v=3Ztr44aKmQ8" src="https://www.youtube.com/embed/3Ztr44aKmQ8?feature=oembed&amp;autoplay=true" />
+<p>Alte Endpunkte (fremder Host):</p>
+<img src="https://www.onenote.com/api/v1.0/me/notes/resources/0-old!1-IMG!3/$value" data-src-type="image/png" data-fullres-src="https://www.onenote.com/api/v1.0/resources/0-old!1-IMG!3/$value" data-fullres-src-type="image/png" />
+<object data="https://www.onenote.com/api/v1.0/me/notes/resources/0-old!1-FILE!4/$value" data-attachment="fileName.pdf" type="application/pdf" />
+</div>
+<div data-id="multi-component-image" style="position:absolute;left:48px;top:900px;width:624px">
+    <img src="https://graph.microsoft.com/v1.0/me/onenote/resources/0-split!1-A!0/$value" data-src-type="image/png" data-fullres-src="https://graph.microsoft.com/v1.0/me/onenote/resources/0-split!1-A!0/$value" data-fullres-src-type="image/png" data-index="0" data-render-original-src="https://example.org/" data-id="same-image" />
+    <img src="https://graph.microsoft.com/v1.0/me/onenote/resources/0-split!1-A!1/$value" data-src-type="image/png" data-fullres-src="https://graph.microsoft.com/v1.0/me/onenote/resources/0-split!1-A!1/$value" data-fullres-src-type="image/png" data-index="1" data-render-original-src="https://example.org/" data-id="same-image" />
+    <img src="https://graph.microsoft.com/v1.0/me/onenote/resources/0-split!1-A!2/$value" data-src-type="image/png" data-fullres-src="https://graph.microsoft.com/v1.0/me/onenote/resources/0-split!1-A!2/$value" data-fullres-src-type="image/png" data-index="2" data-render-original-src="https://example.org/" data-id="same-image" />
+</div>
+<object style="position:absolute;left:400px;top:120px" data="https://graph.microsoft.com/v1.0/me/onenote/resources/0-file!1-DOCX!5/$value" data-attachment="../../etc/passwd" type="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+</body>
+</html>

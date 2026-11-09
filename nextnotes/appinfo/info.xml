@@ -33,7 +33,7 @@ Based on Poznote by Timothé Poznanski (MIT).]]></description>
 Benötigt Nextcloud 35 und Hintergrundjobs per Cron. Teams benötigen die Nextcloud-App Teams (circles).
 
 Basiert auf Poznote von Timothé Poznanski (MIT).]]></description>
-	<version>0.9.1</version>
+	<version>0.9.2</version>
 	<licence>AGPL-3.0-or-later</licence>
 	<author>Thomas Weissel</author>
 	<namespace>NextNotes</namespace>
@@ -62,6 +62,7 @@ Basiert auf Poznote von Timothé Poznanski (MIT).]]></description>
 		<job>OCA\NextNotes\BackgroundJob\ExportTempCleanupJob</job>
 		<job>OCA\NextNotes\BackgroundJob\CleanupJob</job>
 		<job>OCA\NextNotes\BackgroundJob\AssignmentDeadlineJob</job>
+		<job>OCA\NextNotes\BackgroundJob\OneNoteImportJob</job>
 	</background-jobs>
 	<commands>
 		<command>OCA\NextNotes\Command\TeamOrphanCheck</command>

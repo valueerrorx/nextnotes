@@ -12,6 +12,7 @@ namespace OCA\NextNotes\Controller;
 use OCA\NextNotes\AppInfo\Application;
 use OCA\NextNotes\Http\CspFactory;
 use OCA\NextNotes\OneNote\ConnectService;
+use OCA\NextNotes\OneNote\OneNoteImportService;
 use OCA\NextNotes\OneNote\OneNoteMessages;
 use OCA\NextNotes\Service\Exception\BadRequestException;
 use OCA\NextNotes\Service\WorkspaceService;
@@ -28,10 +29,10 @@ use OCP\IURLGenerator;
 use OCP\IUserSession;
 use OCP\Util;
 
-// OneNote-Import (Plan M9 §2 Controller, ADR 0020): Anmeldung, Callback, Anzeige, Abbruch; Rechte nur über die uid der Zeile
+// OneNote-Import (Plan M9 §2 Controller, ADR 0020): Anmeldung, Callback, Auswahl, Start, Anzeige, Abbruch; Rechte nur über die uid der Zeile
 class OneNoteApiController extends ApiController {
 	public function __construct(IRequest $request, IUserSession $userSession, WorkspaceService $workspaces,
-		private ConnectService $connect, private IURLGenerator $urls, private CspFactory $csp, private IL10N $l) {
+		private ConnectService $connect, private OneNoteImportService $importer, private IURLGenerator $urls, private CspFactory $csp, private IL10N $l) {
 		parent::__construct($request, $userSession, $workspaces);
 	}
 
@@ -64,6 +65,21 @@ class OneNoteApiController extends ApiController {
 		return $this->ok($this->connect->cancel($this->uid(), $id));
 	}
 
+	// Notizbücher und erste Ebene (§4.3); teams_offset blättert in Teams (je 20)
+	#[NoAdminRequired]
+	public function tree(int $id): JSONResponse {
+		$raw = $this->param('teams_offset');
+		$offset = is_string($raw) && ctype_digit($raw) ? min((int)$raw, 10000) : 0;
+		return $this->ok($this->importer->tree($this->uid(), $id, $offset));
+	}
+
+	// Auswahl als Positivliste (§4.3)
+	#[NoAdminRequired]
+	#[UserRateLimit(limit: 5, period: 60)]
+	public function start(int $id): JSONResponse {
+		return $this->ok($this->importer->start($this->uid(), $id, $this->param('selection')));
+	}
+
 	// Rücksprung von Microsoft (Top-Level-GET ohne CSRF-Token): state schützt, gebunden an die uid (§4.2, §6 CSRF)
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
@@ -77,7 +93,7 @@ class OneNoteApiController extends ApiController {
 		return new RedirectResponse($this->urls->linkToRoute('nextnotes.one_note_api.page') . '?' . http_build_query($result->query));
 	}
 
-	// Ansicht onenote.php (ADR 0004); M9a: Status und Anmeldung, Auswahl folgt in M9b
+	// Ansicht onenote.php (ADR 0004): Anmeldung, Auswahl, Fortschritt, Bericht
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
 	public function page(): TemplateResponse {
@@ -90,12 +106,17 @@ class OneNoteApiController extends ApiController {
 				$current = $row;
 			}
 		}
+		// ohne offenen Import: den jüngsten zeigen (Ergebnis und Bericht)
+		if ($current === null && $want === null) {
+			$current = $data['imports'][0] ?? null;
+		}
 		$msg = self::str($this->param('msg'));
 		$messages = [];
 		foreach (OneNoteMessages::CODES as $code) {
 			$messages[$code] = OneNoteMessages::forError($code, $this->l);
 		}
 		Util::addScript(Application::APP_ID, 'nextnotes-onenote');
+		Util::addStyle(Application::APP_ID, 'nextnotes-onenote');
 		$response = new TemplateResponse(Application::APP_ID, 'onenote', [
 			'configured' => $data['configured'],
 			'import' => $current,

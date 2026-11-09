@@ -705,8 +705,8 @@ final class MarkdownRenderer {
 
 	    $dom = new DOMDocument();
 	    $dom->encoding = 'UTF-8';
-	    // B39: libxml-Fehler nicht sammeln
-	    \OCA\NextNotes\Service\HtmlSanitizer::loadHtmlQuiet($dom, '<html><body>' . $html . '</body></html>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+	    // B39: libxml-Fehler nicht sammeln; B46: nie still gekürzt, sonst TooLargeException (B37)
+	    \OCA\NextNotes\Service\HtmlSanitizer::loadHtmlComplete($dom, '<html><body>' . $html . '</body></html>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
 
 	    $xpath = new DOMXPath($dom);
 	    $container = $xpath->query('//div[contains(concat(" ", normalize-space(@class), " "), " excalidraw-container ")]')->item(0);

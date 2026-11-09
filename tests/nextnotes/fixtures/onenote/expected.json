@@ -1,0 +1,138 @@
+{
+    "crosswise-blocks": {
+        "html": "<p><img src=\"#nn-onenote-res-0\" width=\"120\" height=\"80\"></p><p>Eins (oben links)</p><p>Zwei (oben rechts)</p><p>Zweieinhalb (Mitte links)</p><p>Drei (unten rechts)</p>",
+        "resources": [
+            {
+                "index": 0,
+                "id": "0-abc!1-DEF!42",
+                "kind": "image",
+                "name": "",
+                "type": "image/png"
+            }
+        ],
+        "skipped": 0,
+        "ink": 0,
+        "tooLarge": false
+    },
+    "ink": {
+        "html": "<p>Vor der Zeichnung</p><p>[Ink drawing not imported]</p><p>Text mit [Ink drawing not imported] Skizze</p><p>[Ink drawing not imported]</p><p>Nach der Zeichnung</p>",
+        "resources": [],
+        "skipped": 0,
+        "ink": 3,
+        "tooLarge": false
+    },
+    "learn-abs-pos": {
+        "html": "<p>This content will appear in the _default div.</p><p>This content will also appear in the _default div.</p><p>This content will appear in an absolute positioned div.</p>",
+        "resources": [],
+        "skipped": 0,
+        "ink": 0,
+        "tooLarge": false
+    },
+    "learn-images-files": {
+        "html": "<p>Web-ready und Originalbild:</p><p><img src=\"#nn-onenote-res-0\" alt=\"Diagramm\" width=\"345\" height=\"180\"></p><p>Dasselbe Bild noch einmal:</p><p><img src=\"#nn-onenote-res-0\"></p><p>Team-Notizbuch:</p><p><img src=\"#nn-onenote-res-1\"></p><p><a href=\"#nn-onenote-res-2\">Arbeitsblatt Woche 3.pdf</a></p><p><a href=\"https://www.youtube.com/watch?v=3Ztr44aKmQ8\">Video: https://www.youtube.com/watch?v=3Ztr44aKmQ8</a></p><p>Alte Endpunkte (fremder Host):</p><p>[Image not imported]</p><p>[File not imported: fileName.pdf]</p><p><a href=\"#nn-onenote-res-3\">_.._etc_passwd</a></p><p><img src=\"#nn-onenote-res-4\"></p><p><img src=\"#nn-onenote-res-5\"></p><p><img src=\"#nn-onenote-res-6\"></p>",
+        "resources": [
+            {
+                "index": 0,
+                "id": "0-full!1-IMG!1",
+                "kind": "image",
+                "name": "",
+                "type": "image/png"
+            },
+            {
+                "index": 1,
+                "id": "0-grp!1-IMG!7",
+                "kind": "image",
+                "name": "",
+                "type": "image/jpeg"
+            },
+            {
+                "index": 2,
+                "id": "0-file!1-PDF!2",
+                "kind": "file",
+                "name": "Arbeitsblatt Woche 3.pdf",
+                "type": "application/pdf"
+            },
+            {
+                "index": 3,
+                "id": "0-file!1-DOCX!5",
+                "kind": "file",
+                "name": "_.._etc_passwd",
+                "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            },
+            {
+                "index": 4,
+                "id": "0-split!1-A!0",
+                "kind": "image",
+                "name": "",
+                "type": "image/png"
+            },
+            {
+                "index": 5,
+                "id": "0-split!1-A!1",
+                "kind": "image",
+                "name": "",
+                "type": "image/png"
+            },
+            {
+                "index": 6,
+                "id": "0-split!1-A!2",
+                "kind": "image",
+                "name": "",
+                "type": "image/png"
+            }
+        ],
+        "skipped": 2,
+        "ink": 0,
+        "tooLarge": false
+    },
+    "learn-note-tags": {
+        "html": "<h1>Status meeting</h1><p>⭐ Next week's meeting has been moved to <strong>Wednesday</strong>.</p><p>❓ What are the exact dates for the conference?</p><p>Upcoming training opportunities. See Katie for more info.</p><p>Around the room updates.</p><ul><li>❗ Design handouts</li><li>❗ Plan keynote</li></ul><ul class=\"checklist\"><li class=\"checklist-item checklist-item-checked\"><input type=\"checkbox\" class=\"checklist-checkbox\" checked=\"checked\"> <span class=\"checklist-text\">Till garden bed</span></li><li class=\"checklist-item\"><input type=\"checkbox\" class=\"checklist-checkbox\"> <span class=\"checklist-text\">Plant peas and spinach</span></li><li class=\"checklist-item\"><input type=\"checkbox\" class=\"checklist-checkbox\"> <span class=\"checklist-text\">Plant tomatoes and peppers</span></li></ul><ul><li>An item with a Project A note tag</li><li>An item with a Project A note tag</li></ul><br><ul><li style=\"list-style-type: disc;\">💡 An item with an Idea note tag</li><li style=\"list-style-type: disc;\">❓ An item with a Question note tag</li></ul><ul class=\"checklist\"><li class=\"checklist-item checklist-item-checked\"><input type=\"checkbox\" class=\"checklist-checkbox\" checked=\"checked\"> <span class=\"checklist-text\">Two note tags:  project-a, client-request:completed</span></li></ul><p>💡❓ Three note tags:  idea, send-in-email, question</p><ol><li>Erster Schritt</li></ol><ul class=\"checklist\"><li class=\"checklist-item\"><input type=\"checkbox\" class=\"checklist-checkbox\"> <span class=\"checklist-text\">Wichtig erledigen</span></li><li class=\"checklist-item checklist-item-checked\"><input type=\"checkbox\" class=\"checklist-checkbox\" checked=\"checked\"> <span class=\"checklist-text\">Schon erledigt</span></li></ul><ol start=\"4\" style=\"counter-reset: item 3;\"><li>Letzter Schritt</li></ol><p>⭐ Next time, <strong>don't</strong> forget to invite <span style=\"background-color: yellow;\">Dan</span>.</p>",
+        "resources": [],
+        "skipped": 0,
+        "ink": 0,
+        "tooLarge": false
+    },
+    "learn-study-notes": {
+        "html": "<h1>American History 101: Moon Landing</h1><p>First moon landing - July 20, 1969 with Apollo 11 (Eagle)</p><br><p><strong>Apollo 11 Astronauts</strong></p><table><tr><td>Neil Armstrong</td><td>Commander</td></tr><tr><td>Buzz Aldrin</td><td>LM Pilot</td></tr><tr><td>Michael Collins</td><td>Command Module Pilot</td></tr></table><br><p><img src=\"#nn-onenote-res-0\" alt=\"Apollo 11 commemorative stamp.\" width=\"400\" height=\"248\"></p><p>References:</p><p><a href=\"https://en.wikipedia.org/wiki/Apollo_11\">https://en.wikipedia.org/wiki/Apollo_11</a></p><p><a href=\"https://www.nasa.gov/mission_pages/apollo/missions/apollo11.html\">https://www.nasa.gov/mission_pages/apollo/missions/apollo11.html</a></p>",
+        "resources": [
+            {
+                "index": 0,
+                "id": "0-f717b5fa5eaa454da7ecdf72a8c137fe!1-73DBAF9B7E5C4B4C!10456",
+                "kind": "image",
+                "name": "",
+                "type": "image/jpeg"
+            }
+        ],
+        "skipped": 0,
+        "ink": 0,
+        "tooLarge": false
+    },
+    "learn-styles-lists": {
+        "html": "<h1>Heading <em>One</em> text</h1><p style=\"text-align: center;\"><span style=\"color: green;\">Some text</span></p><p>Some <span style=\"color: red;\">more</span> text</p><ol><li style=\"list-style-type: upper-roman;\"><span style=\"color: blue;\"><strong>Jacksonville</strong></span></li><li style=\"list-style-type: upper-roman;\"><span style=\"color: blue;\"><s>Orlando</s></span></li><li style=\"list-style-type: upper-roman;\"><span style=\"color: blue;\">Naples</span></li></ol><ul><li style=\"list-style-type: square;\"><em>square style</em></li><li style=\"list-style-type: circle;\"><em>circle style</em></li><li><em>disc style (default)</em></li></ul><p><span style=\"background-color: yellow;\"><u>Marked</u></span> and default colours</p>",
+        "resources": [],
+        "skipped": 0,
+        "ink": 0,
+        "tooLarge": false
+    },
+    "learn-tables": {
+        "html": "<table><tr><td style=\"background-color: green;\">Cell 1</td><td style=\"background-color: green;\">Cell 2</td><td style=\"background-color: green;\">Cell 3</td></tr><tr><td style=\"background-color: red; text-align: right;\">Left</td><td style=\"background-color: blue; text-align: center;\">Middle</td><td style=\"background-color: blue;\">Right</td></tr></table><table><tr><td colspan=\"2\"><p><strong>Kopf über zwei Spalten</strong></p></td><td rowspan=\"2\">Rechts</td></tr><tr><td>A</td><td><table><tr><td>innen</td></tr></table></td></tr><tr><td>null</td><td>x</td><td>groß</td></tr></table>",
+        "resources": [],
+        "skipped": 0,
+        "ink": 0,
+        "tooLarge": false
+    },
+    "malicious": {
+        "html": "<p style=\"color: red;\">Overlay</p><p style=\"font-weight: bold;\">CSS</p><p style=\"color: red;\">Escape</p><p style=\"color: rgba(1,2,3,.5); text-align: center;\">Werte</p><p>js js2 js3 data vb OneNote-Link <a href=\"mailto:lehrer@example.org\">Mail</a> quote protokollrelativ relativ</p><p>[Image not imported][Image not imported][Image not imported][Image not imported][Image not imported][Image not imported][Image not imported][Image not imported]</p><p>Video: javascript:alert(13)</p><p>Video: http://insecure.example/video</p><p>[File not imported: payload.exe]</p><p>Ende <span style=\"color: #123;\">Text</span> kein Kästchen</p><p><span class=\"math-inline\" data-math=\"\\text{\\textbackslash{}href\\{javascript:alert(19)\\}\\{x\\}}\" contenteditable=\"false\">\\text{\\textbackslash{}href\\{javascript:alert(19)\\}\\{x\\}}</span></p><p><span class=\"math-inline\" data-math=\"\\href{javascript:alert(20)}{x}\" contenteditable=\"false\">\\href{javascript:alert(20)}{x}</span></p><p><a href=\"https://example.org/\">Ziel</a></p>",
+        "resources": [],
+        "skipped": 9,
+        "ink": 0,
+        "tooLarge": false
+    },
+    "math": {
+        "html": "<p>Pythagoras: <span class=\"math-inline\" data-math=\"a^{2} + b^{2} = c^{2}\" contenteditable=\"false\">a^{2} + b^{2} = c^{2}</span> gilt.</p><div class=\"math-block\" data-math=\"x = \\frac{- b \\pm \\sqrt{b^{2} - 4ac}}{2a}\" contenteditable=\"false\">x = \\frac{- b \\pm \\sqrt{b^{2} - 4ac}}{2a}</div><div class=\"math-block\" data-math=\"\\sum_{i = 1}^{n} x_{i} \\cdot \\sin \\left(\\alpha\\right)\" contenteditable=\"false\">\\sum_{i = 1}^{n} x_{i} \\cdot \\sin \\left(\\alpha\\right)</div><p>Mit Annotation: <span class=\"math-inline\" data-math=\"E = mc^2\" contenteditable=\"false\">E = mc^2</span></p><p>Präfix: <span class=\"math-inline\" data-math=\"\\sqrt[3]{x} &lt; \\vec{v}\" contenteditable=\"false\">\\sqrt[3]{x} &lt; \\vec{v}</span></p><p>Matrix: <span class=\"math-inline\" data-math=\"\\left[\\begin{matrix}1 &amp; 0 \\\\ 0 &amp; 1\\end{matrix}\\right]\" contenteditable=\"false\">\\left[\\begin{matrix}1 &amp; 0 \\\\ 0 &amp; 1\\end{matrix}\\right]</span></p><p>Unbekannt: kRest</p><p>Als Text: x² + y² = r²</p><p>Sonderzeichen: <span class=\"math-inline\" data-math=\"\\# \\{\\text{50\\% \\&amp; \\$5\\_a} \\}\" contenteditable=\"false\">\\# \\{\\text{50\\% \\&amp; \\$5\\_a} \\}</span></p>",
+        "resources": [],
+        "skipped": 0,
+        "ink": 0,
+        "tooLarge": false
+    }
+}

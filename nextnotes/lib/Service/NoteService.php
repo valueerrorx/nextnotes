@@ -414,6 +414,32 @@ class NoteService {
 		return $out;
 	}
 
+	/**
+	 * OneNote-Import (Plan M9 §5): Richtext-Notiz mit Daten aus Graph; ohne Sitzung, ohne Erwähnungen, in der Transaktion des Aufrufers.
+	 * Ziel prüft der Aufrufer (eigener Workspace, gesperrt).
+	 * @throws \OCA\NextNotes\Service\Exception\TooLargeException Inhalt zu groß (vor dem Einfügen)
+	 */
+	public function createImported(string $uid, int $workspaceId, ?int $folderId, string $heading, string $html, int $createdAt, int $updatedAt, int $order): Note {
+		$heading = trim(Pcre::replace('/[\x00-\x1F\x7F]/u', ' ', $heading));
+		$heading = $this->uniqueHeading($workspaceId, $folderId, mb_substr($heading, 0, 1000));
+		$note = new Note();
+		$note->setWorkspaceId($workspaceId);
+		$note->setFolderId($folderId);
+		$note->setHeading($heading);
+		$note->setType('note');
+		$note->setRole('note');
+		foreach (['Favorite', 'Pinned', 'DashboardOrder', 'SpeedDialOrder', 'KanbanOrder'] as $f) {
+			$note->{'set' . $f}(0);
+		}
+		$note->setDisplayOrder(max(0, $order));
+		$note->setCreatedBy($uid);
+		$note->setUpdatedBy($uid);
+		$note->setCreatedAt($createdAt);
+		$note->setUpdatedAt($updatedAt);
+		$this->applyContent($note, $html);
+		return $this->notes->insert($note);
+	}
+
 	/** @var ?array{0: Note, 1: string} gespeicherte Notiz und Inhalt davor, bis nach dem Commit */
 	private ?array $pendingMention = null;
 

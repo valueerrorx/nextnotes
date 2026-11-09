@@ -374,8 +374,8 @@ class ImportService {
 	/** @return list<array<string, mixed>>|null Upstream extractTaskListFromHTML */
 	private static function tasksFromHtml(string $html): ?array {
 		$dom = new \DOMDocument();
-		// Fehler nicht sammeln (B39)
-		$ok = HtmlSanitizer::loadHtmlQuiet($dom, '<?xml encoding="UTF-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD | LIBXML_NONET);
+		// Fehler nicht sammeln (B39); nie still gekürzt, sonst TooLargeException (B37)
+		$ok = HtmlSanitizer::loadHtmlComplete($dom, '<?xml encoding="UTF-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD | LIBXML_NONET);
 		if (!$ok) {
 			return null;
 		}

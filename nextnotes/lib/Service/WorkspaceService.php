@@ -314,6 +314,19 @@ class WorkspaceService {
 		return [$ws, $tagList];
 	}
 
+	// OneNote-Import (Plan M9 §5): eigener Workspace kind=normal mit freiem Namen; ohne Sitzung, in der Transaktion des Aufrufers
+	public function createImported(string $uid, string $name): Workspace {
+		$base = trim(mb_substr(trim(Pcre::replace('/\s+/u', ' ', Pcre::replace('/[^\p{L}0-9 _-]+/u', ' ', $name))), 0, 240));
+		$base = $base === '' ? 'OneNote' : $base;
+		$candidate = $base;
+		for ($i = 1; $this->workspaces->findOwned($uid, 'normal', $candidate) !== []; $i++) {
+			$candidate = $base . ' OneNote' . ($i > 1 ? ' ' . $i : '');
+		}
+		$ws = $this->insert($uid, $candidate, 'normal', [], null);
+		$this->reset();
+		return $ws;
+	}
+
 	// Nicht Mitglied → 404; Team zählt nicht (versteckt, Backend …), nicht aktiv oder Level < 4 → 403
 	public function requireTeamForCreate(string $uid, mixed $team): string {
 		if (!is_string($team) || strlen($team) > 64 || !$this->teams->isAvailable()) {

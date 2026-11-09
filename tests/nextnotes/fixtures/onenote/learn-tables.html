@@ -1,0 +1,25 @@
+<!-- Quelle: Microsoft Learn „Input and output HTML on OneNote pages“, Abschnitt „Tables“ (Output HTML), https://learn.microsoft.com/en-us/graph/onenote-input-output-html; Code-Beispiele MIT. Zweite Tabelle eigenes Beispiel (Done M9c 3): colspan/rowspan (laut Learn liefert die API sie nicht, sie bleiben trotzdem erhalten) und geschachtelte Tabelle. -->
+<html lang="en-US">
+<head><title>Tables</title></head>
+<body data-absolute-enabled="true" style="font-family:Calibri;font-size:11pt">
+<div data-id="_default" style="position:absolute;left:48px;top:120px;width:624px">
+<table style="border:0px">
+    <tr>
+        <td style="background-color:green;width:166;border:0px">Cell 1</td>
+        <td style="background-color:green;width:166;border:0px">Cell 2</td>
+        <td style="background-color:green;width:166;border:0px">Cell 3</td>
+    </tr>
+    <tr>
+        <td style="background-color:red;width:166;border:0px;text-align:right">Left</td>
+        <td style="background-color:blue;width:166;border:0px;text-align:center">Middle</td>
+        <td style="background-color:blue;width:166;border:0px">Right</td>
+    </tr>
+</table>
+<table style="border:1px solid">
+    <tr><td colspan="2" style="border:1px solid"><p><span style="font-weight:bold">Kopf über zwei Spalten</span></p></td><td rowspan="2">Rechts</td></tr>
+    <tr><td>A</td><td><table><tr><td>innen</td></tr></table></td></tr>
+    <tr><td colspan="0">null</td><td colspan="x">x</td><td rowspan="99999">groß</td></tr>
+</table>
+</div>
+</body>
+</html>

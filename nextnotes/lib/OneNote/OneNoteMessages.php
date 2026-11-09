@@ -22,7 +22,7 @@ final class OneNoteMessages {
 		'unauthorized_client' => 'permissions',
 	];
 	public const CODES = ['cancelled', 'consent', 'permissions', 'failed', 'config_changed', 'account_mismatch', 'not_configured',
-		'invalid_client', 'invalid_grant', 'user_disabled', 'app_disabled', 'quota', 'graph_not_found', 'graph_10008'];
+		'invalid_client', 'invalid_grant', 'user_disabled', 'app_disabled', 'quota', 'graph_not_found', 'graph_10008', 'graph_unavailable', 'stalled'];
 
 	public static function forCallbackError(string $error): string {
 		return self::CALLBACK_ERRORS[$error] ?? 'failed';
@@ -42,7 +42,10 @@ final class OneNoteMessages {
 			'user_disabled' => $l->t('Your account is disabled.'),
 			'app_disabled' => $l->t('You no longer have access to Next Notes.'),
 			'quota' => $l->t('Not enough storage for attachments.'),
-			'graph_not_found', 'graph_10008' => $l->t('Microsoft could not provide the notebook.'),
+			'graph_not_found' => $l->t('Microsoft could not provide the notebook.'),
+			'graph_10008' => $l->t('The notebook library is too large for Microsoft Graph (more than 5000 OneNote items).'),
+			'graph_unavailable' => $l->t('Microsoft did not respond repeatedly. Please start the import again later; pages already imported are skipped.'),
+			'stalled' => $l->t('The import made no progress for 7 days and was stopped.'),
 			default => '',
 		};
 	}

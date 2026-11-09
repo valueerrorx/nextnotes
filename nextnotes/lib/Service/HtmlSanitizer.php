@@ -81,6 +81,10 @@ class HtmlSanitizer {
 	// libxml 2.9 prüft doppelte Attribute je Tag quadratisch (nur HTML); Markdown-Scanner kostet linear je Attribut (B39)
 	public const MAX_ATTRS_PER_TAG = 256;
 	public const MAX_ATTRS = 1000000;
+	// Elementtiefe wie libxml 2.15 mit PARSEHUGE (offene Elemente samt html/body); 2.9 hat keine Grenze
+	public const MAX_DEPTH = 2048;
+	// libxml-Meldungen (Level ERROR), nach denen der Parser abbricht oder kürzt; Mehrwort, damit Tag-Namen nicht passen
+	private const TRUNCATION_ERRORS = '/value too long|text too long|name too long|huge text node|huge input lookup|excessive depth|memory allocation failed|amplification factor/i';
 
 	private const DANGEROUS_PATTERNS = ['/javascript:/i', '/data:(?!image\/)/i', '/vbscript:/i'];
 
@@ -176,17 +180,55 @@ class HtmlSanitizer {
 		}
 	}
 
+	/** loadHtmlQuiet mit PARSEHUGE, nie still gekürzt: Abbruch, Kürzungsmeldung oder Tiefe > MAX_DEPTH → TooLargeException (B37) */
+	public static function loadHtmlComplete(DOMDocument $dom, string $html, int $flags): bool {
+		libxml_clear_errors();
+		$ok = self::loadHtmlQuiet($dom, $html, $flags | LIBXML_PARSEHUGE);
+		// Fataler Fehler hält den Parser an und ist dann der letzte; Rest wäre abgeschnitten
+		$error = libxml_get_last_error();
+		libxml_clear_errors();
+		if ($error !== false && ($error->level === LIBXML_ERR_FATAL
+			|| ($error->level === LIBXML_ERR_ERROR && Pcre::match(self::TRUNCATION_ERRORS, $error->message)))) {
+			throw new TooLargeException('Content too complex to process (' . trim($error->message) . ')');
+		}
+		if (self::elementDepth($dom) > self::MAX_DEPTH) {
+			throw new TooLargeException('Content too deeply nested (max ' . self::MAX_DEPTH . ' levels)');
+		}
+		return $ok;
+	}
+
+	/** Größte Elementtiefe unter $root (Kind = 1), ohne Rekursion */
+	public static function elementDepth(\DOMNode $root): int {
+		$max = 0;
+		$depth = 0;
+		$node = $root->firstChild;
+		while ($node !== null) {
+			if ($node instanceof DOMElement) {
+				$max = max($max, $depth + 1);
+				if ($node->firstChild !== null) {
+					$depth++;
+					$node = $node->firstChild;
+					continue;
+				}
+			}
+			while ($node->nextSibling === null) {
+				$node = $node->parentNode;
+				if ($node === null || $node->isSameNode($root)) {
+					return $max;
+				}
+				$depth--;
+			}
+			$node = $node->nextSibling;
+		}
+		return $max;
+	}
+
 	private function sanitizeDom(string $html): string {
 		$dom = new DOMDocument();
 		$dom->encoding = 'UTF-8';
 		// ohne schließendes </body>: sonst je offenem Tag ein Fehler; PARSEHUGE: sonst fällt ein Attribut > 10 MB weg (B37)
 		$wrapped = '<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"></head><body>' . $html;
-		self::loadHtmlQuiet($dom, $wrapped, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD | LIBXML_PARSEHUGE);
-		// Fataler Fehler hält den Parser an und ist dann der letzte; Rest wäre abgeschnitten → ablehnen (B37)
-		$error = libxml_get_last_error();
-		if ($error !== false && $error->level === LIBXML_ERR_FATAL) {
-			throw new TooLargeException('Content too complex to process (' . trim($error->message) . ')');
-		}
+		self::loadHtmlComplete($dom, $wrapped, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
 		$body = $dom->getElementsByTagName('body')->item(0);
 		if ($body === null) {
 			return '';

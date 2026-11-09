@@ -98,6 +98,45 @@ class OneNoteImportMapper extends QBMapper {
 		return is_string($v) && $v !== '' ? $v : null;
 	}
 
+	/** @return OneNoteImport[] fällige Importe (Job, Plan M9 §2): queued/running, next_run_at erreicht, Lease frei; reihum nach next_run_at */
+	public function findDue(int $now, int $limit): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')->from(self::TABLE)
+			->where($qb->expr()->in('status', $qb->createNamedParameter(['queued', 'running'], IQueryBuilder::PARAM_STR_ARRAY)))
+			->andWhere($qb->expr()->orX($qb->expr()->isNull('next_run_at'), $qb->expr()->lte('next_run_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT))))
+			->andWhere($qb->expr()->orX($qb->expr()->isNull('lease_until'), $qb->expr()->lt('lease_until', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT))))
+			->orderBy('next_run_at', 'ASC')->addOrderBy('id', 'ASC')
+			->setMaxResults($limit);
+		return $this->findEntities($qb);
+	}
+
+	/**
+	 * Claim (Plan M9 §2 Job): nur wenn queued/running und die Lease frei oder abgelaufen ist; Zeilenzahl 1 = übernommen
+	 */
+	public function claim(int $id, string $uid, string $leaseToken, int $now, int $until): int {
+		$qb = $this->db->getQueryBuilder();
+		$qb->update(self::TABLE)
+			->set('status', $qb->createNamedParameter('running'))
+			->set('lease_token', $qb->createNamedParameter($leaseToken))
+			->set('lease_until', $qb->createNamedParameter($until, IQueryBuilder::PARAM_INT))
+			->where($qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT)))
+			->andWhere($qb->expr()->eq('uid', $qb->createNamedParameter($uid)))
+			->andWhere($qb->expr()->in('status', $qb->createNamedParameter(['queued', 'running'], IQueryBuilder::PARAM_STR_ARRAY)))
+			->andWhere($qb->expr()->orX($qb->expr()->isNull('lease_until'), $qb->expr()->lt('lease_until', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT))));
+		return $qb->executeStatement();
+	}
+
+	/** @return OneNoteImport[] Aufräumen (Plan M9 §3): Status in $statuses und $column < $before */
+	public function findStale(array $statuses, string $column, int $before, int $limit = 500): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')->from(self::TABLE)
+			->where($qb->expr()->in('status', $qb->createNamedParameter($statuses, IQueryBuilder::PARAM_STR_ARRAY)))
+			->andWhere($qb->expr()->lt($column, $qb->createNamedParameter($before, IQueryBuilder::PARAM_INT)))
+			->orderBy('id', 'ASC')
+			->setMaxResults($limit);
+		return $this->findEntities($qb);
+	}
+
 	/**
 	 * Bedingtes UPDATE; $where: Spalte → Wert, Liste (IN) oder null (IS NULL)
 	 * @param array<string, int|string|null> $set

@@ -559,7 +559,54 @@ final class PageIsolationTest extends ApiTestCase {
 		'GET /storage-stats-user.php' => 'testM4CompatRoutesForeign', 'POST /api_import_dropped_notes.php' => 'testM4CompatRoutesForeign',
 		'GET /api_upload_background.php' => 'testM4CompatRoutesForeign', 'POST /api_upload_background.php' => 'testM4CompatRoutesForeign',
 		'DELETE /api_upload_background.php' => 'testM4CompatRoutesForeign',
+		'GET /onenote.php' => 'testOneNoteForeign', 'GET /onenote/callback' => 'testOneNoteForeign',
 	];
+
+	// M9: fremder Import über ?import= zeigt nichts davon; Callback ohne eigenen state → 404
+	public function testOneNoteForeign(): void {
+		$a = $this->createUser('ona');
+		$b = $this->createUser('onb');
+		$mark = 'ONENOTE-GEHEIM-' . bin2hex(random_bytes(3));
+		$qb = self::db()->getQueryBuilder();
+		$qb->insert('nextnotes_onenote_imports')->values([
+			'uid' => $qb->createNamedParameter($a->uid), 'status' => $qb->createNamedParameter('done'),
+			'authority' => $qb->createNamedParameter('organizations'), 'client_id' => $qb->createNamedParameter('x'),
+			'report' => $qb->createNamedParameter((string)json_encode([['t' => $mark, 'r' => 'not_found']])),
+			'created_at' => $qb->createNamedParameter(time()), 'updated_at' => $qb->createNamedParameter(time()),
+		])->executeStatement();
+		$id = $qb->getLastInsertId();
+		// Ansicht zeigt Importe nur bei eingerichteter Funktion
+		$cfg = Server::get(\OCP\IAppConfig::class);
+		$oneNote = Server::get(\OCA\NextNotes\OneNote\OneNoteConfig::class);
+		$had = $oneNote->enabled();
+		$client = $oneNote->clientId();
+		if (!$had) {
+			$cfg->setValueString('nextnotes', 'onenote_client_id', '11111111-2222-3333-4444-555555555555');
+			$cfg->setValueString('nextnotes', 'onenote_secret', 'page-isolation', lazy: true, sensitive: true);
+		}
+		try {
+			// AppConfig-Lokalcache des Webservers (APCu) folgt mit Verzögerung
+			for ($i = 0; $i < 30; $i++) {
+				$own = $a->withHeaders(['Accept: text/html'])->absolute('GET', self::APP . "onenote.php?import=$id");
+				if (str_contains($own->body, $mark)) {
+					break;
+				}
+				usleep(500_000);
+			}
+			self::assertSame(200, $own->status);
+			self::assertStringContainsString($mark, $own->body, 'Besitzer sieht den Bericht');
+			$r = $b->withHeaders(['Accept: text/html'])->absolute('GET', self::APP . "onenote.php?import=$id");
+			self::assertSame(200, $r->status);
+			self::assertStringNotContainsString($mark, $r->body);
+			self::assertStringNotContainsString('data-import-id="' . $id . '"', $r->body);
+			self::assertSame(404, $b->withHeaders(['Accept: text/html'])->absolute('GET', self::APP . 'onenote/callback?state=x&code=y')->status);
+		} finally {
+			if (!$had) {
+				$cfg->deleteKey('nextnotes', 'onenote_secret');
+				$client === '' ? $cfg->deleteKey('nextnotes', 'onenote_client_id') : $cfg->setValueString('nextnotes', 'onenote_client_id', $client);
+			}
+		}
+	}
 
 	public function testEveryPageRouteHasForeignCase(): void {
 		$file = Server::get(\OCP\App\IAppManager::class)->getAppPath('nextnotes') . '/appinfo/routes.php';

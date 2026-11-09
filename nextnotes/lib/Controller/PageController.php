@@ -11,6 +11,7 @@ namespace OCA\NextNotes\Controller;
 
 use OCA\NextNotes\AppInfo\Application;
 use OCA\NextNotes\Http\CspFactory;
+use OCA\NextNotes\OneNote\OneNoteConfig;
 use OCA\NextNotes\Service\AttachmentService;
 use OCA\NextNotes\Service\BackgroundService;
 use OCA\NextNotes\Service\EmbedDomainService;
@@ -78,6 +79,7 @@ class PageController extends Controller {
 		private TeamsUiConfig $teamsUi,
 		private AssignmentsViewService $assignmentsView,
 		private BlocksUiConfig $blocksUi,
+		private OneNoteConfig $oneNote,
 	) {
 		parent::__construct(Application::APP_ID, $request);
 	}
@@ -535,6 +537,8 @@ class PageController extends Controller {
 				'uid' => $uid,
 				'appVersion' => $this->appManager->getAppVersion(Application::APP_ID),
 				'contactsUrl' => $this->teamsUi->contactsUrl(),
+				// Karte „Import aus OneNote“ nur, wenn der Admin den Import eingerichtet hat (Plan M9 §2 Ansicht)
+				'oneNoteUrl' => $this->oneNote->enabled() ? $this->urls->linkToRoute('nextnotes.one_note_api.page') : null,
 			];
 		});
 	}

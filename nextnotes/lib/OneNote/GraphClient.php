@@ -81,7 +81,7 @@ class GraphClient {
 		if (!str_starts_with($url, self::PREFIX) || !HttpGate::allowed($url, HttpGate::GRAPH_HOST)) {
 			throw new GraphException('host');
 		}
-		$this->reserve($import);
+		$this->reserve($import, $leaseToken);
 		$this->space();
 		try {
 			$res = $this->http->send('GET', $url, HttpGate::GRAPH_HOST, ['Authorization' => 'Bearer ' . $accessToken], null, $limit);
@@ -109,7 +109,9 @@ class GraphClient {
 	}
 
 	// Anfrage im Fenster buchen (bedingt über rate_version); voll → GraphException budget mit Freizeitpunkt
-	private function reserve(OneNoteImport $import): void {
+	// im Job ($leaseToken) nur mit eigener Lease: nach Abbruch keine weitere Anfrage
+	private function reserve(OneNoteImport $import, ?string $leaseToken): void {
+		$guard = $leaseToken !== null ? ['lease_token' => $leaseToken, 'status' => 'running'] : [];
 		for ($i = 0; $i < self::CAS_TRIES; $i++) {
 			$now = $this->time->getTime();
 			$buckets = RateBudget::decode($import->getRateBuckets(), $now);
@@ -120,7 +122,7 @@ class GraphClient {
 			$version = (int)$import->getRateVersion();
 			$encoded = RateBudget::encode(RateBudget::add($buckets, $now));
 			$n = $this->imports->updateWhere((int)$import->getId(), (string)$import->getUid(),
-				['rate_buckets' => $encoded, 'rate_version' => $version + 1], ['rate_version' => $version]);
+				['rate_buckets' => $encoded, 'rate_version' => $version + 1], ['rate_version' => $version] + $guard);
 			if ($n === 1) {
 				$import->setRateBuckets($encoded);
 				$import->setRateVersion($version + 1);
@@ -129,6 +131,9 @@ class GraphClient {
 			try {
 				$fresh = $this->imports->findOwn((int)$import->getId(), (string)$import->getUid());
 			} catch (\Throwable) {
+				throw new GraphException('lease');
+			}
+			if ($leaseToken !== null && ($fresh->getLeaseToken() !== $leaseToken || $fresh->getStatus() !== 'running')) {
 				throw new GraphException('lease');
 			}
 			$import->setRateBuckets($fresh->getRateBuckets());
