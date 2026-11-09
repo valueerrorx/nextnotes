@@ -73,7 +73,7 @@ class AssignmentsViewService {
 			'teacher' => $teacher,
 			'teamWorkspaces' => $team !== null ? ($keys[$team] ?? []) : [],
 			'homeTeams' => $team === null ? array_map('strval', array_keys($keys)) : [],
-			'createSource' => $teacher !== null ? $this->createSource($uid, $create, $team) : null,
+			'createSource' => $teacher !== null ? $this->createSource($uid, $create, $team, $ws) : null,
 		];
 	}
 
@@ -90,8 +90,8 @@ class AssignmentsViewService {
 			'used' => $this->quota->used('team', $teamId), 'limit' => $this->quota->limit()];
 	}
 
-	// ?create=<Notiz>: nur eine lesbare Notiz aus einem Workspace dieses Teams (inkl. Material), sonst null (kein Hinweis auf fremde Notizen)
-	public function createSource(string $uid, mixed $noteId, string $teamId): ?int {
+	// ?create=<Notiz>: nur eine lesbare Notiz aus einem Workspace dieses Teams (inkl. Material), mit $here nur aus diesem (UI-tplpick); sonst null
+	public function createSource(string $uid, mixed $noteId, string $teamId, ?Workspace $here = null): ?int {
 		if (!is_string($noteId) || !ctype_digit($noteId)) {
 			return null;
 		}
@@ -101,7 +101,7 @@ class AssignmentsViewService {
 		} catch (ApiException) {
 			return null;
 		}
-		return self::teamOf($ws) === $teamId ? (int)$note->getId() : null;
+		return self::teamOf($ws) === $teamId && ($here === null || (int)$here->getId() === (int)$ws->getId()) ? (int)$note->getId() : null;
 	}
 
 	// Link auf die Aufgabe im Team-Workspace (Banner; Benachrichtigungen bauen ihn absolut im Notifier)
@@ -220,8 +220,11 @@ class AssignmentsViewService {
 			'points' => $l->t('Points'),
 			'maxPoints' => $l->t('Maximum points (optional)'),
 			'source' => $l->t('Note'),
-			'sourceSearch' => $l->t('Search notes of this team'),
+			'sourceSearch' => $l->t('Search notes of this workspace'),
+			'sourceAll' => $l->t('Show all notes'),
+			'sourceMore' => $l->t('{n} of {total} notes shown – keep typing to narrow down'),
 			'sourceNone' => $l->t('No matching notes'),
+			'untitled' => $l->t('Untitled note'),
 			'sourceHint' => $l->t('The assignment gets a frozen copy of the note, including attachments.'),
 			'storage' => $l->t('Team storage: {used} of {limit} used'),
 			'storageNeed' => $l->t('Handing out needs about {need} ({size} × {students} students).'),
@@ -271,7 +274,7 @@ class AssignmentsViewService {
 			'invalidPoints' => $l->t('Points must be a whole number between 0 and {max}.'),
 			'invalidDue' => $l->t('The deadline must be in the future.'),
 			'titleRequired' => $l->t('Enter a title and choose a note.'),
-			'sourceNotAllowed' => $l->t('Only your own notes or notes of this team can become an assignment.'),
+			'sourceNotAllowed' => $l->t('Only notes of this workspace can become an assignment. Copy the note into this workspace first.'),
 			'studentDeleted' => $l->t('The account of this student was deleted; the submission can no longer be reopened.'),
 			'invalidTransition' => $l->t('This is not possible in the current state.'),
 			// Schüler-Sicht, Löschen, verwaiste Teams (M6g2)

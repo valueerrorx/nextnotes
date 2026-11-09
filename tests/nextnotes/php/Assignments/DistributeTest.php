@@ -123,12 +123,12 @@ final class DistributeTest extends AssignmentTestCase {
 		self::assertSame(409, $l->call('POST', "/assignments/$bid/distribute")->status, 'distribute nach close');
 	}
 
-	// Lead 2026-11-08: Quelle nur eigene Notizen oder Workspaces desselben Teams; fremde Lesefreigabe und anderes Team → 403
+	// Quelle nur aus dem Team-Workspace der Aufgabe (UI-tplpick, Thomas 2026-11-09); privat, fremde Lesefreigabe und anderes Team → 403
 	public function testSourceRestriction(): void {
 		$fx = $this->fixture(false);
 		['l' => $l, 't' => $t] = $fx;
 		[$own] = self::newWorkspace($l, 'Privat');
-		$this->createAssignment($l, $t, self::newNote($l, $own, 'Eigen', '<p>e</p>'), 'aus privat');
+		$ownNote = self::newNote($l, $own, 'Eigen', '<p>e</p>');
 		$other = $this->teams->create($l->uid, 'Anderes ' . bin2hex(random_bytes(3)));
 		[$otherWs] = self::teamWs($l, $other, 'Andere');
 		$foreignTeam = self::newNote($l, $otherWs, 'Fremdes Team', '<p>f</p>');
@@ -138,7 +138,7 @@ final class DistributeTest extends AssignmentTestCase {
 		$link = (int)self::ok($l->call('POST', '/notes', ['heading' => 'Link fremd', 'type' => 'linked', 'linked_note_id' => $foreignTeam, 'workspace' => $fx['ws']]), 'Link')['note']['id'];
 		$body = static fn (int $src) => ['team' => $t, 'title' => 'x', 'due_at' => time() + 600, 'source_note_id' => $src];
 		$count = self::countRows('nextnotes_assignments', 'team_id', $t);
-		foreach (['anderes Team' => $foreignTeam, 'Lesefreigabe' => $shared, 'Verknüpfung auf anderes Team' => $link] as $what => $src) {
+		foreach (['privat' => $ownNote, 'anderes Team' => $foreignTeam, 'Lesefreigabe' => $shared, 'Verknüpfung auf anderes Team' => $link] as $what => $src) {
 			$r = $l->call('POST', '/assignments', $body($src));
 			self::assertSame([403, 'source_not_allowed'], [$r->status, $r->json()['code'] ?? null], $what);
 		}

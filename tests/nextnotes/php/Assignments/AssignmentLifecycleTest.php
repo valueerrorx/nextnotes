@@ -263,10 +263,13 @@ final class AssignmentLifecycleTest extends AssignmentTestCase {
 		$s = $this->createUser('os');
 		$t = $this->teams->create($l->uid, 'Nur Aufgaben ' . bin2hex(random_bytes(3)));
 		$this->teams->addUser($t, $l->uid, $s->uid);
-		[$wsName] = self::newWorkspace($l, 'Privat');
-		$src = self::newNote($l, $wsName, 'Quelle privat', '<p>q</p>');
+		// Quelle nur aus einem Team-Workspace (UI-tplpick); danach Workspace per DB an L → Team ohne Workspace
+		[$wsName, $wsId] = self::teamWs($l, $t, 'Bald privat');
+		$src = self::newNote($l, $wsName, 'Quelle', '<p>q</p>');
 		$aid = (int)$this->createAssignment($l, $t, $src, 'Ohne Workspace')['id'];
 		self::ok($l->call('POST', "/assignments/$aid/distribute"), 'Austeilen');
+		self::setColumn('nextnotes_workspaces', $wsId, 'owner_type', 'user');
+		self::setColumn('nextnotes_workspaces', $wsId, 'owner_id', $l->uid);
 
 		$this->teams->destroy($l->uid, $t, true);
 		self::assertSame('orphaned', self::teamState($t), 'Event verwaist Team ohne Workspace');

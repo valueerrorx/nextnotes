@@ -225,7 +225,7 @@ class AssignmentService {
 	}
 
 	/**
-	 * POST /assignments {team, title, due_at, source_note_id, max_points?}: Lehrkraft (aktives Team, Level ≥ 4), Quelle lesbar (auch Material, Q2);
+	 * POST /assignments {team, title, due_at, source_note_id, max_points?, workspace?}: Lehrkraft (aktives Team, Level ≥ 4), Quelle lesbar (auch Material, Q2);
 	 * Vorlage = eingefrorene Kopie ohne Workspace, Anhänge gegen die Team-Quote (Plan M6 §2.3a)
 	 * @return array{assignment: array<string, mixed>}
 	 */
@@ -242,7 +242,7 @@ class AssignmentService {
 		if ($source->getRole() !== 'note') {
 			throw new BadRequestException('Only regular notes can be used for an assignment');
 		}
-		$this->requireSourceAllowed($uid, $teamId, $source);
+		$this->requireSourceAllowed($uid, $teamId, $source, $in['workspace'] ?? null);
 		$this->teamState->ensure($teamId, $this->teams->memberTeams($uid)[$teamId] ?? null);
 		$quota = $this->quota->quotaForTeam($teamId, $this->attachments->bytesOf([(int)$source->getId()]));
 		$now = $this->time->getTime();
@@ -280,20 +280,20 @@ class AssignmentService {
 	}
 
 	/**
-	 * Quelle nur aus eigenem Workspace oder einem Workspace desselben Teams (inkl. Material); fremde Freigaben und andere Teams → 403
-	 * (Verlassen-Regel SPEC §3, Lead-Entscheidung 2026-11-08)
+	 * Quelle nur aus dem Team-Workspace der Aufgabe (kind=normal dieses Teams); workspace= legt ihn fest, sonst der Workspace der Quelle.
+	 * Private, fremde, andere Teams und andere Workspaces desselben Teams → 403 (UI-tplpick, Thomas 2026-11-09; vorher Lead 2026-11-08)
 	 */
-	private function requireSourceAllowed(string $uid, string $teamId, Note $source): void {
+	private function requireSourceAllowed(string $uid, string $teamId, Note $source, mixed $wsKey): void {
+		$target = $this->workspaces->resolveOptional($uid, $wsKey);
 		try {
 			$ws = $source->getWorkspaceId() === null ? null : $this->workspaceRows->find((int)$source->getWorkspaceId());
 		} catch (DoesNotExistException) {
 			$ws = null;
 		}
-		$allowed = $ws !== null && $ws->getKind() === 'normal' && (
-			($ws->getOwnerType() === 'user' && $ws->getOwnerId() === $uid)
-			|| ($ws->getOwnerType() === 'team' && $ws->getOwnerId() === $teamId));
+		$allowed = $ws !== null && $ws->getKind() === 'normal' && $ws->getOwnerType() === 'team' && $ws->getOwnerId() === $teamId
+			&& ($target === null || (int)$target->getId() === (int)$ws->getId());
 		if (!$allowed) {
-			throw new ForbiddenException('Only your own notes or notes of this team can become an assignment', ['code' => 'source_not_allowed']);
+			throw new ForbiddenException('The note must be in the team workspace of the assignment', ['code' => 'source_not_allowed']);
 		}
 	}
 

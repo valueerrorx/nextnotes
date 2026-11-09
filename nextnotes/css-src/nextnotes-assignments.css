@@ -304,6 +304,42 @@
 	font-weight: bold;
 }
 
+/* UI-tplpick: Lupe rechts im Suchfeld */
+#content #nextnotes-root .nn-asg-source-input {
+	position: relative;
+}
+
+#content #nextnotes-root .nn-asg-source-input input {
+	padding-inline-end: calc(var(--default-clickable-area) + var(--default-grid-baseline));
+}
+
+#content #nextnotes-root .nn-asg-source-all {
+	position: absolute;
+	inset-block: 0;
+	inset-inline-end: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: var(--default-clickable-area);
+	min-height: 0;
+	margin: 0;
+	padding: 0;
+	border: none;
+	border-radius: var(--border-radius-element);
+	background: transparent;
+	color: var(--color-main-text);
+	cursor: pointer;
+}
+
+#content #nextnotes-root .nn-asg-source-all:is(:hover, :focus-visible, [aria-expanded="true"]) {
+	background-color: var(--color-background-hover);
+}
+
+#content #nextnotes-root .nn-asg-source-more {
+	padding: calc(var(--default-grid-baseline) * 2);
+	font-size: 0.9em;
+}
+
 #content #nextnotes-root .nn-asg-source-results {
 	max-height: 220px;
 	margin: 0;
