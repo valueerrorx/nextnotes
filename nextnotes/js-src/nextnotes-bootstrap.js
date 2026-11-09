@@ -61,7 +61,7 @@
 	// Globals der Upstream-Inline-Skripte (index.php, icon_sidebar.php); nur bekannte Namen
 	var GLOBALS = ['DEFAULT_NOTE_TITLES', 'PoznoteMentionMembers', 'TAG_COLORS', 'NOTE_COLOR_PALETTE', 'PoznoteActiveAccountIsOwn', 'calendarTranslations', 'NOTIFICATIONS_TXT', 'DIARY_DATA',
 		'NOTE_COLOR_TXT', 'DASHBOARD_DATA', 'DASHBOARD_PIN_TXT', 'DASHBOARD_REORDER_TXT', 'DASHBOARD_SHOW_MORE_TXT', 'DASHBOARD_SCOPE_TXT',
-		'DASHBOARD_MODIFIED_TXT', 'DASHBOARD_TAG_FILTER_TXT', 'DASHBOARD_NOTE_MODAL_TXT', 'NEXTNOTES_TXT',
+		'DASHBOARD_MODIFIED_TXT', 'DASHBOARD_TAG_FILTER_TXT', 'NEXTNOTES_TXT',
 		'NOTE_COLOR_DEFAULT_PALETTE', 'NOTE_COLOR_LOCALIZED_NAMES', 'NOTE_COLOR_KNOWN_NAMES'];
 	var pageGlobals = readIsland('nextnotes-globals') || {};
 	GLOBALS.forEach(function (name) {

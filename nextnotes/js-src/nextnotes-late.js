@@ -269,10 +269,10 @@
 			rememberWorkspace(ws);
 			if (e.ctrlKey || e.metaKey) window.open(dashWsUrl(ws), '_blank', 'noopener'); else window.location.href = dashWsUrl(ws);
 		}, true);
-		// Jeder Link vom Board in die Hauptansicht (Karte, Kopf, „Im Editor öffnen“) merkt dessen Workspace; nach den Upstream-Handlern (Modal, Auswahl)
+		// Jeder Link vom Board in die Hauptansicht (Karte inkl. Aufgabenliste, Kopf, Brotkrumen) merkt dessen Workspace; nach den Upstream-Handlern (Auswahl)
 		window.addEventListener('click', function (e) {
-			var a = e.target.closest && e.target.closest('#dashboardGrid a[href], #dashboardBreadcrumb a[href], #dashboardNoteModalOpen');
-			if (!a || e.button !== 0 || (e.defaultPrevented && a.id !== 'dashboardNoteModalOpen')) return;
+			var a = e.target.closest && e.target.closest('#dashboardGrid a[href], #dashboardBreadcrumb a[href]');
+			if (!a || e.button !== 0 || e.defaultPrevented) return;
 			var url = new URL(a.href, window.location.href);
 			if (url.origin === window.location.origin && /\/index\.php$/.test(url.pathname)) rememberWorkspace(url.searchParams.get('workspace'));
 		});

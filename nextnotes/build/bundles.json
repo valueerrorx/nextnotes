@@ -949,7 +949,6 @@
 				"js/navigation.js",
 				"js/request-errors.js",
 				"js/modal-alerts.js",
-				"js/dashboard-note-modal.js",
 				"js/board-view-menu.js",
 				"js/dashboard-page.js",
 				"js/panel-back.js",
@@ -961,6 +960,7 @@
 				"js/ui-customization.js"
 			],
 			"omit": {
+				"js/dashboard-note-modal.js": "Aufgabenlisten-Karte führt wie jede Notizkarte in die Hauptansicht des Workspace (UI-dashcard), kein Modal",
 				"js/ui-customization-panel.js": "kein Kontext-Anpassungspanel auf den Seiten (Elementsichtbarkeit über ui-customization.js und Einstellungen)"
 			}
 		},

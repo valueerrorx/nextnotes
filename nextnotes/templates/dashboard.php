@@ -77,17 +77,6 @@ $islands = [
 			'search' => $t('dashboard.tag_filter.search', 'Filter tags...'),
 			'noMatch' => $t('dashboard.tag_filter.no_match', 'No matching tag.'),
 		],
-		'DASHBOARD_NOTE_MODAL_TXT' => [
-			'loading' => $t('common.loading', 'Loading...'),
-			'saving' => $t('diary.journal_saving', 'Saving...'),
-			'saved' => $t('diary.journal_saved', 'Saved'),
-			'saveError' => $t('dashboard.note_modal.save_error', 'Could not save this note.'),
-			'loadError' => $t('dashboard.note_modal.load_error', 'Could not load this note.'),
-			'conflict' => $t('dashboard.note_modal.conflict', 'This note was changed elsewhere. Your latest changes here were not saved: reload the page to see the current version.'),
-			'addTask' => $t('tasklist.input_placeholder', 'Write a new task and press Enter to add to list...'),
-			'emptyTasks' => $t('dashboard.note_modal.empty_tasks', 'No tasks yet.'),
-			'deleteTask' => $t('common.delete', 'Delete'),
-		],
 		'NOTIFICATIONS_TXT' => [
 			'dismiss' => $t('reminder.dismiss', 'Dismiss'),
 			'justNow' => $t('reminder.just_now', 'Just now'),
@@ -199,23 +188,6 @@ $colorTitle = $t('note_color.modal_title', 'Note color');
 				<button type="button" class="btn-danger" id="noteColorClearBtn" title="<?php p($t('note_color.remove', 'Remove color')); ?>" aria-label="<?php p($t('note_color.remove', 'Remove color')); ?>"><i class="lucide lucide-eraser"></i> <span class="note-color-btn-label"><?php p($t('note_color.remove', 'Remove color')); ?></span></button>
 				<button type="button" class="btn-cancel" data-action="close-note-color-modal"><?php p($t('common.cancel', 'Cancel')); ?></button>
 				<button type="button" class="btn-primary" id="noteColorApplyBtn"><?php p($t('common.apply', 'Apply')); ?></button>
-			</div>
-		</div>
-	</div>
-
-	<div id="dashboardNoteModal" class="modal dashboard-note-modal" role="dialog" aria-modal="true" aria-labelledby="dashboardNoteModalTitle">
-		<div class="modal-content dashboard-note-modal-content">
-			<div class="dashboard-note-modal-header">
-				<h3 id="dashboardNoteModalTitle" class="dashboard-note-modal-title"></h3>
-				<button type="button" class="dashboard-note-modal-icon-btn dashboard-note-modal-close" data-action="close-note-modal" title="<?php p($t('common.close', 'Close')); ?>" aria-label="<?php p($t('common.close', 'Close')); ?>"><i class="lucide lucide-x"></i></button>
-			</div>
-			<div id="dashboardNoteModalBody" class="dashboard-note-modal-body"></div>
-			<div class="dashboard-note-modal-footer">
-				<span id="dashboardNoteModalStatus" class="dashboard-note-modal-status" aria-live="polite"></span>
-				<div class="modal-buttons">
-					<button type="button" class="btn-cancel" data-action="close-note-modal"><?php p($t('common.close', 'Close')); ?></button>
-					<a id="dashboardNoteModalOpen" class="btn btn-primary dashboard-note-modal-open" href="#"><i class="lucide lucide-pencil"></i> <?php p($t('dashboard.note_modal.open_editor', 'Open in the editor')); ?></a>
-				</div>
 			</div>
 		</div>
 	</div>

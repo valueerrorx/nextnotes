@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // UI-dashws (Thomas 2026-11-09): im Dashboard über mehrere Workspaces führt ein Klick auf den Workspace-Kopf, die Brotkrumen,
 // das Kennzeichen einer Karte oder eine Karte selbst in diesen Workspace (?workspace=) und merkt ihn als zuletzt geöffneten,
-// sodass Ansichten ohne Parameter danach in ihm stehen. Aufgabenliste: Modal ohne Wechsel, „Im Editor öffnen“ wechselt.
+// sodass Ansichten ohne Parameter danach in ihm stehen. Aufgabenliste (UI-dashcard): wie Notizkarte, kein Modal.
 // Team-Workspace mit Material-Ordner (Mitglied). 0 CSP/Konsole.
 import { runSpec } from './lib/harness.mjs';
 import { apiClient } from './lib/api.mjs';
@@ -106,16 +106,17 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	ctx.ok(await sidebarWs(page) === ws2, 'Notizkarte: Seitenleiste im Workspace der Notiz');
 	ctx.ok(await waitLast(api, ws2) === ws2, 'Notizkarte merkt last_opened_workspace');
 
-	// 4. Aufgabenliste: Modal ohne Wechsel, „Im Editor öffnen“ wechselt
+	// 4. Aufgabenliste (UI-dashcard): Karte wechselt wie eine Notizkarte in den Workspace, kein Modal; Klick auf eine Aufgabe ebenso
 	await setLast(api, ws1);
 	await board(page);
-	await page.locator('#dashboardGrid .dash-note-card .dash-card-link', { hasText: list2 }).click();
-	await page.locator('#dashboardNoteModal').waitFor({ state: 'visible', timeout: 8000 });
-	await page.waitForTimeout(600);
-	ctx.ok(new URL(page.url()).pathname.endsWith('/dashboard.php') && await lastOpened(api) === ws1, 'Aufgabenliste öffnet das Modal ohne Wechsel');
-	u = await clickTo(page, page.locator('#dashboardNoteModalOpen'), ws2);
-	ctx.ok(isIndexIn(u, ws2), '„Im Editor öffnen“ → Workspace der Liste', u.search);
-	ctx.ok(await waitLast(api, ws2) === ws2, '„Im Editor öffnen“ merkt last_opened_workspace');
+	const listCard = page.locator('#dashboardGrid .dash-note-card', { hasText: list2 });
+	const lc = await listCard.evaluate((c) => ({ modal: !!document.getElementById('dashboardNoteModal'), api: typeof window.poznoteDashboardNoteModal,
+		inputs: c.querySelectorAll('input, button:not(.dash-card-pin), [contenteditable]').length, tasks: c.querySelectorAll('.board-card-tasks li').length }));
+	ctx.ok(!lc.modal && lc.api === 'undefined' && lc.inputs === 0 && lc.tasks === 1, 'Aufgabenlisten-Karte ohne Modal und ohne bedienbare Häkchen', JSON.stringify(lc));
+	u = await clickTo(page, listCard.locator('.board-card-tasks li').first(), ws2);
+	ctx.ok(isIndexIn(u, ws2) && !!u.searchParams.get('note'), 'Aufgabenlisten-Karte → index.php?note=&workspace=', u.search);
+	ctx.ok(await sidebarWs(page) === ws2, 'Aufgabenliste: Seitenleiste im Workspace der Liste');
+	ctx.ok(await waitLast(api, ws2) === ws2, 'Aufgabenlisten-Karte merkt last_opened_workspace');
 
 	// 5. Kennzeichen in der Kartenfußzeile → Hauptansicht des Workspace
 	await setLast(api, ws1);
