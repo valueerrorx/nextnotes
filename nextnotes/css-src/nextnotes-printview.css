@@ -88,6 +88,27 @@ body#body-public #content.app-public {
 	display: none !important;
 }
 
+/* Tabellenblock (M8b): statische Ergebnistabelle */
+#nextnotes-root.note-print-page .nn-sheet-table {
+	border-collapse: collapse;
+	margin: 8px 0;
+}
+
+#nextnotes-root.note-print-page .nn-sheet-table td {
+	min-width: 48px;
+	padding: 2px 6px;
+	border: 1px solid #999;
+}
+
+#nextnotes-root.note-print-page .nn-sheet-table td.nn-num {
+	text-align: right;
+}
+
+#nextnotes-root.note-print-page .nn-sheet-table td.nn-err {
+	color: #b00020;
+	text-align: center;
+}
+
 @page {
 	margin: 2cm;
 }

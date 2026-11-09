@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 - Math formulas in rich text notes: insert inline or as a block from the toolbar or with `/Formel`, edit them in a visual formula editor (MathLive, loaded on first use, on-screen keyboard on touch devices).
+- Calculation tables in rich text notes: insert with the toolbar (Σ) or `/Tabelle`, up to 50 rows × 26 columns, formulas with German function names (`=SUMME(A1:A3)`), references that move with inserted or deleted rows and columns, bold, decimal places and percent. Readers, material and locked notes show the stored results. The engine (HyperFormula, GPLv3) loads only when a table can be edited. Only German function names; `*` and `?` in ZÄHLENWENN/SUMMEWENN match literally (no wildcards). A table has a single sheet: apostrophes and exclamation marks are allowed in formulas only inside quotation marks.
 
 ### Fixed
 - Saving a rich text note with rendered math no longer stores the KaTeX output; only the LaTeX source is kept (B69).

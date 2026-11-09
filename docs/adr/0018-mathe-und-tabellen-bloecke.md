@@ -67,7 +67,26 @@ Reihenfolge M8a → M8b → M8c (Thomas: Tabellenblock wichtiger als Rechenblock
 
 ## Nachtrag M8a (2026-11-08, Lead-Entscheidungen aus M8-Plan r2, gilt für M8b/M8c)
 - (a) Leser des Rechenblocks sehen die gespeicherten, statischen Ergebnisse, keine Neuberechnung; nur der Graph wird bei Lesern gezeichnet, unter denselben Aufwandsgrenzen (M8-Plan §4).
-- (b) `VERSION` und `BEREICH.VERSCHIEBEN` sind in HyperFormula geschützt, nicht entfernbar und harmlos; sie bleiben aktiv, die Whitelist gilt sonst unverändert.
+- (b) `VERSION` und `BEREICH.VERSCHIEBEN` sind in HyperFormula geschützt und nicht entfernbar. ~~harmlos; sie bleiben aktiv~~ – korrigiert in M8b-fix: nicht harmlos, beide gesperrt (Nachtrag M8b-fix).
 - (c) Ein Zirkelbezug zeigt den Engine-Code `#CYCLE!` (nicht `#ZYKLUS!`), Klartext im Tooltip.
 - (d) Der Tabellenblock ist fest deutsch (Funktionsnamen, `;`, Dezimalkomma), unabhängig von der NC-Sprache.
 - Formel (M8a): MathLive 0.111.4 (MIT) lokal unter `js/vendor/mathlive/`, lazy beim ersten Öffnen; keine CSP-Ausnahme (Laden per `strict-dynamic`, keine Sounds, Fonts aus dem KaTeX-Vendor). Markup-Vertrag und Sanitizer-Regeln: SPEC §4.7.
+
+## Nachtrag M8b (2026-11-08, Architekt, Slice M8b)
+- Tabelle: HyperFormula 3.5.0 als esbuild-Bündel aus den ES-Modulen mit `deDE` (`js/vendor/hyperformula/`, 819 KB, 181 KB gz), lazy nur für schreibbare Blöcke; GPL-3.0-Text unter `LICENSES/GPL-3.0-only.txt`. Keine CSP-Ausnahme (einziger Treffer `eval(fn)` in chevrotain bekommt eine Funktion, keinen Text).
+- Whitelist per Plugin-Auswahl wie geplant. Zusätzlich zu `MODUS.EINF` und `ACHSENABSCHNITT` ersetzt ein eigenes Plugin `GANZZAHL`, weil HF 3.5.0 zur Null hin rundet (Calc/Excel: abrunden). Funktionsumfang unverändert.
+- Rückgängig/Wiederholen über eigene Schnappschüsse (Inhalt + Format) statt HF-`undo`, weil das Format nicht in der Engine liegt; die Engine wird dabei neu aufgebaut (≤ 1 300 Zellen).
+- Tastatur-Isolation (Risiko R1) über einen Capture-Listener am `window` im Adapter `nextnotes-bootstrap.js`, der vor allen Upstream-Listenern läuft und Ereignisse aus der Block-UI nur an den Block reicht. Kein `src/`-Patch.
+- Slash-Suche: Upstream schließt das Menü beim Leerzeichen; „/Tabelle“ zeigt „Tabelle rechnen“.
+
+## Nachtrag M8b-fix (2026-11-09, Lead-Entscheidungen aus Review M8b r1)
+- **Kontext**: `BEREICH.VERSCHIEBEN` ignoriert `maxRows`/`maxColumns` (1e6 Zeilen in 1,4 s, 1e8 → Speicherüberlauf); Platzhalter in ZÄHLENWENN bauen Regex mit `.*` (ReDoS > 60 s); englische IDs (`SUM`, `VERSION`) erreichte der Parser über seinen Kanon-Fallback; Matrix-Literale wachsen über 26 Spalten; viele große Bereiche rechnen bis 26 s. Jede Person mit Schreibrecht hätte so den Editor aller anderen eingefroren.
+- **Optionen**: (1) Sprachpaket umbenennen; (2) Formel-Prüfung vor der Engine (Funktionsnamen gegen Whitelist); (3) beides.
+- **Entscheidung**: (3). Prüfung vor `buildFromArray`/`setCellContents`: nur deutsche Whitelist-Namen, keine `{…}`, Klammertiefe ≤ 64, sonst `#NAME?`; `OFFSET` im Sprachpaket intern umbenannt. Platzhalter und Regex aus (`useWildcards:false`, `useRegularExpressions:false`), `*`/`?` sind normale Zeichen. Rechenbudget 200 000 Bereichszellen je Blatt. `WAHR()`/`FALSCH()` auf der Whitelist.
+- **Konsequenzen**: Platzhalter in ZÄHLENWENN/SUMMEWENN gibt es in Next Notes nicht (Abweichung von Calc/Excel, steht in `user.md`). Englische Funktionsnamen und Matrix-Literale ergeben `#NAME?`. Sehr große Blätter mit vielen Bereichsformeln lehnt der Client ab (Hinweis). Die Prüfung muss bei HF-Updates gegen den Lexer (Namens- und Zeichenkettenmuster) abgeglichen werden.
+
+## Nachtrag M8b-fix2 (2026-11-09, Review M8b r2)
+- **Kontext**: Blattnamen `'x"'!B2` enthalten `"`; die Prüfung hielt es für eine Zeichenkette und übersah dahinter liegende Aufrufe (`BEREICH.VERSCHIEBEN` → 1e6 Zeilen, Budget 9,6 s). `Sheet1!A1:Sheet1!Z30` unterlief das Budget. Der interne Name `NN_GESPERRT_OFFSET` war eingebbar.
+- **Optionen**: (1) Blattnamen im Scanner nachbilden; (2) `'` und `!` außerhalb von Zeichenketten sperren; Worker mit Zeitlimit (nur untersucht).
+- **Entscheidung**: (2), ein Durchlauf von links wie der HF-Lexer; `OFFSET` heißt `'NN_GESPERRT_OFFSET` (nie passende Muster scheitern an der chevrotain-Optimierung); zweite Linie über `getSheetDimensions` nach jedem Engine-Aufruf (über 50 × 26 → Engine verwerfen, Block statisch).
+- **Konsequenzen**: Blattbezüge und `'`/`!` außerhalb von Anführungszeichen gibt es nicht (Hinweis beim Bearbeiten, `#NAME?` beim Laden); Fehlerwerte wie `#BEZUG!` bleiben gültig.

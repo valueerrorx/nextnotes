@@ -1,0 +1,333 @@
+{
+ "_doc": "M8b Done 3: Referenzwerte LibreOffice Calc (soffice --headless, en-US), Daten A1:C10, Formeln E1:E46 (deDE in \"de\"); Toleranz 1e-9. HEUTE wird gesondert geprüft.",
+ "data": [
+  [
+   2,
+   1.5,
+   "rot"
+  ],
+  [
+   4,
+   3.1,
+   3
+  ],
+  [
+   4,
+   4.2,
+   "grün"
+  ],
+  [
+   5,
+   4.8,
+   "rot"
+  ],
+  [
+   7,
+   7.4,
+   null
+  ],
+  [
+   9,
+   8.9,
+   "blau"
+  ],
+  [
+   10,
+   10.2,
+   "ja"
+  ],
+  [
+   12,
+   12.8,
+   null
+  ],
+  [
+   15,
+   14.1,
+   1.5
+  ],
+  [
+   20,
+   19.6,
+   "x"
+  ]
+ ],
+ "cases": [
+  {
+   "cell": "E1",
+   "de": "=SUMME(A1:A10)",
+   "lo": "=SUM(A1:A10)",
+   "expected": 88.0
+  },
+  {
+   "cell": "E2",
+   "de": "=MITTELWERT(A1:A10)",
+   "lo": "=AVERAGE(A1:A10)",
+   "expected": 8.8
+  },
+  {
+   "cell": "E3",
+   "de": "=MIN(B1:B10)",
+   "lo": "=MIN(B1:B10)",
+   "expected": 1.5
+  },
+  {
+   "cell": "E4",
+   "de": "=MAX(B1:B10)",
+   "lo": "=MAX(B1:B10)",
+   "expected": 19.6
+  },
+  {
+   "cell": "E5",
+   "de": "=ANZAHL(A1:C10)",
+   "lo": "=COUNT(A1:C10)",
+   "expected": 22.0
+  },
+  {
+   "cell": "E6",
+   "de": "=ANZAHL2(A1:C10)",
+   "lo": "=COUNTA(A1:C10)",
+   "expected": 28.0
+  },
+  {
+   "cell": "E7",
+   "de": "=ZÄHLENWENN(A1:A10;\">5\")",
+   "lo": "=COUNTIF(A1:A10,\">5\")",
+   "expected": 6.0
+  },
+  {
+   "cell": "E8",
+   "de": "=SUMMEWENN(A1:A10;\">5\";B1:B10)",
+   "lo": "=SUMIF(A1:A10,\">5\",B1:B10)",
+   "expected": 73.0
+  },
+  {
+   "cell": "E9",
+   "de": "=RUNDEN(B3/3;2)",
+   "lo": "=ROUND(B3/3,2)",
+   "expected": 1.4
+  },
+  {
+   "cell": "E10",
+   "de": "=AUFRUNDEN(2,341;1)",
+   "lo": "=ROUNDUP(2.341,1)",
+   "expected": 2.4
+  },
+  {
+   "cell": "E11",
+   "de": "=ABRUNDEN(-2,349;2)",
+   "lo": "=ROUNDDOWN(-2.349,2)",
+   "expected": -2.34
+  },
+  {
+   "cell": "E12",
+   "de": "=GANZZAHL(-3,7)",
+   "lo": "=INT(-3.7)",
+   "expected": -4.0
+  },
+  {
+   "cell": "E13",
+   "de": "=ABS(-4,5)",
+   "lo": "=ABS(-4.5)",
+   "expected": 4.5
+  },
+  {
+   "cell": "E14",
+   "de": "=REST(17;5)",
+   "lo": "=MOD(17,5)",
+   "expected": 2.0
+  },
+  {
+   "cell": "E15",
+   "de": "=WURZEL(2)",
+   "lo": "=SQRT(2)",
+   "expected": 1.4142135623731
+  },
+  {
+   "cell": "E16",
+   "de": "=POTENZ(2;10)",
+   "lo": "=POWER(2,10)",
+   "expected": 1024.0
+  },
+  {
+   "cell": "E17",
+   "de": "=PI()",
+   "lo": "=PI()",
+   "expected": 3.14159265358979
+  },
+  {
+   "cell": "E18",
+   "de": "=EXP(1,5)",
+   "lo": "=EXP(1.5)",
+   "expected": 4.48168907033806
+  },
+  {
+   "cell": "E19",
+   "de": "=LN(10)",
+   "lo": "=LN(10)",
+   "expected": 2.30258509299405
+  },
+  {
+   "cell": "E20",
+   "de": "=LOG(8;2)",
+   "lo": "=LOG(8,2)",
+   "expected": 3.0
+  },
+  {
+   "cell": "E21",
+   "de": "=LOG10(250)",
+   "lo": "=LOG10(250)",
+   "expected": 2.39794000867204
+  },
+  {
+   "cell": "E22",
+   "de": "=SIN(1)",
+   "lo": "=SIN(1)",
+   "expected": 0.841470984807897
+  },
+  {
+   "cell": "E23",
+   "de": "=COS(1)",
+   "lo": "=COS(1)",
+   "expected": 0.54030230586814
+  },
+  {
+   "cell": "E24",
+   "de": "=TAN(1)",
+   "lo": "=TAN(1)",
+   "expected": 1.5574077246549
+  },
+  {
+   "cell": "E25",
+   "de": "=ARCSIN(0,5)",
+   "lo": "=ASIN(0.5)",
+   "expected": 0.523598775598299
+  },
+  {
+   "cell": "E26",
+   "de": "=ARCCOS(0,3)",
+   "lo": "=ACOS(0.3)",
+   "expected": 1.2661036727795
+  },
+  {
+   "cell": "E27",
+   "de": "=ARCTAN(2)",
+   "lo": "=ATAN(2)",
+   "expected": 1.10714871779409
+  },
+  {
+   "cell": "E28",
+   "de": "=BOGENMASS(30)",
+   "lo": "=RADIANS(30)",
+   "expected": 0.523598775598299
+  },
+  {
+   "cell": "E29",
+   "de": "=GRAD(1)",
+   "lo": "=DEGREES(1)",
+   "expected": 57.2957795130823
+  },
+  {
+   "cell": "E30",
+   "de": "=WENN(A1>1;\"ja\";\"nein\")",
+   "lo": "=IF(A1>1,\"ja\",\"nein\")",
+   "expected": "ja"
+  },
+  {
+   "cell": "E31",
+   "de": "=UND(A1>1;B1<2)",
+   "lo": "=AND(A1>1,B1<2)",
+   "expected": true
+  },
+  {
+   "cell": "E32",
+   "de": "=ODER(A1>5;B1>5)",
+   "lo": "=OR(A1>5,B1>5)",
+   "expected": false
+  },
+  {
+   "cell": "E33",
+   "de": "=NICHT(A1>5)",
+   "lo": "=NOT(A1>5)",
+   "expected": true
+  },
+  {
+   "cell": "E34",
+   "de": "=MEDIAN(A1:A10)",
+   "lo": "=MEDIAN(A1:A10)",
+   "expected": 8.0
+  },
+  {
+   "cell": "E35",
+   "de": "=MODUS.EINF(A1:A10)",
+   "lo": "=MODE.SNGL(A1:A10)",
+   "expected": 4.0
+  },
+  {
+   "cell": "E36",
+   "de": "=STABW.S(B1:B10)",
+   "lo": "=STDEV.S(B1:B10)",
+   "expected": 5.65099794529938
+  },
+  {
+   "cell": "E37",
+   "de": "=STABW.N(B1:B10)",
+   "lo": "=STDEV.P(B1:B10)",
+   "expected": 5.36100736802329
+  },
+  {
+   "cell": "E38",
+   "de": "=VAR.S(B1:B10)",
+   "lo": "=VAR.S(B1:B10)",
+   "expected": 31.9337777777778
+  },
+  {
+   "cell": "E39",
+   "de": "=VAR.P(B1:B10)",
+   "lo": "=VAR.P(B1:B10)",
+   "expected": 28.7404
+  },
+  {
+   "cell": "E40",
+   "de": "=QUARTILE.INKL(A1:A10;1)",
+   "lo": "=QUARTILE.INC(A1:A10,1)",
+   "expected": 4.25
+  },
+  {
+   "cell": "E41",
+   "de": "=KORREL(A1:A10;B1:B10)",
+   "lo": "=CORREL(A1:A10,B1:B10)",
+   "expected": 0.995181231034077
+  },
+  {
+   "cell": "E42",
+   "de": "=STEIGUNG(B1:B10;A1:A10)",
+   "lo": "=SLOPE(B1:B10,A1:A10)",
+   "expected": 0.998319327731092
+  },
+  {
+   "cell": "E43",
+   "de": "=ACHSENABSCHNITT(B1:B10;A1:A10)",
+   "lo": "=INTERCEPT(B1:B10,A1:A10)",
+   "expected": -0.125210084033613
+  },
+  {
+   "cell": "E44",
+   "de": "=BINOM.VERT(3;10;0,5;0)",
+   "lo": "=BINOM.DIST(3,10,0.5,0)",
+   "expected": 0.1171875
+  },
+  {
+   "cell": "E45",
+   "de": "=NORM.VERT(1;0;1;1)",
+   "lo": "=NORM.DIST(1,0,1,1)",
+   "expected": 0.841344746068543
+  },
+  {
+   "cell": "E46",
+   "de": "=NORM.INV(0,95;0;1)",
+   "lo": "=NORM.INV(0.95,0,1)",
+   "expected": 1.64485362695147
+  }
+ ]
+}

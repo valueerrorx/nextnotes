@@ -4,9 +4,9 @@
 -->
 # Third-party notices
 
-Next Notes is licensed under AGPL-3.0-or-later (see `COPYING`). It ships the following third-party code and fonts. License texts are in `LICENSES/`; the MIT, ISC and BSD texts there are templates, the copyright lines below apply.
+Next Notes is licensed under AGPL-3.0-or-later (see `COPYING`). It ships the following third-party code and fonts. License texts are in `LICENSES/`; the MIT, ISC and BSD texts there are templates, the copyright lines below apply. HyperFormula is used under GPL-3.0-only, which may be combined with the AGPL (GPLv3 section 13, AGPLv3 section 13); see ADR 0018.
 
-Checked by `dev/nextcloud/validate-info.sh` against `bundles.json` (vendor and npmVendor lists), `vendor.json` and the lockfiles of the bundled builds.
+Checked by `dev/nextcloud/validate-info.sh` against `bundles.json` (vendor and npmVendor lists), `vendor.json` and the lockfiles of the bundled builds. `build/build.mjs` checks that every npm package inside a `vendorEntries` bundle is listed below with its lockfile version.
 
 ## Poznote
 
@@ -29,6 +29,7 @@ Copyright (c) 2025 Timothé Poznanski. The front end (JavaScript, CSS, page mark
 | `@excalidraw/excalidraw` | 0.17.6 | MIT | https://github.com/excalidraw/excalidraw | `js/vendor/excalidraw-dist/` (built by Poznote, packages below) |
 | `codemirror` | 6 (see packages below) | MIT | https://codemirror.net | `js/vendor/codemirror-dist/` (built by Poznote, packages below) |
 | `mathlive` | 0.111.4 | MIT | https://github.com/arnog/mathlive | `js/vendor/mathlive/mathlive.min.js` (unchanged from npm, pinned in `build/package-lock.json`; uses the KaTeX fonts above, its sounds are not shipped) |
+| `hyperformula` | 3.5.0 | GPL-3.0-only (dual-licensed, used under GPLv3 with `licenseKey: 'gpl-v3'`) | https://github.com/handsontable/hyperformula | `js/vendor/hyperformula/hyperformula.min.js` (esbuild bundle of the npm ES modules with the `deDE` language, entry `build/vendor-entries/hyperformula.mjs`, packages below, license comments at the end of the file) |
 
 Copyright lines:
 - mermaid: Copyright (c) 2014 - 2022 Knut Sveidqvist. `LICENSES/MIT.txt`.
@@ -40,11 +41,20 @@ Copyright lines:
 - Excalidraw: Copyright (c) 2020 Excalidraw. `LICENSES/MIT.txt`.
 - CodeMirror and Lezer packages: Copyright (C) 2018-2021 by Marijn Haverbeke and others. `LICENSES/MIT.txt`.
 - MathLive: Copyright (c) 2017 - present Arno Gourdol. `LICENSES/MIT.txt`.
+- HyperFormula: Copyright (c) HANDSONCODE sp. z o. o. `LICENSES/GPL-3.0-only.txt` (the package's own `LICENSE.txt` names the dual licensing).
 
 ### Packages inside the CodeMirror bundle
 
 All MIT, Copyright (C) Marijn Haverbeke and others:
 `@codemirror/autocomplete@6.20.3`, `@codemirror/commands@6.10.3`, `@codemirror/lang-cpp@6.0.3`, `@codemirror/lang-css@6.3.1`, `@codemirror/lang-go@6.0.1`, `@codemirror/lang-html@6.4.11`, `@codemirror/lang-java@6.0.2`, `@codemirror/lang-javascript@6.2.5`, `@codemirror/lang-json@6.0.2`, `@codemirror/lang-markdown@6.5.0`, `@codemirror/lang-php@6.0.2`, `@codemirror/lang-python@6.2.1`, `@codemirror/lang-rust@6.0.2`, `@codemirror/lang-sql@6.10.0`, `@codemirror/lang-xml@6.1.0`, `@codemirror/lang-yaml@6.1.3`, `@codemirror/language@6.12.3`, `@codemirror/legacy-modes@6.5.3`, `@codemirror/lint@6.9.7`, `@codemirror/search@6.7.1`, `@codemirror/state@6.6.0`, `@codemirror/view@6.43.1`, `@lezer/common@1.5.2`, `@lezer/cpp@1.1.6`, `@lezer/css@1.3.3`, `@lezer/go@1.0.1`, `@lezer/highlight@1.2.3`, `@lezer/html@1.3.13`, `@lezer/java@1.1.3`, `@lezer/javascript@1.5.4`, `@lezer/json@1.0.3`, `@lezer/lr@1.4.10`, `@lezer/markdown@1.6.4`, `@lezer/php@1.0.5`, `@lezer/python@1.1.19`, `@lezer/rust@1.0.2`, `@lezer/xml@1.0.6`, `@lezer/yaml@1.0.4`, `@marijn/find-cluster-break@1.0.2`, `crelt@1.0.6`, `style-mod@4.1.3`, `w3c-keyname@2.2.8`.
+
+### Packages inside the HyperFormula bundle
+
+Built by `build/build.mjs` from `build/package-lock.json`:
+- `hyperformula@3.5.0`: Copyright (c) HANDSONCODE sp. z o. o., GPL-3.0-only (`LICENSES/GPL-3.0-only.txt`). Contains jStat (Copyright (c) 2013 jStat, MIT) and bessel.js ((C) 2013-present SheetJS, Apache-2.0).
+- `chevrotain@6.5.0`: Shahar Soel (author), Apache-2.0 (`LICENSES/Apache-2.0.txt`).
+- `regexp-to-ast@0.4.0`: Copyright (c) 2018 Shahar Soel, MIT (`LICENSES/MIT.txt`).
+- `tiny-emitter@2.1.0`: Copyright (c) 2017 Scott Corgan, MIT (`LICENSES/MIT.txt`).
 
 ### Packages inside the Excalidraw bundle
 

@@ -18,14 +18,15 @@ use OCA\NextNotes\Service\Pcre;
 /**
  * Block-Hosts (SPEC §4.7) vor HtmlToMarkdown durch Platzhalter ersetzen und danach als Markdown einsetzen (M8-Plan §1.1a).
  * Formel: inline `$…$`, Block `$$…$$`; bricht der Rückweg über MarkdownRenderer, dann Code-Span bzw. Codeblock.
+ * Tabellenblock: Markdown-Tabelle aus dem statischen Fallback (Ergebnisse, keine Formeln, M8-Plan §3).
  */
 final class NextBlocks {
 	// Platzhalter nur aus Buchstaben/Ziffern: übersteht HtmlToMarkdown (Steuerzeichen nicht), Kennung je Aufruf
 	private const MARK = 'NNBLK';
 
-	/** @return array{0: string, 1: array{id: string, blocks: list<array{block: bool, top: bool, latex: string}>}|array{}} */
+	/** @return array{0: string, 1: array{id: string, blocks: list<array{block: bool, top: bool, latex: string, rows?: list<list<string>>}>}|array{}} */
 	public static function toMarkdownPre(string $html): array {
-		if (stripos($html, 'data-math') === false) {
+		if (stripos($html, 'data-math') === false && stripos($html, 'data-nn-sheet') === false) {
 			return [$html, []];
 		}
 		$id = self::MARK . bin2hex(random_bytes(6));
@@ -36,11 +37,18 @@ final class NextBlocks {
 		if ($body === null) {
 			return [$html, []];
 		}
-		$nodes = (new DOMXPath($dom))->query('.//*[@data-math]', $body);
+		$xpath = new DOMXPath($dom);
+		$nodes = $xpath->query('.//*[@data-math or @data-nn-sheet]', $body);
 		$blocks = [];
+		$touched = false;
 		foreach ($nodes === false ? [] : iterator_to_array($nodes) as $el) {
 			// innerhalb eines schon ersetzten Hosts (abgehängt): überspringen
 			if (!$el instanceof DOMElement || !self::below($el, $body)) {
+				continue;
+			}
+			if ($el->hasAttribute('data-nn-sheet')) {
+				$touched = true;
+				self::sheet($dom, $xpath, $el, $body, $id, $blocks);
 				continue;
 			}
 			$class = ' ' . $el->getAttribute('class') . ' ';
@@ -55,14 +63,14 @@ final class NextBlocks {
 			}
 			$el->parentNode->replaceChild($token, $el);
 		}
-		if ($blocks === []) {
+		if ($blocks === [] && !$touched) {
 			return [$html, []];
 		}
 		$out = '';
 		for ($child = $body->firstChild; $child !== null; $child = $child->nextSibling) {
 			$out .= $dom->saveHTML($child);
 		}
-		return [$out, ['id' => $id, 'blocks' => $blocks]];
+		return [$out, $blocks === [] ? [] : ['id' => $id, 'blocks' => $blocks]];
 	}
 
 	/** @param array{id?: string, blocks?: list<array{block: bool, top: bool, latex: string}>} $map aus toMarkdownPre */
@@ -80,7 +88,7 @@ final class NextBlocks {
 			$after = $markdown[$at + strlen($token)] ?? '';
 			$out .= substr($markdown, $pos, $at - $pos);
 			if ($b !== null) {
-				$out .= $b['block'] ? self::blockMath($b['latex'], $b['top']) : self::inlineMath($b['latex'], $before, $after);
+				$out .= isset($b['rows']) ? self::table($b['rows']) : ($b['block'] ? self::blockMath($b['latex'], $b['top']) : self::inlineMath($b['latex'], $before, $after));
 			}
 			$pos = $at + strlen($token);
 		}
@@ -110,6 +118,58 @@ final class NextBlocks {
 		}
 		$latex = Pcre::replace('/(?<!\\\\)\$/', '\\\\$', $latex);
 		return $top ? "\n\n\$\$\n" . $latex . "\n\$\$\n\n" : '$$' . Pcre::replace('/[ \t]*+\n\s*+/', ' ', $latex) . '$$';
+	}
+
+	/**
+	 * Tabellenblock: auf oberster Ebene Platzhalter mit den Zeilen des Fallbacks, sonst nur den Host auspacken (Tabellen-Konverter)
+	 * @param list<array<string, mixed>> $blocks
+	 */
+	private static function sheet(DOMDocument $dom, DOMXPath $xpath, DOMElement $el, DOMElement $body, string $id, array &$blocks): void {
+		$parent = $el->parentNode;
+		if (!$parent->isSameNode($body)) {
+			while ($el->firstChild !== null) {
+				$parent->insertBefore($el->firstChild, $el);
+			}
+			$parent->removeChild($el);
+			return;
+		}
+		$rows = [];
+		foreach ($xpath->query('.//tr', $el) ?: [] as $tr) {
+			$row = [];
+			foreach ($xpath->query('./td|./th', $tr) ?: [] as $cell) {
+				$row[] = trim(Pcre::replace('/\s+/u', ' ', $cell->textContent));
+			}
+			if ($row !== []) {
+				$rows[] = $row;
+			}
+		}
+		$p = $dom->createElement('p');
+		$p->appendChild($dom->createTextNode($id . 'I' . count($blocks) . 'E'));
+		$blocks[] = ['block' => true, 'top' => true, 'latex' => '', 'rows' => $rows];
+		$parent->replaceChild($p, $el);
+	}
+
+	/** @param list<list<string>> $rows Markdown-Tabelle, erste Zeile als Kopf, Zelltext mit escapten Markdown-Zeichen (Rückweg = Text) */
+	public static function table(array $rows): string {
+		if ($rows === []) {
+			return '';
+		}
+		$cols = max(array_map('count', $rows));
+		$out = "\n\n";
+		foreach ($rows as $i => $row) {
+			$row = array_map(self::cellText(...), array_pad($row, $cols, ''));
+			$out .= '| ' . implode(' | ', $row) . " |\n";
+			if ($i === 0) {
+				$out .= '| ' . implode(' | ', array_fill(0, $cols, '---')) . " |\n";
+			}
+		}
+		return $out . "\n";
+	}
+
+	// Tabellenzelle: Zeichen, die der Renderer als Spalte, Auszeichnung, Formel, Link oder HTML liest, mit \ escapen;
+	// mit \ im Text Code-Span (der Renderer liest \\\| als Lauf \\ + Spaltengrenze)
+	private static function cellText(string $c): string {
+		return str_contains($c, '\\') ? self::codeSpan($c) : Pcre::replace('/[|*_~=$\[\]<>`]/', '\\\\$0', $c);
 	}
 
 	// Code-Span: Zaun = längste Backtick-Folge + 1, Leerzeichen innen, wenn der Inhalt mit ` beginnt oder endet

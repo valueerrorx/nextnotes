@@ -50,6 +50,13 @@ Nach Fristende bekommst du eine Sammelmeldung, wie viele abgegeben haben.
 ## Tagebuch
 **Tagebuch** zeigt einen Kalender und die Einträge je Tag. Neue Einträge legt Next Notes im Tagebuch-Ordner des Workspace nach Jahr und Monat ab. Ordner und Vorlage für neue Einträge stellst du unter *Einstellungen → Tagebuch* ein.
 
+## Formeln und Rechentabellen
+Nur in Richtext-Notizen. Knopf **Σ** in der Werkzeugleiste oder `/Formel` bzw. `/Tabelle` im Text.
+- **Formel:** Eingabe im Formelfeld (am Tablet mit Bildschirmtastatur), *Übernehmen* mit Enter. *In eigener Zeile* macht einen Formel-Block. Antippen öffnet die Formel wieder.
+- **Tabelle rechnen:** Zahlen mit Komma eingeben (`3,5`), Formeln mit `=` und deutschen Namen, Argumente mit `;` (`=SUMME(A1:A3)`, `=WENN(A1>5;"ja";"nein")`). Doppelklick (am Tablet zweites Antippen) bearbeitet eine Zelle, die Zeile darüber zeigt immer den Inhalt. Zeilen und Spalten fügst du über **⋯** oder das Kontextmenü ein, Formeln passen sich an. Höchstens 50 Zeilen × 26 Spalten. Fehler wie `#DIV/0!` erklärt ein Hinweis beim Darüberfahren. Nur deutsche Funktionsnamen; `*` und `?` in `ZÄHLENWENN`/`SUMMEWENN` sind normale Zeichen (keine Platzhalter). Sehr viele Formeln über große Bereiche lehnt die Tabelle mit einem Hinweis ab. Es gibt nur ein Blatt: Apostroph `'` und Ausrufezeichen `!` stehen in Formeln nur innerhalb von Anführungszeichen (`="Hallo!"`).
+- Rechnen kann die Tabelle nur, wer die Notiz gerade bearbeiten darf. Wer nur liest (Freigabe, Material, gesperrte Notiz, Druck, Export), sieht die zuletzt gespeicherten Ergebnisse.
+- Wandelst du die Notiz in Markdown um, bleiben nur die Ergebnisse (als Markdown-Tabelle), nicht die Formeln.
+
 ## Erinnerungen und Erwähnungen
 - **Erinnerung:** Glocke in der Notiz-Werkzeugleiste (*Erinnerung setzen*), auch wiederkehrend. Sie kommt als Nextcloud-Benachrichtigung, keine E-Mail.
 - **Erwähnung:** `@Name` in geteilten oder Team-Workspaces benachrichtigt die Person, wenn sie die Notiz lesen darf. Offene Erwähnungen zeigt **Erwähnungen** in der Icon-Leiste.

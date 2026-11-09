@@ -39,7 +39,7 @@ class HtmlSanitizer {
 		'td' => ['colspan', 'rowspan', 'data-formula'],
 		'th' => ['colspan', 'rowspan', 'scope'],
 		'ol' => ['type', 'start'],
-		'div' => ['class', 'data-tasklist-json', 'data-markdown-content', 'data-excalidraw', 'data-diagram-id', 'data-task-embed', 'contenteditable', 'data-math'],
+		'div' => ['class', 'data-tasklist-json', 'data-markdown-content', 'data-excalidraw', 'data-diagram-id', 'data-task-embed', 'contenteditable', 'data-math', 'data-nn-sheet'],
 		'span' => ['class', 'data-math'],
 		'input' => ['type', 'checked', 'disabled'],
 		'time' => ['datetime'],
@@ -257,7 +257,7 @@ class HtmlSanitizer {
 		if ($unwrap) {
 			self::unwrapUnknown($dom, $body);
 		}
-		// Block-Hosts (Formel, ab M8b Tabelle/Rechnen) nach Vertrag (SPEC §4.7)
+		// Block-Hosts (Formel, Tabelle, ab M8c Rechnen) nach Vertrag (SPEC §4.7)
 		BlockMarkup::normalize($body);
 		$out = '';
 		for ($child = $body->firstChild; $child !== null; $child = $child->nextSibling) {

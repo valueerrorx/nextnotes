@@ -193,6 +193,26 @@ for (const v of bundles.npmVendor ?? []) {
 	write(v.to, fs.readFileSync(from));
 }
 
+// 3b. Vendor-Bündel (M8): esbuild-IIFE aus build/vendor-entries/, Lizenzkommentare am Ende;
+// jedes gebündelte npm-Paket muss mit Version (Lockfile) in THIRD-PARTY-NOTICES.md stehen
+if ((bundles.vendorEntries ?? []).length) {
+	const notices = fs.readFileSync(path.join(app, 'THIRD-PARTY-NOTICES.md'), 'utf8');
+	const lock = JSON.parse(fs.readFileSync(path.join(here, 'package-lock.json'), 'utf8')).packages ?? {};
+	for (const v of bundles.vendorEntries) {
+		const r = esbuild.buildSync({
+			entryPoints: [path.join(here, 'vendor-entries', v.entry)], absWorkingDir: here, bundle: true, format: 'iife',
+			globalName: v.global, minify, legalComments: 'eof', charset: 'utf8', target: 'es2020', write: false, metafile: true, logLevel: 'error',
+		});
+		write(v.to, r.outputFiles[0].contents);
+		const pkgs = new Set(Object.keys(r.metafile.inputs).map((p) => (p.match(/node_modules\/((?:@[^/]+\/)?[^/]+)/) || [])[1]).filter(Boolean));
+		for (const name of pkgs) {
+			const ver = lock['node_modules/' + name]?.version;
+			if (!ver) die(`${v.entry}: ${name} fehlt in build/package-lock.json`);
+			if (!notices.includes('`' + name + '@' + ver + '`')) die(`${v.entry}: ${name}@${ver} fehlt in THIRD-PARTY-NOTICES.md`);
+		}
+	}
+}
+
 // 4. i18n: JSON für /system/i18n und gecachte JS-Datei je Sprache (en eingemischt)
 function merge(base, over) {
 	const out = { ...base };

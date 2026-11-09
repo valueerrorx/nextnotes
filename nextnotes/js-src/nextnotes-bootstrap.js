@@ -656,6 +656,25 @@
 		}, function (err) { mathLive = null; throw err; });
 		return mathLive;
 	};
+	// Blöcke (M8, Risiko R1): Tastatur/Eingabe aus einer Block-UI im Shadow DOM vor allen Upstream-Listenern abfangen;
+	// nextnotes-blocks.js reicht sie an den Block weiter (poznoteBlockEvent), sonst sähen Upstream-Menüs den Host als Ziel
+	// dragover/drop: Upstream fügt am Host Bilder ein bzw. der Browser öffnet die Datei; Blöcke nehmen nichts an
+	['keydown', 'keyup', 'keypress', 'beforeinput', 'input', 'paste', 'copy', 'cut', 'compositionstart', 'compositionupdate', 'compositionend', 'dragover', 'drop'].forEach(function (type) {
+		window.addEventListener(type, function (e) {
+			if (typeof window.poznoteBlockEvent !== 'function' || !window.poznoteBlockEvent(e)) return;
+			e.stopImmediatePropagation();
+			if (type === 'dragover' || type === 'drop') {
+				e.preventDefault();
+				if (e.dataTransfer) e.dataTransfer.dropEffect = 'none';
+				var entry = e.target.closest && e.target.closest('.noteentry');
+				if (entry) entry.classList.remove('drag-over');
+			}
+		}, true);
+	});
+	// HyperFormula (M8b): Global NextNotesHyperFormula; Whitelist setzt nextnotes-sheet.js
+	window.poznoteEnsureHyperFormula = function () {
+		return window.NextNotesHyperFormula ? Promise.resolve() : ensureScript('js/vendor/hyperformula/hyperformula.min.js');
+	};
 
 	window.NEXTNOTES = {
 		config: config,

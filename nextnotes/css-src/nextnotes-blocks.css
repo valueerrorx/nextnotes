@@ -2,7 +2,7 @@
  * SPDX-FileCopyrightText: 2026 Thomas Weissel
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
-/* Blöcke in Richtext-Notizen (SPEC §4.7): Formel-Hosts im Editor, Werkzeugleisten-Menü, Formel-Popover.
+/* Blöcke in Richtext-Notizen (SPEC §4.7): Formel-Hosts im Editor, Tabellen-Fallback, Werkzeugleisten-Menü, Formel-Popover.
    Nur NC-Variablen (hell/dunkel), Selektoren ≥ 1,1,0 (ADR 0017). */
 
 /* Formel im schreibbaren Editor: anklickbar; leerer Platzhalter sichtbar */
@@ -26,6 +26,27 @@
 #nextnotes-root .noteentry div[data-math=""] {
 	display: block;
 	min-height: 2em;
+}
+
+/* Tabellenblock (M8b): Host und statischer Fallback (Leser, Laden); die bearbeitbare UI liegt im Shadow DOM */
+#nextnotes-root .noteentry .nn-sheet {
+	max-width: 100%;
+	margin: 8px 0;
+	overflow-x: auto;
+}
+
+#nextnotes-root .noteentry .nn-sheet .nn-sheet-table td {
+	min-width: 64px;
+}
+
+#nextnotes-root .noteentry .nn-sheet .nn-sheet-table td.nn-num {
+	text-align: end;
+	font-variant-numeric: tabular-nums;
+}
+
+#nextnotes-root .noteentry .nn-sheet .nn-sheet-table td.nn-err {
+	color: var(--color-error-text, var(--color-error));
+	text-align: center;
 }
 
 /* Menü der Werkzeugleiste */

@@ -8,6 +8,7 @@
     "esbuild": "0.28.2"
   },
   "dependencies": {
+    "hyperformula": "3.5.0",
     "mathlive": "0.111.4"
   }
 }

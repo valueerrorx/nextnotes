@@ -20,6 +20,12 @@ final class BlockMarkup {
 	// Block-Attribute; von isDangerous ausgenommen (Text bzw. JSON, nie URL)
 	public const ATTRS = ['data-math', 'data-nn-sheet', 'data-nn-calc'];
 	public const MATH_MAX = 10000;
+	// Tabellenblock (M8-Plan §3): Attributlänge in Bytes, Rastergrenzen, Zelltext
+	public const SHEET_MAX = 262144;
+	public const SHEET_ROWS = 50;
+	public const SHEET_COLS = 26;
+	public const SHEET_TEXT_MAX = 1000;
+	private const SHEET_KEYS = ['v', 'lang', 'rows', 'cols', 'cells', 'fmt'];
 
 	public static function isBlockAttr(string $name): bool {
 		return in_array($name, self::ATTRS, true);
@@ -65,7 +71,8 @@ final class BlockMarkup {
 		$value = $el->getAttribute($attr);
 		return match ($attr) {
 			'data-math' => trim($value) !== '' && mb_strlen($value, 'UTF-8') <= self::MATH_MAX,
-			// Tabellen- und Rechenblock folgen in M8b/M8c; bis dahin lässt die Tag-Whitelist die Attribute nicht durch
+			'data-nn-sheet' => self::validSheet($value),
+			// Rechenblock folgt in M8c; bis dahin lässt die Tag-Whitelist das Attribut nicht durch
 			default => false,
 		};
 	}
@@ -75,6 +82,9 @@ final class BlockMarkup {
 		$classes = array_values(array_filter(explode(' ', strtr($el->getAttribute('class'), "\t\r\n\f", '    ')), static fn (string $c): bool => $c !== ''));
 		if ($attr === 'data-math' && !in_array('math-inline', $classes, true) && !in_array('math-block', $classes, true)) {
 			$classes[] = strtolower($el->tagName) === 'div' ? 'math-block' : 'math-inline';
+		}
+		if ($attr === 'data-nn-sheet' && !in_array('nn-sheet', $classes, true)) {
+			$classes[] = 'nn-sheet';
 		}
 		$value = $el->getAttribute($attr);
 		foreach (['class', $attr, 'contenteditable'] as $name) {
@@ -93,6 +103,73 @@ final class BlockMarkup {
 			$el->removeChild($el->firstChild);
 		}
 		$el->appendChild($el->ownerDocument->createTextNode($el->getAttribute('data-math')));
+	}
+
+	/** Schema v1 (SPEC §4.7.6): sonst ungültig, nur das Attribut fällt weg */
+	public static function validSheet(string $value): bool {
+		if ($value === '' || strlen($value) > self::SHEET_MAX) {
+			return false;
+		}
+		try {
+			$data = json_decode($value, false, 4, JSON_THROW_ON_ERROR);
+		} catch (\JsonException) {
+			return false;
+		}
+		if (!$data instanceof \stdClass) {
+			return false;
+		}
+		$keys = array_keys(get_object_vars($data));
+		if (array_diff($keys, self::SHEET_KEYS) !== [] || !isset($data->v, $data->lang, $data->rows, $data->cols, $data->cells)) {
+			return false;
+		}
+		if ($data->v !== 1 || $data->lang !== 'deDE' || !self::intIn($data->rows, 1, self::SHEET_ROWS) || !self::intIn($data->cols, 1, self::SHEET_COLS)) {
+			return false;
+		}
+		if (!is_array($data->cells) || count($data->cells) !== $data->rows) {
+			return false;
+		}
+		foreach ($data->cells as $row) {
+			if (!is_array($row) || count($row) !== $data->cols) {
+				return false;
+			}
+			foreach ($row as $cell) {
+				$ok = $cell === null || is_bool($cell) || is_int($cell)
+					|| (is_float($cell) && is_finite($cell))
+					|| (is_string($cell) && mb_strlen($cell, 'UTF-8') <= self::SHEET_TEXT_MAX);
+				if (!$ok) {
+					return false;
+				}
+			}
+		}
+		if (!property_exists($data, 'fmt')) {
+			return true;
+		}
+		if (!$data->fmt instanceof \stdClass) {
+			return false;
+		}
+		foreach (get_object_vars($data->fmt) as $addr => $f) {
+			if (!Pcre::match('/^[A-Z][1-9][0-9]?$/D', (string)$addr) || ord($addr[0]) - 65 >= $data->cols || (int)substr($addr, 1) > $data->rows) {
+				return false;
+			}
+			if (!$f instanceof \stdClass) {
+				return false;
+			}
+			foreach (get_object_vars($f) as $k => $x) {
+				$ok = match ($k) {
+					'b', 'p' => $x === 0 || $x === 1,
+					'd' => self::intIn($x, 0, 4),
+					default => false,
+				};
+				if (!$ok) {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
+	private static function intIn(mixed $x, int $min, int $max): bool {
+		return is_int($x) && $x >= $min && $x <= $max;
 	}
 
 	private static function attachedBelow(DOMElement $el, DOMElement $root): bool {

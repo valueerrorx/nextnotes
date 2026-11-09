@@ -355,6 +355,14 @@
 			"to": "js/vendor/mathlive/mathlive.min.js"
 		}
 	],
+	"vendorEntries": [
+		{
+			"_doc": "Tabellenblock (M8b): HyperFormula 3.5.0 (GPL-3.0-only) + deDE; Whitelist in nextnotes-sheet.js",
+			"entry": "hyperformula.mjs",
+			"global": "NextNotesHyperFormula",
+			"to": "js/vendor/hyperformula/hyperformula.min.js"
+		}
+	],
 	"adapterHooks": [
 		{
 			"file": "js/slash-command.js",

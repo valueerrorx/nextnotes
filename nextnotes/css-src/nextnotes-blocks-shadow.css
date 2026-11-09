@@ -1,0 +1,232 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Thomas Weissel
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+/* Laufzeit-UI der Blöcke im Shadow DOM (M8-Plan §1.1): keine Upstream-/NC-CSS hier, nur NC-Variablen (erben). */
+
+:host {
+	display: block;
+	margin: 8px 0;
+	max-width: 100%;
+	color: var(--color-main-text);
+}
+
+.nn-block-ui[hidden] {
+	display: none;
+}
+
+/* Tabellenblock */
+.nn-sheet-ui {
+	position: relative;
+	font: inherit;
+	font-size: 14px;
+}
+
+.nn-sheet-bar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px;
+	margin-bottom: 4px;
+}
+
+.nn-sheet-addr {
+	min-width: 4.5em;
+	padding: 0 6px;
+	color: var(--color-text-maxcontrast);
+	font-variant-numeric: tabular-nums;
+}
+
+.nn-sheet-fx {
+	flex: 1 1 200px;
+	min-width: 0;
+	min-height: var(--default-clickable-area, 34px);
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0 8px;
+	border: 1px solid var(--color-border-maxcontrast, var(--color-border));
+	border-radius: var(--border-radius-element, 8px);
+	background: var(--color-main-background);
+	color: var(--color-main-text);
+	font: inherit;
+}
+
+.nn-sheet-tools {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 2px;
+}
+
+.nn-sheet-btn {
+	min-width: var(--default-clickable-area, 34px);
+	min-height: var(--default-clickable-area, 34px);
+	margin: 0;
+	padding: 0 8px;
+	border: 1px solid transparent;
+	border-radius: var(--border-radius-element, 8px);
+	background: transparent;
+	color: var(--color-main-text);
+	font: inherit;
+	cursor: pointer;
+}
+
+.nn-sheet-btn:hover:not([disabled]),
+.nn-sheet-btn:focus-visible {
+	background: var(--color-background-hover);
+}
+
+.nn-sheet-btn:focus-visible,
+.nn-sheet-fx:focus-visible {
+	outline: 2px solid var(--color-primary-element);
+	outline-offset: 1px;
+}
+
+.nn-sheet-btn[aria-pressed="true"] {
+	background: var(--color-primary-element-light, var(--color-background-hover));
+	border-color: var(--color-primary-element);
+}
+
+.nn-sheet-btn[disabled] {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.nn-sheet-bold {
+	font-weight: bold;
+}
+
+.nn-sheet-scroll {
+	position: relative;
+	overflow-x: auto;
+	max-width: 100%;
+}
+
+.nn-sheet-grid {
+	border-collapse: collapse;
+	table-layout: fixed;
+	user-select: none;
+	-webkit-user-select: none;
+	touch-action: manipulation;
+}
+
+.nn-sheet-grid th,
+.nn-sheet-grid td {
+	height: 28px;
+	padding: 0 6px;
+	border: 1px solid var(--color-border);
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.nn-sheet-grid td {
+	min-width: 64px;
+	max-width: 240px;
+	background: var(--color-main-background);
+	cursor: cell;
+}
+
+.nn-sheet-grid th {
+	min-width: 28px;
+	background: var(--color-background-dark, var(--color-background-hover));
+	color: var(--color-text-maxcontrast);
+	font-weight: normal;
+	text-align: center;
+}
+
+.nn-sheet-grid td.nn-num {
+	text-align: end;
+	font-variant-numeric: tabular-nums;
+}
+
+.nn-sheet-grid td.nn-bold {
+	font-weight: bold;
+}
+
+/* Fehlerzelle: Text in Fehlerfarbe, Kontrast über die NC-Variable */
+.nn-sheet-grid td.nn-err {
+	color: var(--color-error-text, var(--color-error));
+	text-align: center;
+}
+
+.nn-sheet-grid td.is-sel {
+	background: var(--color-primary-element-light, var(--color-background-hover));
+}
+
+.nn-sheet-grid td.is-active {
+	outline: 2px solid var(--color-primary-element);
+	outline-offset: -2px;
+}
+
+.nn-sheet-edit {
+	position: absolute;
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0 6px;
+	border: 2px solid var(--color-primary-element);
+	background: var(--color-main-background);
+	color: var(--color-main-text);
+	font: inherit;
+	z-index: 2;
+}
+
+.nn-sheet-edit[hidden] {
+	display: none;
+}
+
+/* Fokusfeld im Navigationsmodus: unsichtbar über der aktiven Zelle */
+.nn-sheet-sink {
+	position: absolute;
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	opacity: 0;
+	resize: none;
+	overflow: hidden;
+	pointer-events: none;
+	caret-color: transparent;
+}
+
+.nn-sheet-msg:empty {
+	display: none;
+}
+
+.nn-sheet-msg,
+.nn-sheet-note {
+	margin: 4px 0;
+	color: var(--color-text-maxcontrast);
+}
+
+.nn-sheet-menu {
+	position: absolute;
+	z-index: 10;
+	display: flex;
+	flex-direction: column;
+	min-width: 200px;
+	padding: 4px;
+	background: var(--color-main-background);
+	color: var(--color-main-text);
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-large, 12px);
+	box-shadow: 0 2px 12px var(--color-box-shadow, rgba(0, 0, 0, 0.2));
+}
+
+.nn-sheet-menu-item {
+	text-align: start;
+}
+
+/* Formatknöpfe stehen breit in der Leiste, schmal nur im Menü */
+.nn-sheet-menu-item.nn-sheet-narrow {
+	display: none;
+}
+
+@media (max-width: 600px) {
+	.nn-sheet-tools > .nn-sheet-btn:not(.nn-sheet-menu-btn) {
+		display: none;
+	}
+
+	.nn-sheet-menu-item.nn-sheet-narrow {
+		display: block;
+	}
+}
