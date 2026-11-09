@@ -1291,6 +1291,46 @@ body.icon-sidebar-collapsed #content #nextnotes-root #iconSidebarToggle {
 	box-shadow: none;
 }
 
+/* UI-dashws (Thomas 2026-11-09): Workspace-Kopf, Brotkrumen und Kennzeichen des Dashboards sind Links in den Workspace (nextnotes-late.js) */
+#nextnotes-root #dashboardGrid .dash-group-title > .nn-dash-ws-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	margin-inline-start: -6px;
+	padding: 2px 6px;
+	border-radius: var(--border-radius-element, var(--border-radius-large));
+	color: inherit;
+	text-decoration: none;
+}
+
+#nextnotes-root #dashboardGrid .dash-group-title > .nn-dash-ws-link > .lucide {
+	width: 16px;
+	height: 16px;
+	color: var(--pz-text-subtle);
+}
+
+#nextnotes-root #dashboardBreadcrumb a.bc-workspace {
+	border-radius: var(--border-radius-element, var(--border-radius-large));
+	text-decoration: none;
+}
+
+#nextnotes-root :is(#dashboardGrid .dash-group-title > .nn-dash-ws-link, #dashboardBreadcrumb a.bc-workspace):hover {
+	background-color: var(--color-background-hover);
+}
+
+#nextnotes-root :is(#dashboardGrid .dash-group-title > .nn-dash-ws-link, #dashboardBreadcrumb a.bc-workspace):focus-visible {
+	outline: 2px solid var(--color-main-text);
+	box-shadow: 0 0 0 4px var(--color-main-background);
+}
+
+#nextnotes-root #dashboardGrid :is(.board-card-ws, .dash-card-ws) {
+	cursor: pointer;
+}
+
+#nextnotes-root #dashboardGrid :is(.board-card-ws, .dash-card-ws):hover .dash-ws-name {
+	text-decoration: underline;
+}
+
 /* Graph: Kopfblock schwebt breit über der Zeichenfläche (Upstream ab 641 px mittig); schmal bleibt er gestreckt */
 @media (min-width: 641px) {
 	#content #nextnotes-root > .nn-page-main .graph-head {

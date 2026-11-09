@@ -60,6 +60,16 @@
 		});
 	});
 
+	// Gewählten Workspace als zuletzt geöffneten merken (wie die Hauptansicht), best effort; überlebt die folgende Navigation
+	function rememberWorkspace(ws) {
+		if (!ws) return;
+		fetch('api/v1/settings/last_opened_workspace', {
+			method: 'PUT', credentials: 'same-origin', keepalive: true,
+			headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+			body: JSON.stringify({ value: ws })
+		}).catch(function () {});
+	}
+
 	// Workspace-Auswahl im Seitentitel (UI-ws): Liste wie das Menü der Hauptansicht (GET api/v1/workspaces), Wechsel bleibt auf der Seite
 	var wsMenu = null;
 	var wsList = null;
@@ -190,15 +200,8 @@
 			wsChipClose(btn, false);
 			return;
 		}
-		// Wahl als zuletzt geöffneten Workspace merken (wie die Hauptansicht), best effort
 		var item = target.closest('a[data-workspace]');
-		if (item) {
-			fetch('api/v1/settings/last_opened_workspace', {
-				method: 'PUT', credentials: 'same-origin', keepalive: true,
-				headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-				body: JSON.stringify({ value: item.getAttribute('data-workspace') })
-			}).catch(function () {});
-		}
+		if (item) rememberWorkspace(item.getAttribute('data-workspace'));
 	});
 	document.addEventListener('keydown', function (e) {
 		var btn = document.querySelector('[data-nn-ws-chip]');
@@ -222,6 +225,59 @@
 			if (btn && wsMenu && e.target !== wsMenu && btn.getAttribute('aria-expanded') === 'true') wsChipPosition(btn);
 		}, true);
 	});
+
+	// Dashboard (UI-dashws): Workspace-Kopf, Brotkrumen und Kennzeichen führen in die Hauptansicht des Workspace; jeder Wechsel wird gemerkt
+	function dashWsUrl(ws) {
+		return 'index.php?' + new URLSearchParams({ workspace: ws }).toString();
+	}
+	function dashLinkify() {
+		Array.prototype.forEach.call(document.querySelectorAll('#dashboardGrid .dash-group-title > .dash-group-name'), function (name) {
+			var a = document.createElement('a');
+			a.className = 'nn-dash-ws-link';
+			a.href = dashWsUrl(name.textContent);
+			var title = name.parentNode;
+			var mark = name.previousElementSibling;
+			title.insertBefore(a, mark || name);
+			if (mark) a.appendChild(mark);
+			a.appendChild(name);
+		});
+		var crumb = document.querySelector('#dashboardBreadcrumb span.bc-workspace');
+		if (crumb) {
+			var link = document.createElement('a');
+			link.className = 'bc-workspace nn-dash-ws-link';
+			while (crumb.firstChild) link.appendChild(crumb.firstChild);
+			link.href = dashWsUrl(link.textContent);
+			crumb.replaceWith(link);
+		}
+	}
+	function dashInit() {
+		if (!document.querySelector('#nextnotes-root.dashboard-page')) return;
+		var observer = new MutationObserver(dashLinkify);
+		['dashboardGrid', 'dashboardBreadcrumb'].forEach(function (id) {
+			var el = document.getElementById(id);
+			if (el) observer.observe(el, { childList: true });
+		});
+		dashLinkify();
+		// Kennzeichen auf Karten (Fußzeile, Ordnerkarte): Klick öffnet den Workspace statt der Karte; nicht im Auswahlmodus
+		document.addEventListener('click', function (e) {
+			var badge = e.target.closest && e.target.closest('#dashboardGrid .board-card-ws, #dashboardGrid .dash-card-ws');
+			var bar = document.getElementById('dashboardSelectionBar');
+			if (!badge || e.button !== 0 || (bar && !bar.hidden)) return;
+			var ws = (badge.querySelector('.dash-ws-name') || badge).textContent;
+			e.preventDefault();
+			e.stopPropagation();
+			rememberWorkspace(ws);
+			if (e.ctrlKey || e.metaKey) window.open(dashWsUrl(ws), '_blank', 'noopener'); else window.location.href = dashWsUrl(ws);
+		}, true);
+		// Jeder Link vom Board in die Hauptansicht (Karte, Kopf, „Im Editor öffnen“) merkt dessen Workspace; nach den Upstream-Handlern (Modal, Auswahl)
+		window.addEventListener('click', function (e) {
+			var a = e.target.closest && e.target.closest('#dashboardGrid a[href], #dashboardBreadcrumb a[href], #dashboardNoteModalOpen');
+			if (!a || e.button !== 0 || (e.defaultPrevented && a.id !== 'dashboardNoteModalOpen')) return;
+			var url = new URL(a.href, window.location.href);
+			if (url.origin === window.location.origin && /\/index\.php$/.test(url.pathname)) rememberWorkspace(url.searchParams.get('workspace'));
+		});
+	}
+	if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', dashInit); else dashInit();
 
 	// Mobil (UI-nav-mobil): Zurück des Browsers auf eine URL ohne Notiz/Kanban zeigt wieder die Liste (Upstream: Wischen über body.scrollLeft)
 	window.addEventListener('popstate', function () {
