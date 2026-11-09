@@ -208,6 +208,32 @@ body.nextnotes-readonly #attachmentsList [data-action="delete"] {
 	height: calc(100% - var(--excalidraw-toolbar-height)) !important;
 }
 
+/* Schmal (UI-excalmob): Upstream lässt die ganze Leiste waagrecht scrollen, der letzte Knopf lag außerhalb; Knöpfe bleiben stehen und brechen um, nur der Titel scrollt */
+@media (max-width: 800px) {
+	#nextnotes-root .poznote-toolbar {
+		overflow: hidden;
+		gap: calc(2 * var(--default-grid-baseline, 4px));
+		padding-inline: calc(2 * var(--default-grid-baseline, 4px)) !important;
+	}
+	#nextnotes-root .poznote-toolbar-buttons {
+		flex: 0 1 auto;
+		min-width: 0;
+		align-items: stretch;
+		gap: calc(1.5 * var(--default-grid-baseline, 4px));
+	}
+	#nextnotes-root .poznote-toolbar .excalidraw-btn {
+		flex: 0 1 auto;
+		white-space: normal;
+		line-height: 1.15;
+		text-align: center;
+	}
+	#nextnotes-root .poznote-toolbar-title {
+		flex: 1 1 0;
+		min-width: 0;
+		overflow-x: auto;
+	}
+}
+
 /* excalidraw.css färbt body mit var(--pz-bg) und verdeckt den NC-Kopf (Logo/App-Name weiß auf weiß): NC-Hintergrund zurück */
 body#body-user.excalidraw-editor-page {
 	background-color: var(--color-background-plain, var(--color-main-background));

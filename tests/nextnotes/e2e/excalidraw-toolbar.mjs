@@ -4,7 +4,7 @@
 // Je Breite (1400, 390): sichtbare Werkzeug-Icons ≥ 1rem (Excalidraw-Standard --lg/--default-icon-size), vollständig im Knopf, Knopf ≥ 2rem
 // (mobil Excalidraw 1.8rem) und größer als das Icon, nicht abgeschnitten, versteckte Werkzeug-Inputs unsichtbar (Ursache: revert/NC machten native Radios sichtbar), Zoom/Undo/Menü/Hilfe ohne
 // NC-Abstand und in Excalidraw-Größe; Farbfeld behält beim Hover seine Farbe (NC-Hover-Hintergrund); Regelliste in nextnotes-late.js
-// vollständig; NC-Elemente außerhalb (Kopfleiste, App-Knöpfe, Dialog) unverändert; Theme folgt NC; 0 CSP/Fehler.
+// vollständig; App-Kopfleiste (UI-excalmob): Knöpfe je Breite vollständig sichtbar, nicht überlappt; NC-Elemente außerhalb (Kopfleiste, App-Knöpfe, Dialog) unverändert; Theme folgt NC; 0 CSP/Fehler.
 import { runSpec } from './lib/harness.mjs';
 import { apiClient } from './lib/api.mjs';
 
@@ -61,6 +61,27 @@ await runSpec(import.meta.url, async (ctx, page) => {
 		ctx.ok(r.buttons.length >= (r.mobile ? 2 : 6), `${w}: Menü-/Zoom-/Undo-Knöpfe gefunden (${r.buttons.length})`);
 		const bad = r.buttons.filter((b) => b.margin !== '0px' || !['auto', '0px'].includes(b.minH) || b.bb.h < 2 * r.rem - 0.01 || b.bb.w < 1.8 * r.rem || !b.svgIn || b.border === 'outset');
 		ctx.ok(bad.length === 0, `${w}: Menü-/Zoom-/Undo-/Hilfe-Knöpfe in Excalidraw-Größe ohne NC-Abstand/Rahmen`, bad.map((b) => `${b.cls} ${b.bb.w}×${b.bb.h} m=${b.margin} minH=${b.minH} ${b.border}`).join(', '));
+		// UI-excalmob: Knöpfe der App-Kopfleiste vollständig im Fenster und in der Leiste, nicht überlappt, Mitte trifft den Knopf
+		const bar = await page.evaluate(() => {
+			const box = (el) => { const b = el.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }; };
+			const tb = document.querySelector('.poznote-toolbar'), tbb = box(tb);
+			const btns = [...tb.querySelectorAll('.poznote-toolbar-buttons button')].map((el) => {
+				const b = box(el), hit = document.elementFromPoint((b.l + b.r) / 2, (b.t + b.b) / 2);
+				return { id: el.id, text: el.textContent.trim(), b, inView: b.l >= -0.5 && b.r <= innerWidth + 0.5 && b.t >= -0.5 && b.b <= innerHeight + 0.5,
+					inBar: b.l >= tbb.l - 0.5 && b.r <= tbb.r + 0.5 && b.t >= tbb.t - 0.5 && b.b <= tbb.b + 0.5, hit: !!hit && (hit === el || el.contains(hit)),
+					clip: el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1 };
+			});
+			const overlap = [];
+			btns.forEach((a, i) => btns.slice(i + 1).forEach((c) => { if (a.b.l < c.b.r - 0.5 && c.b.l < a.b.r - 0.5 && a.b.t < c.b.b - 0.5 && c.b.t < a.b.b - 0.5) overlap.push(`${a.id}/${c.id}`); }));
+			const app = box(document.getElementById('app'));
+			return { btns, overlap, scrolled: tb.scrollLeft, barBottom: tbb.b, appTop: app.t };
+		});
+		ctx.ok(bar.btns.length === 3, `${w}: drei Knöpfe in der App-Kopfleiste`, bar.btns.map((b) => b.text).join(' | '));
+		const hidden = bar.btns.filter((b) => !b.inView || !b.inBar || !b.hit || b.clip);
+		ctx.ok(hidden.length === 0, `${w}: App-Knöpfe vollständig sichtbar und bedienbar (im Fenster, in der Leiste, Mitte trifft Knopf, Text nicht abgeschnitten)`,
+			hidden.map((b) => `${b.text} ${JSON.stringify(b.b)} view=${b.inView} bar=${b.inBar} hit=${b.hit} clip=${b.clip}`).join(', '));
+		ctx.ok(bar.overlap.length === 0, `${w}: App-Knöpfe überlappen nicht`, bar.overlap.join(', '));
+		ctx.ok(bar.appTop >= bar.barBottom - 0.5, `${w}: Zeichenfläche beginnt unter der Kopfleiste`, `${bar.appTop} < ${bar.barBottom}`);
 		await ctx.screenshot(page, `toolbar-${w}`);
 	}
 
