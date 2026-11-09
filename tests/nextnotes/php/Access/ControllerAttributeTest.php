@@ -21,7 +21,9 @@ final class ControllerAttributeTest extends TestCase {
 	// "Klasse::methode" mit #[NoCSRFRequired]; M2b: Anhang-GET (wird als <img src> geladen)
 	private const CSRF_ALLOWLIST = ['AttachmentsApiController::show',
 		// M6g: ZIP der Abgaben, GET-Download ohne Seiteneffekt (SPEC §9.5)
-		'AssignmentsApiController::export', 'AssignmentsApiController::exportSubmission'];
+		'AssignmentsApiController::export', 'AssignmentsApiController::exportSubmission',
+		// M9: Seite onenote.php und Rücksprung von Microsoft (Top-Level-GET; state schützt den Rücksprung, SPEC §4.2)
+		'OneNoteApiController::page', 'OneNoteApiController::callback'];
 
 	/** @return array<string, \ReflectionMethod> */
 	private static function apiMethods(): array {

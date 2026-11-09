@@ -168,6 +168,13 @@ final class IsolationTest extends ApiTestCase {
 			// M5a: Teams des Aufrufers (ohne Objekt-ID); Team-Rechte prüfen Teams/TeamAccessTest
 			'GET /teams' => ['scoped', 'path' => '/teams', 'sees' => null],
 			// M6d: Aufgaben hängen an Teams; A hat hier keine. Rechte-Matrix und Schüler↔Schüler in Assignments/AssignmentAccessTest
+			// M9 OneNote: nur eigene Importe; Rechte in OneNote/ImportRightsTest
+			'POST /onenote/connect' => ['excluded', 'path' => '/onenote/connect', 'body' => [], 'status' => 403, 'reason' => 'ohne Admin-Konfiguration gesperrt; Rechte in OneNote/'],
+			'GET /onenote/imports' => ['scoped', 'path' => '/onenote/imports', 'sees' => null],
+			'GET /onenote/imports/{}' => ['excluded', 'path' => '/onenote/imports/999999999', 'status' => 404, 'reason' => 'A hat keine Importe; Rechte in OneNote/'],
+			'POST /onenote/imports/{}/cancel' => ['excluded', 'path' => '/onenote/imports/999999999/cancel', 'body' => [], 'status' => 404, 'reason' => 'A hat keine Importe; Rechte in OneNote/'],
+			'GET /onenote/imports/{}/tree' => ['excluded', 'path' => '/onenote/imports/999999999/tree', 'status' => 403, 'reason' => 'ohne Admin-Konfiguration gesperrt; Rechte in OneNote/'],
+			'POST /onenote/imports/{}/start' => ['excluded', 'path' => '/onenote/imports/999999999/start', 'body' => ['selection' => []], 'status' => 403, 'reason' => 'ohne Admin-Konfiguration gesperrt; Rechte in OneNote/'],
 			'GET /assignments' => ['scoped', 'path' => '/assignments', 'sees' => null],
 			'POST /assignments' => ['excluded', 'path' => '/assignments', 'body' => ['team' => 'keinTeam', 'title' => 'x', 'due_at' => 4102444800, 'source_note_id' => 1], 'status' => 404, 'reason' => 'nur mit Team; Rechte in Assignments/'],
 			'GET /assignments/{}' => ['excluded', 'path' => '/assignments/999999999', 'status' => 404, 'reason' => 'A hat keine Aufgaben; Rechte in Assignments/'],
@@ -468,7 +475,7 @@ final class IsolationTest extends ApiTestCase {
 			}
 		}
 		self::assertSame([], $errors);
-		self::assertCount(139, $table);
+		self::assertCount(145, $table);
 	}
 
 	public function testDetectorsObject(): void {

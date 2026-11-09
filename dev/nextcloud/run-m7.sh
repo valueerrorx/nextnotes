@@ -3,14 +3,15 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # run-m7.sh [env…]: einzige volle Matrix (Done M1–M7, ersetzt run-m6.sh; Standard: sqlite mariadb pgsql nginx).
 # Vorab: make dist zweimal (zweiter ohne Netz) mit gleicher sha256, check-dist, Build + check-upstream, validate-info (ohne Netz),
-# check-forbidden-sql. Die App kommt in ALLEN Umgebungen aus dem Paket (NN_APP_TARBALL, auch in lifecycle/check-purge/upgrade-path).
+# check-forbidden-sql, Node-Tests (tests/nextnotes/node). Die App kommt in ALLEN Umgebungen aus dem Paket (NN_APP_TARBALL, auch in lifecycle/check-purge/upgrade-path).
 # Phase 1 je Umgebung parallel (PARALLEL=0: nacheinander): Lebenszyklus M1 (frisch, Seite, Spike/CSP je Webserver, Schema),
 # danach frisch: App, Circles-Loopback (up.sh), mysql.utf8mb4 (mariadb), occ --help der Befehle aus docs/app/admin.md + upgrade.md,
-# PHPUnit (Apache), Großanhang-Probe (mariadb, pgsql), Circles-Aus-Lauf (alle), check-purge (Apache, M7b Done 7; zuletzt, löscht alles).
-# Phase 2 nacheinander, ohne Parallel-Last: Playwright Hell+Dunkel (sqlite, nginx), alle Specs (Glob, inkl. lists-katex); E2E_PARALLEL=1 gleichzeitig.
+# PHPUnit (Apache), PHPUnit-Gruppe msmock mit OneNote-Mock (msmock.sh, Umgebungen nacheinander), Log-Suche, Großanhang-Probe (mariadb, pgsql), Circles-Aus-Lauf (alle), check-purge (Apache, M7b Done 7; zuletzt, löscht alles).
+# Phase 2 nacheinander, ohne Parallel-Last: Playwright Hell+Dunkel (sqlite, nginx), alle Specs (Glob); onenote-* nur auf sqlite mit Mock,
+#   danach Log-Suche; E2E_PARALLEL=1 gleichzeitig.
 # Phase 3: upgrade-path.sh ab 0.1.0, 0.1.2, 0.3.3 (UPGRADE_REFS) auf sqlite, mariadb, pgsql; je DB parallel (UPGRADE_PARALLEL=0: nacheinander).
 # ONLY="<schritte>" führt nur diese Schritte aus (Nachlauf/Probelauf), z. B. ONLY="dist install help purge e2e" SPECS=lists-katex THEMES=light.
-#   Schritte: dist checkdist upstream info sql | lifecycle install utf8mb4 help phpunit grenzen circlesoff purge | e2e | upgrade
+#   Schritte: dist checkdist upstream info sql node | lifecycle install utf8mb4 help phpunit msmock logscan grenzen circlesoff purge | e2e | upgrade
 #   install = frische Umgebung + Paket + app:enable; ohne install/lifecycle muss die Umgebung schon laufen.
 # SPECS= Auswahl der E2E-Specs (Standard alle), THEMES= wie run-e2e.sh. NN_APP_TARBALL= vorhandenes Paket statt dist (dann kein dist-Schritt).
 # Logs je Umgebung in NN_LOG_DIR (Standard dev/nextcloud/.cache/run-m7-<Zeit>). KEEP=1 lässt rote Umgebungen stehen.
@@ -20,7 +21,7 @@ source "$dir/env.sh"
 
 envs=("$@"); [[ ${#envs[@]} -gt 0 ]] || envs=("${NN_ENVS[@]}")
 for env in "${envs[@]}"; do check_env "$env"; done
-all_steps="dist checkdist upstream info sql lifecycle install utf8mb4 help phpunit grenzen circlesoff purge e2e upgrade"
+all_steps="dist checkdist upstream info sql node lifecycle install utf8mb4 help phpunit msmock logscan grenzen circlesoff purge e2e upgrade"
 only="${ONLY:-$all_steps}"
 for s in $only; do [[ " $all_steps " == *" $s "* ]] || die "unbekannter Schritt '$s' (erlaubt: $all_steps)"; done
 want() { [[ " $only " == *" $1 "* ]]; }
@@ -67,6 +68,7 @@ if want upstream; then
 fi
 want info && nn_offline "$dir/validate-info.sh"
 want sql && "$dir/check-forbidden-sql.sh"
+want node && node --test "$NN_REPO_ROOT"/tests/nextnotes/node/*.mjs
 [[ -d "$NN_DEV_DIR/node_modules/playwright-core" ]] || npm --prefix "$NN_DEV_DIR" ci --no-audit --no-fund
 
 # occ --help aller in admin.md/upgrade.md genannten Befehle; Optionen aus den Abschnittsköpfen (### `occ nextnotes:…`) müssen in der Hilfe stehen
@@ -89,6 +91,27 @@ check_help() {
 		done
 	done < <(grep -h '^### `occ nextnotes:' "${docs[@]}")
 	echo "$env: occ --help OK ($n Befehle: $(tr '\n' ' ' <<<"$cmds"))"
+}
+
+# nextcloud.log ohne Token/Secret (M9a Done 6): Mock-Token, Secrets aus PHPUnit (OneNoteTestCase) und E2E, JWT-Anfang eyJ
+check_log() {
+	local env="$1" svc hits
+	svc="$(svc_for "$env")"
+	hits="$(dc "$env" exec -T -u www-data "$svc" sh -c 'cat "$(php occ config:system:get datadirectory)/nextcloud.log" 2>/dev/null || true' \
+		| grep -nE 'msmock-access-|msmock-refresh-|mock-secret-|E2E-Secret-|eyJ' | cut -c1-300 || true)"
+	[[ -z "$hits" ]] || { echo "FEHLER: $env: nextcloud.log enthält Token/Secret:"$'\n'"$hits" >&2; return 1; }
+	echo "$env: nextcloud.log ohne Token/Secret/eyJ"
+}
+# OneNote-Mock: ein Dienst je Projekt, Zähler global → Umgebungen nacheinander (Sperre per mkdir, auch macOS)
+mock_lock() { until mkdir "$logs/msmock.lock" 2>/dev/null; do sleep 2; done; }
+mock_unlock() { rmdir "$logs/msmock.lock" 2>/dev/null || true; }
+phpunit_msmock() {
+	local env="$1" code=0
+	mock_lock
+	{ "$dir/msmock.sh" "$env" up && "$dir/run-phpunit.sh" "$env" --group msmock; } || code=$?
+	"$dir/msmock.sh" "$env" down || true
+	mock_unlock
+	return "$code"
 }
 
 phase1() {
@@ -115,6 +138,8 @@ phase1() {
 	fi
 	want help && check_help "$env"
 	case "$env" in sqlite|mariadb|pgsql) want phpunit && "$dir/run-phpunit.sh" "$env" ;; esac
+	case "$env" in sqlite|mariadb|pgsql) want msmock && phpunit_msmock "$env" ;; esac
+	want logscan && check_log "$env"
 	case "$env" in mariadb|pgsql) want grenzen && "$dir/scripts/probe-grenzen.sh" "$env" ;; esac
 	want circlesoff && "$dir/scripts/probe-circles-off.sh" "$env"
 	# zuletzt: löscht alle App-Daten und installiert das Paket neu (Umgebung danach frisch für E2E)
@@ -161,11 +186,21 @@ fi
 
 # --- Phase 2: E2E --------------------------------------------------------------------------------------
 e2e() {
-	local env="$1" code=0
+	local env="$1" code=0 s plain=() one=()
 	echo "=== $env: Phase 2 E2E (Log $logs/$env.log)"
-	# shellcheck disable=SC2086
-	"$dir/run-e2e.sh" "$env" ${SPECS:-} >> "$logs/$env.log" 2>&1 || code=$?
+	if [[ -n "${SPECS:-}" ]]; then for s in $SPECS; do s="${s%.mjs}"; [[ "$s" == onenote-* ]] && one+=("$s") || plain+=("$s"); done
+	else for s in "$NN_REPO_ROOT"/tests/nextnotes/e2e/*.mjs; do s="$(basename "$s" .mjs)"; [[ "$s" == onenote-* ]] && one+=("$s") || plain+=("$s"); done; fi
+	[[ ${#plain[@]} -eq 0 ]] || "$dir/run-e2e.sh" "$env" "${plain[@]}" >> "$logs/$env.log" 2>&1 || code=$?
 	grep '^run-e2e ' "$logs/$env.log" | tail -n 1 || true
+	# OneNote-Specs brauchen den Mock (nur Apache-Umgebungen); danach Log-Suche
+	if [[ ${#one[@]} -gt 0 && "$env" == sqlite ]]; then
+		mock_lock
+		{ "$dir/msmock.sh" "$env" up && "$dir/run-e2e.sh" "$env" "${one[@]}"; } >> "$logs/$env.log" 2>&1 || code=$?
+		"$dir/msmock.sh" "$env" down >> "$logs/$env.log" 2>&1 || true
+		mock_unlock
+		grep '^run-e2e ' "$logs/$env.log" | tail -n 1 || true
+	fi
+	if want logscan; then check_log "$env" >> "$logs/$env.log" 2>&1 || code=$?; fi
 	return "$code"
 }
 e2e_envs=()

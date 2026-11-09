@@ -44,6 +44,8 @@ await runSpec(import.meta.url, async (ctx, page) => {
 	// 0. Formel-Notiz per ?note= direkt (M7c-Befund: KaTeX seitenrelativ → 404, nichts gerendert)
 	let m = ctx.mark();
 	await page.goto(`${app}/index.php?note=${math}`, { waitUntil: 'networkidle' });
+	// seit M8 rendert die Block-Warteschlange asynchron: auf die Formeln warten statt sofort zu zählen
+	await page.waitForFunction(() => document.querySelectorAll('#right_col .noteentry .math-block .katex, #right_col .noteentry .math-inline .katex').length >= 2, null, { timeout: 10000 }).catch(() => {});
 	const rendered = await page.evaluate(() => ['.math-inline', '.math-block'].map((s) => document.querySelectorAll(`#right_col .noteentry ${s} .katex`).length));
 	ctx.ok(rendered.every((n) => n > 0), 'Formel-Notiz ?note=: Inline- und Blockformel gerendert', JSON.stringify(rendered));
 	const kj = ctx.responses.slice(m.r).filter((r) => /katex\.min\.js/.test(r.url));
