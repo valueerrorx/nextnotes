@@ -440,6 +440,12 @@ class NoteService {
 		return $this->notes->insert($note);
 	}
 
+	/** Inhalt einer gerade importierten Notiz setzen (OneNote-Ressourcen, M9d); nur Job, in dessen Transaktion */
+	public function setImportedContent(Note $note, string $html): Note {
+		$this->applyContent($note, $html);
+		return $this->notes->update($note);
+	}
+
 	/** @var ?array{0: Note, 1: string} gespeicherte Notiz und Inhalt davor, bis nach dem Commit */
 	private ?array $pendingMention = null;
 

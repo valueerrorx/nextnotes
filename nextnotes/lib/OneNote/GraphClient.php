@@ -35,8 +35,9 @@ class GraphClient {
 	) {
 	}
 
+	// Muster aus §6; reine Punkt-IDs (Pfadsegment . oder ..) und leere !-Segmente nie (Review M9b-r1 Hinweis 3)
 	public static function validId(string $id): bool {
-		return preg_match(self::ID_PATTERN, $id) === 1;
+		return preg_match(self::ID_PATTERN, $id) === 1 && trim($id, '.') !== '' && !in_array('', explode('!', $id), true);
 	}
 
 	// Wurzel aus der Auswahl: me | group:{id} → Pfad unter /v1.0/
@@ -77,14 +78,15 @@ class GraphClient {
 	 * GET mit Budget; $leaseToken gesetzt (Job): Lease wird danach verlängert, sonst GraphException lease
 	 * @throws GraphException
 	 */
-	public function get(OneNoteImport $import, #[\SensitiveParameter] string $accessToken, string $url, ?string $leaseToken = null, int $limit = HttpGate::JSON_LIMIT): HttpResult {
+	public function get(OneNoteImport $import, #[\SensitiveParameter] string $accessToken, string $url, ?string $leaseToken = null, int $limit = HttpGate::JSON_LIMIT,
+		?string $file = null, int $timeout = HttpGate::TIMEOUT): HttpResult {
 		if (!str_starts_with($url, self::PREFIX) || !HttpGate::allowed($url, HttpGate::GRAPH_HOST)) {
 			throw new GraphException('host');
 		}
 		$this->reserve($import, $leaseToken);
 		$this->space();
 		try {
-			$res = $this->http->send('GET', $url, HttpGate::GRAPH_HOST, ['Authorization' => 'Bearer ' . $accessToken], null, $limit);
+			$res = $this->http->send('GET', $url, HttpGate::GRAPH_HOST, ['Authorization' => 'Bearer ' . $accessToken], null, $limit, $file, $timeout);
 		} catch (GateException $e) {
 			$this->extendLease($import, $leaseToken);
 			throw new GraphException($e->reason === 'too_large' ? 'too_large' : 'network');
@@ -106,6 +108,17 @@ class GraphClient {
 			$res->status >= 500 => new GraphException('server', $res->status, 0, $code),
 			default => new GraphException('http', $res->status, 0, $code),
 		};
+	}
+
+	// freie Anfragen im Stundenfenster der uid (Seitenstart §4.5) und Zeitpunkt, ab dem $need passen
+	public function remaining(OneNoteImport $import): int {
+		$now = $this->time->getTime();
+		return max(0, RateBudget::MAX - RateBudget::used(RateBudget::decode($import->getRateBuckets(), $now)));
+	}
+
+	public function freeAt(OneNoteImport $import, int $need): int {
+		$now = $this->time->getTime();
+		return RateBudget::nextFreeAt(RateBudget::decode($import->getRateBuckets(), $now), $now, $need);
 	}
 
 	// Anfrage im Fenster buchen (bedingt über rate_version); voll → GraphException budget mit Freizeitpunkt

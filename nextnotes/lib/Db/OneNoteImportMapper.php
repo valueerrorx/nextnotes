@@ -111,7 +111,7 @@ class OneNoteImportMapper extends QBMapper {
 	}
 
 	/**
-	 * Claim (Plan M9 §2 Job): nur wenn queued/running und die Lease frei oder abgelaufen ist; Zeilenzahl 1 = übernommen
+	 * Claim (Plan M9 §2 Job): nur wenn queued/running, fällig (next_run_at <= now) und die Lease frei oder abgelaufen ist; Zeilenzahl 1 = übernommen
 	 */
 	public function claim(int $id, string $uid, string $leaseToken, int $now, int $until): int {
 		$qb = $this->db->getQueryBuilder();
@@ -122,6 +122,8 @@ class OneNoteImportMapper extends QBMapper {
 			->where($qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT)))
 			->andWhere($qb->expr()->eq('uid', $qb->createNamedParameter($uid)))
 			->andWhere($qb->expr()->in('status', $qb->createNamedParameter(['queued', 'running'], IQueryBuilder::PARAM_STR_ARRAY)))
+			// Backoff eines anderen Laufs gilt auch bei veraltetem findDue-Ergebnis (Review M9b-r1 Hinweis 2)
+			->andWhere($qb->expr()->orX($qb->expr()->isNull('next_run_at'), $qb->expr()->lte('next_run_at', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT))))
 			->andWhere($qb->expr()->orX($qb->expr()->isNull('lease_until'), $qb->expr()->lt('lease_until', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT))));
 		return $qb->executeStatement();
 	}

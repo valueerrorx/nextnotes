@@ -45,6 +45,8 @@ class AttachmentService {
 		'application/x-ms-dos-executable', 'application/x-msdownload', 'application/x-perl', 'application/x-python',
 		'application/x-python-code', 'application/x-ruby', 'application/x-sh', 'application/x-sharedlib', 'application/x-shellscript',
 		'text/x-perl', 'text/x-python', 'text/x-ruby', 'text/x-script.python', 'text/x-sh', 'text/x-shellscript'];
+	// Bilder aus Fremdquellen (OneNote-Import): nur diese Typen laut Inhalt, SVG nie (Plan M9 §6)
+	public const IMAGE_TYPES = ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/gif' => 'gif', 'image/webp' => 'webp', 'image/bmp' => 'bmp'];
 	private const AUDIO_EXT = ['mp3' => 'audio/mpeg', 'wav' => 'audio/wav', 'flac' => 'audio/flac', 'aac' => 'audio/aac',
 		'm4a' => 'audio/mp4', 'weba' => 'audio/webm', 'oga' => 'audio/ogg', 'opus' => 'audio/ogg'];
 
@@ -246,6 +248,42 @@ class AttachmentService {
 		$a = $this->newRow($noteId, $name, $mime, strlen($data), $uid, $origin);
 		$this->removeOnRollback($noteId, (int)$a->getId());
 		$this->noteFolder($noteId)->newFile((string)$a->getId(), $data);
+		return $a;
+	}
+
+	// Bildtyp laut Inhalt (finfo) aus IMAGE_TYPES, sonst null
+	public function imageType(string $path): ?string {
+		$mime = strtolower(trim(explode(';', $this->mimeDetector->detectContent($path), 2)[0]));
+		$mime = $mime === 'image/x-ms-bmp' ? 'image/bmp' : $mime;
+		return isset(self::IMAGE_TYPES[$mime]) ? $mime : null;
+	}
+
+	/**
+	 * Regeln wie beim Upload (Name, gesperrte Endungen und Typen) für eine Datei aus einer Fremdquelle
+	 * @return array{0: string, 1: string} Anzeigename, MIME
+	 * @throws BadRequestException
+	 */
+	public function fileRules(string $path, string $name): array {
+		$clean = self::cleanName($name);
+		return [$clean, $this->mimeOf($path, $clean)];
+	}
+
+	/** Datei (z. B. Temp-Datei) gestreamt als Anhang; Aufrufer hält die Transaktion (enforceQuota zuerst) und hat Größe und Typ geprüft */
+	public function createFromFile(int $noteId, string $name, string $mime, string $path, string $uid): Attachment {
+		$size = filesize($path);
+		$handle = fopen($path, 'rb');
+		if ($size === false || $handle === false) {
+			throw new BadRequestException('Invalid file');
+		}
+		try {
+			$a = $this->newRow($noteId, $name, $mime, $size, $uid);
+			$this->removeOnRollback($noteId, (int)$a->getId());
+			$this->noteFolder($noteId)->newFile((string)$a->getId(), $handle);
+		} finally {
+			if (is_resource($handle)) {
+				fclose($handle);
+			}
+		}
 		return $a;
 	}
 

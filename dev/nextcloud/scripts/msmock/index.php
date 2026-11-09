@@ -4,6 +4,9 @@
 // Mock für login.microsoftonline.com und graph.microsoft.com (nur Tests, Profil msmock, Plan M9 §9 M9a).
 // Steuerung über http://ms-mock/__ctl?op=…: reset, counts, set (expires_in, token_error, sub, graph_status, pages), hold/release (Pfad anhalten),
 // error (path=<host+pfad>&status=N, 0 = entfernen). M9b: Notizbuch nb1 (Abschnitt s1 mit `pages` Seiten, Gruppe g1 mit Abschnitt s2, 2 Seiten).
+// M9d: set res=<Liste>&res_n=N bettet in jede p-Seite N-mal je Art Ressourcen ein: png, jpg, mb (1 MiB PNG), pdf, big (endlos),
+// bomb (gzip, 1 MiB → 1 GiB), slow (PNG nach 5 s), svg, txt (Text als Bild), e404, e403; Abruf /me/onenote/resources/<art>-<i>-<seite>/$value.
+// tag=<a-z0-9> macht die s1-Seiten-IDs je Lauf neu (p<tag>-N), damit frühere Importe sie nicht überspringen.
 // Code-Format beim Token-Abruf: mock.<sub> (aud = client_id) oder mock-badaud.<sub> (aud falsch).
 
 declare(strict_types=1);
@@ -42,6 +45,113 @@ function b64(array $a): string {
 	return rtrim(strtr(base64_encode((string)json_encode($a)), '+/', '-_'), '=');
 }
 
+// Ressourcen-HTML wie Graph (F9): Bilder als img, Dateien als object
+function resources_html(string $list, int $n, string $page): string {
+	$out = '';
+	$base = 'https://graph.microsoft.com/v1.0/me/onenote/resources/';
+	foreach (array_filter(explode(',', $list)) as $kind) {
+		if (!preg_match('/^[a-z0-9]{1,8}$/', $kind)) {
+			continue;
+		}
+		for ($i = 0; $i < max(1, min(200, $n)); $i++) {
+			$url = $base . $kind . '-' . $i . '-' . $page . '/$value';
+			$out .= in_array($kind, ['pdf', 'big', 'bomb'], true)
+				? '<p><object data-attachment="' . ($kind === 'pdf' ? 'Handout.pdf' : $kind . '.bin') . '" type="application/' . ($kind === 'pdf' ? 'pdf' : 'octet-stream') . '" data="' . $url . '"></object></p>'
+				: '<p><img src="' . $url . '" data-src-type="image/png" width="40" height="30" alt="' . $kind . ' ' . $i . '"></p>';
+		}
+	}
+	return $out;
+}
+
+function png(int $w, int $h, int $rgb): string {
+	$im = imagecreatetruecolor($w, $h);
+	imagefill($im, 0, 0, $rgb);
+	ob_start();
+	imagepng($im);
+	return (string)ob_get_clean();
+}
+
+// gzip von 1 GiB Nullen (~1 MiB), einmal erzeugt
+function bomb(): string {
+	$file = '/tmp/msmock-bomb.gz';
+	if (!is_file($file)) {
+		$ctx = deflate_init(ZLIB_ENCODING_GZIP, ['level' => 9]);
+		$zero = str_repeat("\0", 1 << 20);
+		$h = fopen($file . '.tmp', 'wb');
+		for ($i = 0; $i < 1024; $i++) {
+			fwrite($h, deflate_add($ctx, $zero, ZLIB_NO_FLUSH));
+		}
+		fwrite($h, deflate_add($ctx, '', ZLIB_FINISH));
+		fclose($h);
+		rename($file . '.tmp', $file);
+	}
+	return $file;
+}
+
+function resource(string $kind): never {
+	while (ob_get_level() > 0) {
+		ob_end_clean();
+	}
+	if (function_exists('apache_setenv')) {
+		apache_setenv('no-gzip', '1');
+	}
+	switch ($kind) {
+		case 'png':
+			header('Content-Type: image/png');
+			echo png(40, 30, 0xCC2233);
+			exit;
+		case 'jpg':
+			$im = imagecreatetruecolor(40, 30);
+			imagefill($im, 0, 0, 0x2233CC);
+			header('Content-Type: image/jpeg');
+			imagejpeg($im);
+			exit;
+		case 'mb':
+			// gültige PNG-Signatur + 1 MiB Füllung (Typ laut Inhalt: PNG)
+			header('Content-Type: image/png');
+			echo png(4, 4, 0x22CC33) . random_bytes(1 << 20);
+			exit;
+		case 'pdf':
+			header('Content-Type: application/pdf');
+			echo "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n";
+			exit;
+		case 'big':
+			// endlos (bis 4 GiB), bricht ab, sobald der Client trennt
+			header('Content-Type: application/octet-stream');
+			$chunk = str_repeat('A', 65536);
+			for ($i = 0; $i < 65536 && !connection_aborted(); $i++) {
+				echo $chunk;
+				flush();
+			}
+			exit;
+		case 'bomb':
+			header('Content-Type: application/octet-stream');
+			header('Content-Encoding: gzip');
+			$file = bomb();
+			header('Content-Length: ' . filesize($file));
+			readfile($file);
+			exit;
+		case 'slow':
+			sleep(5);
+			header('Content-Type: image/png');
+			echo png(40, 30, 0x999999);
+			exit;
+		case 'svg':
+			header('Content-Type: image/svg+xml');
+			echo '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><script>alert(1)</script><rect width="10" height="10"/></svg>';
+			exit;
+		case 'txt':
+			header('Content-Type: image/png');
+			echo "kein Bild, nur Text\n";
+			exit;
+		case 'e404':
+			json(404, ['error' => ['code' => '20102', 'message' => 'mock not found']]);
+		case 'e403':
+			json(403, ['error' => ['code' => '40001', 'message' => 'mock forbidden']]);
+	}
+	json(404, ['error' => ['code' => '20102', 'message' => 'mock unknown resource']]);
+}
+
 $host = strtolower(explode(':', $_SERVER['HTTP_HOST'] ?? '')[0]);
 $path = (string)parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $https = ($_SERVER['HTTPS'] ?? '') === 'on';
@@ -57,7 +167,7 @@ if (!$https && str_starts_with($path, '/__ctl')) {
 			case 'counts':
 				return ['counts' => $s['counts']];
 			case 'set':
-				foreach (['expires_in', 'token_error', 'sub', 'graph_status', 'pages'] as $k) {
+				foreach (['expires_in', 'token_error', 'sub', 'graph_status', 'pages', 'res', 'res_n', 'tag'] as $k) {
 					if (isset($_GET[$k])) {
 						$s['settings'][$k] = $_GET[$k];
 					}
@@ -163,7 +273,8 @@ if ($host === 'graph.microsoft.com') {
 		json(200, ['value' => []]);
 	}
 	if (preg_match('#^/v1\.0/me/onenote/sections/(s1|s2)/pages$#', $path, $m)) {
-		$ids = $m[1] === 's1' ? array_map(static fn (int $i): string => 'p-' . $i, $n > 0 ? range(0, $n - 1) : []) : ['q-0', 'q-1'];
+		$tag = preg_match('/^[a-z0-9]{1,16}$/', (string)($settings['tag'] ?? '')) ? (string)$settings['tag'] : '';
+		$ids = $m[1] === 's1' ? array_map(static fn (int $i): string => 'p' . $tag . '-' . $i, $n > 0 ? range(0, $n - 1) : []) : ['q-0', 'q-1'];
 		$skip = (int)($_GET['$skip'] ?? 0);
 		$top = max(1, min(100, (int)($_GET['$top'] ?? 20)));
 		$value = [];
@@ -177,10 +288,14 @@ if ($host === 'graph.microsoft.com') {
 		}
 		json(200, $out);
 	}
-	if (preg_match('#^/v1\.0/me/onenote/pages/([pq]-\d+)/content$#', $path, $m)) {
+	if (preg_match('#^/v1\.0/me/onenote/pages/([pq][a-z0-9]{0,16}-\d+)/content$#', $path, $m)) {
 		header('Content-Type: text/html');
-		echo '<html><body data-absolute-enabled="true"><div style="position:absolute;left:10px;top:20px"><p>Inhalt ' . $m[1] . '</p></div></body></html>';
+		echo '<html><body data-absolute-enabled="true"><div style="position:absolute;left:10px;top:20px"><p>Inhalt ' . $m[1] . '</p>'
+			. ($m[1][0] === 'p' ? resources_html((string)($settings['res'] ?? ''), (int)($settings['res_n'] ?? 1), $m[1]) : '') . '</div></body></html>';
 		exit;
+	}
+	if (preg_match('#^/v1\.0/me/onenote/resources/([a-z0-9]+)-\d+-[pq][a-z0-9]{0,16}-\d+/\$value$#', $path, $m)) {
+		resource($m[1]);
 	}
 	json(404, ['error' => ['code' => '20102', 'message' => 'mock not found']]);
 }

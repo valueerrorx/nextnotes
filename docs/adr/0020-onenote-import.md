@@ -55,3 +55,9 @@ Option 1, dazu Option 3 nur als Doku.
 - Laufbudget je Import (50 Anfragen), Zeit je Lauf 120 s; Lauf-Ende setzt `queued` und gibt die Lease frei. Ziel-Workspace/-Ordner während des Imports gelöscht → Notizbuch wird neu aufgebaut (Items verhindern Duplikate).
 - Zusätzliche `error_code`: `graph_unavailable` (10 Fehlversuche), `stalled` (7 Tage ohne Fortschritt). Bericht: Liste `{t, r}` mit `r` ∈ `not_found|forbidden|too_large|error|invalid_id`, ab 200 ein Sammeleintrag `more`.
 - Konverter: `OneNote\Convert\PageConverter` (M9c) direkt; Ressourcen bleiben bis M9d Platzhalter und zählen als `resources_failed`.
+
+## Nachtrag M9d (Umsetzung)
+- Abbruch beim Lesen über die `IClient`-Option `sink` mit eigenem zählendem PSR-7-Stream (`LimitedSink`); NC 35 nutzt fest den `CurlHandler`, `stream => true` wirkt dort nicht, `progress` kann nicht abbrechen. curl liefert dekodierte Bytes, die Grenze gilt also nach gzip/br.
+- Ressourcen werden Anhänge über `AttachmentService` (Regeln wie Uploads, gestreamt aus Temp-Dateien); Bilder nur PNG/JPEG/GIF/WebP/BMP laut Inhalt.
+- Bericht: zusätzlich `{t, r: resources, n}` für angelegte Seiten mit fehlenden Bildern/Dateien; zählt in `onenote_done` nicht als „nicht importiert“.
+- `tree`: höchstens 25 Graph-Anfragen je Aufruf (Teams seitenweise über `teams_next`), harte Obergrenze 50.

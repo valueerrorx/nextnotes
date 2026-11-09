@@ -1,10 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Thomas Weissel
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // M9b (Plan M9 §9 M9b): Einstellungen-Karte, Auswahl (eigene vorausgewählt), Start, Job per occ, Fortschritt und Ergebnis; Mobil 390 px.
+// M9d: importierte Seite mit Bild (sichtbar) und PDF (Anhang herunterladbar).
 // Gegen den Mock (Profil msmock, dev/nextcloud/msmock.sh up); Autorisierung per page.route wie onenote-connect.mjs.
 import { execFileSync } from 'node:child_process';
 import { runSpec } from './lib/harness.mjs';
 import { ncContainer } from './lib/docker.mjs';
+import { apiClient } from './lib/api.mjs';
 
 const RUN = `${process.argv[3]}${Date.now().toString(36)}`;
 const TENANT = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
@@ -17,7 +19,8 @@ await runSpec(import.meta.url, async (ctx, page, context) => {
 	const sh = (cmd) => execFileSync('docker', ['exec', '-u', 'www-data', nc, 'sh', '-c', cmd], { encoding: 'utf8' }).trim();
 	const occ = (...a) => execFileSync('docker', ['exec', '-u', 'www-data', nc, 'php', 'occ', ...a], { encoding: 'utf8' }).trim();
 	if (!sh('curl -fsS --max-time 5 "http://ms-mock/__ctl?op=reset" || echo down').includes('ok')) throw new Error('Mock nicht erreichbar: dev/nextcloud/msmock.sh <env> up');
-	sh('curl -fsS --max-time 5 "http://ms-mock/__ctl?op=set&pages=3" >/dev/null');
+	const TAG = RUN.toLowerCase().replace(/[^a-z0-9]/g, '').slice(-12);
+	sh(`curl -fsS --max-time 5 "http://ms-mock/__ctl?op=set&pages=3&res=png,pdf&res_n=1&tag=${TAG}" >/dev/null`);
 	occ('config:app:set', 'nextnotes', 'onenote_authority', `--value=${TENANT}`);
 	occ('config:app:set', 'nextnotes', 'onenote_client_id', `--value=${CLIENT}`);
 	occ('config:app:set', 'nextnotes', 'onenote_secret', `--value=${SECRET}`, '--lazy', '--sensitive');
@@ -99,6 +102,31 @@ await runSpec(import.meta.url, async (ctx, page, context) => {
 		await page.goto(ctx.appUrl('index.php'), { waitUntil: 'networkidle' });
 		ctx.ok((await page.content()).includes('Mock-Buch'), 'C: neuer Workspace in der App');
 		ctx.assertClean('C Job', m);
+	}
+
+	// E. M9d: Seite mit Bild (geladen) und PDF-Anhang (Download 200, PDF)
+	{
+		const m = ctx.mark();
+		const api = apiClient(ctx, page.request);
+		const found = (await api.must('GET', `/notes?search=${encodeURIComponent(`Inhalt p${TAG}-0`)}`)).notes ?? [];
+		ctx.ok(found.length === 1, 'E: importierte Seite gefunden', JSON.stringify(found).slice(0, 160));
+		const n = found[0] ?? {};
+		const bad = [];
+		page.on('response', (r) => { if (/\/attachments\/\d+/.test(r.url()) && r.status() >= 400) bad.push(`${r.status()} ${r.url()}`); });
+		await page.goto(ctx.appUrl(`index.php?workspace=${encodeURIComponent(n.workspace)}&note=${n.id}`), { waitUntil: 'networkidle' });
+		const img = page.locator(`#entry${n.id} img[src*="/attachments/"]`).first();
+		await img.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+		const loaded = (await img.count()) ? await img.evaluate((el) => el.complete && el.naturalWidth === 40) : false;
+		ctx.ok(loaded, 'E: Bild sichtbar und geladen (40 px breit)');
+		const link = page.locator(`#entry${n.id} a[href*="/attachments/"]`).first();
+		ctx.ok((await link.count()) === 1 && (await link.innerText()).includes('Handout.pdf'), 'E: PDF als Link mit Dateinamen');
+		const href = (await link.count()) ? await link.getAttribute('href') : '';
+		const res = await page.request.get(new URL(href || 'about:blank', page.url()).toString());
+		const body = await res.body();
+		ctx.ok(res.status() === 200 && body.subarray(0, 5).toString() === '%PDF-', 'E: Anhang herunterladbar', `${res.status()} ${href}`);
+		ctx.ok(bad.length === 0, 'E: kein 4xx auf Anhänge', bad.join(' | '));
+		await ctx.screenshot(page, 'resources');
+		ctx.assertClean('E Ressourcen', m);
 	}
 
 	// D. nextcloud.log ohne Token, Code, Secret

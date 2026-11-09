@@ -26,6 +26,7 @@ use OCA\NextNotes\Service\Exception\ForbiddenException;
 use OCA\NextNotes\Service\Exception\NotFoundException;
 use OCA\NextNotes\Service\Exception\TooLargeException;
 use OCA\NextNotes\Service\Exception\TooManyRequestsException;
+use OCA\NextNotes\Service\AttachmentService;
 use OCA\NextNotes\Service\FolderService;
 use OCA\NextNotes\Service\NoteService;
 use OCA\NextNotes\Service\Transaction;
@@ -52,6 +53,10 @@ class OneNoteImportService {
 	public const MAX_SELECTION = 200;
 	public const NOT_FOUND_LIMIT = 20;
 	public const TEAMS_PER_CALL = 20;
+	// Graph-Anfragen je tree-Aufruf; darüber „weitere laden“ (Review M9b-r1 Hinweis 7)
+	public const TREE_REQUESTS = 25;
+	// Seitentitel im Cursor (Review M9b-r1 Hinweis 6)
+	public const CURSOR_TITLE = 200;
 	private const DUE_BATCH = 20;
 	private const SELECT_TTL = 86400;
 	private const REAUTH_TTL = 7 * 86400;
@@ -83,6 +88,8 @@ class OneNoteImportService {
 		private IFactory $l10n,
 		private OneNoteNotifications $notify,
 		private LoggerInterface $logger,
+		private ResourceFetcher $fetcher,
+		private AttachmentService $attachments,
 	) {
 	}
 
@@ -100,9 +107,15 @@ class OneNoteImportService {
 		try {
 			$notebooks = $teamOffset === 0 ? $this->notebookList($run, 'me', null) : [];
 			$more = false;
+			$next = $teamOffset;
 			if ($teamsAllowed) {
 				$teams = $this->joinedTeams($run);
 				foreach (array_slice($teams, $teamOffset, self::TEAMS_PER_CALL) as $team) {
+					// Anfragen je Web-Request begrenzt (mindestens ein Team je Aufruf): Rest über teams_next
+					if ($run->requests >= self::TREE_REQUESTS && $next > $teamOffset) {
+						break;
+					}
+					$next++;
 					try {
 						array_push($notebooks, ...$this->notebookList($run, 'group:' . $team['id'], $team['name']));
 					} catch (GraphException $e) {
@@ -112,7 +125,7 @@ class OneNoteImportService {
 						}
 					}
 				}
-				$more = count($teams) > $teamOffset + self::TEAMS_PER_CALL;
+				$more = count($teams) > $next;
 			}
 		} catch (TokenException $e) {
 			throw new ConflictException('Microsoft sign-in is no longer valid', ['code' => $e->reason === 'failed' ? 'invalid_client' : 'reconnect']);
@@ -122,7 +135,7 @@ class OneNoteImportService {
 			}
 			throw new ConflictException('Microsoft Graph request failed', ['code' => 'graph_error']);
 		}
-		return ['notebooks' => $notebooks, 'teams' => $teamsAllowed, 'teams_more' => $more, 'teams_next' => $teamOffset + self::TEAMS_PER_CALL];
+		return ['notebooks' => $notebooks, 'teams' => $teamsAllowed, 'teams_more' => $more, 'teams_next' => $next, 'incomplete' => $run->truncated];
 	}
 
 	/**
@@ -256,7 +269,8 @@ class OneNoteImportService {
 	/** @return list<array<string, mixed>> value-Listen mit nextLink (nur Graph-Präfix) */
 	private function listAll(ImportRun $run, string $url): array {
 		$out = [];
-		for ($i = 0; $i < self::LIST_FOLLOW_MAX && $url !== null; $i++) {
+		// harte Obergrenze je tree-Aufruf (nur tree nutzt listAll)
+		for ($i = 0; $i < self::LIST_FOLLOW_MAX && $url !== null && $run->requests < 2 * self::TREE_REQUESTS; $i++) {
 			$data = $this->fetch($run, $url)->json() ?? [];
 			foreach (is_array($data['value'] ?? null) ? $data['value'] : [] as $v) {
 				if (is_array($v)) {
@@ -264,6 +278,9 @@ class OneNoteImportService {
 				}
 			}
 			$url = self::nextLink($data);
+		}
+		if ($url !== null) {
+			$run->truncated = true;
 		}
 		return $out;
 	}
@@ -396,6 +413,8 @@ class OneNoteImportService {
 			return;
 		}
 		$name = self::name($nb) !== '' ? self::name($nb) : (string)$sel['name'];
+		// Stand vor den Berichtseinträgen dieses Notizbuchs (Neuaufbau nach RestructureException)
+		$base = $run->mark();
 		$top = self::children($nb);
 		if ($sel['items'] !== null) {
 			$wanted = [];
@@ -410,10 +429,12 @@ class OneNoteImportService {
 			}
 		}
 		try {
-			$this->inTx($run, function () use ($run, $sel, $nb, $name, $top, $index): void {
+			$this->inTx($run, function () use ($run, $sel, $nb, $name, $top, $index, $base): void {
 				$ws = $this->targetWorkspace($run, (string)$sel['notebook'], $name, PageConverter::timestamp(is_string($nb['lastModifiedDateTime'] ?? null) ? $nb['lastModifiedDateTime'] : null));
 				$wsId = (int)$ws->getId();
 				$this->folders->lockWorkspace($wsId);
+				// Neuaufbau nach RestructureException zählt und berichtet nicht doppelt
+				$run->cursor['base'] = $base;
 				$queue = [];
 				foreach ($top as $order => $el) {
 					$this->buildFolders($run, (string)$sel['root'], $index, $wsId, null, $el, $order, $queue, 0);
@@ -485,7 +506,9 @@ class OneNoteImportService {
 				$run->report($title, 'invalid_id');
 				continue;
 			}
-			$pages[] = ['id' => $pid, 't' => mb_substr($title, 0, 1000), 'c' => (string)($p['createdDateTime'] ?? ''), 'm' => (string)($p['lastModifiedDateTime'] ?? ''),
+			$pages[] = ['id' => $pid, 't' => mb_substr(trim($title), 0, self::CURSOR_TITLE),
+				'c' => PageConverter::timestamp(is_string($p['createdDateTime'] ?? null) ? $p['createdDateTime'] : null),
+				'm' => PageConverter::timestamp(is_string($p['lastModifiedDateTime'] ?? null) ? $p['lastModifiedDateTime'] : null),
 				'l' => max(0, min(2, (int)($p['level'] ?? 0))), 'o' => (int)($p['order'] ?? 0)];
 		}
 		$next = self::nextLink($data);
@@ -502,7 +525,7 @@ class OneNoteImportService {
 		$this->save($run);
 	}
 
-	// Je Seite (§4.4.4): vorhandenes Ziel → überspringen; sonst Inhalt holen, konvertieren und in einer Transaktion anlegen
+	// Je Seite (§4.4.4, §6): vorhandenes Ziel → überspringen; sonst Inhalt und Ressourcen ohne Transaktion holen, Quote prüfen, in einer Transaktion anlegen
 	private function pageStep(ImportRun $run): void {
 		$cur = $run->cursor['cur'];
 		$page = $cur['pages'][0];
@@ -510,16 +533,25 @@ class OneNoteImportService {
 		$item = $this->items->findBySource($run->uid(), $hash);
 		if ($item !== null && $this->noteExists((int)$item->getTargetId())) {
 			$this->popPage($run);
-			$run->pagesSkipped++;
+			// von diesem Import angelegt (Neuaufbau nach RestructureException): zählt als angelegt
+			if ((int)$item->getImportId() === $run->id()) {
+				$run->pagesDone++;
+			} else {
+				$run->pagesSkipped++;
+			}
 			$run->notFoundStreak = 0;
 			$this->save($run);
 			return;
 		}
+		$wsId = (int)$cur['w'];
+		// Quote vor dem Inhaltsabruf: kein freier Platz → failed/quota (§6)
+		if ($this->quota($wsId, 1) === false) {
+			$this->failQuota($run);
+		}
 		$title = PageConverter::title((string)$page['t'], (int)$page['l'], $run->l);
 		$url = GraphClient::PREFIX . GraphClient::rootPath((string)$cur['r']) . '/onenote/pages/' . rawurlencode((string)$page['id']) . '/content';
-		$tooLarge = false;
 		try {
-			$html = $this->fetch($run, $url, self::PAGE_LIMIT)->body;
+			$converted = $this->converter->convert($this->fetch($run, $url, self::PAGE_LIMIT)->body, $run->l);
 		} catch (GraphException $e) {
 			if ($e->reason !== 'too_large') {
 				$this->skipOnError($run, $e, $title);
@@ -527,49 +559,91 @@ class OneNoteImportService {
 				$this->saveOrFail($run);
 				return;
 			}
-			$html = '';
-			$tooLarge = true;
+			$converted = null;
 		}
-		$converted = $tooLarge ? null : $this->converter->convert($html, $run->l);
-		$content = $converted === null || $converted->tooLarge ? self::tooLargeHint($run->l) : $this->converter->applyResources($converted->html, [], $run->l);
-		// M9b: Ressourcen werden noch nicht geholt (M9d) und bleiben Platzhalter
-		$placeholders = $converted === null ? 0 : count($converted->resources) + $converted->skippedResources;
-		$created = PageConverter::timestamp((string)$page['c']) ?? $this->time->getTime();
-		$modified = PageConverter::timestamp((string)$page['m']) ?? $created;
+		$hint = $converted === null || $converted->tooLarge;
+		$html = $hint ? PageConverter::tooLargeHint($run->l) : $converted->html;
+		$resources = $hint ? [] : $converted->resources;
+		// Seitenstart (§4.5): passen die Ressourcen nicht mehr ins Stundenfenster, endet der Lauf vor ihnen
+		if ($resources !== [] && $this->graph->remaining($run->import) < count($resources)) {
+			throw new GraphException('budget', 0, $this->graph->freeAt($run->import, count($resources)));
+		}
+		$batch = null;
 		try {
-			$this->inTx($run, function () use ($run, $cur, $item, $hash, $title, $content, $created, $modified, $page, $placeholders, $converted, $tooLarge): void {
+			$batch = $resources === [] ? new ResourceBatch()
+				: $this->fetcher->fetch((string)$cur['r'], $resources, fn (string $u, string $file, int $limit, int $timeout): HttpResult => $this->fetch($run, $u, $limit, $file, $timeout));
+			// Quote mit Summe der Ressourcen + HTML vor der Transaktion (§6)
+			$quota = $this->quota($wsId, $batch->bytes + strlen($html));
+			if ($quota === false) {
+				$this->failQuota($run);
+			}
+			$this->writePage($run, $cur, $page, $item, $hash, $title, $html, $hint, $batch, $quota, ($converted?->skippedResources ?? 0));
+		} finally {
+			$batch?->cleanup();
+		}
+	}
+
+	/**
+	 * Seite in einer Transaktion: Lease-Check, Quote unter Sperre, Notiz, Anhänge aus den Temp-Dateien, Item, Cursor und Zähler
+	 * @param array<string, mixed> $cur
+	 * @param array<string, mixed> $page
+	 * @param array{type: string, id: string, ws: int, bytes: int}|null $quota
+	 */
+	private function writePage(ImportRun $run, array $cur, array $page, ?OneNoteItem $item, string $hash, string $title, string $html, bool $hint,
+		ResourceBatch $batch, ?array $quota, int $skipped): void {
+		$created = self::cursorTime($page['c'] ?? null) ?? $this->time->getTime();
+		$modified = self::cursorTime($page['m'] ?? null) ?? $created;
+		try {
+			$this->inTx($run, function () use ($run, $cur, $page, $item, $hash, $title, $html, $hint, $batch, $quota, $skipped, $created, $modified): void {
+				$this->attachments->enforceQuota($quota);
 				$wsId = (int)$cur['w'];
-				if (!$this->ownWorkspace($run->uid(), $wsId)) {
-					throw new RestructureException();
-				}
-				$this->folders->lockWorkspace($wsId);
 				$folderId = (int)$cur['f'];
-				if (!$this->folderIn($folderId, $wsId)) {
+				// erst sperren, dann Besitz prüfen (Review M9b-r1 Hinweis 1)
+				if ($this->workspaceRows->lockRows([$wsId]) !== 1 || !$this->ownWorkspace($run->uid(), $wsId) || !$this->folderIn($folderId, $wsId)) {
 					throw new RestructureException();
 				}
-				$hint = $tooLarge || ($converted?->tooLarge ?? false);
+				$note = $this->notes->createImported($run->uid(), $wsId, $folderId, $title, '', $created, $modified, (int)$page['o']);
+				$noteId = (int)$note->getId();
+				$urls = [];
+				foreach ($batch->files as $index => $f) {
+					$a = $this->attachments->createFromFile($noteId, $f['name'], $f['mime'], $f['path'], $run->uid());
+					$urls[$index] = '/api/v1/notes/' . $noteId . '/attachments/' . (int)$a->getId();
+				}
 				try {
-					$note = $this->notes->createImported($run->uid(), $wsId, $folderId, $title, $content, $created, $modified, (int)$page['o']);
+					$this->notes->setImportedContent($note, $hint ? $html : $this->converter->applyResources($html, $urls, $run->l));
 				} catch (TooLargeException) {
-					$note = $this->notes->createImported($run->uid(), $wsId, $folderId, $title, self::tooLargeHint($run->l), $created, $modified, (int)$page['o']);
+					$this->notes->setImportedContent($note, PageConverter::tooLargeHint($run->l));
 					$hint = true;
 				}
-				$this->link($run, $item, $hash, 'page', (int)$note->getId(), $modified);
+				$this->link($run, $item, $hash, 'page', $noteId, $modified);
 				if ($hint) {
 					$run->report($title, 'too_large');
 				}
+				$missing = $skipped + count($batch->failed);
+				if ($missing > 0) {
+					$run->report($title, 'resources', $missing);
+				}
 				$this->popPage($run);
 				$run->pagesDone++;
-				$run->resourcesFailed += $placeholders;
+				$run->resourcesDone += count($batch->files);
+				$run->resourcesFailed += $missing;
 				$run->notFoundStreak = 0;
 				// erst eine angelegte Seite setzt das Backoff zurück (§4.5)
 				$run->backoffLevel = 0;
 				$this->save($run);
 			});
-		} catch (RestructureException) {
-			// Ziel-Workspace oder -Ordner weg bzw. nicht mehr eigen: Notizbuch neu aufbauen, vorhandene Seiten werden übersprungen
+		} catch (TooLargeException) {
+			// Quote unter Sperre überschritten: zurückgerollt
 			$this->reload($run);
-			$run->cursor = ['nb' => (int)$cur['i'], 'queue' => [], 'cur' => null];
+			$this->failQuota($run);
+		} catch (RestructureException) {
+			// Ziel-Workspace oder -Ordner weg bzw. nicht mehr eigen: Notizbuch neu aufbauen, Zähler ab Stand vor dem Notizbuch
+			$this->reload($run);
+			$base = $run->cursor['base'];
+			$run->cursor = ['nb' => (int)$cur['i'], 'queue' => [], 'cur' => null, 'base' => null];
+			if ($base !== null) {
+				$run->rewind($base);
+			}
 			$this->save($run);
 		} catch (DbException $e) {
 			if ($e->getReason() !== DbException::REASON_UNIQUE_CONSTRAINT_VIOLATION) {
@@ -581,6 +655,28 @@ class OneNoteImportService {
 			$run->pagesSkipped++;
 			$this->save($run);
 		}
+	}
+
+	// Vorprüfung ohne Sperre; false = überschritten, null = nichts zu prüfen bzw. Workspace weg (die Transaktion prüft)
+	private function quota(int $wsId, int $bytes): array|false|null {
+		try {
+			return $this->attachments->quotaFor($wsId, $bytes);
+		} catch (TooLargeException) {
+			return false;
+		} catch (DoesNotExistException) {
+			return null;
+		}
+	}
+
+	// Zeitstempel im Cursor: Unix (M9d) oder ISO-Text (Cursor aus M9b)
+	private static function cursorTime(mixed $v): ?int {
+		return is_int($v) ? $v : (is_string($v) ? PageConverter::timestamp($v) : null);
+	}
+
+	private function failQuota(ImportRun $run): never {
+		$this->save($run);
+		$this->connect->fail($run->import, 'quota', $run->lease);
+		throw new GraphException('lease');
 	}
 
 	private function popPage(ImportRun $run): void {
@@ -667,11 +763,11 @@ class OneNoteImportService {
 	 * Graph-GET mit Token-Erneuerung (§4.6): vor der Anfrage bei Ablauf < 5 min, nach 401 einmal Refresh und Wiederholung, dann reauth
 	 * @throws GraphException|TokenException
 	 */
-	private function fetch(ImportRun $run, string $url, int $limit = HttpGate::JSON_LIMIT): HttpResult {
+	private function fetch(ImportRun $run, string $url, int $limit = HttpGate::JSON_LIMIT, ?string $file = null, int $timeout = HttpGate::TIMEOUT): HttpResult {
 		$run->requests++;
 		$token = $this->connect->accessToken($run->import, $run->lease);
 		try {
-			return $this->graph->get($run->import, $token, $url, $run->lease, $limit);
+			return $this->graph->get($run->import, $token, $url, $run->lease, $limit, $file, $timeout);
 		} catch (GraphException $e) {
 			if ($e->reason !== 'unauthorized') {
 				throw $e;
@@ -680,7 +776,7 @@ class OneNoteImportService {
 		$token = $this->connect->refresh($run->import, $run->lease);
 		$run->requests++;
 		try {
-			return $this->graph->get($run->import, $token, $url, $run->lease, $limit);
+			return $this->graph->get($run->import, $token, $url, $run->lease, $limit, $file, $timeout);
 		} catch (GraphException $e) {
 			if ($e->reason === 'unauthorized') {
 				$this->connect->toReauth($run->import, 'invalid_grant', $run->lease);
@@ -742,7 +838,8 @@ class OneNoteImportService {
 	private function targetWorkspace(ImportRun $run, string $graphId, string $name, ?int $modified): Workspace {
 		$hash = OneNoteItemMapper::hash('notebook', $graphId);
 		$item = $this->items->findBySource($run->uid(), $hash);
-		if ($item !== null && $this->ownWorkspace($run->uid(), (int)$item->getTargetId())) {
+		// erst sperren, dann Besitz prüfen (Review M9b-r1 Hinweis 1)
+		if ($item !== null && $this->workspaceRows->lockRows([(int)$item->getTargetId()]) === 1 && $this->ownWorkspace($run->uid(), (int)$item->getTargetId())) {
 			return $this->workspaceRows->find((int)$item->getTargetId());
 		}
 		$ws = $this->workspaces->createImported($run->uid(), $name !== '' ? $name : 'OneNote');
@@ -793,12 +890,14 @@ class OneNoteImportService {
 
 	public function cleanup(): void {
 		$now = $this->time->getTime();
+		$this->fetcher->cleanStale($now);
 		foreach ($this->imports->findStale(['auth'], 'auth_expires_at', $now) as $i) {
 			$this->imports->deleteWhere((int)$i->getId(), (string)$i->getUid(), ['status' => 'auth', 'updated_at' => (int)$i->getUpdatedAt()]);
 		}
-		$expire = ['select' => self::SELECT_TTL, 'reauth' => self::REAUTH_TTL];
-		foreach ($expire as $status => $ttl) {
-			foreach ($this->imports->findStale([$status], 'updated_at', $now - $ttl) as $i) {
+		// select: ab Anlage (Token ≤ 24 h, §7; Refresh in tree verlängert nicht), reauth: ab letzter Änderung
+		$expire = ['select' => [self::SELECT_TTL, 'created_at'], 'reauth' => [self::REAUTH_TTL, 'updated_at']];
+		foreach ($expire as $status => [$ttl, $column]) {
+			foreach ($this->imports->findStale([$status], $column, $now - $ttl) as $i) {
 				$this->imports->updateWhere((int)$i->getId(), (string)$i->getUid(), ConnectService::cleared()
 					+ ['status' => 'expired', 'finished_at' => $now, 'updated_at' => $now], ['status' => $status, 'updated_at' => (int)$i->getUpdatedAt()]);
 			}
@@ -834,10 +933,5 @@ class OneNoteImportService {
 	private static function name(mixed $el): string {
 		$n = is_array($el) && is_string($el['displayName'] ?? null) ? trim($el['displayName']) : '';
 		return mb_substr($n, 0, 255);
-	}
-
-	// Seiten-HTML über 16 MiB (Abbruch beim Lesen): gleicher Hinweis wie der Konverter
-	private static function tooLargeHint(IL10N $l): string {
-		return '<p>' . htmlspecialchars($l->t('This OneNote page was too large or too complex to import.'), ENT_QUOTES, 'UTF-8') . '</p>';
 	}
 }

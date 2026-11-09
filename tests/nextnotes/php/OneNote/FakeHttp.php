@@ -15,11 +15,14 @@ use OCP\Http\Client\IPromise;
 use OCP\Http\Client\IResponse;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\StreamInterface;
 
 // Gefälschter IClientService (M9a Done 8): zeichnet jede Anfrage mit allen Optionen auf, Antworten aus $responder
 final class FakeHttp implements IClientService {
 	/** @var list<array{method: string, url: string, options: array<string, mixed>}> */
 	public array $calls = [];
+	// an sink übergebene Bytes (Abbruch an der Grenze)
+	public int $written = 0;
 	/** @var \Closure(string, string, array<string, mixed>): (IResponse|\Throwable) */
 	public \Closure $responder;
 
@@ -37,6 +40,16 @@ final class FakeHttp implements IClientService {
 		$r = ($this->responder)($method, $url, $options);
 		if ($r instanceof \Throwable) {
 			throw $r;
+		}
+		// wie Guzzle CurlHandler: Body stückweise in sink; kürzere Rückgabe bricht ab (curl Fehler 23)
+		$sink = $options['sink'] ?? null;
+		if ($sink instanceof StreamInterface && $r instanceof FakeResponse) {
+			foreach ($r->chunks() as $chunk) {
+				$this->written += strlen($chunk);
+				if ($sink->write($chunk) < strlen($chunk)) {
+					throw new \RuntimeException('cURL error 23: Failure writing output to destination');
+				}
+			}
 		}
 		return $r;
 	}

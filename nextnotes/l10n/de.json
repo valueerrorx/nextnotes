@@ -378,6 +378,7 @@
   "Team and class notebooks can contain content of other people, for example of classmates. Nothing is selected there: choose only what you need.": "Team- und Klassennotizbücher können Inhalte anderer Personen enthalten, zum Beispiel von Mitschülerinnen und Mitschülern. Dort ist nichts ausgewählt: Wähle nur aus, was du brauchst.",
   "Loading notebooks …": "Notizbücher werden geladen …",
   "Load more teams": "Weitere Teams laden",
+  "Not all notebooks could be loaded.": "Nicht alle Notizbücher konnten geladen werden.",
   "Import selected": "Auswahl importieren",
   "Pages imported": "Importierte Seiten",
   "Pages found": "Gefundene Seiten",
@@ -388,6 +389,10 @@
   "_and %n more_::_and %n more_": [
    "und %n weiterer",
    "und %n weitere"
+  ],
+  "_imported, %n image or file missing_::_imported, %n images or files missing_": [
+   "angelegt, %n Bild oder Datei fehlt",
+   "angelegt, %n Bilder oder Dateien fehlen"
   ],
   "Start a new import": "Neuen Import starten",
   "The Microsoft sign-in has expired. Connect again.": "Die Microsoft-Anmeldung ist abgelaufen. Verbinde dich erneut.",

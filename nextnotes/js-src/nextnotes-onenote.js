@@ -194,6 +194,7 @@
 				if (!notebooks.length) loading.hidden = false, loading.textContent = msg('empty');
 				teamsNext = res.data.teams_next || 0;
 				more.hidden = !res.data.teams_more;
+				if (res.data.incomplete) document.getElementById('nextnotes-onenote-incomplete').hidden = false;
 				updateStart();
 			}).catch(function () {
 				loading.hidden = true;

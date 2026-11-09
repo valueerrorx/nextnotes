@@ -194,7 +194,7 @@ UNIQUE `nn_oni_src`(uid, source_hash); `nn_oni_tgt`(kind, target_id).
    3. Seitenliste je Abschnitt: `GET {root}/onenote/sections/{id}/pages?pagelevel=true&$select=id,title,createdDateTime,lastModifiedDateTime,level,order&$top=100`, `nextLink` folgen, nach `order` sortieren. `pages_total` hochzählen.
    4. Je Seite:
       - Steht sie schon in Items und das Ziel existiert → überspringen.
-      - Sonst ohne Transaktion: Inhalt holen, Ressourcen zählen, Budget prüfen (§4.5), Ressourcen in Temp-Dateien holen (§6), Quote mit der Summe prüfen. Dann in **einer** Transaktion: Lease-Check, Notiz, Anhänge, Item, Cursor und Zähler. Temp-Dateien werden im `finally` gelöscht.
+      - Sonst ohne Transaktion: Inhalt holen, Ressourcen zählen, Budget prüfen (§4.5), Ressourcen in Temp-Dateien holen (§6), Quote mit der Summe prüfen. Dann in **einer** Transaktion: Lease-Check, Notiz, Anhänge, Item, Cursor und Zähler. Temp-Dateien werden im `finally` gelöscht; Reste eines hart beendeten Prozesses (`oc_tmp_*.nn-onenote`, älter als 1 h, nur reguläre Dateien) löscht das Aufräumen jedes Job-Laufs (M9d-fix).
       - Graph 404 für Notizbuch, Abschnitt oder Seite → überspringen, Bericht, `not_found_streak++`. Ab 20 in Folge: `failed`, `error_code=graph_not_found`, Token löschen. Jede angelegte oder übersprungene vorhandene Seite setzt `not_found_streak` auf 0. Ressourcen-404 zählen nicht, sie werden Platzhalter.
       - Graph 403 für Notizbuch, Abschnitt oder Seite (z. B. Team verlassen, Zustimmung entzogen) → überspringen, Bericht mit Grund „kein Zugriff“, eigener Zähler im Bericht. 403 zählt nicht zu `not_found_streak` und nicht zu den Fehlversuchen. Ressourcen-403 → Platzhalter.
    5. Ende: `done`, Token löschen, Benachrichtigung.
@@ -230,7 +230,7 @@ UNIQUE `nn_oni_src`(uid, source_hash); `nn_oni_tgt`(kind, target_id).
 |---|---|
 | Notizbuch | eigener neuer Workspace `kind=normal`, `owner_type=user`. Name = `displayName`, bei Kollision „Name (OneNote)“, dann „(2)“ … (Regeln `WorkspaceService`). Kein Import in Team-Workspaces (Datenschutz, §8). |
 | Abschnittsgruppe, Abschnitt | Ordner, verschachtelt wie im Notizbuch; Name gekürzt auf 255 |
-| Seite | Notiz `type=note`, `heading` = Titel (leer → l10n „Ohne Titel“), `created_at`/`updated_at` = `createdDateTime`/`lastModifiedDateTime` (UTC → Unix), `created_by`/`updated_by` = uid, `display_order` = `order` |
+| Seite | Notiz `type=note`, `heading` = Titel gekürzt auf 200 Zeichen (Cursor-Grenze, M9d; leer → l10n „Ohne Titel“), `created_at`/`updated_at` = `createdDateTime`/`lastModifiedDateTime` (UTC → Unix), `created_by`/`updated_by` = uid, `display_order` = `order` |
 | Unterseite (`level` 1, 2) | bleibt flach direkt hinter der Elternseite, Titelpräfix „› “ je Ebene |
 | `body`-Kinder absolut positioniert | stabil sortiert nach (top, left) in px (fehlend = 120/48 wie OneNote-Standardlage, Learn abs-pos; M9c), dann nacheinander ausgegeben. `position/left/top/width` entfallen. |
 | `data-tag="to-do"`, `"to-do:completed"`, `to-do-priority-1/2` und alle weiteren Kontrollkästchen-Kennzeichen (`discuss-with-*`, `schedule-meeting`, `call-back`, `client-request`; M9c) | aufeinanderfolgende Elemente → eine Upstream-Checkliste (`ul.checklist`…, `checked` und `checklist-item-checked`) |
@@ -238,7 +238,7 @@ UNIQUE `nn_oni_src`(uid, source_hash); `nn_oni_tgt`(kind, target_id).
 | Stile | erlaubt: `color`, `background-color`, `font-weight`, `font-style`, `text-decoration`, `text-align`, `list-style-type`. Alles andere entfällt (Calibri 11pt, Ränder, Positionen). |
 | Tabellen | `table/tr/td/th` mit `colspan`/`rowspan`. Rahmen und Breiten entfallen, Upstream-CSS übernimmt. |
 | `img` | Ressourcen-ID aus `data-fullres-src`, sonst aus `src` → Anhang (§6), `src="/api/v1/notes/{n}/attachments/{a}"`, `width`/`height`/`alt` bleiben. Geteilte Bilder in Lage-/Dokumentreihenfolge (`data-index` laut Learn unzuverlässig; M9c). Fehler → Platzhalter „[Bild nicht übernommen]“. |
-| `object` | Anhang + Link `<a href="/api/v1/notes/{n}/attachments/{a}">{data-attachment}</a>`. Fehler → Platzhalter mit Dateinamen. |
+| `object` | Anhang + Link `<a href="/api/v1/notes/{n}/attachments/{a}">{data-attachment}</a>` (Name byte-genau auf 255 Bytes gekürzt, Endung bleibt). Fehler → Platzhalter mit Dateinamen. |
 | `iframe` (Video) | Link auf `data-original-src` (nur `https:`), Text „Video: …“ |
 | Links | `http/https/mailto` bleiben. `onenote:` und andere Schemata → nur Text. |
 | Freihand | nicht im HTML (F10). Bericht und Doku nennen es, Platzhalter nur mit M9f. |
@@ -251,12 +251,12 @@ Der Konverter erzeugt das HTML ausschließlich per DOM (`HtmlSanitizer::loadHtml
 - **IDs**: Graph-IDs (Notizbuch, Abschnitt, Seite, Ressource, Gruppe) müssen auf `^[A-Za-z0-9!._,-]{1,512}$` passen und werden `rawurlencode`t. Sonst wird übersprungen und der Bericht vermerkt es.
 - **`@odata.nextLink`**: nur, wenn er mit `https://graph.microsoft.com/v1.0/` beginnt, keine `@`/Backslash/`..`.
 - **Ressourcen-URLs aus dem HTML**: Nur die ID wird entnommen (`/onenote/resources/{id}/$value`), die URL wird aus der Notizbuch-Wurzel neu gebaut. Fremde Hosts (auch `www.onenote.com`) → Platzhalter.
-- **`IClientService`**: `allow_redirects => false`, Timeout 30 s, `stream => true`. Die App setzt **keine** Option `nextcloud.allow_local_address`; der Local-Address-Schutz bleibt an (Unit-Nachweis M9a). Der `Authorization`-Header geht nur an `graph.microsoft.com`.
+- **`IClientService`**: `allow_redirects => false`, Timeout 30 s, Body über die Option `sink` (zählender Stream, Abbruch an der Grenze; M9d: `stream => true` wirkt mit dem `CurlHandler` von NC 35 nicht, SPEC §4.9). Die App setzt **keine** Option `nextcloud.allow_local_address`; der Local-Address-Schutz bleibt an (Unit-Nachweis M9a). Der `Authorization`-Header geht nur an `graph.microsoft.com`.
 - **Größengrenzen** (alle auf **dekodierte** Bytes, gezählt beim Lesen des Body-Streams; `IClient` sendet `Accept-Encoding: gzip`):
   - je Ressource ≤ `min(attachment_max_file_mb, 100 MiB)`, Abbruch beim Lesen;
-  - **je Seite** ≤ 100 Ressourcen und ≤ 256 MiB Summe; was darüber liegt, wird Platzhalter (Bericht). Wanduhrzeit je Seite ≤ 15 min, danach werden offene Ressourcen Platzhalter;
+  - **je Seite** ≤ 100 Ressourcen und ≤ 256 MiB Summe; was darüber liegt, wird Platzhalter (Bericht). Wanduhrzeit je Seite ≤ 15 min, je Ressource ≤ 240 s (unter der Lease von 300 s, die nach jeder Anfrage verlängert wird); danach werden offene Ressourcen Platzhalter;
   - Seiten-HTML ≤ 16 MiB, JSON-Antworten ≤ 4 MiB.
-- **Speicher**: Ressourcen landen gestreamt in Temp-Dateien (`ITempManager::getTemporaryFile`), nicht im Speicher. In der Transaktion wird je Anhang nur eine Datei gelesen (≤ 100 MiB). Temp-Dateien werden im `finally` gelöscht.
+- **Speicher**: Ressourcen landen gestreamt in Temp-Dateien (`ITempManager::getTemporaryFile`), nicht im Speicher. In der Transaktion wird je Anhang nur eine Datei gelesen (≤ 100 MiB). Temp-Dateien werden im `finally` gelöscht; Reste eines hart beendeten Prozesses (`oc_tmp_*.nn-onenote`, älter als 1 h, nur reguläre Dateien) löscht das Aufräumen jedes Job-Laufs (M9d-fix).
 - **Typen**: Bilder nur `image/png|jpeg|gif|webp|bmp` laut Inhalt (`finfo`), SVG nie als Bild. Dateien mit erkanntem MIME, Auslieferung wie bisher (`sandbox`, SPEC B22).
 - **Quote**: Vor dem Inhaltsabruf: freier Platz ≤ 0 → `failed`/`quota`. Nach dem Holen der Ressourcen: `QuotaService::quotaForNote` mit **Summe der Ressourcen + HTML-Größe**, bevor die Transaktion beginnt. Bei Überschreitung: `failed`, `error_code=quota`, Temp-Dateien weg. Bereits importierte Seiten bleiben.
 - **Rechte**: Jede Route lädt den Import über `uid`, fremde ID → 404. Callback nur für den Besitzer. Ziel immer ein eigener Workspace (`owner_type=user`, `owner_id=uid`, `kind=normal`), neu angelegt oder aus den Items (§3).
@@ -362,7 +362,7 @@ Done:
    - 12a. Graph 403 für einen Abschnitt und eine Seite → beide übersprungen, Bericht „kein Zugriff“, übrige Seiten angelegt, `not_found_streak` unverändert, kein Backoff, Import endet `done`.
 
 Testnachweis:
-- PHPUnit `OneNote/{ImportJob,Idempotence,Budget,Concurrency,AccountState}Test.php`, Job per `occ background-job:execute --force-execute`.
+- PHPUnit `OneNote/{ImportJob,Idempotence,Concurrency,AccountState}Test.php` (Budget in `AccountStateTest::testBudgetAndBackoff`), Job per `occ background-job:execute --force-execute`.
 - E2E `onenote-import.mjs` (hell und dunkel, Mobil 390 px).
 
 ### M9c: Seiten-Konverter (Umfang M, vor M9b möglich)
@@ -396,7 +396,7 @@ Done:
 8. Seite mit **80 Ressourcen** bei vollem Laufbudget: wird in einem Lauf vollständig angelegt (81 Anfragen > 50), danach beginnt keine neue Seite im Lauf. Variante mit nur 60 freien Anfragen im Stundenfenster: Lauf endet nach dem Inhaltsabruf ohne Anhänge; der nächste Lauf nach Freiwerden legt die Seite vollständig an; keine Duplikate, keine Temp-Reste.
 9. 429 mitten in einer Seite → Seite verworfen, keine Reste; nächster Lauf legt sie vollständig an. `backoff_level` bleibt bis zur angelegten Seite erhalten; eine Seite, die zehnmal an derselben Stelle 429/5xx bekommt, führt zu `failed`.
 
-Testnachweis: PHPUnit `OneNote/ResourceFetcherTest.php`, `OneNote/PageBudgetTest.php`, E2E-Abschnitt Bilder und PDF.
+Testnachweis: PHPUnit `OneNote/ResourceFetcherTest.php`, `OneNote/PageBudgetTest.php`, `OneNote/ImportHardeningTest.php` (Review M9b-r1 Hinweise 2–7), Gruppe `msmock` in `OneNote/ImportMockTest.php` (echtes curl: gzip-Bombe, endlos, langsam, 80 Ressourcen gemessen, `delete-user-data` mitten im Lauf), E2E `onenote-import.mjs` Abschnitt E (Bild sichtbar, PDF herunterladbar).
 
 ### M9e: Doku, SPEC, Abnahme (Umfang S)
 Dateien:

@@ -131,8 +131,12 @@ final class PageConverter {
 		return $date === false ? null : $date->getTimestamp();
 	}
 
+	// Hinweis statt Inhalt für zu große oder zu komplexe Seiten; schon ein Fixpunkt des Sanitizers
+	public static function tooLargeHint(IL10N $l): string {
+		return '<p>' . htmlspecialchars($l->t('This OneNote page was too large or too complex to import.'), ENT_QUOTES, 'UTF-8') . '</p>';
+	}
+
 	private function tooLarge(IL10N $l): ConvertResult {
-		$html = $this->sanitizer->sanitizeHtml('<p>' . htmlspecialchars($l->t('This OneNote page was too large or too complex to import.'), ENT_QUOTES, 'UTF-8') . '</p>');
-		return new ConvertResult($html, [], 0, 0, true);
+		return new ConvertResult($this->sanitizer->sanitizeHtml(self::tooLargeHint($l)), [], 0, 0, true);
 	}
 }

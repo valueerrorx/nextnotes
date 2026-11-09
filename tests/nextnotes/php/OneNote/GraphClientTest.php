@@ -116,7 +116,8 @@ final class GraphClientTest extends OneNoteTestCase {
 			self::assertArrayNotHasKey('nextcloud', $call['options'], $call['url']);
 			self::assertFalse($call['options']['allow_redirects'], 'keine Redirects');
 			self::assertSame(30, $call['options']['timeout']);
-			self::assertTrue($call['options']['stream']);
+			// Body nur über den zählenden sink (CurlHandler kennt stream=true nicht, M9d)
+			self::assertInstanceOf(\OCA\NextNotes\OneNote\LimitedSink::class, $call['options']['sink']);
 			$auth = $call['options']['headers']['Authorization'] ?? null;
 			if (str_starts_with($call['url'], 'https://graph.microsoft.com/')) {
 				self::assertSame('Bearer tok', $auth);

@@ -9,13 +9,14 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\OneNote;
 
-// Antwort von HttpGate: Status, ausgewählte Kopfzeilen, Body (gekürzt auf die Grenze)
+// Antwort von HttpGate: Status, ausgewählte Kopfzeilen, Body (bei Datei-Ziel nur im Fehlerfall), geschriebene Bytes
 final class HttpResult {
 	/** @param array<string, string> $headers Kleinbuchstaben-Namen */
 	public function __construct(
 		public readonly int $status,
 		public readonly array $headers,
 		public readonly string $body,
+		public readonly int $bytes = 0,
 	) {
 	}
 

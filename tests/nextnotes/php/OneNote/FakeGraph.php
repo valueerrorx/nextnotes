@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Tests\OneNote;
 
-// M9b: Graph im Prozess (Notizbücher, Abschnitte, Seiten mit Paging, Teams, Fehler je Pfad, Zähler je Pfad)
+// M9b: Graph im Prozess (Notizbücher, Abschnitte, Seiten mit Paging, Teams, Fehler je Pfad, Zähler je Pfad); M9d: Ressourcen
 final class FakeGraph {
 	public const PREFIX = 'https://graph.microsoft.com/v1.0/';
 
@@ -17,6 +17,8 @@ final class FakeGraph {
 	public array $notebooks = [];
 	/** @var list<array{id: string, displayName: string}> */
 	public array $teams = [];
+	// joinedTeams liefert immer einen nextLink (Liste bricht an der Anfragegrenze ab)
+	public bool $teamsEndless = false;
 	/** @var array<string, int|list<int>> Pfad → Status (Liste: je Aufruf der nächste Wert, danach 200) */
 	public array $errors = [];
 	/** @var array<string, int> Pfad → Aufrufe */
@@ -24,6 +26,8 @@ final class FakeGraph {
 	/** @var (\Closure(string): void)|null vor jeder Antwort (z. B. Abbruch mitten im Lauf) */
 	public ?\Closure $onRequest = null;
 	public int $pageSize = 100;
+	/** @var array<string, string|FakeResponse> Ressourcen-ID → Inhalt (200) oder ganze Antwort */
+	public array $resources = [];
 
 	public function count(string $prefix = ''): int {
 		$n = 0;
@@ -51,7 +55,7 @@ final class FakeGraph {
 			}
 		}
 		if ($path === 'me/joinedTeams') {
-			return FakeHttp::json(200, ['value' => $this->teams]);
+			return FakeHttp::json(200, ['value' => $this->teams] + ($this->teamsEndless ? ['@odata.nextLink' => self::PREFIX . 'me/joinedTeams?$skiptoken=x'] : []));
 		}
 		if (preg_match('#^(me|groups/[^/]+)/onenote/notebooks$#', $path, $m)) {
 			$out = [];
@@ -88,7 +92,29 @@ final class FakeGraph {
 			return $page === null ? self::notFound()
 				: new FakeResponse(200, '<html><head><title>x</title></head><body data-absolute-enabled="true">' . ($page['html'] ?? '<p>Inhalt ' . htmlspecialchars($page['id']) . '</p>') . '</body></html>', ['Content-Type' => 'text/html']);
 		}
+		if (preg_match('#^(me|groups/[^/]+)/onenote/resources/([^/]+)/\$value$#', $path, $m)) {
+			$r = $this->resources[rawurldecode($m[2])] ?? null;
+			return $r === null ? self::notFound() : ($r instanceof FakeResponse ? $r : new FakeResponse(200, $r, ['Content-Type' => 'application/octet-stream']));
+		}
 		return self::notFound();
+	}
+
+	// Graph-URL einer Ressource wie im Seiten-HTML (F9)
+	public static function resourceUrl(string $id, string $root = 'me'): string {
+		return self::PREFIX . $root . '/onenote/resources/' . $id . '/$value';
+	}
+
+	// kleines gültiges PNG (Typ laut Inhalt)
+	public static function png(int $pad = 0): string {
+		return base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==') . str_repeat("\0", $pad);
+	}
+
+	public static function jpeg(): string {
+		return "\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00" . str_repeat("\x00", 64) . "\xFF\xD9";
+	}
+
+	public static function pdf(): string {
+		return "%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n";
 	}
 
 	private static function notFound(): FakeResponse {

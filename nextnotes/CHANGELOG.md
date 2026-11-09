@@ -9,6 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+- OneNote import: images and file attachments of a page become attachments of the imported note (images shown inline, files as download links), with the same type, size and storage quota rules as uploads. Missing or oversized items are replaced by a placeholder and listed in the report. The notebook selection notes when not all notebooks could be loaded.
+
 ## 0.9.2 – 2026-11-09
 
 ### Added

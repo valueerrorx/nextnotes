@@ -20,6 +20,8 @@ use OCA\NextNotes\OneNote\HttpGate;
 use OCA\NextNotes\OneNote\OneNoteConfig;
 use OCA\NextNotes\OneNote\OneNoteImportService;
 use OCA\NextNotes\OneNote\OneNoteNotifications;
+use OCA\NextNotes\OneNote\ResourceFetcher;
+use OCA\NextNotes\Service\AttachmentService;
 use OCA\NextNotes\Service\FolderService;
 use OCA\NextNotes\Service\NoteService;
 use OCA\NextNotes\Service\Transaction;
@@ -55,8 +57,13 @@ abstract class ImportTestCase extends OneNoteTestCase {
 			Server::get(PageConverter::class), Server::get(WorkspaceService::class), Server::get(FolderService::class), Server::get(NoteService::class),
 			Server::get(WorkspaceMapper::class), Server::get(FolderMapper::class), Server::get(NoteMapper::class), Server::get(Transaction::class),
 			Server::get(ISecureRandom::class), $this->time(), Server::get(IUserManager::class), Server::get(IAppManager::class),
-			Server::get(IFactory::class), Server::get(OneNoteNotifications::class), $this->logger(),
+			Server::get(IFactory::class), Server::get(OneNoteNotifications::class), $this->logger(), $this->fetcher(), Server::get(AttachmentService::class),
 		);
+	}
+
+	// Seitengrenzen für Tests überschreibbar (M9d)
+	protected function fetcher(): ResourceFetcher {
+		return Server::get(ResourceFetcher::class);
 	}
 
 	/** Angemeldet, Auswahl gespeichert (queued); liefert die Import-ID */

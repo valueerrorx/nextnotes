@@ -180,7 +180,7 @@ final class ImportJobTest extends ImportTestCase {
 		self::assertNoSecrets($id2);
 	}
 
-	// Bilder werden in M9b Platzhalter (M9d holt sie) und zählen nicht zur 404-Serie
+	// Ressource fehlt (404) → Platzhalter, zählt nicht zur 404-Serie (M9d holt Ressourcen)
 	public function testResourcesArePlaceholders(): void {
 		$u = $this->createUser('rs');
 		$this->notebook('me', 'nbR', 1, 1);
@@ -189,7 +189,7 @@ final class ImportJobTest extends ImportTestCase {
 		$this->importer()->runDue();
 		$row = self::row($id);
 		self::assertSame(['done', 1, 0], [$row['status'], (int)$row['resources_failed'], (int)$row['not_found_streak']]);
-		self::assertSame(0, $this->graph->count('me/onenote/resources'));
+		self::assertSame(1, $this->graph->count('me/onenote/resources'));
 		self::assertStringNotContainsString('graph.microsoft.com', (string)self::notesOf($u->uid)[0]['content']);
 	}
 }

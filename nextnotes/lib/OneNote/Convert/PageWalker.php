@@ -38,6 +38,8 @@ final class PageWalker {
 	// Standardlage ohne Angabe laut Learn (onenote-abs-pos)
 	private const DEFAULT_TOP = 120.0;
 	private const DEFAULT_LEFT = 48.0;
+	// Dateiname: Byte-Grenze wie AttachmentService::cleanName
+	private const NAME_BYTES = 255;
 
 	private DOMDocument $out;
 	/** @var list<ConvertResource> */
@@ -539,7 +541,13 @@ final class PageWalker {
 	private static function fileName(string $name): string {
 		$name = self::plain($name, 1000);
 		$name = trim(strtr($name, ['/' => '_', '\\' => '_']), " .\t");
-		return mb_substr($name, 0, 255);
+		if (strlen($name) <= self::NAME_BYTES) {
+			return $name;
+		}
+		// auf 255 Bytes (Grenze der Upload-Regeln) an Zeichengrenzen kürzen, kurze Endung bleibt
+		$dot = strrpos($name, '.');
+		$ext = $dot !== false && $dot > 0 && strlen($name) - $dot <= 16 ? substr($name, $dot) : '';
+		return rtrim(mb_strcut($name, 0, self::NAME_BYTES - strlen($ext), 'UTF-8'), " .\t") . $ext;
 	}
 
 	// Steuerzeichen raus, Länge begrenzt

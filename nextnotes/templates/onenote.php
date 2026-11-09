@@ -55,6 +55,7 @@ $progress = $imp !== null && in_array($imp['status'], ['queued', 'running', 'don
 				<p id="nextnotes-onenote-team-hint" class="nn-onenote-hint" hidden><?php p($l->t('Team and class notebooks can contain content of other people, for example of classmates. Nothing is selected there: choose only what you need.')); ?></p>
 				<p id="nextnotes-onenote-loading"><?php p($l->t('Loading notebooks …')); ?></p>
 				<div id="nextnotes-onenote-tree" class="nn-onenote-tree"></div>
+				<p id="nextnotes-onenote-incomplete" class="nn-onenote-hint" hidden><?php p($l->t('Not all notebooks could be loaded.')); ?></p>
 				<p><button type="button" id="nextnotes-onenote-more-teams" data-action="more-teams" hidden><?php p($l->t('Load more teams')); ?></button></p>
 				<p>
 					<button type="button" class="primary" data-action="start" disabled><?php p($l->t('Import selected')); ?></button>
@@ -79,6 +80,8 @@ $progress = $imp !== null && in_array($imp['status'], ['queued', 'running', 'don
 					<?php foreach ($imp['report'] as $entry) { ?>
 						<?php if (($entry['r'] ?? '') === 'more') { ?>
 							<li><?php p($l->n('and %n more', 'and %n more', (int)($entry['n'] ?? 0))); ?></li>
+						<?php } elseif (($entry['r'] ?? '') === 'resources') { ?>
+							<li data-reason="resources"><span class="nn-onenote-title"><?php p((string)($entry['t'] ?? '') !== '' ? (string)$entry['t'] : $l->t('Untitled note')); ?></span> – <?php p($l->n('imported, %n image or file missing', 'imported, %n images or files missing', (int)($entry['n'] ?? 0))); ?></li>
 						<?php } else { ?>
 							<li data-reason="<?php p((string)($entry['r'] ?? '')); ?>"><span class="nn-onenote-title"><?php p((string)($entry['t'] ?? '') !== '' ? (string)$entry['t'] : $l->t('Untitled note')); ?></span> – <?php p($reasons[$entry['r'] ?? ''] ?? (string)($entry['r'] ?? '')); ?></li>
 						<?php } ?>
