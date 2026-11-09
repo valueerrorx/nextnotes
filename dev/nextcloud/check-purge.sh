@@ -14,7 +14,10 @@ install="${NN_INSTALL:-$NN_DEV_DIR/install-app.sh}"
 
 out="$(occ "$env" nextnotes:purge)"
 grep -q 'background jobs: 0' <<<"$out" || die "$env: nach purge noch Jobs der App"$'\n'"$out"
-[[ "$(grep -c ': 0 row(s)' <<<"$out")" == 13 ]] || die "$env: nach purge nicht alle Tabellen leer"$'\n'"$out"
+[[ "$(grep -c ': 0 row(s)' <<<"$out")" == 15 ]] || die "$env: nach purge nicht alle Tabellen leer"$'\n'"$out"
+# M9a Done 6a: keine onenote_*-Schlüssel (auch sensible) mehr in der App-Config
+occ "$env" config:list nextnotes --private --output=json | jq -e '[.apps.nextnotes // {} | keys[] | select(startswith("onenote_"))] | length == 0' >/dev/null \
+	|| die "$env: nach purge noch onenote_*-Schlüssel"
 
 occ "$env" app:remove nextnotes || die "$env: app:remove nach purge fehlgeschlagen"
 occ "$env" app:list --output=json | jq -e '.enabled.nextnotes == null and .disabled.nextnotes == null' >/dev/null \
@@ -24,7 +27,7 @@ occ "$env" app:list --output=json | jq -e '.enabled.nextnotes == null and .disab
 occ "$env" app:enable nextnotes || die "$env: app:enable nach purge/app:remove fehlgeschlagen"
 out="$(occ "$env" nextnotes:purge)"
 echo "$out"
-[[ "$(grep -c ': 0 row(s)' <<<"$out")" == 13 ]] || die "$env: Tabellen nach Neuinstallation nicht leer"
+[[ "$(grep -c ': 0 row(s)' <<<"$out")" == 15 ]] || die "$env: Tabellen nach Neuinstallation nicht leer"
 jobs="$(grep -c '<job>' "$NN_REPO_ROOT/nextnotes/appinfo/info.xml")"
 grep -q "background jobs: $jobs" <<<"$out" || die "$env: Hintergrundjobs nach app:enable nicht neu registriert"
 echo "$env: check-purge OK (purge, app:remove Exit 0, app:enable legt neu an)"

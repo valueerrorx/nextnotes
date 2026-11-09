@@ -47,6 +47,13 @@ return [
 		['name' => 'page#settings', 'url' => '/settings.php', 'verb' => 'GET'],
 		// Admin-Formular (Settings\AdminSettings), nur Admins
 		['name' => 'admin_settings#save', 'url' => '/admin/settings', 'verb' => 'POST'],
+		// OneNote-Import (Plan M9, ADR 0020): Ansicht, Rücksprung von Microsoft, API
+		['name' => 'one_note_api#page', 'url' => '/onenote.php', 'verb' => 'GET'],
+		['name' => 'one_note_api#callback', 'url' => '/onenote/callback', 'verb' => 'GET'],
+		['name' => 'one_note_api#connect', 'url' => '/api/v1/onenote/connect', 'verb' => 'POST'],
+		['name' => 'one_note_api#index', 'url' => '/api/v1/onenote/imports', 'verb' => 'GET'],
+		['name' => 'one_note_api#show', 'url' => '/api/v1/onenote/imports/{id}', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
+		['name' => 'one_note_api#cancel', 'url' => '/api/v1/onenote/imports/{id}/cancel', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 		// Kompatibilitätsrouten (SPEC §4.2): Upstream-Einzeldateien unter gleichem Namen
 		['name' => 'compat#noteInfo', 'url' => '/api_note_info.php', 'verb' => 'GET'],
 		['name' => 'compat#downloadNote', 'url' => '/api_download_note.php', 'verb' => 'GET'],

@@ -45,6 +45,8 @@ final class PurgeTest extends AdminTestCase {
 		Server::get(IUserConfig::class)->setValueString($l->uid, 'nextnotes', 'm7b_probe', 'x');
 		Server::get(IAppConfig::class)->setValueString('nextnotes', 'm7b_probe', 'x');
 		Server::get(INotificationManager::class)->notify(self::notice($l->uid, 'note', $own, 'reminder'));
+		// M9a Done 6a: OneNote-Zeilen und App-Config onenote_* inkl. sensiblem Secret
+		self::seedOneNote($l->uid);
 		foreach (Purge::TABLES as $table) {
 			$qb = self::db()->getQueryBuilder();
 			self::assertGreaterThan(0, (int)$qb->select($qb->func()->count('*'))->from($table)->executeQuery()->fetchOne(), "Kontrolle: $table gefüllt");
@@ -53,6 +55,39 @@ final class PurgeTest extends AdminTestCase {
 		self::assertGreaterThan(0, self::notificationCount(), 'Kontrolle: Benachrichtigung');
 		self::assertGreaterThan(0, self::jobCount(), 'Kontrolle: Jobs');
 		return $fx + ['note' => $note];
+	}
+
+	public const ONENOTE_SECRET = 'purge-onenote-secret-M9a';
+
+	private static function seedOneNote(string $uid): void {
+		$db = self::db();
+		$qb = $db->getQueryBuilder();
+		$qb->insert('nextnotes_onenote_imports')->values([
+			'uid' => $qb->createNamedParameter($uid), 'status' => $qb->createNamedParameter('select'),
+			'authority' => $qb->createNamedParameter('organizations'), 'client_id' => $qb->createNamedParameter('11111111-2222-3333-4444-555555555555'),
+			'created_at' => $qb->createNamedParameter(1), 'updated_at' => $qb->createNamedParameter(1),
+		])->executeStatement();
+		$qb = $db->getQueryBuilder();
+		$qb->insert('nextnotes_onenote_items')->values([
+			'uid' => $qb->createNamedParameter($uid), 'source_hash' => $qb->createNamedParameter(hash('sha256', 'page:purge')),
+			'kind' => $qb->createNamedParameter('page'), 'target_id' => $qb->createNamedParameter(1),
+			'import_id' => $qb->createNamedParameter(1), 'created_at' => $qb->createNamedParameter(1),
+		])->executeStatement();
+		$cfg = Server::get(IAppConfig::class);
+		$cfg->setValueString('nextnotes', 'onenote_client_id', '11111111-2222-3333-4444-555555555555');
+		$cfg->setValueString('nextnotes', 'onenote_secret', self::ONENOTE_SECRET, lazy: true, sensitive: true);
+	}
+
+	/** @return int Zeilen in oc_appconfig mit onenote_*-Schlüssel oder dem Secret im Klartext */
+	private static function oneNoteConfigRows(): int {
+		$qb = self::db()->getQueryBuilder();
+		$qb->select($qb->func()->count('*'))->from('appconfig')
+			->where($qb->expr()->eq('appid', $qb->createNamedParameter('nextnotes')))
+			->andWhere($qb->expr()->orX(
+				$qb->expr()->like('configkey', $qb->createNamedParameter(self::db()->escapeLikeParameter('onenote_') . '%')),
+				$qb->expr()->like('configvalue', $qb->createNamedParameter('%' . self::db()->escapeLikeParameter(self::ONENOTE_SECRET) . '%')),
+			));
+		return (int)$qb->executeQuery()->fetchOne();
 	}
 
 	private static function jobCount(): int {
@@ -99,6 +134,7 @@ final class PurgeTest extends AdminTestCase {
 		$keys = Server::get(IAppConfig::class)->getKeys('nextnotes');
 		sort($keys);
 		self::assertSame(['enabled', 'installed_version', 'types'], $keys, 'nur Kern-Schlüssel bleiben');
+		self::assertSame(0, self::oneNoteConfigRows(), 'kein onenote_*-Schlüssel und kein Secret in oc_appconfig');
 		self::assertSame([], Server::get(IUserConfig::class)->getUserIds('nextnotes'), 'keine Benutzerwerte');
 		self::assertSame(0, self::notificationCount(), 'keine Benachrichtigungen');
 		self::assertSame(0, self::jobCount(), 'keine Jobs');

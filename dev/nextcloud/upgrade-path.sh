@@ -139,6 +139,10 @@ if [[ $seed_team == 1 ]]; then
 	echo "Daten: Team $TEAM, Team-Workspace „$TW“, Material-Ordner $MF, Aufgabe $AID, Abgabe $SID ($SSTATUS, Notiz $SNOTE)"
 fi
 
+# Zeilen je App-Tabelle vor/nach dem Upgrade (purge ohne --force zählt nur; ältere Stände ohne purge: übersprungen)
+rowcounts() { occ "$env" nextnotes:purge 2>/dev/null | sed -n 's/^  table \(.*\): \([0-9]*\) row(s)$/\1 \2/p' | sort || true; }
+rowcounts > "$work/rows-before"
+
 step "Paket einspielen + occ upgrade"
 NN_APP_TARBALL="$pkg" "$dir/install-app.sh" "$env"
 code=0; occ "$env" upgrade -n || code=$?
@@ -152,6 +156,13 @@ for i in $(seq 1 60); do
 	[[ $i -eq 60 ]] && die "$env: Webserver nach Neustart nicht erreichbar"
 	sleep 1
 done
+
+if [[ -s "$work/rows-before" ]]; then
+	rowcounts > "$work/rows-after"
+	missing="$(comm -23 "$work/rows-before" "$work/rows-after")"
+	[[ -z "$missing" ]] && echo "Zeilenzahlen unverändert ($(wc -l < "$work/rows-before") Tabellen vorher, $(wc -l < "$work/rows-after") nachher)" \
+		|| fail "Zeilenzahlen nach Upgrade abweichend: ${missing//$'\n'/; }"
+fi
 
 [[ "$brk" == schema ]] && nnprobe break-schema
 step "Schema"

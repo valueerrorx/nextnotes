@@ -33,6 +33,8 @@ abstract class AdminTestCase extends AssignmentTestCase {
 		'nextnotes_mentions_handled' => ['user_id'],
 		'nextnotes_assignments' => ['owner_uid', 'created_by'],
 		'nextnotes_submissions' => ['student_uid', 'feedback_by'],
+		'nextnotes_onenote_imports' => ['uid'],
+		'nextnotes_onenote_items' => ['uid'],
 	];
 
 	/**

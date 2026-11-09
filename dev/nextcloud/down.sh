@@ -7,7 +7,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 
 target="${1:?Aufruf: down.sh <env|all>}"
 if [[ "$target" == all ]]; then
-	profiles=(); for e in "${NN_ENVS[@]}"; do profiles+=(--profile "$e"); done
+	profiles=(--profile msmock); for e in "${NN_ENVS[@]}"; do profiles+=(--profile "$e"); done
 	docker compose -p "$NN_PROJECT" -f "$NN_DEV_DIR/compose.yaml" "${profiles[@]}" down -v --remove-orphans
 else
 	check_env "$target"

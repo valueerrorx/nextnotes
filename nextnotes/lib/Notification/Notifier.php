@@ -17,6 +17,7 @@ use OCA\NextNotes\Db\SubmissionMapper;
 use OCA\NextNotes\Db\TeamMapper;
 use OCA\NextNotes\Db\Workspace;
 use OCA\NextNotes\Db\WorkspaceMapper;
+use OCA\NextNotes\OneNote\OneNoteNotifications;
 use OCA\NextNotes\Service\AccessService;
 use OCA\NextNotes\Service\AssignmentNotifications;
 use OCA\NextNotes\Service\TeamCleanupService;
@@ -50,6 +51,7 @@ class Notifier implements INotifier {
 		private SubmissionMapper $submissions,
 		private IDateTimeZone $timeZone,
 		private ITimeFactory $time,
+		private OneNoteNotifications $oneNote,
 	) {
 	}
 
@@ -62,6 +64,9 @@ class Notifier implements INotifier {
 	}
 
 	public function prepare(INotification $notification, string $languageCode): INotification {
+		if ($this->oneNote->handles($notification)) {
+			return $this->oneNote->prepare($notification, $languageCode);
+		}
 		if ($notification->getApp() === Application::APP_ID && $notification->getObjectType() === 'cleanup' && $notification->getSubject() === 'cleanup_suspicious') {
 			return $this->prepareSuspicious($notification, $languageCode);
 		}

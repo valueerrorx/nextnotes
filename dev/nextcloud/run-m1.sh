@@ -16,6 +16,8 @@ for env in "${envs[@]}"; do
 	# Spike und CSP nur je Webserver (Apache = sqlite, nginx)
 	web=0; [[ "$env" == sqlite || "$env" == nginx ]] && web=1
 	CHECK_PAGE=1 CHECK_SPIKE=$web CHECK_CSP=$web "$dir/lifecycle.sh" "$env"
+	# M9a Done 9: Local-Address-Schutz an; allow_local_remote_servers gibt es nur im Profil msmock (msmock.sh)
+	if occ "$env" config:system:get allow_local_remote_servers >/dev/null 2>&1; then die "$env: allow_local_remote_servers ist gesetzt (nur msmock)"; fi
 	db="$env"; [[ "$env" == mariadb ]] && db=mysql; [[ "$env" == nginx ]] && db=sqlite
 	php "$NN_REPO_ROOT/tests/nextnotes/schema/check-schema.php" "$NN_CACHE/schema-$env.json" --db="$db"
 	"$dir/down.sh" "$env"

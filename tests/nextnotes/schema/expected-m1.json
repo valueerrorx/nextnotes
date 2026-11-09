@@ -279,6 +279,66 @@
         "nn_sub_student": [false, ["student_uid", "status"]],
         "nn_sub_due": [false, ["status", "due_override_at"]]
       }
+    },
+    "nextnotes_onenote_imports": {
+      "primary": ["id"],
+      "columns": {
+        "id": ["bigint", true, null, null, true],
+        "uid": ["string", true, null, 64, false],
+        "status": ["string", true, null, 16, false],
+        "authority": ["string", true, null, 64, false],
+        "client_id": ["string", true, null, 64, false],
+        "team_scopes": ["smallint", true, "0", null, false],
+        "ms_account": ["string", false, null, 64, false],
+        "state_hash": ["string", false, null, 64, false],
+        "pkce_enc": ["text", false, null, null, false],
+        "redirect_uri": ["string", false, null, 1000, false],
+        "auth_expires_at": ["bigint", false, null, null, false],
+        "access_enc": ["text", false, null, null, false],
+        "refresh_enc": ["text", false, null, null, false],
+        "access_expires_at": ["bigint", false, null, null, false],
+        "selection": ["text", false, null, null, false],
+        "cursor": ["text", false, null, null, false],
+        "pages_total": ["integer", true, "0", null, false],
+        "pages_done": ["integer", true, "0", null, false],
+        "pages_skipped": ["integer", true, "0", null, false],
+        "resources_done": ["integer", true, "0", null, false],
+        "resources_failed": ["integer", true, "0", null, false],
+        "report": ["text", false, null, null, false],
+        "rate_buckets": ["text", false, null, null, false],
+        "rate_version": ["integer", true, "0", null, false],
+        "backoff_level": ["smallint", true, "0", null, false],
+        "not_found_streak": ["smallint", true, "0", null, false],
+        "next_run_at": ["bigint", false, null, null, false],
+        "lease_until": ["bigint", false, null, null, false],
+        "lease_token": ["string", false, null, 32, false],
+        "error_code": ["string", false, null, 64, false],
+        "created_at": ["bigint", true, null, null, false],
+        "updated_at": ["bigint", true, null, null, false],
+        "finished_at": ["bigint", false, null, null, false]
+      },
+      "indexes": {
+        "nn_oni_uid": [false, ["uid", "status"]],
+        "nn_oni_run": [false, ["status", "next_run_at"]],
+        "nn_oni_state": [false, ["state_hash"]]
+      }
+    },
+    "nextnotes_onenote_items": {
+      "primary": ["id"],
+      "columns": {
+        "id": ["bigint", true, null, null, true],
+        "uid": ["string", true, null, 64, false],
+        "source_hash": ["string", true, null, 64, false],
+        "kind": ["string", true, null, 16, false],
+        "target_id": ["bigint", true, null, null, false],
+        "source_modified_at": ["bigint", false, null, null, false],
+        "import_id": ["bigint", true, null, null, false],
+        "created_at": ["bigint", true, null, null, false]
+      },
+      "indexes": {
+        "nn_oni_src": [true, ["uid", "source_hash"]],
+        "nn_oni_tgt": [false, ["kind", "target_id"]]
+      }
     }
   }
 }

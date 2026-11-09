@@ -108,6 +108,20 @@ services:
       - nc-nginx:/var/www/html:ro
       - ./nginx/nextcloud.conf:/etc/nginx/conf.d/default.conf:ro
 
+  # OneNote-Mock (M9a, nur Tests): Microsoft-Hostnamen als Netzaliase im Projektnetz; Start/Stopp, Test-CA und
+  # allow_local_remote_servers nur über msmock.sh. Apache + mod_ssl aus dem NC-Image (kein weiteres Image).
+  ms-mock:
+    profiles: [msmock]
+    image: nextcloud:35.0.2-apache
+    pull_policy: missing
+    entrypoint: ["/bin/sh", "/msmock/www/start.sh"]
+    volumes:
+      - ./scripts/msmock:/msmock/www:ro
+      - ./.cache/msmock:/msmock/certs:ro
+    networks:
+      default:
+        aliases: [login.microsoftonline.com, graph.microsoft.com]
+
 volumes:
   nc-sqlite:
   db-mariadb:

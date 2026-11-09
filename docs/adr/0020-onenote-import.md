@@ -42,3 +42,9 @@ Option 1, dazu Option 3 nur als Doku.
 - Der Admin muss das Client-Secret vor Ablauf erneuern. Abgelaufen bedeutet `invalid_client`, alle Importe stoppen mit Meldung.
 - Zertifikat statt Secret, Ink, SharePoint-Site-Notizbücher und Aktualisieren statt Überspringen bleiben spätere Optionen mit eigener Entscheidung.
 - Neue Ansicht `onenote.php` (ADR 0004) mit eigenem Skript, kein Upstream-Patch.
+
+## Nachtrag M9a (Umsetzung)
+- Routen einheitlich unter `/api/v1/onenote/…` (connect, imports, imports/{id}, imports/{id}/cancel); Callback `GET /onenote/callback`, Ansicht `/onenote.php`.
+- App-Version 0.9.1 mit Migration `Version000700Date20261111000000`.
+- Gleichzeitiges `connect`: eine `auth`-Zeile jünger als 5 s wird nicht ersetzt (409 `connect_pending`), sonst ersetzt; Nachzählen nach dem INSERT bleibt.
+- Test-Mock: Dienst `ms-mock` (Profil `msmock`, `dev/nextcloud/msmock.sh`) als PHP unter Apache aus dem vorhandenen NC-Image, kein weiteres Image.

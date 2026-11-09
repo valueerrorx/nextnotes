@@ -17,6 +17,8 @@ use OCA\NextNotes\Db\FolderMapper;
 use OCA\NextNotes\Db\LockMapper;
 use OCA\NextNotes\Db\MentionHandledMapper;
 use OCA\NextNotes\Db\NoteMapper;
+use OCA\NextNotes\Db\OneNoteImportMapper;
+use OCA\NextNotes\Db\OneNoteItemMapper;
 use OCA\NextNotes\Db\ReminderMapper;
 use OCA\NextNotes\Db\SnapshotMapper;
 use OCA\NextNotes\Db\SubmissionMapper;
@@ -46,6 +48,8 @@ class UserDataService {
 		MentionHandledMapper::TABLE => ['user_id'],
 		AssignmentMapper::TABLE => ['owner_uid', 'created_by'],
 		SubmissionMapper::TABLE => ['student_uid', 'feedback_by'],
+		OneNoteImportMapper::TABLE => ['uid'],
+		OneNoteItemMapper::TABLE => ['uid'],
 	];
 
 	/** @var array<string, string[]> uid → Team-IDs aus BeforeUserDeletedEvent (Circles entfernt die Mitgliedschaft im UserDeletedEvent) */
@@ -192,6 +196,9 @@ class UserDataService {
 				->where($qb->expr()->eq('owner_type', $qb->createNamedParameter('user')))
 				->andWhere($qb->expr()->eq('owner_id', $qb->createNamedParameter($uid)))
 				->executeStatement();
+			// OneNote-Import vor den Inhalten: Token weg, ein laufender Job findet seine Zeile nicht mehr (Plan M9 §3)
+			$this->deleteWhere(OneNoteImportMapper::TABLE, 'uid', $uid);
+			$this->deleteWhere(OneNoteItemMapper::TABLE, 'uid', $uid);
 			// Abgaben bleiben (ADR 0008 a, Plan M6 §2.5 O3): in derselben Transaktion wie owner_type=deleted Kopien lösen (Workspace → Notizen → Abgaben)
 			$now = $this->time->getTime();
 			$this->notes->detachSubmissions($this->submissions->noteIdsOf($uid), $now);

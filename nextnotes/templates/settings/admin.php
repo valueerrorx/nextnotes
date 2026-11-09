@@ -20,6 +20,11 @@ $messages = [
 	'invalid' => $l->t('invalid host name'),
 	'too_many' => $l->t('at most %s entries', [(string)$_['maxDomains']]),
 	'range' => $l->t('value out of range'),
+	'onenote_authority' => $l->t('enter a tenant ID, a domain, organizations or common'),
+	'onenote_client_id' => $l->t('the client ID is a GUID like 00000000-0000-0000-0000-000000000000'),
+	'onenote_secret' => $l->t('invalid client secret'),
+	'secret_set' => $l->t('A client secret is stored.'),
+	'secret_unset' => $l->t('No client secret stored.'),
 	'saved' => $l->t('Saved'),
 	'failed' => $l->t('Could not save the settings'),
 ];
@@ -47,6 +52,36 @@ $messages = [
 			value="<?php p((string)$_['quotaMb']); ?>">
 	</p>
 	<p class="settings-hint"><?php p($l->t('Exports are limited to 1 GiB. Larger attachments can only be downloaded individually, not as part of an export.')); ?></p>
+
+	<?php $on = $_['oneNote']; $common = $on['authority'] === 'common'; ?>
+	<h3><?php p($l->t('OneNote import')); ?></h3>
+	<p class="settings-hint"><?php p($l->t('Lets users import their OneNote notebooks through Microsoft Graph. Register an app (platform Web) in the Microsoft Entra admin center of your school and enter its values here. Without client ID and secret the import is off.')); ?></p>
+	<p>
+		<label for="nextnotes-onenote-redirect"><?php p($l->t('Redirect URI for the app registration')); ?></label>
+		<input id="nextnotes-onenote-redirect" type="text" readonly size="60" value="<?php p($on['redirectUri']); ?>">
+	</p>
+	<p>
+		<label for="nextnotes-onenote-authority"><?php p($l->t('Authority (tenant ID, organizations or common)')); ?></label>
+		<input id="nextnotes-onenote-authority" name="onenote_authority" type="text" size="40" spellcheck="false" value="<?php p($on['authority']); ?>">
+	</p>
+	<p>
+		<label for="nextnotes-onenote-client"><?php p($l->t('Application (client) ID')); ?></label>
+		<input id="nextnotes-onenote-client" name="onenote_client_id" type="text" size="40" spellcheck="false" autocomplete="off" value="<?php p($on['clientId']); ?>">
+	</p>
+	<p>
+		<label for="nextnotes-onenote-secret"><?php p($l->t('Client secret')); ?></label>
+		<input id="nextnotes-onenote-secret" name="onenote_secret" type="password" size="40" autocomplete="new-password" value="" placeholder="<?php p($on['secretSet'] ? $l->t('unchanged') : ''); ?>">
+		<span id="nextnotes-onenote-secret-state" data-set="<?php p($on['secretSet'] ? '1' : '0'); ?>"><?php p($on['secretSet'] ? $l->t('A client secret is stored.') : $l->t('No client secret stored.')); ?></span>
+	</p>
+	<p>
+		<input id="nextnotes-onenote-secret-clear" type="checkbox" class="checkbox">
+		<label for="nextnotes-onenote-secret-clear"><?php p($l->t('Remove the stored client secret')); ?></label>
+	</p>
+	<p>
+		<input id="nextnotes-onenote-teams" name="onenote_teams" type="checkbox" class="checkbox"<?php if ($on['teams']) { ?> checked<?php } ?><?php if ($common) { ?> disabled<?php } ?>>
+		<label for="nextnotes-onenote-teams"><?php p($l->t('Allow team and class notebooks')); ?></label>
+	</p>
+	<p id="nextnotes-onenote-teams-hint" class="settings-hint"<?php if (!$common) { ?> hidden<?php } ?>><?php p($l->t('Team and class notebooks are only available with an authority for organization accounts (tenant ID or organizations).')); ?></p>
 
 	<p>
 		<button id="nextnotes-admin-save" type="button" class="primary"><?php p($l->t('Save')); ?></button>

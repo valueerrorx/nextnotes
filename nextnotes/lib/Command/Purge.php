@@ -17,6 +17,8 @@ use OCA\NextNotes\Db\LockMapper;
 use OCA\NextNotes\Db\MentionHandledMapper;
 use OCA\NextNotes\Db\NoteMapper;
 use OCA\NextNotes\Db\NoteTagMapper;
+use OCA\NextNotes\Db\OneNoteImportMapper;
+use OCA\NextNotes\Db\OneNoteItemMapper;
 use OCA\NextNotes\Db\ReminderMapper;
 use OCA\NextNotes\Db\SnapshotMapper;
 use OCA\NextNotes\Db\SubmissionMapper;
@@ -45,6 +47,7 @@ class Purge extends Command {
 		WorkspaceMapper::TABLE, TeamMapper::TABLE, WsShareMapper::TABLE, FolderMapper::TABLE, NoteMapper::TABLE,
 		NoteTagMapper::TABLE, AttachmentMapper::TABLE, SnapshotMapper::TABLE, ReminderMapper::TABLE, LockMapper::TABLE,
 		MentionHandledMapper::TABLE, AssignmentMapper::TABLE, SubmissionMapper::TABLE,
+		OneNoteImportMapper::TABLE, OneNoteItemMapper::TABLE,
 	];
 	// vom Kern verwaltet: ohne sie gilt die App als nicht installiert und app:remove scheitert
 	public const CORE_KEYS = ['enabled', 'installed_version', 'types'];

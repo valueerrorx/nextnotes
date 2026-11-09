@@ -14,10 +14,11 @@
 			<directory>php</directory>
 		</testsuite>
 	</testsuites>
-	<!-- destructive: löscht alle App-Daten (PurgeTest), nur über dev/nextcloud/check-purge.sh -->
+	<!-- destructive: löscht alle App-Daten (PurgeTest), nur über dev/nextcloud/check-purge.sh; msmock: nur mit OneNote-Mock (dev/nextcloud/msmock.sh) -->
 	<groups>
 		<exclude>
 			<group>destructive</group>
+			<group>msmock</group>
 		</exclude>
 	</groups>
 </phpunit>

@@ -11,6 +11,7 @@ namespace OCA\NextNotes\Settings;
 
 use OCA\NextNotes\AppInfo\Application;
 use OCA\NextNotes\Controller\AdminSettingsController;
+use OCA\NextNotes\OneNote\OneNoteConfig;
 use OCA\NextNotes\Service\AttachmentService;
 use OCA\NextNotes\Service\EmbedDomainService;
 use OCP\AppFramework\Http\TemplateResponse;
@@ -19,12 +20,13 @@ use OCP\IURLGenerator;
 use OCP\Settings\ISettings;
 use OCP\Util;
 
-// Admin-Formular: Embed-Domains, Anhangsgrenzen (SPEC §1.4, M4-Plan M4a)
+// Admin-Formular: Embed-Domains, Anhangsgrenzen (SPEC §1.4, M4-Plan M4a), OneNote-Import (Plan M9 §2)
 class AdminSettings implements ISettings {
 	public function __construct(
 		private IAppConfig $appConfig,
 		private EmbedDomainService $embedDomains,
 		private IURLGenerator $urls,
+		private OneNoteConfig $oneNote,
 	) {
 	}
 
@@ -37,6 +39,14 @@ class AdminSettings implements ISettings {
 			'quotaMb' => $this->appConfig->getValueInt(Application::APP_ID, 'attachment_quota_mb', AttachmentService::DEFAULT_QUOTA_MB),
 			'limits' => AdminSettingsController::LIMITS,
 			'maxDomains' => EmbedDomainService::MAX_ENTRIES,
+			// Secret nie ins HTML, nur gesetzt/nicht gesetzt (Plan M9 §2 Admin)
+			'oneNote' => [
+				'authority' => $this->oneNote->authority(),
+				'clientId' => $this->oneNote->clientId(),
+				'secretSet' => $this->oneNote->hasSecret(),
+				'teams' => $this->oneNote->teamsSwitch(),
+				'redirectUri' => $this->oneNote->redirectUri(),
+			],
 		]);
 	}
 

@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\NextNotes\Command;
 
+use OCA\NextNotes\OneNote\ConnectService;
 use OCA\NextNotes\Service\UserExportService;
 use OCP\ITempManager;
 use OCP\IUserManager;
@@ -23,13 +24,14 @@ class ExportUser extends Command {
 		private UserExportService $export,
 		private ITempManager $temp,
 		private IUserManager $users,
+		private ConnectService $oneNote,
 	) {
 		parent::__construct();
 	}
 
 	protected function configure(): void {
 		$this->setName('nextnotes:export-user')
-			->setDescription('Export the Next Notes data of a user (own workspaces, own submissions with feedback once returned) into a ZIP file')
+			->setDescription('Export the Next Notes data of a user (own workspaces, own submissions with feedback once returned, OneNote import reports) into a ZIP file')
 			->addArgument('uid', InputArgument::REQUIRED, 'User ID')
 			->addArgument('target', InputArgument::REQUIRED, 'Path of the ZIP file to create (must not exist)');
 	}
@@ -47,7 +49,9 @@ class ExportUser extends Command {
 			$output->writeln('<error>Target ' . $target . ' already exists.</error>');
 			return 1;
 		}
-		if (!$this->export->hasData($uid)) {
+		// OneNote-Importe mit Bericht (Plan M9 §7, Thomas 2026-11-08); ohne Token, state, ms_account, Cursor und Items
+		$oneNote = $this->oneNote->exportRows($uid);
+		if (!$this->export->hasData($uid) && $oneNote === []) {
 			$output->writeln('No Next Notes data for ' . $uid . ', nothing written.');
 			return 0;
 		}
@@ -76,6 +80,10 @@ class ExportUser extends Command {
 				$staged[] = $tmp;
 				$zip->addFile($tmp, $path);
 			});
+			if ($oneNote !== []) {
+				$zip->addFromString('onenote-imports.json', (string)json_encode(['imports' => $oneNote], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+				$parts++;
+			}
 			if (!$zip->close()) {
 				throw new \RuntimeException('Cannot write ' . $target);
 			}
