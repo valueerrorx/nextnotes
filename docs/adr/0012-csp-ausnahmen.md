@@ -51,3 +51,6 @@ Tagebuch: `diary` gehört zu `NOTE_VIEWS` (`frame-src 'self'` + Embed-Domains au
 
 ## Nachtrag M6g (2026-11-08)
 Aufgaben-Seite `assignments` gehört zu `SELF_FRAME_VIEWS` (nur `frame-src 'self'`, keine Embed-Domains): Der Lesemodus einer Abgabe zeigt die Druckansicht der Kopie (`api_export_note.php?…&format=html&disposition=inline`, serverseitig bereinigt, Rechte über `requireNote`) im iFrame neben dem Feedback. Eingebettete Videos der Abgabe lädt die Druckansicht selbst unter ihrer eigenen Policy (`export_print`). Keine weitere Lockerung.
+
+## Nachtrag UI-excal (2026-11-09)
+Excalidraw-Editor: keine CSP-Ausnahme. `nextnotes-late.js` nimmt beim Mounten von `.excalidraw` eine feste Liste von NC-Kern-Regeln (`core/css`: Formulare, Überschriften, `kbd`, Grund-Reset, `*`, `:focus-visible`) per CSSOM von `.excalidraw` aus (CSSOM-Änderungen fallen nicht unter `style-src`). Begründung und Optionen: ADR 0017 Nachtrag UI-excal.

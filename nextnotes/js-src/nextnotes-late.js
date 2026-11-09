@@ -285,4 +285,78 @@
 		var params = new URLSearchParams(window.location.search);
 		if (!params.get('note') && !params.get('kanban')) window.scrollToLeftColumn();
 	});
+
+	// Excalidraw-Editor (UI-excal, ADR 0017 Nachtrag): NC-Kern-Regeln, die in .excalidraw greifen (Formulare inkl. Hover/Fokus, Überschriften,
+	// kbd, Grund-Reset mit cursor, box-sizing) erhalten je Selektor :where(:not(.excalidraw *)); Spezifität und Wirkung außerhalb unverändert.
+	// CSS-Gegenregeln reichen nicht: sie setzen nur auf Browser-Standard zurück, nicht auf den Excalidraw-Wert (z. B. Farbfeld beim Hover).
+	var EXCAL_GUARD = ':where(:not(.excalidraw *))';
+	// Teil-Selektoren aus core/css (inputs.scss, apps.scss, styles.scss), die nachweislich Excalidraw-Elemente treffen (E2E excalidraw-toolbar)
+	var EXCAL_NC_PARTS = [
+		/(^|[\s>+~(])(button|input|select|textarea|label|kbd|h[2-6]|em|dl|dt|dd)(?![\w-])/i, // Formulare, Überschriften, kbd
+		/(^|[\s>+~(])(div|span|section|footer|a|p|ul|li|form|fieldset|legend)(?![\w-])/i, // Grund-Reset (cursor: default …)
+		/\*$/, // #content[class*=app-] * (box-sizing), button * (cursor)
+		/:focus-visible/ // Fokusring
+	];
+	var EXCAL_PSEUDO_ELEMENT = /^(::|:(before|after|first-line|first-letter)\b)/i;
+	var excalGuardSelector = function (sel) {
+		var out = [], depth = 0, quote = '', start = 0, pe = -1, changed = false;
+		for (var i = 0; i <= sel.length; i++) {
+			var c = sel.charAt(i);
+			if (quote) {
+				if (c === '\\') i++; else if (c === quote) quote = '';
+				continue;
+			}
+			if (c === '\\') i++;
+			else if (c === '"' || c === "'") quote = c;
+			else if (c === '(' || c === '[') depth++;
+			else if (c === ')' || c === ']') depth--;
+			else if (depth === 0 && c === ':' && pe < 0 && EXCAL_PSEUDO_ELEMENT.test(sel.slice(i, i + 14))) pe = i;
+			else if (depth === 0 && (c === ',' || i === sel.length)) {
+				var cut = pe < 0 ? i : pe, part = sel.slice(start, cut).trim();
+				var hit = part.indexOf(EXCAL_GUARD) < 0 && EXCAL_NC_PARTS.some(function (re) { return re.test(part); });
+				out.push((part + (hit ? EXCAL_GUARD : '') + sel.slice(cut, i)).trim());
+				changed = changed || hit;
+				start = i + 1;
+				pe = -1;
+			}
+		}
+		return changed ? out.join(', ') : sel;
+	};
+	var excalGuarded = new WeakSet();
+	var excalGuardRules = function (rules) {
+		for (var k = 0; k < rules.length; k++) {
+			var rule = rules[k];
+			if (rule.selectorText) {
+				var next = excalGuardSelector(rule.selectorText);
+				if (next !== rule.selectorText) rule.selectorText = next;
+			} else if (rule.cssRules) excalGuardRules(rule.cssRules);
+		}
+	};
+	// nur NC-Kern-Stylesheets (core/css), jedes einmal; fehlend, nicht geladen oder fremder Ursprung → übersprungen
+	var excalGuardSheets = function () {
+		Array.prototype.forEach.call(document.styleSheets, function (sheet) {
+			if (excalGuarded.has(sheet) || !sheet.href || !/\/core\/css\//.test(sheet.href)) return;
+			var rules;
+			try { rules = sheet.cssRules; } catch (e) { return; }
+			excalGuarded.add(sheet);
+			excalGuardRules(rules);
+		});
+	};
+	// erst, wenn ein Excalidraw-Editor gemountet wird
+	var excalRoot = document.querySelector('#nextnotes-root.nextnotes-excalidraw');
+	if (excalRoot) {
+		var excalStart = function () {
+			excalGuardSheets();
+			window.addEventListener('load', excalGuardSheets);
+		};
+		if (excalRoot.querySelector('.excalidraw')) excalStart();
+		else {
+			var excalObserver = new MutationObserver(function () {
+				if (!excalRoot.querySelector('.excalidraw')) return;
+				excalObserver.disconnect();
+				excalStart();
+			});
+			excalObserver.observe(excalRoot, { childList: true, subtree: true });
+		}
+	}
 })();

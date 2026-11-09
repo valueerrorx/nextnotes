@@ -110,8 +110,9 @@ html.nextnotes-ready #nextnotes-root:is(.nextnotes-subpage, .nextnotes-excalidra
 /*
  * Reset gegen NC-Kern-CSS (server.css: button/input/select/textarea, max. Spezifität 0,4,1) im App-Bereich:
  * zurück auf Browser-Standard wie in Poznote; Upstream-Regeln (+1 ID-Stelle, ADR 0017) setzen sich durch.
+ * Nicht in Excalidraw: revert verwürfe deren eigene Regeln (versteckte Werkzeug-Inputs sichtbar); NC-Kern dort per nextnotes-late.js aus (UI-excal).
  */
-:where(#nextnotes-root) :is(button, input, select, textarea):not(.nn-r1):not(.nn-r2):not(.nn-r3):not(.nn-r4):not(.nn-r5) {
+:where(#nextnotes-root) :is(button, input, select, textarea):not(.nn-r1):not(.nn-r2):not(.nn-r3):not(.nn-r4):not(.nn-r5):not(.excalidraw *) {
 	width: revert;
 	height: revert;
 	min-height: revert;
