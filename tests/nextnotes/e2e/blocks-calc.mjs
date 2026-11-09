@@ -4,7 +4,7 @@
 // Aufwandsgrenzen im Browser (Zähler f20, Tiefe g60, 200 Zeilen; Long Tasks), Graph bei Inhaber und Leser (f6 gezeichnet,
 // f7 Laufbudget, f40 Tiefe), Hell/Dunkel, Tastatur-Isolation (R1), Sicherheit, Markdown/Suche, Druck, Austeilen, Mobil/Tablet.
 // 0 CSP/Konsole je Abschnitt. Rechenkern ohne Browser: tests/nextnotes/node/calc-engine.mjs
-import { runSpec } from './lib/harness.mjs';
+import { runSpec, KEY_DOC_END } from './lib/harness.mjs';
 import { apiClient } from './lib/api.mjs';
 import { createTeam, share } from './lib/docker.mjs';
 
@@ -273,7 +273,7 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	const outside = () => kbEntry.evaluate((e) => [...e.childNodes].filter((n) => !(n.nodeType === 1 && n.classList.contains('nn-calc'))).map((n) => n.textContent).join('|'));
 	const before = await outside();
 	await ta(page, kbId).click();
-	await page.keyboard.press('Control+End');
+	await page.keyboard.press(KEY_DOC_END);
 	await page.keyboard.press('Enter');
 	for (const s of ['/', ':', '@', '- ', '[ ]']) { await page.keyboard.type(s); await page.waitForTimeout(250); }
 	ctx.ok((await visibleMenus(page)).length === 0, 'Done 5: kein Upstream-Menü beim Tippen im Textfeld', (await visibleMenus(page)).join(','));
@@ -387,7 +387,7 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	await go(pb, ctx.appUrl(`index.php?note=${sub?.note_id}`));
 	ctx.ok(await live(pb, sub?.note_id), 'Schüler: Block bearbeitbar');
 	await ta(pb, sub?.note_id).click();
-	await pb.keyboard.press('Control+End');
+	await pb.keyboard.press(KEY_DOC_END);
 	await pb.keyboard.type('\na * 5');
 	await pb.keyboard.press('Tab');
 	ctx.ok(await waitFor(async () => calcJson(await content(sub.note_id, apiB))?.src === 'a = 2\na * 3\na * 5'), 'Schüler-Änderung gespeichert');
@@ -408,7 +408,7 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 		await go(mp, url(gId));
 		ctx.ok(await live(mp, gId), `${label}: Block eingehängt`);
 		await ta(mp, gId).tap();
-		await mp.keyboard.press('Control+End');
+		await mp.keyboard.press(KEY_DOC_END);
 		await mp.keyboard.type(label === 'mobil' ? '\n6 * 7' : '\n2^10');
 		const want = label === 'mobil' ? '42' : '1024', at = label === 'mobil' ? 2 : 3;
 		const om = await outsAfter(mp, gId, at, new RegExp(`^${want}$`));

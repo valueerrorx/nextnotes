@@ -14,6 +14,15 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 export const OUT_DIR = join(HERE, '..', 'out');
 export const REPO_ROOT = join(HERE, '..', '..', '..', '..');
 export const APP_SEGMENT = '/apps/nextnotes/';
+// Caret ans Ende: Chromium auf macOS bildet Tasten auf Cocoa-Editierbefehle ab (End = nur scrollen, Strg+Ende = nichts)
+export const KEY_DOC_END = process.platform === 'darwin' ? 'Meta+ArrowDown' : 'Control+End';
+export const KEY_LINE_END = process.platform === 'darwin' ? 'Meta+ArrowRight' : 'End';
+// Inline-Formel anklicken: auf macOS liegt das versteckte .katex-mathml (MathML mit Fläche) im Klickpunkt von Playwright
+// („<p> intercepts pointer events“); dort die sichtbare KaTeX-Darstellung treffen, sonst unverändert den Host
+export async function clickMath(loc, how = 'click') {
+	const k = loc.locator('.katex-html');
+	await (process.platform === 'darwin' && await k.count() > 0 ? k.first() : loc)[how]();
+}
 
 const pw = await import(pathToFileURL(join(process.env.PW_CORE ?? join(REPO_ROOT, 'dev/nextcloud/node_modules/playwright-core'), 'index.mjs')).href);
 

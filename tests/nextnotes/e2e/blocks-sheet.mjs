@@ -8,7 +8,7 @@
 // Zellgrenze nach Bezugsverschiebung (H2), Ablegen auf dem Block (H3). Engine-Grenzen ohne Browser: tests/nextnotes/node/sheet-engine.mjs
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { runSpec, REPO_ROOT } from './lib/harness.mjs';
+import { runSpec, REPO_ROOT, clickMath } from './lib/harness.mjs';
 import { apiClient } from './lib/api.mjs';
 import { createTeam, share } from './lib/docker.mjs';
 
@@ -261,7 +261,7 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 		window.modalAlert.alert = (t) => { window.__nnNotes.push(String(t)); };
 	});
 	const pop = page.locator('.nn-formula-popover');
-	await page.locator(`#entry${longId} [data-math]`).click();
+	await clickMath(page.locator(`#entry${longId} [data-math]`));
 	await pop.waitFor({ state: 'visible', timeout: 15000 });
 	await pop.locator('math-field').evaluate((f) => { f.value = 'x+'.repeat(5001); });
 	await pop.locator('.nn-formula-apply').click();
@@ -488,7 +488,7 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	await pb.waitForFunction((n) => document.querySelector(`#entry${n} [data-math] .katex`), readId, { timeout: 15000 }).catch(() => {});
 	ctx.ok(await pb.locator(`#entry${readId}`).getAttribute('data-nextnotes-readonly') === 'true', 'Lesefreigabe: nur lesen');
 	ctx.ok(await isStatic(pb, readId), 'Done 6: Lesefreigabe – Tabelle statisch');
-	await pb.locator(`#entry${readId} [data-math]`).first().click();
+	await clickMath(pb.locator(`#entry${readId} [data-math]`).first());
 	await pb.waitForTimeout(800);
 	ctx.ok(await pb.locator('.nn-formula-popover').count() === 0 && await pb.locator(`#entry${readId} [data-math] .katex`).count() === 1, 'Review M8a 1: Lesefreigabe – Formel sichtbar, kein Popover');
 	ctx.ok(hfRequests(mB).length === 0, 'Done 6: Leser lädt keine Engine (Netzwerk-Log)', hfRequests(mB).map((r) => r.url).join(' | '));

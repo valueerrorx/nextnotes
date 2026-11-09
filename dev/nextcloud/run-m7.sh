@@ -161,7 +161,7 @@ finish() {
 }
 
 # --- Phase 1 -------------------------------------------------------------------------------------------
-p1="lifecycle install utf8mb4 help phpunit grenzen circlesoff purge"
+p1="lifecycle install utf8mb4 help phpunit msmock logscan grenzen circlesoff purge"
 p1_any=0; for s in $p1; do want "$s" && p1_any=1; done
 if [[ $p1_any == 1 ]]; then
 	# Netz des Compose-Projekts vorab anlegen: parallele "up" würden es sonst gleichzeitig erzeugen

@@ -3,7 +3,7 @@
 // M8a (SPEC §4.7, M8-Plan §2): Formel einfügen über Werkzeugleiste und /Formel, bearbeiten, Inline↔Block, löschen, Neuladen,
 // B69 (gespeichert nur der Vertrag), MathLive lazy, 30 Schulformeln MathLive → KaTeX, Tastatur-Isolation, Leser/Material/Sperre,
 // Druckansicht, Export, Austeilen, MathLive-Payloads, Mobil/Tablet. 0 CSP/Konsole je Abschnitt, keine Fremd-Anfragen.
-import { runSpec } from './lib/harness.mjs';
+import { runSpec, clickMath } from './lib/harness.mjs';
 import { apiClient } from './lib/api.mjs';
 import { createTeam } from './lib/docker.mjs';
 
@@ -134,7 +134,7 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	// 3. Tastatur-Isolation (R1): / : @ Enter-frei, Tab im Feld öffnen kein Menü und ändern die Notiz nicht
 	m = ctx.mark();
 	const before = await entry.evaluate((e) => e.textContent);
-	await inl.click();
+	await clickMath(inl);
 	await pop.waitFor({ state: 'visible', timeout: 5000 });
 	ctx.ok(await focused(), 'Popover: Fokus im Formelfeld (Klick)');
 	await page.keyboard.press('End');
@@ -151,7 +151,7 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 
 	// 4. Bearbeiten: Inline → Block, Block → Inline, Löschen; Neuladen identisch
 	m = ctx.mark();
-	await inl.click();
+	await clickMath(inl);
 	await pop.waitFor({ state: 'visible' });
 	await field.evaluate((f) => { f.value = 'a^2+b^2=c^2'; });
 	await pop.locator('.nn-formula-toggle input').check();
@@ -166,7 +166,7 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	await pop.locator('.nn-formula-apply').click();
 	await pop.waitFor({ state: 'detached' });
 	ctx.ok(await entry.locator(`span.math-inline[data-math="${fracSel}"]`).count() === 1 && await fracBlock.count() === 0, 'Block → Inline');
-	await entry.locator('span.math-inline[data-math]').click();
+	await clickMath(entry.locator('span.math-inline[data-math]'));
 	await pop.waitFor({ state: 'visible' });
 	await pop.locator('.nn-formula-delete').click();
 	await pop.waitFor({ state: 'detached' });
@@ -227,7 +227,7 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	const hosts = page.locator(`#entry${evil} [data-math]`);
 	ctx.ok(await hosts.count() === PAYLOADS.length, 'Payloads gespeichert als Formeln', String(await hosts.count()));
 	for (let i = 0; i < PAYLOADS.length; i++) {
-		await hosts.nth(i).click();
+		await clickMath(hosts.nth(i));
 		await pop.waitFor({ state: 'visible', timeout: 10000 });
 		const box = await field.boundingBox();
 		if (box) await page.mouse.click(box.x + Math.min(30, box.width / 2), box.y + box.height / 2, { modifiers: ['Control'] });
@@ -293,7 +293,7 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	ctx.ok(await pb.locator(`#entry${mat}`).getAttribute('data-nextnotes-readonly') === 'true', 'Material: nur lesen');
 	ctx.ok(await pb.locator(`#entry${mat} [data-math] .katex`).count() === 2, 'Done 4: Leser sieht Formeln');
 	ctx.ok(await pb.locator(`#note${mat} .btn-nn-blocks`).count() === 0, 'Leser: kein Formel-Knopf');
-	await pb.locator(`#entry${mat} [data-math]`).first().click();
+	await clickMath(pb.locator(`#entry${mat} [data-math]`).first());
 	await pb.waitForTimeout(800);
 	ctx.ok(await popB.count() === 0, 'Done 4: Leser – kein Popover');
 	ctx.ok(mlRequests(mB).length === 0, 'Leser lädt kein MathLive');
@@ -307,7 +307,7 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	await pb.goto(ctx.appUrl(`index.php?workspace=${encodeURIComponent(TW)}&note=${shared}`), { waitUntil: 'networkidle' });
 	const banner = await pb.locator('.note-edit-lock-banner').first().waitFor({ state: 'visible', timeout: 10000 }).then(() => true, () => false);
 	ctx.ok(banner, 'Sperre: B sieht das Sperr-Banner');
-	await pb.locator(`#entry${shared} [data-math]`).first().click();
+	await clickMath(pb.locator(`#entry${shared} [data-math]`).first());
 	await pb.waitForTimeout(800);
 	ctx.ok(await popB.count() === 0, 'Done 4: fremde Sperre – kein Popover');
 	await page.goto(noteUrl, { waitUntil: 'networkidle' });
@@ -318,7 +318,7 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 		return false;
 	})();
 	ctx.ok(free, 'Sperre frei: B ohne Neuladen bearbeitbar');
-	await pb.locator(`#entry${shared} [data-math]`).first().click();
+	await clickMath(pb.locator(`#entry${shared} [data-math]`).first());
 	ctx.ok(await popB.waitFor({ state: 'visible', timeout: 10000 }).then(() => true, () => false), 'Done 4: nach Freigabe öffnet das Popover ohne Neuladen');
 	await pb.keyboard.press('Escape');
 	ctx.assertClean('Leser/Sperre', m);
@@ -352,7 +352,7 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 		const host = mp.locator(`#entry${id} [data-math]`).first();
 		await host.waitFor({ state: 'visible', timeout: 15000 });
 		await mp.waitForFunction((n) => window.NextNotesBlocks?.writable(document.querySelector(`#entry${n}`)), id, { timeout: 15000 }).catch(() => {});
-		await host.tap();
+		await clickMath(host, 'tap');
 		const mpop = mp.locator('.nn-formula-popover');
 		ctx.ok(await mpop.waitFor({ state: 'visible', timeout: 15000 }).then(() => true, () => false), `${label}: Popover öffnet per Tippen`);
 		const sheet = await mpop.evaluate((el) => ({ sheet: el.classList.contains('is-sheet'), bottom: Math.round(window.innerHeight - el.getBoundingClientRect().bottom), w: Math.round(el.getBoundingClientRect().width) }));

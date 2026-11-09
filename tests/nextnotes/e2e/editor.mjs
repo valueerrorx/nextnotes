@@ -4,7 +4,7 @@
 // „+“ → Bearbeiten → Speichern → Reload; Fragment + Adresszeile (B31); Beacon mit Token, ohne → 412 (B4);
 // > 64 KiB beim Schließen (B30); Tippen während Speichern (B32); Sperre/duplizierter Tab nur lesbar (P7);
 // eingeschleuste Bedienelemente wirkungslos (B26); Tags mit '; Verschieben-Dialoge. Je Abschnitt 0 CSP/pageerror/Konsole.
-import { runSpec } from './lib/harness.mjs';
+import { runSpec, KEY_DOC_END } from './lib/harness.mjs';
 import { apiClient } from './lib/api.mjs';
 import { shareRead } from './lib/docker.mjs';
 
@@ -80,7 +80,7 @@ await runSpec(import.meta.url, async (ctx, page, context) => {
 		const p2 = await context.newPage();
 		await open(p2, id);
 		await p2.locator(`#entry${id}`).click();
-		await p2.keyboard.press('Control+End');
+		await p2.keyboard.press(KEY_DOC_END);
 		await p2.keyboard.type(` zu${size}${RUN}`);
 		await p2.waitForTimeout(500);
 		p2.on('dialog', (d) => d.accept().catch(() => {}));
@@ -127,7 +127,7 @@ await runSpec(import.meta.url, async (ctx, page, context) => {
 			await route.continue();
 		});
 		await page.locator(`#entry${id}`).click();
-		await page.keyboard.press('Control+End');
+		await page.keyboard.press(KEY_DOC_END);
 		await page.keyboard.type(` eins${RUN}`);
 		await page.evaluate(() => document.querySelector('.btn-save')?.click());
 		await page.waitForTimeout(400);

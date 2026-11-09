@@ -38,7 +38,9 @@ done
 [[ "$code" == 200 ]] || die "$env: App-Seite HTTP $code statt 200"
 
 set +e
+# Soft-Limit offener Dateien anheben (bis zum Hard-Limit): Colima/containerd 2 setzt 1024, die Gesamtsuite braucht mehr
 dc "$env" exec -T -u www-data -e NN_REF_DIR="$dest/ref" -e NN_BASE_URL=http://localhost "$svc" \
+	sh -c 'ulimit -n "$(ulimit -Hn)" 2>/dev/null || ulimit -n 65536 2>/dev/null || true; exec "$@"' sh \
 	php "$dest/vendor/bin/phpunit" -c "$dest/phpunit.xml" "$@"
 rc=$?
 set -e

@@ -3,7 +3,7 @@
 // M6c (Plan M6 §2.2, Done M6c, P33): „@“-Vorschläge in Tasklist-Feldern im Team-Workspace: neue Aufgabe (Enter wählt, legt nichts an;
 // zweites Enter legt an; B erhält Benachrichtigung), Pfeil/Tab/Escape, Bearbeiten-Dialog (Escape schließt nur das Menü, Klick wählt),
 // Unteraufgabe neu/bearbeiten, eingebettete Tasklist; privater Workspace ohne Menü. 0 CSP/Konsole.
-import { runSpec } from './lib/harness.mjs';
+import { runSpec, KEY_LINE_END } from './lib/harness.mjs';
 import { apiClient } from './lib/api.mjs';
 import { createTeam, ensureUser, occ } from './lib/docker.mjs';
 
@@ -172,7 +172,7 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	const inl = page.locator(`#tasks-list-${tl} .task-edit-input`);
 	ctx.ok(await inl.waitFor({ state: 'visible', timeout: 5000 }).then(() => true, () => false), 'Inline-Bearbeiten offen');
 	await inl.focus();
-	await page.keyboard.press('End');
+	await page.keyboard.press(KEY_LINE_END);
 	await page.keyboard.type(` @${B.slice(0, 2)}`);
 	ctx.ok(await menuOpen(), 'Inline: Menü');
 	await page.keyboard.press('Enter');

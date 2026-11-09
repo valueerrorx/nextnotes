@@ -31,21 +31,28 @@ nn_port_listening() {
 	command -v lsof >/dev/null 2>&1 && [[ -n "$(lsof -nP -iTCP:"$1" -sTCP:LISTEN -t 2>/dev/null)" ]]
 }
 nn_check_ports() {
-	local own=() foreign=(8090) c proj ports p ids=""
-	command -v docker >/dev/null 2>&1 && ids="$(docker ps -aq 2>/dev/null || true)"
-	if [[ -n "$ids" ]]; then
-		# alle Container, auch gestoppte (z. B. nc35-gftest): Projekt und gebundene Host-Ports
+	local own=() foreign=() c proj ports p ids="" try
+	# Container-Ports lesen: alle Container, auch gestoppte (z. B. nc35-gftest): Projekt und gebundene Host-Ports
+	nn_read_ports() {
+		own=(); foreign=(8090); ids=""
+		command -v docker >/dev/null 2>&1 && ids="$(docker ps -aq 2>/dev/null || true)"
+		[[ -n "$ids" ]] || return 0
 		while read -r c proj ports; do
 			[[ -n "$c" ]] || continue
 			if [[ "$proj" == "$NN_PROJECT" ]]; then own+=($ports); else foreign+=($ports); fi
 		done < <(docker inspect -f '{{.Name}} {{index .Config.Labels "com.docker.compose.project"}} {{range $k, $v := .HostConfig.PortBindings}}{{range $v}}{{.HostPort}} {{end}}{{end}}' $ids 2>/dev/null \
 			| awk '{ if (NF == 1 || $2 ~ /^[0-9]+$/) { n = $1; $1 = ""; print n, "-", $0 } else print }')
-	fi
+	}
+	nn_read_ports
 	for p in "$NN_PORT_SQLITE" "$NN_PORT_MARIADB" "$NN_PORT_PGSQL" "$NN_PORT_NGINX"; do
 		[[ " ${foreign[*]} " == *" $p "* ]] && { echo "FEHLER: Port $p gehört einem fremden Container oder der Demo (NN_PORT_BASE ändern)" >&2; exit 1; }
-		if [[ " ${own[*]} " != *" $p "* ]] && nn_port_listening "$p"; then
-			echo "FEHLER: Port $p ist schon belegt (NN_PORT_BASE ändern)" >&2; exit 1
-		fi
+		# Lauscher ohne eigenen Container: parallele Umgebung desselben Projekts kann gerade neu starten
+		# (Colima/Lima-Portweiterleitung per ssh folgt dem Container verzögert) → bis 10 s neu lesen
+		for try in 1 2 3 4 5 6; do
+			[[ " ${own[*]} " != *" $p "* ]] && nn_port_listening "$p" || break
+			[[ $try -lt 6 ]] || { echo "FEHLER: Port $p ist schon belegt (NN_PORT_BASE ändern)" >&2; exit 1; }
+			sleep 2; nn_read_ports
+		done
 	done
 	return 0
 }

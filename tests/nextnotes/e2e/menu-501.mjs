@@ -3,7 +3,7 @@
 // M3-fix4 (2): Detektor – klickt alle sichtbaren Menüpunkte durch (Rechtsklick-/Slash-Menü in Rich-Text- und Markdown-Notiz,
 // Notiz-Werkzeugleiste, Titelmenü, Seitenleisten-Menüs) und bestätigt sich öffnende Dialoge. Jede Antwort 501 (not_implemented) ist FAIL.
 // Ergänzt stripped.mjs (Gestrichenes unsichtbar) um „Sichtbares funktioniert ohne 501“.
-import { runSpec } from './lib/harness.mjs';
+import { runSpec, KEY_DOC_END } from './lib/harness.mjs';
 import { apiClient } from './lib/api.mjs';
 
 const RUN = `${process.argv[3]}${Date.now().toString(36)}`;
@@ -71,7 +71,7 @@ await runSpec(import.meta.url, async (ctx, page) => {
 	};
 	const slashMenu = async (id) => {
 		await (await editor(id)).click();
-		await page.keyboard.press('Control+End');
+		await page.keyboard.press(KEY_DOC_END);
 		await page.keyboard.press('Enter');
 		await page.keyboard.type('/');
 		await page.locator('.slash-command-menu').first().waitFor({ state: 'visible', timeout: 3000 });
