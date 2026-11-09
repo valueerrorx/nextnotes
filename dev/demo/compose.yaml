@@ -38,6 +38,16 @@ services:
       - nc:/var/www/html
     restart: unless-stopped
 
+  # Hintergrundjobs alle 5 min (OneNote-Import, Fristen, Aufräumen); offizielles Muster des Images
+  cron:
+    image: nextcloud:35.0.2-apache
+    pull_policy: missing
+    depends_on: [nc]
+    entrypoint: /cron.sh
+    volumes:
+      - nc:/var/www/html
+    restart: unless-stopped
+
 volumes:
   db:
   nc:

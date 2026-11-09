@@ -29,6 +29,7 @@ nn_tar -C "$src/nextnotes" --exclude=.gitignore --exclude=./build/node_modules -
 occ app:enable nextnotes >/dev/null || true
 occ upgrade >/dev/null || true
 occ maintenance:repair >/dev/null 2>&1 || true
+occ background:cron >/dev/null || true   # Container „cron“ (compose.yaml) führt cron.php alle 5 min aus
 # Browser-Cache: NC hängt an App-Skripte ?v=<App-Version>-<theming cachebuster>; die Version bleibt zwischen Demo-Ständen gleich (M6i-fix)
 occ config:app:set theming cachebuster --value="$(git -C "$repo" rev-parse --short "${NN_DEMO_REF:-HEAD}")" >/dev/null || true
 # Demo-Konten (nur anlegen, wenn sie fehlen)

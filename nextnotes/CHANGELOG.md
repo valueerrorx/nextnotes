@@ -10,7 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 ### Added
-- OneNote import: images and file attachments of a page become attachments of the imported note (images shown inline, files as download links), with the same type, size and storage quota rules as uploads. Missing or oversized items are replaced by a placeholder and listed in the report. The notebook selection notes when not all notebooks could be loaded.
+- OneNote import completed: images and file attachments of a page become attachments of the imported note (images shown inline, files as download links), with the same type, size and storage quota rules as uploads. Missing or oversized items (more than 100 per page or 256 MiB in total) are replaced by a placeholder and listed in the report. The notebook selection notes when not all notebooks could be loaded.
+- Documentation for the OneNote import: step-by-step Microsoft Entra app registration, account types, operation (cron, Microsoft request limits, duration), error messages, data protection and revoking access at Microsoft (`docs/app/admin.md`); user guide with what is converted and what is not, e.g. ink drawings (`docs/app/user.md`).
 
 ## 0.9.2 – 2026-11-09
 

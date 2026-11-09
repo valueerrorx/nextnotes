@@ -60,6 +60,7 @@ System-Cron einrichten (*Verwaltung → Grundeinstellungen → Hintergrund-Aufga
 | `SnapshotRetentionJob` | täglich | alte automatische Versionen von Notizen ausdünnen |
 | `CleanupJob` | täglich | gelöschte Teams erkennen und nach Frist aufräumen, verwaiste Anhangsdateien und Zeichnungs-Vorschauen löschen, Rollenwechsel bei Aufgaben nachziehen |
 | `DeletedWorkspaceSweepJob` | täglich | Inhalte gelöschter Konten nachräumen, falls der einmalige Löschjob abbrach |
+| `OneNoteImportJob` | 5 min | OneNote-Importe fortsetzen, abgelaufene Anmeldungen und alte Importe aufräumen (Abschnitt 13) |
 
 Dazu kommt bei jeder Kontolöschung ein einmaliger `UserDataDeletionJob`.
 
@@ -74,6 +75,7 @@ Dazu kommt bei jeder Kontolöschung ein einmaliger `UserDataDeletionJob`.
 *Verwaltung → Next Notes*:
 - **Erlaubte Embed-Domains:** ein Host je Zeile (z. B. `www.youtube-nocookie.com`), höchstens 100. Nur genau diese Hosts, keine Platzhalter, keine IP-Adressen, keine Ports. Ab Werk leer. Eingebettete Frames anderer Hosts werden beim Speichern einer Notiz dauerhaft entfernt. Eingebettete Inhalte lädt der Browser direkt beim Drittanbieter, der dabei Daten der Leser erhält; datensparsame Hosts bevorzugen.
 - **Maximale Dateigröße (MiB):** je Anhang, Standard 20, erlaubt 1–2048. Die PHP-Grenzen (`upload_max_filesize`, `post_max_size`) und die des Webservers müssen mindestens so groß sein.
+- **OneNote-Import:** Authority, Client-ID, Client-Geheimnis und Team-Notizbücher, siehe Abschnitt 13.
 - **Speicherkontingent für Anhänge je Benutzer (MiB):** Standard 500, erlaubt 1–1048576. Zählt die Anhänge aller Workspaces eines Besitzers, auch Uploads von Personen, mit denen geteilt wurde. Jedes Team hat ein eigenes Kontingent in derselben Höhe (Summe aller Team-Workspaces, inklusive ausgeteilter Kopien).
 
 ## 8. Speicher, Grenzen, Temp-Platz
@@ -107,6 +109,7 @@ Auskunft und Datenübertragbarkeit (DSGVO Art. 15/20) für ein Konto.
 - Inhalt: je eigenem Workspace ein strukturierter Export (`workspaces/…zip`, ohne Papierkorb) und je eigener Abgabe ein Export (`submissions/…zip`, Feedback und Punkte erst nach der Rückgabe). Keine fremden Daten, keine Team-Workspaces, keine Vorlagen.
 - `<ziel.zip>` darf nicht existieren. Ohne Daten: Hinweis, Exit 0, keine Datei.
 - Überschreitet ein Teil die Exportgrenze von 1 GiB, bricht der Befehl ab (Exit 1, keine Datei).
+- Hat das Konto gespeicherte OneNote-Importe (offene und bis 30 Tage nach Abschluss), enthält die Datei zusätzlich `onenote-imports.json` (Status, Zeitpunkte, Zähler, Fehlercode und Bericht mit Seitentiteln; keine Anmeldedaten). Der Export der App User migration enthält sie nicht.
 - Für bereits gelöschte Konten liefert der Befehl nichts: Abgaben gelöschter Konten sind nur noch über die frühere UID gekennzeichnet und gehören den Lehrkräften.
 - Der Befehl enthält auch Abgaben aus Teams, die der Schüler verlassen hat (er selbst sieht sie nicht mehr).
 - Ist die App **User migration** installiert, enthält deren Export dieselben Teile unter `nextnotes/`, aber nur Abgaben, die der Benutzer selbst noch öffnen kann. Der Import überspringt Next Notes (kein Import in Next Notes).
@@ -137,7 +140,9 @@ Löscht **alle** Daten der App aller Benutzer und Teams. Nur für die Deinstalla
 
 **Welche Daten:** Inhalte der Notizen, Anhänge und Zeichnungen, Ordner, Tags, Versionen, Erinnerungen, Erwähnungen, Freigaben, persönliche Einstellungen; bei Teams zusätzlich Aufgaben, Abgaben, Feedback und Punkte. Gespeichert werden UIDs und, wo Namen nach einer Kontolöschung sichtbar bleiben müssen, Anzeigenamen (Schüler in Abgaben, Lehrkraft bei Aufgabe und Feedback, Verfasser einer Erwähnung).
 
-**Wo:** nur in der Datenbank und im Datenverzeichnis dieser Nextcloud (Abschnitt 8). Die App sendet keine Daten an Dritte und führt kein eigenes Aktivitätsprotokoll. Ausnahme liegt in der Hand der Administration: eingebettete Inhalte von erlaubten Embed-Domains (Abschnitt 7) lädt der Browser der Leser direkt beim Anbieter. Die App enthält keine KI-Funktionen.
+**Wo:** nur in der Datenbank und im Datenverzeichnis dieser Nextcloud (Abschnitt 8). Die App sendet keine Daten an Dritte und führt kein eigenes Aktivitätsprotokoll. Zwei Ausnahmen liegen in der Hand der Administration: eingebettete Inhalte von erlaubten Embed-Domains (Abschnitt 7) lädt der Browser der Leser direkt beim Anbieter; der OneNote-Import (Abschnitt 13) meldet Benutzer bei Microsoft an und liest dort ihre Notizbücher, schickt aber keine Inhalte aus Next Notes hin. Die App enthält keine KI-Funktionen.
+
+**OneNote-Import:** Was dabei gespeichert wird und wie lange: Abschnitt 13.6.
 
 **Auskunft und Datenübertragbarkeit:** Benutzer exportieren ihre Workspaces selbst (*Einstellungen → Export*) und ihre Abgaben in der Ansicht „Aufgaben“. Admins nutzen `occ nextnotes:export-user` oder die App User migration (Abschnitt 9).
 
@@ -170,3 +175,124 @@ Löscht **alle** Daten der App aller Benutzer und Teams. Nur für die Deinstalla
 
 ## 12. Datensicherung
 Zu sichern sind die Tabellen `oc_nextnotes_*` und der Ordner `appdata_<instanceid>/nextnotes/` im Datenverzeichnis, beide zusammen (Anhänge gehören zu Tabellenzeilen). Die normale Nextcloud-Sicherung (Datenbank + Datenverzeichnis) deckt beides ab.
+
+## 13. OneNote-Import
+Benutzer können ihre OneNote-Notizbücher aus Microsoft 365 in eigene Workspaces importieren (Bedienung: [user.md](user.md#aus-onenote-importieren)). Dafür braucht die Schule eine eigene **App-Registrierung in Microsoft Entra**. Es gibt keine zentrale App von Next Notes, weil jede Nextcloud eine eigene Rücksprung-Adresse hat. Ohne Registrierung ist der Import aus und Benutzer sehen ihn nicht.
+
+### 13.1 Was die App macht und was nicht
+- **Macht:** Der Benutzer meldet sich mit seinem Microsoft-Konto an (im Browser direkt bei Microsoft, Next Notes sieht kein Passwort). Er wählt Notizbücher oder Abschnitte. Ein Hintergrundjob liest sie über Microsoft Graph und legt je Notizbuch einen neuen eigenen Workspace an. Bereits importierte Seiten werden beim nächsten Import übersprungen.
+- **Macht nicht:** nichts nach OneNote zurückschreiben, nicht synchronisieren, importierte Seiten nicht aktualisieren, keine Notizbücher anderer Benutzer ohne deren Anmeldung lesen, nicht in Team-Workspaces importieren, keine SharePoint-Website-Notizbücher.
+- **Die Registrierung legt der Admin bei Microsoft an**; Next Notes registriert nichts selbst und ändert nichts im Tenant.
+- Der Server ruft nur `https://login.microsoftonline.com` und `https://graph.microsoft.com` auf (ausgehend, Port 443). Ein Proxy aus `config.php` (`proxy`) gilt auch hier. Nationale Clouds (z. B. 21Vianet) werden nicht unterstützt.
+
+### 13.2 Kontotyp wählen
+Bei der Registrierung fragt Microsoft, wer die App nutzen darf. In Next Notes trägt man dazu passend die **Authority** ein:
+
+| Kontotyp bei Microsoft | Authority in Next Notes | Wann |
+|---|---|---|
+| Nur Konten in diesem Organisationsverzeichnis (Single-Tenant) | **Verzeichnis-(Mandanten-)ID** (GUID) oder die Domain des Tenants (z. B. `schule.example`) | **Empfohlen.** Nur Konten der eigenen Schule. Keine Probleme mit der Zustimmung. |
+| Konten in einem beliebigen Organisationsverzeichnis (Mehrmandanten) | `organizations` | Mehrere Schulen bzw. Tenants nutzen dieselbe Nextcloud. In den anderen Tenants muss meist deren Admin zustimmen, weil die App nicht von Microsoft verifiziert ist. |
+| Konten in einem beliebigen Organisationsverzeichnis und persönliche Microsoft-Konten | `common` | Zusätzlich private Konten (Outlook.com, Hotmail). **Team- und Klassennotizbücher gibt es damit nicht**, der Schalter dafür wirkt nicht. Private Konten sehen auf der Zustimmungsseite „nicht verifiziert“. |
+
+Authority und Kontotyp müssen zusammenpassen, sonst lehnt Microsoft die Anmeldung ab. Nur private Konten (`consumers`) bietet Next Notes nicht an.
+
+### 13.3 App registrieren (Microsoft Entra Admin Center)
+Die Bezeichnungen folgen der deutschen Oberfläche, in Klammern die englische.
+1. In Next Notes *Verwaltung → Next Notes → OneNote-Import* öffnen und die **Umleitungs-URI für die App-Registrierung** kopieren. Sie sieht etwa so aus: `https://cloud.schule.example/apps/nextnotes/onenote/callback` (je nach Webserver mit `/index.php/` vor `apps`, bei Nextcloud in einem Unterordner mit diesem davor). Immer den angezeigten Wert nehmen, nicht abtippen.
+   - Die Adresse kommt aus der Adresse, unter der man die Verwaltung gerade geöffnet hat. Die Seite deshalb über die offizielle Adresse der Nextcloud öffnen (die auch die Benutzer verwenden).
+   - Microsoft verlangt `https://`; nur `http://localhost` ist für Tests erlaubt.
+2. Im [Microsoft Entra Admin Center](https://entra.microsoft.com) anmelden (mindestens Rolle „Anwendungsentwickler“; für Schritt 7 eine Administratorrolle, die Zustimmungen erteilen darf).
+3. *Entra ID → App-Registrierungen (App registrations) → Neue Registrierung (New registration)*:
+   - **Name:** z. B. „Next Notes OneNote-Import“. Benutzer sehen ihn auf der Anmeldeseite.
+   - **Unterstützte Kontotypen (Supported account types):** wie in 13.2.
+   - **Umleitungs-URI (Redirect URI):** Plattform **Web** (nicht „Single-Page-Anwendung“, nicht „Öffentlicher Client“), Wert = die kopierte Adresse, exakt (Groß-/Kleinschreibung, kein Schrägstrich am Ende).
+   - *Registrieren*.
+4. Auf der Übersichtsseite die **Anwendungs-ID (Client-ID)** kopieren, bei Single-Tenant auch die **Verzeichnis-ID (Mandanten-ID)**.
+5. *Zertifikate & Geheimnisse (Certificates & secrets) → Geheime Clientschlüssel → Neuer geheimer Clientschlüssel*:
+   - Beschreibung (z. B. „Next Notes 2027“) und Ablauf wählen.
+   - Den **Wert** (nicht die „Geheimnis-ID“) sofort kopieren; Microsoft zeigt ihn nur einmal.
+   - **Ablaufdatum im Kalender notieren** und einige Wochen vorher eine Erinnerung setzen (Abschnitt 13.5).
+6. *API-Berechtigungen (API permissions) → Berechtigung hinzufügen → Microsoft Graph → Delegierte Berechtigungen*:
+   - Immer: `openid`, `offline_access`, `Notes.Read`.
+   - Nur wenn Team- und Klassennotizbücher erlaubt werden sollen (nicht bei `common`): zusätzlich `Notes.Read.All` und `Team.ReadBasic.All`.
+   - `User.Read`, das Microsoft bei neuen Registrierungen vorgibt, braucht Next Notes nicht. Es kann bleiben oder entfernt werden.
+   - Keine Anwendungsberechtigungen (Application permissions) hinzufügen; Next Notes nutzt sie nicht.
+7. **Administratorzustimmung für <Schule> erteilen** (Grant admin consent) und bestätigen. Microsoft verlangt sie für diese Berechtigungen nicht, sie ist aber **empfohlen**: Ohne sie sieht jeder Schüler beim ersten Mal eine Zustimmungsseite, und ist die Benutzerzustimmung im Tenant abgeschaltet, geht die Anmeldung ohne sie gar nicht.
+
+### 13.4 In Next Notes eintragen
+*Verwaltung → Next Notes → OneNote-Import*:
+- **Authority:** wie in 13.2 (Mandanten-ID, Domain, `organizations` oder `common`).
+- **Anwendungs-ID (Client-ID):** aus Schritt 4.
+- **Client-Geheimnis:** der Wert aus Schritt 5. Das Feld zeigt danach nur „gesetzt“; der Wert wird nie wieder angezeigt. Leer lassen = unverändert, *Gespeichertes Client-Geheimnis entfernen* schaltet den Import ab.
+- **Team- und Klassennotizbücher erlauben:** ab Werk aus. Nur mit Mandanten-ID, Domain oder `organizations` und den Berechtigungen aus Schritt 6. Team-Notizbücher können Inhalte anderer Personen enthalten (z. B. Abschnitte aller Schüler im Klassennotizbuch einer Lehrkraft); importiert wird nur, was der Benutzer ausdrücklich auswählt, und nur in seinen eigenen Workspace.
+- *Speichern*. Sind Client-ID und Geheimnis gesetzt, erscheint bei den Benutzern unter *Einstellungen* die Karte „Import aus OneNote“.
+
+### 13.5 Betrieb
+- **Cron ist Pflicht.** Der Import läuft nur im Hintergrundjob `OneNoteImportJob` (alle 5 min, Abschnitt 5). Mit „AJAX“ läuft er nur, solange jemand Nextcloud im Browser offen hat, und lange Läufe brechen ab. Es geht dabei nichts kaputt, der Import wird nur sehr langsam.
+- **Drosselung durch Microsoft:** höchstens 400 Anfragen pro Stunde je Benutzer und App. Next Notes nutzt davon etwa **350 pro Stunde** und hält mindestens 0,6 s Abstand. Eine Seite braucht eine Anfrage plus eine je Bild oder Datei.
+- **Dauer:** Ein Notizbuch mit 300 Seiten und 600 Bildern braucht rund **2,5–3 Stunden**, 50 Seiten mit wenigen Bildern etwa 15–30 Minuten. Mehrere Benutzer können gleichzeitig importieren, jeder mit eigenem Kontingent bei Microsoft. Der Job arbeitet aber je Lauf nur etwa 2 Minuten und teilt sie reihum auf; bei mehr als etwa drei gleichzeitigen Importen wird jeder einzelne langsamer. Die Importseite zeigt eine geschätzte Restzeit, am Ende kommt eine Nextcloud-Benachrichtigung.
+- **Grenzen je Seite:** höchstens 100 Bilder und Dateien, zusammen höchstens 256 MiB, 15 min. Je Datei gilt die *Maximale Dateigröße* aus Abschnitt 7, höchstens aber 100 MiB. Was darüber liegt, wird ein Platzhalter und steht im Bericht. Importierte Anhänge zählen zum Speicherkontingent des Benutzers (Abschnitt 7).
+- **Temp-Platz:** Bilder und Dateien einer Seite liegen kurz im Temp-Verzeichnis (bis 256 MiB je laufendem Import). Reste nach einem harten Abbruch löscht der Job nach 1 h.
+- **Client-Geheimnis erneuern:** Vor Ablauf in Entra ein neues Geheimnis anlegen, in Next Notes eintragen, danach das alte in Entra löschen. Ein neues Geheimnis bei gleicher Client-ID ändert an laufenden Importen nichts.
+- **Abgelaufenes Geheimnis:** Microsoft lehnt die Anmeldung der App ab. Laufende Importe enden mit „Die OneNote-Konfiguration ist ungültig“ (`invalid_client`), im Nextcloud-Log steht eine Warnung „OneNote client ID or secret rejected by Microsoft“. Neues Geheimnis eintragen; die Benutzer starten den Import neu, bereits importierte Seiten werden übersprungen.
+- **Konfiguration ändern:** Ändert der Admin Client-ID oder Authority, enden alle offenen Importe mit „Konfiguration geändert“ (`config_changed`), ihre Anmeldedaten werden gelöscht. Die Benutzer starten neu, bereits importierte Seiten werden übersprungen. Wird der Schalter für Team-Notizbücher ausgeschaltet, enden ebenso alle offenen Importe, die Team-Notizbücher enthalten; die anderen laufen weiter.
+- **Import ausschalten:** Client-Geheimnis entfernen. Offene Importe ruhen dann ohne Anfrage an Microsoft; ihre Anmeldedaten werden trotzdem nach den Fristen in 13.6 gelöscht.
+- **Job hängt nach Serverneustart:** Bricht ein Cron-Prozess hart ab (Neustart, Speicherfehler), hält Nextcloud den Job bis zu **12 Stunden** als „reserviert“ und alle Importe ruhen so lange. Es gehen keine Daten verloren. Sofort weiter geht es mit:
+  ```
+  occ background-job:list --class='OCA\NextNotes\BackgroundJob\OneNoteImportJob'
+  occ background-job:execute <ID> --force-execute
+  ```
+  `--force-execute` hebt die Reservierung auf und führt einen Lauf aus; danach übernimmt der normale Cron wieder.
+
+### 13.6 Datenschutz
+| Was | Wo | Wie lange |
+|---|---|---|
+| Zugriffs- und Aktualisierungs-Token von Microsoft | Tabelle `oc_nextnotes_onenote_imports`, verschlüsselt mit dem `secret` aus `config.php` | **nur während des Imports**: in der Auswahl höchstens 24 h, beim Importieren bis zum Ende; gelöscht bei Ende, Abbruch, Fehler, Konfigurationswechsel, deaktiviertem Konto, entzogenem App-Zugriff und nach 7 Tagen ohne Fortschritt |
+| Einmalwerte der Anmeldung (state, PKCE) | dto. | höchstens 10 min, einmal verwendbar |
+| Kennung des Microsoft-Kontos (Hash aus Tenant- und Benutzerkennung, kein Name, keine E-Mail) | dto. | wie der Import; nur um eine Neuanmeldung mit einem anderen Konto zu erkennen |
+| Auswahl, Fortschritt, Zähler, Bericht (gekürzte Seitentitel mit Grund) | dto. | 30 Tage nach Abschluss |
+| Zuordnung „Microsoft-Element → importierte Notiz“ (Hash der Microsoft-ID, keine Inhalte) | `oc_nextnotes_onenote_items` | bis zur Kontolöschung, `delete-user-data` oder `purge`; verhindert doppelte Importe |
+| Importierte Notizen und Anhänge | wie alle Notizen | wie alle Notizen (Abschnitt 10) |
+| Client-Geheimnis | App-Einstellungen, als vertraulich markiert | bis der Admin es ändert oder `purge` |
+
+- **Auskunft:** `occ nextnotes:export-user` enthält `onenote-imports.json` mit Status, Zeitpunkten, Zählern, Fehlercode und dem Bericht (Seitentitel). Nicht enthalten: Token, Einmalwerte, Kontokennung, Auswahl und die Zuordnungstabelle (technische Hilfsdaten ohne Inhalt). Die importierten Notizen selbst sind wie alle Notizen im Export.
+- **Umzug** (App User migration): ohne Importe und Zuordnungen; ein Import ist an die Instanz und das Microsoft-Konto gebunden.
+- **Löschung:** Kontolöschung und `occ nextnotes:delete-user-data` löschen beide Tabellen des Kontos, `occ nextnotes:purge` alles einschließlich der Einstellungen `onenote_*` und des Client-Geheimnisses.
+- **Logs:** Next Notes schreibt nie Token, Geheimnis, Seitentitel oder Inhalte ins Log, nur Import-ID, HTTP-Status und Fehlercode. Der Webserver protokolliert einmal die Rücksprung-Adresse mit dem einmaligen Anmeldecode; er ist ohne Geheimnis nutzlos und nach Minuten verfallen.
+- **Bei Microsoft:** Die Anmeldungen erscheinen in den Anmeldeprotokollen (Sign-in logs) des Tenants. Weitere Empfänger gibt es nicht.
+- Klassennotizbücher enthalten Inhalte von Schülern. Ob Lehrkräfte sie in Next Notes übernehmen dürfen, regelt die Schule (Verzeichnis von Verarbeitungstätigkeiten, Abschnitt 10).
+
+### 13.7 Widerruf bei Microsoft
+- In Next Notes löscht *Import abbrechen* die Token sofort. Die **Zustimmung bei Microsoft bleibt** bestehen, damit eine spätere Anmeldung ohne erneute Rückfrage geht.
+- **Admins:** Entra Admin Center → *Entra ID → Unternehmensanwendungen (Enterprise applications)* → App wählen → *Berechtigungen (Permissions)* → Administratorzustimmung widerrufen. Zustimmungen einzelner Benutzer lassen sich dort nicht per Klick widerrufen, nur mit Microsoft Graph oder PowerShell. Ein Widerruf verhindert keine neue Zustimmung; soll niemand mehr importieren, das Client-Geheimnis in Next Notes entfernen oder die Registrierung löschen.
+- **Benutzer mit Schulkonto:** im Portal „Meine Apps“ (<https://myapps.microsoft.com>) die App entfernen. Hat der Admin für alle zugestimmt (Schritt 7), kann nur der Admin widerrufen.
+- **Benutzer mit privatem Konto** (`common`): im Microsoft-Konto unter „Apps und Dienste“ die App entfernen.
+
+### 13.8 Fehlerbilder
+| Benutzer sieht | Code | Ursache | Abhilfe |
+|---|---|---|---|
+| Fehlerseite bei Microsoft (z. B. `AADSTS50011`) statt Rücksprung | – | Umleitungs-URI passt nicht, Kontotyp passt nicht zum Konto, falsche Client-ID | URI exakt aus der Admin-Karte übernehmen (13.3), Kontotyp und Authority prüfen (13.2) |
+| „Anmeldung abgebrochen.“ | – | Benutzer hat bei Microsoft abgebrochen oder nicht zugestimmt | erneut verbinden |
+| „Anmeldung fehlgeschlagen.“ | – | sonstiger Fehler beim Rücksprung oder Token-Abruf | erneut verbinden; bleibt es, Nextcloud-Log prüfen (Fehlercode, keine Token) |
+| „Die Zustimmung fehlt. Bitte frage deine Administration.“ | `consent` | Benutzerzustimmung im Tenant abgeschaltet oder fremder Tenant ohne Admin-Zustimmung | Administratorzustimmung erteilen (13.3, Schritt 7) |
+| „Berechtigungen in der App-Registrierung prüfen (Administration).“ | `permissions` | Berechtigung fehlt in der Registrierung oder Client nicht zugelassen | Berechtigungen aus Schritt 6 ergänzen, Zustimmung erneuern |
+| „Die OneNote-Konfiguration ist ungültig …“ | `invalid_client` | Geheimnis abgelaufen oder falsch, Client-ID gelöscht | neues Geheimnis (13.5), Benutzer starten neu |
+| „Die Administration hat die OneNote-Konfiguration geändert …“ | `config_changed` | Client-ID, Authority oder Team-Schalter geändert | Benutzer starten neu; nichts doppelt |
+| „Pausiert: erneut bei Microsoft anmelden“ (mit Benachrichtigung) | `reauth` | Microsoft-Anmeldung abgelaufen (Passwortwechsel, bedingter Zugriff, Widerruf) | Benutzer meldet sich auf der Importseite neu an, der Import setzt fort. Ohne Neuanmeldung nach 7 Tagen „Abgelaufen“ |
+| „Bitte melde dich mit demselben Microsoft-Konto an wie beim Start.“ | `account_mismatch` | Neuanmeldung mit anderem Konto | mit dem ursprünglichen Konto anmelden oder abbrechen und neu starten |
+| „Dein Konto ist deaktiviert.“ / „Du hast keinen Zugriff mehr auf Next Notes.“ | `user_disabled` / `app_disabled` | Nextcloud-Konto deaktiviert oder App-Gruppen geändert (Abschnitt 3) | nach Freischaltung neu anmelden, sonst nach 7 Tagen „Abgelaufen“ |
+| „Nicht genug Speicherplatz für Anhänge.“ | `quota` | Speicherkontingent für Anhänge voll | Kontingent erhöhen (Abschnitt 7) oder Platz schaffen, neu starten |
+| „Die Notizbuch-Bibliothek ist zu groß für Microsoft Graph …“ | `graph_10008` | Eine Dokumentbibliothek des Benutzers oder Teams hat mehr als 5000 OneNote-Elemente bzw. 20.000 Elemente; Microsoft liefert dann nichts | Bibliothek in OneDrive/SharePoint verkleinern; sonst nicht lösbar |
+| „Microsoft konnte das Notizbuch nicht liefern.“ | `graph_not_found` | 20 Elemente hintereinander bei Microsoft nicht gefunden (gelöscht, verschoben) | neu starten |
+| „Microsoft hat wiederholt nicht geantwortet …“ | `graph_unavailable` | 10 Fehlversuche hintereinander (Störung, Netz, Proxy) | Erreichbarkeit der beiden Hosts prüfen (13.1), später neu starten |
+| „Der Import kam 7 Tage lang nicht voran …“ | `stalled` | Cron läuft nicht oder Job reserviert | Cron prüfen, 13.5 „Job hängt“ |
+| „Der OneNote-Import ist auf diesem Server nicht eingerichtet.“ | `not_configured` | Client-ID oder Geheimnis fehlt | 13.4 |
+
+Einzelne Seiten, die Microsoft verweigert (403) oder nicht findet (404), werden übersprungen und stehen im Bericht; der Import läuft weiter.
+
+### 13.9 Vor dem Rollout testen
+1. Mit einem **Testkonto** der Schule (kein Admin) ein kleines Notizbuch mit Text, Tabelle, To-do, Bild und PDF importieren.
+2. Ist der Team-Schalter an: ein Klassennotizbuch als Lehrkraft-Testkonto, nur einen Abschnitt auswählen.
+3. Prüfen: Benachrichtigung am Ende, Bericht, Workspace mit Ordnern, Bilder sichtbar, PDF herunterladbar.
+4. *Import abbrechen* während eines Laufs testen; danach lässt sich ein neuer Import starten.
+5. Erst dann die Benutzer informieren (Dauer, Datenschutzhinweis aus 13.6).

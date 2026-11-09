@@ -1,8 +1,8 @@
 # M9-Plan: Import aus Microsoft OneNote über Microsoft Graph
 
-Stand: **r3**, 2026-11-08, Basis Commit `1cbb6623`. **Vom Lead freigegeben** (nach zwei Review-Runden). Offen bei Thomas: Q1–Q4 und die Auskunftsfrage (§7); M9b bleibt bis Q1 gesperrt. Grundlage: ADR 0020 (vorgeschlagen), ADR 0002/0004/0008/0009/0012. Entscheidungen Thomas (2026-11-08):
+Stand: **r3**, 2026-11-08, Basis Commit `1cbb6623`. **Vom Lead freigegeben** (nach zwei Review-Runden). Q1–Q4 und die Auskunftsfrage hat Thomas am 2026-11-08 entschieden (§8); M9a–M9d umgesetzt, M9e Doku. Grundlage: ADR 0020 (entschieden), ADR 0002/0004/0008/0009/0012. Entscheidungen Thomas (2026-11-08):
 - Import über Graph.
-- Notweg nur als Doku (OneNoteMdExporter).
+- Notweg nur als Doku (OneNoteMdExporter); **entfällt** nach Q3 (§8).
 - Kein `.one`-Parser.
 - Schul- und Organisationskonten immer, private Konten optional über die Authority-Einstellung.
 - Keine zentrale App.
@@ -228,9 +228,9 @@ UNIQUE `nn_oni_src`(uid, source_hash); `nn_oni_tgt`(kind, target_id).
 ## 5. Abbildung (`PageConverter`, rein)
 | OneNote | Next Notes |
 |---|---|
-| Notizbuch | eigener neuer Workspace `kind=normal`, `owner_type=user`. Name = `displayName`, bei Kollision „Name (OneNote)“, dann „(2)“ … (Regeln `WorkspaceService`). Kein Import in Team-Workspaces (Datenschutz, §8). |
+| Notizbuch | eigener neuer Workspace `kind=normal`, `owner_type=user`. Name = `displayName`, bei Kollision „Name OneNote“, dann „Name OneNote 2“ … (Workspace-Namen ohne Klammern, ADR 0020 Nachtrag M9b). Kein Import in Team-Workspaces (Datenschutz, §8). |
 | Abschnittsgruppe, Abschnitt | Ordner, verschachtelt wie im Notizbuch; Name gekürzt auf 255 |
-| Seite | Notiz `type=note`, `heading` = Titel gekürzt auf 200 Zeichen (Cursor-Grenze, M9d; leer → l10n „Ohne Titel“), `created_at`/`updated_at` = `createdDateTime`/`lastModifiedDateTime` (UTC → Unix), `created_by`/`updated_by` = uid, `display_order` = `order` |
+| Seite | Notiz `type=note`, `heading` = Titel gekürzt auf 200 Zeichen (Cursor-Grenze, M9d; leer → l10n „Unbenannte Notiz“), `created_at`/`updated_at` = `createdDateTime`/`lastModifiedDateTime` (UTC → Unix), `created_by`/`updated_by` = uid, `display_order` = `order` |
 | Unterseite (`level` 1, 2) | bleibt flach direkt hinter der Elternseite, Titelpräfix „› “ je Ebene |
 | `body`-Kinder absolut positioniert | stabil sortiert nach (top, left) in px (fehlend = 120/48 wie OneNote-Standardlage, Learn abs-pos; M9c), dann nacheinander ausgegeben. `position/left/top/width` entfallen. |
 | `data-tag="to-do"`, `"to-do:completed"`, `to-do-priority-1/2` und alle weiteren Kontrollkästchen-Kennzeichen (`discuss-with-*`, `schedule-meeting`, `call-back`, `client-request`; M9c) | aufeinanderfolgende Elemente → eine Upstream-Checkliste (`ul.checklist`…, `checked` und `checklist-item-checked`) |
@@ -281,9 +281,11 @@ Der Konverter erzeugt das HTML ausschließlich per DOM (`HtmlSanitizer::loadHtml
 - Der Auth-Code steht einmal in der Webserver-Logzeile des Callbacks. Er ist nutzlos ohne Verifier und Secret und gilt nur Minuten (Doku-Hinweis).
 - Microsoft protokolliert die Anmeldung in den Entra-Sign-in-Logs des Tenants.
 - Es gibt keine weiteren Empfänger.
-- **Widerruf** (Doku, F17): Abbrechen in Next Notes löscht die Token sofort. Die Zustimmung bei Microsoft bleibt bestehen; Benutzer widerrufen sie über ihr Microsoft-Konto (Organisationskonto: Portal „Meine Apps“; privates Konto: Seite „Apps und Dienste“ des Microsoft-Kontos), Admins im Entra Admin Center (Unternehmensanwendungen → App → Berechtigungen) bzw. per Graph/PowerShell für Benutzerzustimmungen. Die genauen Benutzer-URLs prüft M9e gegen die Microsoft-Hilfe.
+- **Widerruf** (Doku, F17): Abbrechen in Next Notes löscht die Token sofort. Die Zustimmung bei Microsoft bleibt bestehen; Benutzer widerrufen sie über ihr Microsoft-Konto (Organisationskonto: Portal „Meine Apps“; privates Konto: Seite „Apps und Dienste“ des Microsoft-Kontos), Admins im Entra Admin Center (Unternehmensanwendungen → App → Berechtigungen) bzw. per Graph/PowerShell für Benutzerzustimmungen. Geprüft in M9e: Organisationskonto `https://myapps.microsoft.com` (Learn „howto-convert-app-to-be-multi-tenant“ § Revoking consent, „application-consent-experience“); nach Admin-Zustimmung kann nur der Admin widerrufen. Für private Konten ist in den gelesenen Learn-Seiten keine URL belegt, die Doku nennt nur „Apps und Dienste“ im Microsoft-Konto.
 
 ## 8. Fragen an Thomas
+**Entschieden 2026-11-08 (alle Vorschläge):** Q1 ja für Lehrkräfte und Schüler, nichts vorausgewählt, Import nur in eigenen Workspace (auch Collaboration Space); Q2 Überspringen genügt; Q3 kein Notweg, §10 entfällt; Q4 Abnahme mit Test-Account der Schule, Registrierung legt Thomas an (Checkliste `docs/app/onenote-acceptance.md`); Auskunft mit Bericht, ohne Items (§7).
+
 - **Q1 [THOMAS] Klassen- und Team-Notizbücher** (sperrt M9b):
   - Lehrkraft: Sie sieht im Klassennotizbuch die Abschnitte aller Schüler. Darf sie diese in ihren privaten Workspace importieren?
   - Schüler: Sie sehen im Klassennotizbuch neben dem eigenen Abschnitt den **Collaboration Space** (Inhalte anderer Schüler) und die Inhaltsbibliothek. Dürfen sie diese importieren?
@@ -294,7 +296,7 @@ Der Konverter erzeugt das HTML ausschließlich per DOM (`HtmlSanitizer::loadHtml
 
 ## 9. Slices
 Reihenfolge M9a → M9c → M9b → M9d → M9e. M9f ist optional.
-- **M9b ist gesperrt, bis Thomas Q1 entschieden hat.** M9c (Konverter, rein) wird deshalb vorgezogen.
+- M9b war gesperrt, bis Thomas Q1 entschieden hatte (2026-11-08 entschieden). M9c (Konverter, rein) wurde deshalb vorgezogen.
 - speccritic prüft vorher und nachher bei M9a, M9b und M9d (Rechte, Token, SSRF, Sperre), bei M9c und M9e nur den Diff.
 
 ### M9a: Admin-Einstellungen, OAuth, Migration, Bestandsprüfungen, Mock-Server (Umfang L)
@@ -303,7 +305,7 @@ Dateien:
 - `OneNoteApiController` (connect, callback, show, cancel, list), Admin-Karte (`AdminSettings`, `AdminSettingsController`), Routen.
 - Löschung und Auskunft: `Service/UserDataService.php` (`UID_COLUMNS`, sofortige Phase), `Command/DeleteUserData.php`, `Listener/UserDeletedListener`, `Command/Purge.php`, `Service/UserExportService.php` (`onenote-imports.json`), `UserMigration/NextNotesMigrator.php` (Nachweis „nicht enthalten“).
 - Bestandsprüfungen: `dev/nextcloud/check-purge.sh` (13 → 15 Tabellen), `docs/SPEC.md` §8 (Tabellenzahl, Lebenszyklus der zwei Tabellen), `tests/nextnotes/schema/expected-m1.json`, `dev/nextcloud/upgrade-path.sh` (Upgrade vom letzten Stand auf M9a).
-- Mock: `dev/nextcloud/` Profil `msmock` + `scripts/msmock/` (Node, ohne Abhängigkeiten).
+- Mock: `dev/nextcloud/` Profil `msmock` + `scripts/msmock/` (PHP unter Apache mit `mod_ssl` aus dem vorhandenen NC-Image, kein weiteres Image; Start und Zertifikate über `dev/nextcloud/msmock.sh`).
   - Docker-Netzaliase `login.microsoftonline.com` und `graph.microsoft.com` zeigen auf den Mock.
   - Test-CA und ein Serverzertifikat mit beiden Namen (SAN). Die CA wird im NC-Container per `occ security:certificates:import` eingespielt, weil `IClient` das NC-Bundle nutzt.
   - Nur in diesem Profil: `occ config:system:set allow_local_remote_servers --value=true --type=boolean`.
@@ -335,7 +337,7 @@ Testnachweis:
 - `check-purge.sh`, `upgrade-path.sh`, `run-m1.sh`.
 - E2E `onenote-connect.mjs` (hell und dunkel): Playwright leitet `login.microsoftonline.com` per `page.route` auf den Mock um.
 
-### M9b: Auswahl, Job, Struktur, Fortsetzen (Umfang L) – **gesperrt bis Q1**
+### M9b: Auswahl, Job, Struktur, Fortsetzen (Umfang L) – nach Q1 entsperrt
 Dateien: `OneNoteImportService`, `OneNoteImportJob` (+ `info.xml` `<background-jobs>`), Controller `tree`/`start`, `templates/onenote.php`, `js-src/nextnotes-onenote.js`, `css-src`, Einstellungen-Karte, `Notifier` (3 Subjects), l10n.
 
 Done:
@@ -401,7 +403,7 @@ Testnachweis: PHPUnit `OneNote/ResourceFetcherTest.php`, `OneNote/PageBudgetTest
 ### M9e: Doku, SPEC, Abnahme (Umfang S)
 Dateien:
 - `docs/app/admin.md`: neuer Abschnitt aus §11, Datenschutz §10 ergänzt.
-- `docs/app/user.md`: Import, Dauer, Grenzen, Freihand, Widerruf bei Microsoft, Notweg OneNoteMdExporter; nur ein offener Import gleichzeitig, „Abbrechen“ auch bei „Erneut anmelden“; nach „Konfiguration geändert“ neu starten.
+- `docs/app/user.md`: Import, Dauer, Grenzen, Freihand, Widerruf bei Microsoft (Notweg entfällt, Q3); nur ein offener Import gleichzeitig, „Abbrechen“ auch bei „Erneut anmelden“; nach „Konfiguration geändert“ neu starten.
 - `docs/SPEC.md`: §2.1 Tabellen, §4 Routen, §5 Job, §6 Subjects, §14 OCP (§8 schon in M9a).
 - ADR 0020 → entschieden, ADR-0008-Nachtrag (Auskunft, Umzug, Löschung laut §7), CHANGELOG.
 
@@ -411,13 +413,13 @@ Done:
 3. `run-m5.sh` grün (Meilenstein-Ende).
 4. Protokoll Abnahmetest `docs/progress/M9e-abnahme.md` mit Ergebnis je Punkt.
 
-Abnahmetest [THOMAS] (Schulkonto, echter Tenant, eigene Test-Instanz, nicht die Demo):
+Abnahmetest [THOMAS] (Schulkonto, echter Tenant; Instanz laut Lead die Demo `localhost:8090` mit eigener Test-Registrierung; Checkliste `docs/app/onenote-acceptance.md`):
 - Registrierung nach Anleitung.
 - Import eines privaten Notizbuchs (~20 Seiten mit Bildern, PDF, Tabelle, To-do, Unterseiten).
 - Import eines Klassennotizbuchs als Lehrkraft (nach Q1).
 - Zu notieren:
   - Dauer und Anzahl der 429.
-  - Ob `Notes.Read` für `/groups/{id}/onenote` genügt (sonst bleibt `Notes.Read.All` im Schalter).
+  - Ob `Notes.Read` für `/groups/{id}/onenote` genügt, prüft die Abnahme nicht; der Team-Schalter fordert weiter `Notes.Read.All` an.
   - Wie Gleichungen und Freihand im HTML erscheinen.
   - Verhalten mit `common` und einem privaten Konto, falls vorhanden (nur Basis-Scopes).
 
@@ -428,7 +430,8 @@ Nur, wenn der Abnahmetest zeigt, dass `GET …/content?includeInkML=true` eine d
 
 Sonst entfällt das Slice.
 
-## 10. Notweg ohne Admin (Doku-Entwurf für user.md)
+## 10. Notweg ohne Admin (entfällt, Q3)
+Nicht in die Doku übernommen. Entwurf bleibt nur zur Nachvollziehbarkeit.
 1. Windows-PC mit OneNote-Desktop (2013 oder neuer, nicht die Store-App) und Word. Das Notizbuch ist geöffnet und synchronisiert, kennwortgeschützte Abschnitte sind entsperrt.
 2. OneNoteMdExporter (GPL-3.0) von GitHub laden, Format „Markdown“ wählen.
 3. Ergebnis: ein Ordner je Abschnitt, eine `.md` je Seite.

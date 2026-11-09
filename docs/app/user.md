@@ -73,6 +73,59 @@ Nur in Richtext-Notizen. Knopf **Σ** in der Werkzeugleiste oder `/Formel`, `/Ta
 - Alles Eigene: *Einstellungen → Export* → *Strukturierter Export* (Notizen als Dateien in ihren Ordnern) oder *Anhang-Export*. Ein Export darf höchstens 1 GiB groß sein. Die Formate kann Poznote wieder einlesen.
 - Eigene Abgaben: in der Ansicht **Aufgaben** (siehe oben).
 
+## Aus OneNote importieren
+Gibt es nur, wenn die Administration den Import eingerichtet hat ([admin.md](admin.md#13-onenote-import)). Dann steht unter *Einstellungen* die Karte **Import aus OneNote**.
+
+**Ablauf**
+1. *Import aus OneNote* → **Mit Microsoft verbinden**. Du landest auf der Anmeldeseite von Microsoft. Melde dich mit deinem Schulkonto an (ob private Microsoft-Konten gehen, legt die Administration fest) und stimme beim ersten Mal zu, dass Next Notes deine Notizbücher lesen darf. Dein Passwort sieht Next Notes nicht.
+2. Zurück in Next Notes siehst du deine Notizbücher. **Meine Notizbücher** sind schon ausgewählt. Je Notizbuch wählst du **Ganzes Notizbuch** oder **Abschnitte wählen** (Abschnitte und Abschnittsgruppen der ersten Ebene).
+3. **Team- und Klassennotizbücher** erscheinen darunter als *Team: …*, wenn die Administration sie erlaubt; viele Teams lädst du mit *Weitere Teams laden*. Dort ist **nichts ausgewählt**, weil sie Inhalte anderer Personen enthalten können (im Klassennotizbuch z. B. die Abschnitte aller Schüler oder den Bereich für die Zusammenarbeit). Wähle nur aus, was du brauchst. Importiert wird immer in deinen **eigenen** Workspace, nie in einen Team-Workspace.
+4. **Auswahl importieren**. Höchstens 200 Einträge auf einmal.
+
+**Ergebnis**
+- Jedes Notizbuch wird ein neuer eigener Workspace mit dem Namen des Notizbuchs. Gibt es den Namen schon, heißt er „Name OneNote“, dann „Name OneNote 2“ usw.
+- Abschnittsgruppen und Abschnitte werden Ordner in derselben Verschachtelung, Seiten werden Richtext-Notizen in der Reihenfolge aus OneNote.
+- Erstell- und Änderungsdatum kommen aus OneNote.
+
+**Dauer und Fortschritt**
+- Der Import läuft im Hintergrund weiter, auch wenn du die Seite schließt oder dich abmeldest. Microsoft erlaubt nur etwa 350 Anfragen pro Stunde; jede Seite braucht eine Anfrage plus eine je Bild oder Datei. Ein großes Notizbuch dauert daher Stunden (300 Seiten mit 600 Bildern rund 3 Stunden).
+- Die Importseite zeigt gefundene, importierte und übersprungene Seiten und eine geschätzte Restzeit. Am Ende kommt eine Nextcloud-Benachrichtigung „OneNote-Import abgeschlossen“ mit den Zahlen; Einzelheiten stehen im **Bericht** auf der Importseite (30 Tage lang).
+- Es läuft immer nur **ein Import gleichzeitig**. Für einen weiteren warte das Ende ab oder brich den offenen ab.
+
+**Abbrechen, Fortsetzen, neu starten**
+- **Import abbrechen** beendet den Import sofort und löscht deine Microsoft-Anmeldung in Next Notes. Schon importierte Notizen bleiben.
+- **Pausiert: erneut bei Microsoft anmelden**: Deine Microsoft-Anmeldung ist abgelaufen (z. B. Passwort geändert). Du bekommst eine Benachrichtigung. Mit **Erneut bei Microsoft anmelden** geht es an derselben Stelle weiter; melde dich mit **demselben** Microsoft-Konto an wie beim Start. Ohne Neuanmeldung verfällt der Import nach 7 Tagen. Auch hier kannst du abbrechen.
+- **Konfiguration geändert** oder ein anderer Abbruch mit Fehler: **Neuen Import starten** und dieselbe Auswahl treffen.
+- **Erneuter Import:** Seiten, die schon importiert sind, werden übersprungen, auch wenn sie in OneNote inzwischen geändert wurden. Eine Notiz im Papierkorb gilt als vorhanden. Erst wenn du sie endgültig gelöscht hast, wird sie neu angelegt.
+- Triffst du nach dem Verbinden 24 Stunden lang keine Auswahl, verfällt die Anmeldung; verbinde dich dann neu.
+
+**Was übernommen wird**
+
+| In OneNote | In Next Notes |
+|---|---|
+| Notizbuch | eigener neuer Workspace |
+| Abschnittsgruppe, Abschnitt | Ordner |
+| Seite | Richtext-Notiz; Titel höchstens 200 Zeichen, ohne Titel „Unbenannte Notiz“ |
+| Unterseite | eigene Notiz direkt hinter der übergeordneten Seite, Titel mit „› “ je Ebene davor |
+| frei platzierte Textblöcke | untereinander, von oben nach unten und von links nach rechts gelesen |
+| Text, Überschriften, Listen, fett, kursiv, unterstrichen, durchgestrichen, Textfarbe, Markierung, Ausrichtung | bleibt erhalten (Schwarz, Weiß und das Überschriftenblau von OneNote werden zur Standardfarbe, damit der dunkle Modus lesbar bleibt) |
+| Schriftart, Schriftgröße, Abstände, Position | entfallen, es gilt das Aussehen von Next Notes |
+| Tabelle | Tabelle, verbundene Zellen bleiben; Rahmen und Spaltenbreiten entfallen |
+| To-do-Kästchen (auch „Mit … besprechen“, „Besprechung planen“, „Rückruf“ u. Ä.) | Checkliste, abgehakte Einträge bleiben abgehakt |
+| Kategorien Wichtig, Frage, Kritisch, Idee | Zeichen ⭐ ❓ ❗ 💡 vor dem Text |
+| andere Kategorien (Notizkennzeichen) | entfallen, der Text bleibt |
+| Bild | Anhang, in der Notiz sichtbar |
+| eingefügte Datei (z. B. PDF) | Anhang mit Link zum Herunterladen |
+| Formel, soweit Microsoft sie als MathML liefert | Formel (bearbeitbar wie mit **Σ**), sonst Text |
+| Video | Link „Video: …“ |
+| Weblinks und E-Mail-Adressen | Links |
+| Links auf andere OneNote-Seiten | nur der Text |
+| **Freihand** (Zeichnungen, Handschrift) | **wird nicht übernommen**, Microsoft liefert sie über diesen Weg nicht |
+
+Grenzen je Seite: höchstens 100 Bilder und Dateien, je Datei die Größe, die die Administration für Anhänge erlaubt. Was darüber liegt oder nicht geladen werden konnte, wird ein Platzhalter („[Bild nicht übernommen]“, „[Datei nicht übernommen: Name]“) und steht im Bericht. Eine Seite über 16 MiB wird eine Notiz mit Hinweis. Importierte Anhänge zählen zu deinem Speicherkontingent; ist es voll, stoppt der Import mit einer Meldung.
+
+**Zugriff bei Microsoft widerrufen:** *Import abbrechen* löscht die Anmeldung in Next Notes. Deine Zustimmung bei Microsoft bleibt bestehen. Mit Schulkonto entfernst du die App im Portal „Meine Apps“ (<https://myapps.microsoft.com>); hat die Administration für alle zugestimmt, kann nur sie das. Mit privatem Konto entfernst du sie im Microsoft-Konto unter „Apps und Dienste“.
+
 ## Unterschiede zu Poznote
 Gegenüber dem Original fehlen bewusst:
 - eigene Anmeldung, Benutzerverwaltung und Zwei-Faktor (macht Nextcloud),
@@ -84,4 +137,4 @@ Gegenüber dem Original fehlen bewusst:
 - zusätzliche Themes, eigene Schriften und CSS,
 - Speed Dial und die Seite „Erstellen“.
 
-Neu sind Team-Workspaces, Material-Ordner und Aufgaben mit Abgaben.
+Neu sind Team-Workspaces, Material-Ordner, Aufgaben mit Abgaben und der Import aus OneNote.
