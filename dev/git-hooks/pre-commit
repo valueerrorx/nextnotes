@@ -1,0 +1,14 @@
+#!/bin/sh
+# SPDX-FileCopyrightText: 2026 Thomas Weissel
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Quelle: dev/git-hooks/ (Installation: sh dev/git-hooks/install.sh)
+# Lokaler Secret-Schutz (Thomas 2026-11-09): blockiert Commits, deren hinzugefügte Zeilen nach Secret aussehen.
+# Gilt für alle Worktrees dieses Repos. Falscher Alarm: Zeile mit "nn-allow-secret" markieren – nur nach Rückfrage bei Thomas.
+pat="$(git rev-parse --git-common-dir)/hooks/secret-patterns.txt"
+hits=$(git diff --cached -U0 --no-color --diff-filter=AM | grep -E '^\+' | grep -v '^+++' | grep -v 'nn-allow-secret' | grep -n -E -f "$pat")
+if [ -n "$hits" ]; then
+	echo "pre-commit: mögliches Secret in hinzugefügten Zeilen – Commit abgebrochen:" >&2
+	echo "$hits" | cut -c1-200 >&2
+	exit 1
+fi
+exit 0

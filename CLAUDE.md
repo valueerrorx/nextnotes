@@ -23,6 +23,9 @@ Branch `nextcloud-port`. Ziel: native Nextcloud-App „Next Notes“ (App-ID `ne
 - Frontend (Poznote) behalten; Änderungen in `src/` gezielt und in SPEC §11.1 gelistet, damit Upstream-Updates nachziehbar bleiben.
 - Nur Hell/Dunkel nach Nextcloud-Theme.
 - Abgaben bleiben bei Entfernen aus dem Team und bei Kontolöschung erhalten; Team-Löschung und manuelles Löschen der Aufgabe durch die Lehrkraft entfernen sie.
+- Kein Rückwärtskompatibilitäts-Code, solange kein Release veröffentlicht ist: neue Entscheidungen gelten, Altdaten/alte Zustände sind egal (keine Übergangslogik, keine Sonderpfade).
+- Workspaces werden nicht gemischt (z. B. Aufgaben-Vorlage nur aus demselben Workspace, Aufgaben fest an ihren Team-Workspace).
+- **Keine Secrets in Git**: Passwörter, Tokens, Client-Secrets, Schlüssel (auch aus dem Chat) nie in Repo-Dateien, `STATUS.md`, `docs/progress/`, Tests, Commit-Messages oder Agent-Aufträge; nur Umgebungsvariable oder Datei außerhalb des Repos. Bekannte Demo-Zugänge (`dev/demo/README.md`) sind Absicht. Je Klon einmal `sh dev/git-hooks/install.sh` (pre-commit-Hook mit Secret-Mustern); nie `--no-verify` ohne Thomas.
 
 ## Umgebung
 - Nextcloud-OCP-Referenz (35.0.2, nur lesen, nicht im Repo): `.ref/nextcloud-server/`
