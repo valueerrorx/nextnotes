@@ -198,7 +198,9 @@ for (const v of bundles.npmVendor ?? []) {
 // Kleine Korrekturen an Paketdateien beim Bündeln (bundles.json patches): genau ein Treffer, sonst Abbruch (Paket-Update prüfen);
 // nach dem Bündeln: jeder Patch genau einmal angewandt (Datei nicht mehr geladen → Abbruch)
 function vendorPatches(v) {
-	const byFile = new Map(v.patches.map((p) => [path.join(here, p.file), p]));
+	// echter Pfad: esbuild löst Symlinks auf (z. B. node_modules als Link im Demo-/dist-worktree)
+	const real = (f) => { try { return fs.realpathSync(f); } catch { return f; } };
+	const byFile = new Map(v.patches.map((p) => [real(path.join(here, p.file)), p]));
 	const used = new Map(v.patches.map((p) => [p, 0]));
 	const check = () => {
 		for (const [p, n] of used) if (n !== 1) die(`${v.entry}: Patch für ${p.file} ${n}-mal angewandt statt einmal (Datei nicht im Bündel?)`);
