@@ -150,6 +150,12 @@ html.nextnotes-ready #nextnotes-root:is(.nextnotes-subpage, .nextnotes-excalidra
 	opacity: revert;
 }
 
+/* UI-cering: NC-Kern legt um div[contenteditable=true] bei Hover/Fokus einen Feld-Ring (box-shadow 0 0 0 2px, 0,3,1; Notiz-Editor, CodeMirror) – im App-Bereich aus.
+   Gleiche Spezifität, später geladen; echte Eingabefelder und Excalidraw unberührt. */
+:where(#nextnotes-root) div[contenteditable="true"]:not(:disabled):is(:hover, :focus, :active):not(.excalidraw *) {
+	box-shadow: none;
+}
+
 /* Unterseiten (revisions.php, attachments.php) im NC-Rahmen: Spalte, eigener Scrollbereich */
 #nextnotes-root.nextnotes-subpage {
 	display: block;
