@@ -8,7 +8,9 @@
     "esbuild": "0.28.2"
   },
   "dependencies": {
+    "function-plot": "1.26.0",
     "hyperformula": "3.5.0",
+    "mathjs": "15.2.0",
     "mathlive": "0.111.4"
   }
 }

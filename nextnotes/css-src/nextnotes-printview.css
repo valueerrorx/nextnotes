@@ -109,6 +109,33 @@ body#body-public #content.app-public {
 	text-align: center;
 }
 
+/* Rechenblock (M8c): Zeilen mit Ergebnis, Graph nur als Hinweiszeile */
+#nextnotes-root.note-print-page .nn-calc-line {
+	margin: 0;
+	font-family: monospace;
+	white-space: pre-wrap;
+}
+
+#nextnotes-root.note-print-page .nn-calc-out {
+	margin-left: 2em;
+}
+
+#nextnotes-root.note-print-page .nn-calc-out:not(:empty)::before {
+	content: '= ';
+}
+
+#nextnotes-root.note-print-page .nn-calc-out.nn-err {
+	color: #b00020;
+}
+
+#nextnotes-root.note-print-page .nn-calc-out.nn-err::before {
+	content: '';
+}
+
+#nextnotes-root.note-print-page .nn-calc-graph {
+	font-style: italic;
+}
+
 @page {
 	margin: 2cm;
 }

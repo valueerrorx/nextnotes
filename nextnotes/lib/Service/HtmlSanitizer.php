@@ -39,7 +39,7 @@ class HtmlSanitizer {
 		'td' => ['colspan', 'rowspan', 'data-formula'],
 		'th' => ['colspan', 'rowspan', 'scope'],
 		'ol' => ['type', 'start'],
-		'div' => ['class', 'data-tasklist-json', 'data-markdown-content', 'data-excalidraw', 'data-diagram-id', 'data-task-embed', 'contenteditable', 'data-math', 'data-nn-sheet'],
+		'div' => ['class', 'data-tasklist-json', 'data-markdown-content', 'data-excalidraw', 'data-diagram-id', 'data-task-embed', 'contenteditable', 'data-math', 'data-nn-sheet', 'data-nn-calc'],
 		'span' => ['class', 'data-math'],
 		'input' => ['type', 'checked', 'disabled'],
 		'time' => ['datetime'],

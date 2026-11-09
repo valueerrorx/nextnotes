@@ -15,6 +15,29 @@
 	display: none;
 }
 
+/* Über dem Rechenbudget der Seite (M8c-fix): Fallback bleibt, Knopf rechnet den Block */
+.nn-block-deferred {
+	min-height: var(--default-clickable-area, 34px);
+	margin: 4px 0 0;
+	padding: 0 12px;
+	border: 1px solid var(--color-border-maxcontrast, var(--color-border));
+	border-radius: var(--border-radius-element, 8px);
+	background: transparent;
+	color: var(--color-main-text);
+	font: inherit;
+	cursor: pointer;
+}
+
+.nn-block-deferred:hover,
+.nn-block-deferred:focus-visible {
+	background: var(--color-background-hover);
+}
+
+.nn-block-deferred:focus-visible {
+	outline: 2px solid var(--color-primary-element);
+	outline-offset: 1px;
+}
+
 /* Tabellenblock */
 .nn-sheet-ui {
 	position: relative;
@@ -228,5 +251,164 @@
 
 	.nn-sheet-menu-item.nn-sheet-narrow {
 		display: block;
+	}
+}
+
+/* Rechenblock (M8c): Eingabe links, Ergebnisse rechts in gleicher Zeilenhöhe; Graph darunter */
+.nn-calc-ui {
+	--nn-calc-line: 1.6em;
+	font-size: 14px;
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-element, 8px);
+	padding: 4px 8px 8px;
+}
+
+.nn-calc-bar {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-height: var(--default-clickable-area, 34px);
+}
+
+.nn-calc-title {
+	flex: 1 1 auto;
+	color: var(--color-text-maxcontrast);
+}
+
+.nn-calc-btn {
+	min-height: var(--default-clickable-area, 34px);
+	margin: 0;
+	padding: 0 12px;
+	border: 1px solid var(--color-border-maxcontrast, var(--color-border));
+	border-radius: var(--border-radius-element, 8px);
+	background: transparent;
+	color: var(--color-main-text);
+	font: inherit;
+	cursor: pointer;
+}
+
+.nn-calc-btn:hover,
+.nn-calc-btn:focus-visible {
+	background: var(--color-background-hover);
+}
+
+.nn-calc-btn:focus-visible,
+.nn-calc-src:focus-visible {
+	outline: 2px solid var(--color-primary-element);
+	outline-offset: 1px;
+}
+
+.nn-calc-btn[hidden] {
+	display: none;
+}
+
+.nn-calc-body {
+	display: grid;
+	grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+	gap: 12px;
+	align-items: start;
+}
+
+.nn-calc-src,
+.nn-calc-res {
+	margin: 0;
+	padding: 6px 8px;
+	font-family: var(--font-face-monospace, ui-monospace, monospace);
+	font-size: inherit;
+	line-height: var(--nn-calc-line);
+}
+
+.nn-calc-src {
+	box-sizing: border-box;
+	width: 100%;
+	min-height: calc(2 * var(--nn-calc-line) + 14px);
+	border: 1px solid var(--color-border-maxcontrast, var(--color-border));
+	border-radius: var(--border-radius-element, 8px);
+	background: var(--color-main-background);
+	color: var(--color-main-text);
+	resize: none;
+	overflow-x: auto;
+	overflow-y: hidden;
+	white-space: pre;
+}
+
+.nn-calc-res {
+	border: 1px solid transparent;
+	color: var(--color-text-maxcontrast);
+}
+
+.nn-calc-res .nn-calc-out {
+	height: var(--nn-calc-line);
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.nn-calc-res .nn-calc-out:not(:empty)::before {
+	content: '= ';
+}
+
+.nn-calc-res .nn-err:not(:empty)::before {
+	content: '';
+}
+
+.nn-err {
+	color: var(--color-error-text, var(--color-error));
+}
+
+.nn-calc-msg:empty {
+	display: none;
+}
+
+.nn-calc-msg,
+.nn-calc-note,
+.nn-calc-legend {
+	margin: 4px 0;
+	color: var(--color-text-maxcontrast);
+}
+
+.nn-calc-msg {
+	color: var(--color-warning-text, var(--color-warning));
+}
+
+.nn-calc-plot:empty {
+	display: none;
+}
+
+.nn-calc-plot {
+	margin-top: 8px;
+	overflow-x: auto;
+	color: var(--color-main-text);
+}
+
+/* function-plot: Achsen, Gitter und Text aus der Schriftfarbe (hell/dunkel) */
+.nn-calc-chart svg {
+	display: block;
+	max-width: 100%;
+	height: auto;
+	color: var(--color-main-text);
+	background: var(--color-main-background);
+}
+
+.nn-calc-chart .domain,
+.nn-calc-chart .tick line {
+	stroke: currentColor;
+}
+
+.nn-calc-chart .tick text,
+.nn-calc-chart text {
+	fill: currentColor;
+}
+
+.nn-calc-chart .grid .tick line,
+.nn-calc-chart .origin {
+	stroke: var(--color-border-maxcontrast, var(--color-border));
+	opacity: 0.6;
+}
+
+@media (max-width: 600px) {
+	.nn-calc-body {
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		gap: 6px;
 	}
 }

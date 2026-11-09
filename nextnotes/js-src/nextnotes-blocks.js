@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 // Blöcke in Richtext-Notizen (SPEC §4.7, M8-Plan §1): Einträge im Slash-Menü (Hook P38) und im Werkzeugleisten-Menü,
-// Einfügen, Modus (schreibbar/lesend), Speichern über das input-Ereignis. Block-UIs laden lazy (nextnotes-formula.js, nextnotes-sheet.js).
-// Hosts werden am Attribut erkannt (data-math, data-nn-sheet), nie an der Klasse. Laufzeit-UI der Blöcke im Shadow DOM (M8-Plan §1.1).
+// Einfügen, Modus (schreibbar/lesend), Speichern über das input-Ereignis. Block-UIs laden lazy (nextnotes-formula/-sheet/-calc.js).
+// Hosts werden am Attribut erkannt (data-math, data-nn-sheet, data-nn-calc), nie an der Klasse. Laufzeit-UI der Blöcke im Shadow DOM (M8-Plan §1.1).
 (function () {
 	'use strict';
 
@@ -14,15 +14,23 @@
 
 	var HOST = '[data-math]';
 	var MATH_MAX = 10000;
+	// Einträge: a = Block-Attribut (Shadow-DOM-Block), sonst Formel (b = als Block)
 	var ITEMS = [
-		{ id: 'nn-formula', icon: 'lucide-sigma', label: tr('formula', 'Formula'), run: function (entry, range) { insertFormula(entry, range, false); } },
-		{ id: 'nn-formula-block', icon: 'lucide-sigma', label: tr('formulaBlock', 'Formula block'), run: function (entry, range) { insertFormula(entry, range, true); } },
-		{ id: 'nn-sheet', icon: 'lucide-table', label: tr('sheet', 'Calculation table'), run: function (entry, range) { insertSheet(entry, range); } },
+		{ id: 'nn-formula', icon: 'lucide-sigma', label: tr('formula', 'Formula') },
+		{ id: 'nn-formula-block', icon: 'lucide-sigma', label: tr('formulaBlock', 'Formula block'), b: true },
+		{ id: 'nn-sheet', icon: 'lucide-table', label: tr('sheet', 'Calculation table'), a: 'data-nn-sheet' },
+		{ id: 'nn-calc', icon: 'lucide-calculator', label: tr('calc', 'Calculation'), a: 'data-nn-calc' },
 	];
-	// Blöcke mit Laufzeit-UI im Shadow DOM: Attribut → Modul, Bibliothek, Global
+	function run(item, entry, range) {
+		if (item.a) insertBlock(entry, range, item.a); else insertFormula(entry, range, !!item.b);
+	}
+	// Blöcke mit Laufzeit-UI im Shadow DOM: Attribut → Name (Modul js/nextnotes-<n>.js, Text <n>LoadError), Bibliothek, Global;
+	// view: auch lesend einhängen (Graph); plot: Graph-Bibliothek vorab, wenn view und fn (Funktionsdefinition) passen
 	var BLOCKS = {
-		'data-nn-sheet': { script: 'js/nextnotes-sheet.js', lib: 'poznoteEnsureHyperFormula', api: 'NextNotesSheet' },
+		'data-nn-sheet': { n: 'sheet', lib: 'poznoteEnsureHyperFormula', api: 'NextNotesSheet' },
+		'data-nn-calc': { n: 'calc', lib: 'poznoteEnsureMathjs', api: 'NextNotesCalc', view: /"graph":1[,}]/, plot: 'poznoteEnsureFunctionPlot', fn: /\w\s*\([^()]*\)\s*=(?!=)/ },
 	};
+	function script(def) { return window.poznoteEnsureScript('js/nextnotes-' + def.n + '.js'); }
 	var BLOCK_SELECTOR = Object.keys(BLOCKS).map(function (a) { return '[' + a + ']'; }).join(',');
 	// Upstream-Meldung (ui.js); ohne sie bleibt nur die Konsole, Tabellen-Hinweise stehen im Block
 	function notify(text, type) {
@@ -90,7 +98,7 @@
 		return n && n.parentNode === entry ? n : null;
 	}
 	function emptyBlock(el) {
-		return !el.textContent.replace(/​/g, '').trim() && !el.querySelector('img, iframe, video, audio, [data-math], [data-nn-sheet], table, hr');
+		return !el.textContent.replace(/​/g, '').trim() && !el.querySelector('img, iframe, video, audio, [data-math], ' + BLOCK_SELECTOR + ', table, hr');
 	}
 	function newParagraph() {
 		var p = document.createElement('p');
@@ -103,7 +111,7 @@
 		var top = topOf(entry, range.startContainer);
 		if (!top) {
 			range.insertNode(block);
-		} else if (/^(P|H[1-6])$/.test(top.tagName) || (top.tagName === 'DIV' && !top.className && !top.hasAttribute('data-math') && !top.hasAttribute('data-nn-sheet'))) {
+		} else if (/^(P|H[1-6])$/.test(top.tagName) || (top.tagName === 'DIV' && !top.className && !top.hasAttribute('data-math') && !blockAttr(top))) {
 			var tail = document.createRange();
 			tail.setStart(range.startContainer, range.startOffset);
 			tail.setEnd(top, top.childNodes.length);
@@ -209,6 +217,33 @@
 	// --- Blöcke mit Shadow DOM (M8-Plan §1.1) ---
 	// Light DOM = gespeicherter Vertrag (JSON-Attribut + statischer Fallback); UI nur im Shadow Root, nie im Inhalt.
 	// schreibbar: Modul + Bibliothek lazy, UI ohne <slot>; sonst nur <slot> (Fallback sichtbar), keine Bibliothek.
+	// Rechenwarteschlange (M8c-fix): jeder Rechenschritt eines Blocks (Einhängen, Vorprüfung, Zeichnen) in einer eigenen Task.
+	// Folgeschritte (eingereiht während eines Schritts) laufen vor dem nächsten Block, damit fertige Blöcke vollständig sind.
+	// Automatische Schritte teilen sich ein Seitenbudget (PAGE_MS); darüber zeigt der Block over() (Klick rechnet).
+	// Das Budget beginnt neu, sobald die Schlange leer ist (neue Seite, Moduswechsel). user: vom Nutzer ausgelöst, immer.
+	var PAGE_MS = 1000;
+	var jobs = [], next = null, spent = 0, pumping = false;
+	function enqueue(job) {
+		if (next) { next.push(job); return; }
+		jobs.push(job);
+		if (!pumping) { pumping = true; setTimeout(pump, 0); }
+	}
+	function pump() {
+		var job = jobs.shift();
+		if (!job) { pumping = false; spent = 0; return; }
+		var t = performance.now();
+		next = [];
+		try {
+			if (job.user || spent < PAGE_MS) job.run(); else job.over();
+		} catch (e) {
+			console.error('nextnotes: Block', e);
+		}
+		jobs = next.concat(jobs);
+		next = null;
+		spent += performance.now() - t;
+		setTimeout(pump, 0);
+	}
+
 	var live = new Map();
 	var fresh = new WeakSet(); // gerade eingefügt: nach dem Einhängen fokussieren
 	var scanQueued = false;
@@ -247,53 +282,92 @@
 		if (host.shadowRoot) host.shadowRoot.replaceChildren(document.createElement('slot'));
 	}
 	function mount(host, entry, mode) {
-		var def = BLOCKS[blockAttr(host)];
-		var rec = { entry: entry, mode: mode, inst: null, obs: null, focus: fresh.has(host) };
+		var attr = blockAttr(host), def = BLOCKS[attr];
+		var rec = { entry: entry, mode: mode, inst: null, obs: null, focus: fresh.has(host), user: fresh.has(host) };
 		live.set(host, rec);
 		fresh.delete(host);
-		if (mode !== 'edit') {
+		var edit = mode === 'edit';
+		var json = host.getAttribute(attr);
+		var plot = !!(def.view && def.view.test(json));
+		if (!edit && !plot) {
 			if (host.shadowRoot) host.shadowRoot.replaceChildren(document.createElement('slot'));
 			return;
 		}
-		Promise.all([window.poznoteEnsureScript(def.script), window[def.lib]()]).then(function () {
-			if (live.get(host) !== rec) return;
-			// Erst das Modul (wirft es, bleibt der Host ohne Shadow Root bzw. mit <slot>: Fallback sichtbar)
-			var box = document.createElement('div');
-			box.className = 'nn-block-ui';
-			box.hidden = true;
-			rec.inst = window[def.api].mount(box, {
-				txt: txt,
-				data: host.getAttribute(blockAttr(host)),
-				commit: function (json, fallback) { write(host, rec, json, fallback); changed(entry); },
-			});
-			var root = host.shadowRoot || host.attachShadow({ mode: 'open' });
-			// Bis das Stylesheet geladen ist, bleibt der Fallback sichtbar (<slot>), die UI verborgen
-			var link = document.createElement('link');
-			link.rel = 'stylesheet';
-			link.href = window.poznoteAssetUrl('css/nextnotes-blocks-shadow.css');
-			var slot = document.createElement('slot');
-			root.replaceChildren(link, slot, box);
-			link.addEventListener('load', function () {
-				slot.remove();
-				box.hidden = false;
-				if (rec.focus && rec.inst) rec.inst.focus();
-			});
-			// Fremdänderung am Light DOM (Suchen/Ersetzen, Markierung): Fallback aus dem Block neu, anderes JSON → neu einhängen
-			rec.obs = new MutationObserver(function (records) {
-				if (live.get(host) !== rec) return;
-				if (records.some(function (r) { return r.type === 'attributes'; })) { unmount(host); scheduleScan(); return; }
-				if (rec.inst) write(host, rec, null, rec.inst.fallback());
-			});
-			rec.obs.observe(host, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: Object.keys(BLOCKS) });
-		}).catch(function (err) {
+		var fail = function (err) {
 			console.error('nextnotes: Block', err);
 			if (live.get(host) !== rec) return;
 			// aufräumen, Eintrag bleibt (kein neuer Versuch bis zum Moduswechsel)
 			unmount(host);
 			live.set(host, rec);
 			rec.inst = rec.obs = null;
-			notify(txt.sheetLoadError, 'error');
+			notify(txt[def.n + 'LoadError'], 'error');
+		};
+		// Bibliotheken vorab (auch die des Graphen), damit alle Rechenschritte ohne Netz in der Schlange liegen
+		Promise.all([script(def), window[def.lib](), plot && def.plot && def.fn.test(json) ? window[def.plot]() : null]).then(function () {
+			if (live.get(host) !== rec) return;
+			enqueue({
+				user: rec.user,
+				run: function () { if (live.get(host) === rec) { try { attach(host, rec, def, attr); } catch (e) { fail(e); } } },
+				over: function () { if (live.get(host) === rec) deferred(host, rec, def, attr, fail); },
+			});
+		}).catch(fail);
+	}
+	function stylesheet() {
+		var link = document.createElement('link');
+		link.rel = 'stylesheet';
+		link.href = window.poznoteAssetUrl('css/nextnotes-blocks-shadow.css');
+		return link;
+	}
+	// Über dem Seitenbudget: Fallback bleibt, Knopf rechnet diesen Block (vom Nutzer, ohne Budget)
+	function deferred(host, rec, def, attr, fail) {
+		var b = document.createElement('button');
+		b.type = 'button';
+		b.className = 'nn-block-deferred';
+		b.textContent = tr('blockDeferred', 'Not calculated. Click to calculate.');
+		['mousedown', 'pointerdown', 'dblclick'].forEach(function (type) { b.addEventListener(type, function (e) { e.stopPropagation(); }); });
+		b.addEventListener('click', function (e) {
+			e.stopPropagation();
+			b.disabled = true;
+			rec.user = true;
+			enqueue({ user: true, run: function () { if (live.get(host) === rec) { try { attach(host, rec, def, attr); } catch (err) { fail(err); } } }, over: function () {} });
 		});
+		var root = host.shadowRoot || host.attachShadow({ mode: 'open' });
+		root.replaceChildren(stylesheet(), document.createElement('slot'), b);
+	}
+	function attach(host, rec, def, attr) {
+		var edit = rec.mode === 'edit', entry = rec.entry;
+		// Erst das Modul (wirft es, bleibt der Host ohne Shadow Root bzw. mit <slot>: Fallback sichtbar)
+		var box = document.createElement('div');
+		box.className = 'nn-block-ui';
+		box.hidden = true;
+		rec.inst = window[def.api].mount(box, {
+			txt: txt,
+			mode: rec.mode,
+			data: host.getAttribute(attr),
+			commit: function (json, fallback) { write(host, rec, json, fallback); changed(entry); },
+			// Rechenschritt in eigener Task: run(), über dem Seitenbudget over(); user = vom Nutzer ausgelöst
+			queue: function (run, over, user) {
+				enqueue({ user: !!user || rec.user, run: function () { if (live.get(host) === rec) run(); }, over: function () { if (live.get(host) === rec) over(); } });
+			},
+		});
+		var root = host.shadowRoot || host.attachShadow({ mode: 'open' });
+		// Bis das Stylesheet geladen ist, bleibt der Fallback sichtbar (<slot>), die UI verborgen; lesend bleibt er immer
+		var link = stylesheet();
+		var slot = document.createElement('slot');
+		root.replaceChildren(link, slot, box);
+		link.addEventListener('load', function () {
+			if (edit) slot.remove();
+			box.hidden = false;
+			if (rec.focus && rec.inst) rec.inst.focus();
+		});
+		// Fremdänderung am Light DOM (Suchen/Ersetzen, Markierung): Fallback aus dem Block neu, anderes JSON → neu einhängen
+		if (!edit) return;
+		rec.obs = new MutationObserver(function (records) {
+			if (live.get(host) !== rec) return;
+			if (records.some(function (r) { return r.type === 'attributes'; })) { unmount(host); scheduleScan(); return; }
+			if (rec.inst) write(host, rec, null, rec.inst.fallback());
+		});
+		rec.obs.observe(host, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: Object.keys(BLOCKS) });
 	}
 	// Light DOM schreiben (eigene Änderung, nicht beobachtet)
 	function write(host, rec, json, fallback) {
@@ -316,15 +390,16 @@
 	};
 	scheduleScan();
 
-	// Host (leeres 5×5-Blatt mit Fallback) baut das Modul; Einfügen danach an der gemerkten Marke
-	function insertSheet(entry, range) {
+	// Host (leerer Block mit Fallback) baut das Modul; Einfügen danach an der gemerkten Marke
+	function insertBlock(entry, range, attr) {
+		var def = BLOCKS[attr];
 		range = range || currentRange(entry);
-		window.poznoteEnsureScript(BLOCKS['data-nn-sheet'].script).then(function () {
-			var host = window.NextNotesSheet.host();
+		script(def).then(function () {
+			var host = window[def.api].host();
 			fresh.add(host);
 			placeBlock(entry, range, host);
 			changed(entry);
-		}, function () { notify(txt.sheetLoadError, 'error'); });
+		}, function () { notify(txt[def.n + 'LoadError'], 'error'); });
 	}
 
 	function hostIn(entry, target) {
@@ -359,7 +434,7 @@
 		var entry = activeEntry();
 		if (!entry) return [];
 		return ITEMS.map(function (item) {
-			return { id: item.id, icon: item.icon, label: item.label, noRefocus: true, action: function () { item.run(entry, currentRange(entry)); } };
+			return { id: item.id, icon: item.icon, label: item.label, noRefocus: true, action: function () { run(item, entry, currentRange(entry)); } };
 		});
 	};
 
@@ -386,7 +461,7 @@
 			i.className = 'lucide ' + item.icon;
 			i.setAttribute('aria-hidden', 'true');
 			b.append(i, document.createTextNode(' ' + item.label));
-			b.addEventListener('click', function () { closeMenu(); item.run(entry, range); });
+			b.addEventListener('click', function () { closeMenu(); run(item, entry, range); });
 			menu.appendChild(b);
 		});
 		document.body.appendChild(menu);
@@ -417,5 +492,5 @@
 	}, true);
 	window.addEventListener('resize', closeMenu);
 
-	window.NextNotesBlocks = { writable: writable, editFormula: editFormula, scan: scan };
+	window.NextNotesBlocks = { writable: writable, editFormula: editFormula, scan: scan, queue: enqueue, PAGE_MS: PAGE_MS };
 })();

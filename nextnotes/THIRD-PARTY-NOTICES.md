@@ -30,6 +30,8 @@ Copyright (c) 2025 Timothé Poznanski. The front end (JavaScript, CSS, page mark
 | `codemirror` | 6 (see packages below) | MIT | https://codemirror.net | `js/vendor/codemirror-dist/` (built by Poznote, packages below) |
 | `mathlive` | 0.111.4 | MIT | https://github.com/arnog/mathlive | `js/vendor/mathlive/mathlive.min.js` (unchanged from npm, pinned in `build/package-lock.json`; uses the KaTeX fonts above, its sounds are not shipped) |
 | `hyperformula` | 3.5.0 | GPL-3.0-only (dual-licensed, used under GPLv3 with `licenseKey: 'gpl-v3'`) | https://github.com/handsontable/hyperformula | `js/vendor/hyperformula/hyperformula.min.js` (esbuild bundle of the npm ES modules with the `deDE` language, entry `build/vendor-entries/hyperformula.mjs`, packages below, license comments at the end of the file) |
+| `mathjs` | 15.2.0 | Apache-2.0 | https://github.com/josdejong/mathjs | `js/vendor/mathjs/mathjs.min.js` (esbuild bundle of selected npm ES modules, entry `build/vendor-entries/mathjs.mjs` with the Next Notes restrictions, packages below, license comments at the end of the file) |
+| `function-plot` | 1.26.0 | MIT | https://github.com/mauriciopoppe/function-plot | `js/vendor/function-plot/function-plot.min.js` (esbuild bundle of the npm package, entry `build/vendor-entries/function-plot.mjs`, one-line fix in `dist/samplers/builtIn.js` applied at build time (`build/bundles.json` `patches`), packages below) |
 
 Copyright lines:
 - mermaid: Copyright (c) 2014 - 2022 Knut Sveidqvist. `LICENSES/MIT.txt`.
@@ -42,6 +44,8 @@ Copyright lines:
 - CodeMirror and Lezer packages: Copyright (C) 2018-2021 by Marijn Haverbeke and others. `LICENSES/MIT.txt`.
 - MathLive: Copyright (c) 2017 - present Arno Gourdol. `LICENSES/MIT.txt`.
 - HyperFormula: Copyright (c) HANDSONCODE sp. z o. o. `LICENSES/GPL-3.0-only.txt` (the package's own `LICENSE.txt` names the dual licensing).
+- math.js: Copyright (C) 2013-2026 Jos de Jong. `LICENSES/Apache-2.0.txt`. NOTICE file of the package (Apache-2.0 §4 d): "math.js – https://github.com/josdejong/mathjs – Copyright (C) 2013-2026 Jos de Jong <wjosdejong@gmail.com> – Licensed under the Apache License, Version 2.0".
+- function-plot: Copyright (c) 2015 Mauricio Poppe. `LICENSES/MIT.txt`.
 
 ### Packages inside the CodeMirror bundle
 
@@ -55,6 +59,34 @@ Built by `build/build.mjs` from `build/package-lock.json`:
 - `chevrotain@6.5.0`: Shahar Soel (author), Apache-2.0 (`LICENSES/Apache-2.0.txt`).
 - `regexp-to-ast@0.4.0`: Copyright (c) 2018 Shahar Soel, MIT (`LICENSES/MIT.txt`).
 - `tiny-emitter@2.1.0`: Copyright (c) 2017 Scott Corgan, MIT (`LICENSES/MIT.txt`).
+
+### Packages inside the math.js bundle
+
+Built by `build/build.mjs` from `build/package-lock.json`:
+- `mathjs@15.2.0`: Copyright (C) 2013-2026 Jos de Jong, Apache-2.0 (`LICENSES/Apache-2.0.txt`, NOTICE above).
+- `typed-function@4.2.2`: Copyright (c) 2014-2024 Jos de Jong, MIT (`LICENSES/MIT.txt`).
+- `decimal.js@10.6.0`: Copyright (c) 2025 Michael Mclaughlin, MIT (`LICENSES/MIT.txt`).
+- `complex.js@2.4.3`, `fraction.js@5.3.4`: Copyright (c) 2025 Robert Eisele, MIT (`LICENSES/MIT.txt`).
+- `javascript-natural-sort@0.7.1`: Jim Palmer, MIT (`LICENSES/MIT.txt`).
+- `escape-latex@1.2.0`: Copyright (c) 2012 Dang Mai, MIT (`LICENSES/MIT.txt`).
+- `seedrandom@3.0.5`: Copyright 2019 David Bau, MIT (`LICENSES/MIT.txt`).
+- `tiny-emitter@2.1.0`: Copyright (c) 2017 Scott Corgan, MIT (`LICENSES/MIT.txt`).
+- `@babel/runtime@7.29.13`: Copyright (c) 2014-present Sebastian McKenzie and other contributors, MIT (`LICENSES/MIT.txt`).
+- `mathjs/lib/esm/utils/lruQueue.js` is derived from `lru-queue`: (c) 2018 Mariusz Nowak, ISC (`LICENSES/ISC.txt`).
+
+### Packages inside the function-plot bundle
+
+Built by `build/build.mjs` from `build/package-lock.json`:
+- `function-plot@1.26.0`, `math-codegen@0.4.3`: Copyright (c) 2015 Mauricio Poppe, MIT (`LICENSES/MIT.txt`).
+- `mr-parser@0.2.2`, `built-in-math-eval@0.3.2`, `interval-arithmetic-eval@0.5.3`: Mauricio Poppe, MIT (`LICENSES/MIT.txt`).
+- `interval-arithmetic@1.1.3`: Mauricio Poppe, BSL-1.0 (`LICENSES/BSL-1.0.txt`).
+- `double-bits@1.1.1`, `nextafter@1.0.0`: Copyright (c) 2013 Mikola Lysenko, MIT (`LICENSES/MIT.txt`).
+- `extend@3.0.2`: Copyright (c) 2014 Stefan Thomas, MIT (`LICENSES/MIT.txt`).
+- `events@3.3.0`: Copyright Joyent, Inc. and other Node contributors, MIT (`LICENSES/MIT.txt`).
+- `d3-array@3.2.5`, `d3-axis@3.0.1`, `d3-color@3.1.1`, `d3-dispatch@3.0.2`, `d3-drag@3.0.1`, `d3-format@3.1.3`, `d3-interpolate@3.0.2`, `d3-path@3.1.1`, `d3-scale@4.0.3`, `d3-selection@3.0.1`, `d3-shape@3.2.1`, `d3-time@3.1.1`, `d3-time-format@4.1.1`, `d3-timer@3.0.2`, `d3-transition@3.0.2`, `d3-zoom@3.0.1`: Copyright 2010-2026 Mike Bostock, ISC (`LICENSES/ISC.txt`).
+- `d3-ease@3.0.2`: Copyright 2010-2026 Mike Bostock, Copyright 2001 Robert Penner, BSD-3-Clause (`LICENSES/BSD-3-Clause.txt`).
+- `internmap@2.0.3` (inlined in `d3-array/dist/d3-array.mjs`): Copyright 2021 Mike Bostock, ISC (`LICENSES/ISC.txt`).
+- `quickselect` (inlined in `d3-array`, "Based on https://github.com/mourner/quickselect"): Copyright 2018 Vladimir Agafonkin, ISC (`LICENSES/ISC.txt`).
 
 ### Packages inside the Excalidraw bundle
 

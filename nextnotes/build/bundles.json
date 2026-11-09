@@ -361,6 +361,26 @@
 			"entry": "hyperformula.mjs",
 			"global": "NextNotesHyperFormula",
 			"to": "js/vendor/hyperformula/hyperformula.min.js"
+		},
+		{
+			"_doc": "Rechenblock (M8c): math.js 15.2.0 (Apache-2.0) eingeschränkt; Whitelist, Stubs, AST-Prüfung und Budget im Eintrag",
+			"entry": "mathjs.mjs",
+			"global": "NextNotesMath",
+			"to": "js/vendor/mathjs/mathjs.min.js"
+		},
+		{
+			"_doc": "Graph im Rechenblock (M8c): function-plot 1.26.0 (MIT, d3), nur fn als JS-Funktion (CSP)",
+			"entry": "function-plot.mjs",
+			"global": "NextNotesFunctionPlot",
+			"to": "js/vendor/function-plot/function-plot.min.js",
+			"patches": [
+				{
+					"_doc": "M8c-fix: ohne gültige Stützstelle (nur NaN/±Infinity, Zoom in eine Lücke, Laufbudget sofort erschöpft) zeichnete polyline [undefined] und warf",
+					"file": "node_modules/function-plot/dist/samplers/builtIn.js",
+					"from": "let evalGroup = [data[0]];",
+					"to": "let evalGroup = data.length ? [data[0]] : [];"
+				}
+			]
 		}
 	],
 	"adapterHooks": [

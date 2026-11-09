@@ -49,6 +49,44 @@
 	text-align: center;
 }
 
+/* Rechenblock (M8c): statischer Fallback (Leser, Laden, Druckvorschau im Editor); Eingabe links, Ergebnis rechts */
+#nextnotes-root .noteentry .nn-calc {
+	max-width: 100%;
+	margin: 8px 0;
+	overflow-x: auto;
+}
+
+#nextnotes-root .noteentry .nn-calc .nn-calc-line {
+	display: flex;
+	gap: 16px;
+	min-height: 1.5em;
+	margin: 0;
+	font-family: var(--font-face-monospace, ui-monospace, monospace);
+	white-space: pre;
+}
+
+#nextnotes-root .noteentry .nn-calc .nn-calc-out {
+	color: var(--color-text-maxcontrast);
+}
+
+#nextnotes-root .noteentry .nn-calc .nn-calc-out:not(:empty)::before {
+	content: '= ';
+}
+
+#nextnotes-root .noteentry .nn-calc .nn-calc-out.nn-err {
+	color: var(--color-error-text, var(--color-error));
+}
+
+#nextnotes-root .noteentry .nn-calc .nn-calc-out.nn-err::before {
+	content: '';
+}
+
+#nextnotes-root .noteentry .nn-calc .nn-calc-graph {
+	margin: 4px 0 0;
+	color: var(--color-text-maxcontrast);
+	font-style: italic;
+}
+
 /* Menü der Werkzeugleiste */
 #body-user .nn-blocks-menu {
 	position: fixed;

@@ -50,12 +50,19 @@ Nach Fristende bekommst du eine Sammelmeldung, wie viele abgegeben haben.
 ## Tagebuch
 **Tagebuch** zeigt einen Kalender und die Einträge je Tag. Neue Einträge legt Next Notes im Tagebuch-Ordner des Workspace nach Jahr und Monat ab. Ordner und Vorlage für neue Einträge stellst du unter *Einstellungen → Tagebuch* ein.
 
-## Formeln und Rechentabellen
-Nur in Richtext-Notizen. Knopf **Σ** in der Werkzeugleiste oder `/Formel` bzw. `/Tabelle` im Text.
+## Formeln, Rechentabellen und Rechnen
+Nur in Richtext-Notizen. Knopf **Σ** in der Werkzeugleiste oder `/Formel`, `/Tabelle` bzw. `/Rechnen` im Text.
 - **Formel:** Eingabe im Formelfeld (am Tablet mit Bildschirmtastatur), *Übernehmen* mit Enter. *In eigener Zeile* macht einen Formel-Block. Antippen öffnet die Formel wieder.
 - **Tabelle rechnen:** Zahlen mit Komma eingeben (`3,5`), Formeln mit `=` und deutschen Namen, Argumente mit `;` (`=SUMME(A1:A3)`, `=WENN(A1>5;"ja";"nein")`). Doppelklick (am Tablet zweites Antippen) bearbeitet eine Zelle, die Zeile darüber zeigt immer den Inhalt. Zeilen und Spalten fügst du über **⋯** oder das Kontextmenü ein, Formeln passen sich an. Höchstens 50 Zeilen × 26 Spalten. Fehler wie `#DIV/0!` erklärt ein Hinweis beim Darüberfahren. Nur deutsche Funktionsnamen; `*` und `?` in `ZÄHLENWENN`/`SUMMEWENN` sind normale Zeichen (keine Platzhalter). Sehr viele Formeln über große Bereiche lehnt die Tabelle mit einem Hinweis ab. Es gibt nur ein Blatt: Apostroph `'` und Ausrufezeichen `!` stehen in Formeln nur innerhalb von Anführungszeichen (`="Hallo!"`).
 - Rechnen kann die Tabelle nur, wer die Notiz gerade bearbeiten darf. Wer nur liest (Freigabe, Material, gesperrte Notiz, Druck, Export), sieht die zuletzt gespeicherten Ergebnisse.
 - Wandelst du die Notiz in Markdown um, bleiben nur die Ergebnisse (als Markdown-Tabelle), nicht die Formeln.
+- **Rechnen:** eine Rechnung je Zeile, das Ergebnis steht rechts daneben. Variablen gelten für die folgenden Zeilen (`a = 3`, dann `b = a^2 + 1`), jeder Name nur einmal. Dezimalkomma oder -punkt (`3,5` = `3.5`), Argumente mit `;` (`round(2,567; 2)`). Einheiten mit `to` umrechnen (`5 km / 20 min to km/h`, `sin(30 deg)`). Nicht ganze Ergebnisse stehen zusätzlich als Bruch da (`1/3 + 1/6` → `0,5 = 1/2`). Text nach `#` ist ein Kommentar.
+  - Funktionen (englische Namen wie am Taschenrechner): `sqrt`, `cbrt`, `nthRoot`, `abs`, `exp`, `log` (natürlich, `log(x; b)` zur Basis b), `log10`, `log2`, `round`, `floor`, `ceil`, `fix`, `sign`, `mod`, `pow`, `hypot`, `gcd`, `lcm`, `factorial` (auch `5!`), `combinations`, `permutations` (Zahlen bis 10.000), `mean`, `median`, `std`, `variance`, `sum`, `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`; Konstanten `pi`, `e`. Vergleiche (`<`, `==`, …) ergeben *wahr*/*falsch*, `a > 0 ? 1 : -1` wählt.
+  - Eigene Funktionen: `f(x) = x^2 - 2`, danach `f(3)`. Funktionen mit einem Parameter zeichnet der Block als Graph (höchstens 5, x von −10 bis 10, Zoomen und Verschieben mit Maus oder Fingern); *Graph ausblenden* blendet ihn aus. Eine Funktion kann sich nicht selbst aufrufen. Sehr aufwendige Rechnungen brechen mit „Rechenaufwand zu groß“ ab, aufwendige Graphen mit „Graph zu aufwendig“.
+  - Ein Name, den du im Block zuweist (`m = 2`), ist im ganzen Block keine Einheit mehr; vor der Zuweisung ist er unbekannt.
+  - Wer nur liest, sieht die zuletzt gespeicherten Ergebnisse und den Graphen. Höchstens 200 Zeilen mit je 500 Zeichen.
+  - Enthält eine Notiz viele aufwendige Rechen- oder Tabellenblöcke, rechnet sie beim Öffnen nur die ersten; die übrigen zeigen ihre gespeicherten Ergebnisse und „Nicht berechnet. Zum Rechnen klicken.“
+  - Wandelst du die Notiz in Markdown um, wird der Block ein Codeblock mit `Eingabe  # = Ergebnis` je Zeile.
 
 ## Erinnerungen und Erwähnungen
 - **Erinnerung:** Glocke in der Notiz-Werkzeugleiste (*Erinnerung setzen*), auch wiederkehrend. Sie kommt als Nextcloud-Benachrichtigung, keine E-Mail.

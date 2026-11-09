@@ -195,16 +195,39 @@ for (const v of bundles.npmVendor ?? []) {
 
 // 3b. Vendor-Bündel (M8): esbuild-IIFE aus build/vendor-entries/, Lizenzkommentare am Ende;
 // jedes gebündelte npm-Paket muss mit Version (Lockfile) in THIRD-PARTY-NOTICES.md stehen
+// Kleine Korrekturen an Paketdateien beim Bündeln (bundles.json patches): genau ein Treffer, sonst Abbruch (Paket-Update prüfen)
+function vendorPatches(v) {
+	const byFile = new Map(v.patches.map((p) => [path.join(here, p.file), p]));
+	return {
+		name: 'nn-patches',
+		setup(b) {
+			b.onLoad({ filter: /\.[cm]?js$/ }, (args) => {
+				const p = byFile.get(args.path);
+				if (!p) return undefined;
+				const text = fs.readFileSync(args.path, 'utf8');
+				if (text.split(p.from).length !== 2) die(`${v.entry}: Patch für ${p.file} trifft nicht genau einmal`);
+				return { contents: text.replace(p.from, p.to), loader: 'js' };
+			});
+		},
+	};
+}
 if ((bundles.vendorEntries ?? []).length) {
 	const notices = fs.readFileSync(path.join(app, 'THIRD-PARTY-NOTICES.md'), 'utf8');
 	const lock = JSON.parse(fs.readFileSync(path.join(here, 'package-lock.json'), 'utf8')).packages ?? {};
 	for (const v of bundles.vendorEntries) {
-		const r = esbuild.buildSync({
+		const r = await esbuild.build({
 			entryPoints: [path.join(here, 'vendor-entries', v.entry)], absWorkingDir: here, bundle: true, format: 'iife',
 			globalName: v.global, minify, legalComments: 'eof', charset: 'utf8', target: 'es2020', write: false, metafile: true, logLevel: 'error',
+			plugins: v.patches ? [vendorPatches(v)] : [],
 		});
 		write(v.to, r.outputFiles[0].contents);
-		const pkgs = new Set(Object.keys(r.metafile.inputs).map((p) => (p.match(/node_modules\/((?:@[^/]+\/)?[^/]+)/) || [])[1]).filter(Boolean));
+		const dirs = new Map(Object.keys(r.metafile.inputs).map((p) => p.match(/^(.*node_modules\/((?:@[^/]+\/)?[^/]+))\//)).filter(Boolean).map((m) => [m[2], m[1]]));
+		const pkgs = new Set(dirs.keys());
+		// Abhängigkeiten, die ein Paket-dist schon inline enthält (z. B. internmap in d3-array), sieht das Metafile nicht
+		for (const [name, dir] of dirs) {
+			const deps = JSON.parse(fs.readFileSync(path.join(here, dir, 'package.json'), 'utf8')).dependencies ?? {};
+			for (const d of Object.keys(deps)) if (!pkgs.has(d) && lock['node_modules/' + d]) pkgs.add(d);
+		}
 		for (const name of pkgs) {
 			const ver = lock['node_modules/' + name]?.version;
 			if (!ver) die(`${v.entry}: ${name} fehlt in build/package-lock.json`);

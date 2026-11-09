@@ -675,6 +675,13 @@
 	window.poznoteEnsureHyperFormula = function () {
 		return window.NextNotesHyperFormula ? Promise.resolve() : ensureScript('js/vendor/hyperformula/hyperformula.min.js');
 	};
+	// Rechenblock (M8c): eingeschränktes math.js (Global NextNotesMath) und function-plot (Global NextNotesFunctionPlot)
+	window.poznoteEnsureMathjs = function () {
+		return window.NextNotesMath ? Promise.resolve() : ensureScript('js/vendor/mathjs/mathjs.min.js');
+	};
+	window.poznoteEnsureFunctionPlot = function () {
+		return window.NextNotesFunctionPlot ? Promise.resolve() : ensureScript('js/vendor/function-plot/function-plot.min.js');
+	};
 
 	window.NEXTNOTES = {
 		config: config,

@@ -26,6 +26,11 @@ final class BlockMarkup {
 	public const SHEET_COLS = 26;
 	public const SHEET_TEXT_MAX = 1000;
 	private const SHEET_KEYS = ['v', 'lang', 'rows', 'cols', 'cells', 'fmt'];
+	// Rechenblock (M8-Plan §4): Attributlänge in Bytes, Quelltext in Zeichen, Zeilen, Zeilenlänge
+	public const CALC_MAX = 65536;
+	public const CALC_SRC_MAX = 20000;
+	public const CALC_LINES = 200;
+	public const CALC_LINE_MAX = 500;
 
 	public static function isBlockAttr(string $name): bool {
 		return in_array($name, self::ATTRS, true);
@@ -72,7 +77,7 @@ final class BlockMarkup {
 		return match ($attr) {
 			'data-math' => trim($value) !== '' && mb_strlen($value, 'UTF-8') <= self::MATH_MAX,
 			'data-nn-sheet' => self::validSheet($value),
-			// Rechenblock folgt in M8c; bis dahin lässt die Tag-Whitelist das Attribut nicht durch
+			'data-nn-calc' => self::validCalc($value),
 			default => false,
 		};
 	}
@@ -83,8 +88,9 @@ final class BlockMarkup {
 		if ($attr === 'data-math' && !in_array('math-inline', $classes, true) && !in_array('math-block', $classes, true)) {
 			$classes[] = strtolower($el->tagName) === 'div' ? 'math-block' : 'math-inline';
 		}
-		if ($attr === 'data-nn-sheet' && !in_array('nn-sheet', $classes, true)) {
-			$classes[] = 'nn-sheet';
+		$own = ['data-nn-sheet' => 'nn-sheet', 'data-nn-calc' => 'nn-calc'][$attr] ?? null;
+		if ($own !== null && !in_array($own, $classes, true)) {
+			$classes[] = $own;
 		}
 		$value = $el->getAttribute($attr);
 		foreach (['class', $attr, 'contenteditable'] as $name) {
@@ -163,6 +169,39 @@ final class BlockMarkup {
 				if (!$ok) {
 					return false;
 				}
+			}
+		}
+		return true;
+	}
+
+	/** Schema v1 (SPEC §4.7.10): genau v = 1, src (Grenzen), graph 0/1; sonst ungültig */
+	public static function validCalc(string $value): bool {
+		if ($value === '' || strlen($value) > self::CALC_MAX) {
+			return false;
+		}
+		try {
+			$data = json_decode($value, false, 2, JSON_THROW_ON_ERROR);
+		} catch (\JsonException) {
+			return false;
+		}
+		if (!$data instanceof \stdClass) {
+			return false;
+		}
+		$keys = array_keys(get_object_vars($data));
+		sort($keys);
+		if ($keys !== ['graph', 'src', 'v'] || $data->v !== 1 || ($data->graph !== 0 && $data->graph !== 1) || !is_string($data->src)) {
+			return false;
+		}
+		if (mb_strlen($data->src, 'UTF-8') > self::CALC_SRC_MAX) {
+			return false;
+		}
+		$lines = explode("\n", $data->src);
+		if (count($lines) > self::CALC_LINES) {
+			return false;
+		}
+		foreach ($lines as $line) {
+			if (mb_strlen($line, 'UTF-8') > self::CALC_LINE_MAX) {
+				return false;
 			}
 		}
 		return true;
