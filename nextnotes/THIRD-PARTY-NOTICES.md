@@ -73,6 +73,7 @@ Built by `build/build.mjs` from `build/package-lock.json`:
 - `tiny-emitter@2.1.0`: Copyright (c) 2017 Scott Corgan, MIT (`LICENSES/MIT.txt`).
 - `@babel/runtime@7.29.13`: Copyright (c) 2014-present Sebastian McKenzie and other contributors, MIT (`LICENSES/MIT.txt`).
 - `mathjs/lib/esm/utils/lruQueue.js` is derived from `lru-queue`: (c) 2018 Mariusz Nowak, ISC (`LICENSES/ISC.txt`).
+- `cbrt` in `mathjs/lib/esm/utils/number.js` and `hypot` in `mathjs/lib/esm/function/arithmetic/hypot.js` contain code from `es6-shim`: Copyright (c) 2013-2016 Paul Miller and contributors, MIT (`LICENSES/MIT.txt`).
 
 ### Packages inside the function-plot bundle
 

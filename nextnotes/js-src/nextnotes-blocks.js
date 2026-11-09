@@ -25,10 +25,11 @@
 		if (item.a) insertBlock(entry, range, item.a); else insertFormula(entry, range, !!item.b);
 	}
 	// Blöcke mit Laufzeit-UI im Shadow DOM: Attribut → Name (Modul js/nextnotes-<n>.js, Text <n>LoadError), Bibliothek, Global;
-	// view: auch lesend einhängen (Graph); plot: Graph-Bibliothek vorab, wenn view und fn (Funktionsdefinition) passen
+	// view: auch lesend einhängen (Graph); plot: Graph-Bibliothek vorab, wenn view und fn (Funktionsdefinition) passen.
+	// fn: Namenszeichen wie math.js parse.isAlpha (Latein, Griechisch, Buchstabensymbole, mathematische Alphanumerik)
 	var BLOCKS = {
 		'data-nn-sheet': { n: 'sheet', lib: 'poznoteEnsureHyperFormula', api: 'NextNotesSheet' },
-		'data-nn-calc': { n: 'calc', lib: 'poznoteEnsureMathjs', api: 'NextNotesCalc', view: /"graph":1[,}]/, plot: 'poznoteEnsureFunctionPlot', fn: /\w\s*\([^()]*\)\s*=(?!=)/ },
+		'data-nn-calc': { n: 'calc', lib: 'poznoteEnsureMathjs', api: 'NextNotesCalc', view: /"graph":1[,}]/, plot: 'poznoteEnsureFunctionPlot', fn: /[\w$À-ʯͰ-Ͽ℀-⅏\uDC00-\uDFFF]\s*\([^()]*\)\s*=(?!=)/ },
 	};
 	function script(def) { return window.poznoteEnsureScript('js/nextnotes-' + def.n + '.js'); }
 	var BLOCK_SELECTOR = Object.keys(BLOCKS).map(function (a) { return '[' + a + ']'; }).join(',');
@@ -220,9 +221,10 @@
 	// Rechenwarteschlange (M8c-fix): jeder Rechenschritt eines Blocks (Einhängen, Vorprüfung, Zeichnen) in einer eigenen Task.
 	// Folgeschritte (eingereiht während eines Schritts) laufen vor dem nächsten Block, damit fertige Blöcke vollständig sind.
 	// Automatische Schritte teilen sich ein Seitenbudget (PAGE_MS); darüber zeigt der Block over() (Klick rechnet).
-	// Das Budget beginnt neu, sobald die Schlange leer ist (neue Seite, Moduswechsel). user: vom Nutzer ausgelöst, immer.
+	// Das Budget gilt je angezeigter Notiz (budgetKey = Note-IDs, scan) und beginnt nur bei Notizwechsel oder Klick neu,
+	// nicht bei leerer Schlange, Sperr-/Moduswechsel oder spät geladener Bibliothek. user: vom Nutzer ausgelöst, immer.
 	var PAGE_MS = 1000;
-	var jobs = [], next = null, spent = 0, pumping = false;
+	var jobs = [], next = null, spent = 0, pumping = false, budgetKey = null;
 	function enqueue(job) {
 		if (next) { next.push(job); return; }
 		jobs.push(job);
@@ -230,7 +232,7 @@
 	}
 	function pump() {
 		var job = jobs.shift();
-		if (!job) { pumping = false; spent = 0; return; }
+		if (!job) { pumping = false; return; }
 		var t = performance.now();
 		next = [];
 		try {
@@ -257,6 +259,11 @@
 		return null;
 	}
 	function scan() {
+		// Notizwechsel (andere Note-IDs im DOM) → neues Budget; kurz ohne Notiz (Neuladen) zählt nicht
+		var ids = [];
+		document.querySelectorAll('.noteentry').forEach(function (entry) { ids.push(String(entry.getAttribute('data-note-id'))); });
+		var key = ids.sort().join(',');
+		if (key && key !== budgetKey) { budgetKey = key; spent = 0; }
 		live.forEach(function (rec, host) {
 			if (!host.isConnected || !blockAttr(host) || entryOf(host) !== rec.entry) unmount(host);
 		});
@@ -318,7 +325,7 @@
 		link.href = window.poznoteAssetUrl('css/nextnotes-blocks-shadow.css');
 		return link;
 	}
-	// Über dem Seitenbudget: Fallback bleibt, Knopf rechnet diesen Block (vom Nutzer, ohne Budget)
+	// Über dem Seitenbudget: Fallback bleibt, Knopf rechnet diesen Block (vom Nutzer) und gibt der Seite neues Budget
 	function deferred(host, rec, def, attr, fail) {
 		var b = document.createElement('button');
 		b.type = 'button';
@@ -329,6 +336,7 @@
 			e.stopPropagation();
 			b.disabled = true;
 			rec.user = true;
+			spent = 0;
 			enqueue({ user: true, run: function () { if (live.get(host) === rec) { try { attach(host, rec, def, attr); } catch (err) { fail(err); } } }, over: function () {} });
 		});
 		var root = host.shadowRoot || host.attachShadow({ mode: 'open' });

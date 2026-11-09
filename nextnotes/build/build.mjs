@@ -195,10 +195,15 @@ for (const v of bundles.npmVendor ?? []) {
 
 // 3b. Vendor-Bündel (M8): esbuild-IIFE aus build/vendor-entries/, Lizenzkommentare am Ende;
 // jedes gebündelte npm-Paket muss mit Version (Lockfile) in THIRD-PARTY-NOTICES.md stehen
-// Kleine Korrekturen an Paketdateien beim Bündeln (bundles.json patches): genau ein Treffer, sonst Abbruch (Paket-Update prüfen)
+// Kleine Korrekturen an Paketdateien beim Bündeln (bundles.json patches): genau ein Treffer, sonst Abbruch (Paket-Update prüfen);
+// nach dem Bündeln: jeder Patch genau einmal angewandt (Datei nicht mehr geladen → Abbruch)
 function vendorPatches(v) {
 	const byFile = new Map(v.patches.map((p) => [path.join(here, p.file), p]));
-	return {
+	const used = new Map(v.patches.map((p) => [p, 0]));
+	const check = () => {
+		for (const [p, n] of used) if (n !== 1) die(`${v.entry}: Patch für ${p.file} ${n}-mal angewandt statt einmal (Datei nicht im Bündel?)`);
+	};
+	return { check, plugin: {
 		name: 'nn-patches',
 		setup(b) {
 			b.onLoad({ filter: /\.[cm]?js$/ }, (args) => {
@@ -206,20 +211,23 @@ function vendorPatches(v) {
 				if (!p) return undefined;
 				const text = fs.readFileSync(args.path, 'utf8');
 				if (text.split(p.from).length !== 2) die(`${v.entry}: Patch für ${p.file} trifft nicht genau einmal`);
+				used.set(p, used.get(p) + 1);
 				return { contents: text.replace(p.from, p.to), loader: 'js' };
 			});
 		},
-	};
+	} };
 }
 if ((bundles.vendorEntries ?? []).length) {
 	const notices = fs.readFileSync(path.join(app, 'THIRD-PARTY-NOTICES.md'), 'utf8');
 	const lock = JSON.parse(fs.readFileSync(path.join(here, 'package-lock.json'), 'utf8')).packages ?? {};
 	for (const v of bundles.vendorEntries) {
+		const patches = v.patches ? vendorPatches(v) : null;
 		const r = await esbuild.build({
 			entryPoints: [path.join(here, 'vendor-entries', v.entry)], absWorkingDir: here, bundle: true, format: 'iife',
 			globalName: v.global, minify, legalComments: 'eof', charset: 'utf8', target: 'es2020', write: false, metafile: true, logLevel: 'error',
-			plugins: v.patches ? [vendorPatches(v)] : [],
+			plugins: patches ? [patches.plugin] : [],
 		});
+		if (patches) patches.check();
 		write(v.to, r.outputFiles[0].contents);
 		const dirs = new Map(Object.keys(r.metafile.inputs).map((p) => p.match(/^(.*node_modules\/((?:@[^/]+\/)?[^/]+))\//)).filter(Boolean).map((m) => [m[2], m[1]]));
 		const pkgs = new Set(dirs.keys());
