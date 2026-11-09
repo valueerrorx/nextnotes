@@ -26,6 +26,14 @@ done
 dest=/var/www/html/custom_apps/nextnotes
 nn_tar -C "$src/nextnotes" --exclude=.gitignore --exclude=./build/node_modules --exclude=./build --exclude=./Makefile --exclude=./js-src --exclude=./css-src -cf - . \
 	| dc exec -T -u root nc sh -c "rm -rf '$dest' && mkdir -p '$dest' && tar -xf - -C '$dest' && chown -R www-data:www-data '$dest'"
+# App-Dateien im laufenden Apache ausgetauscht: Opcache/JIT kann danach jede Anfrage mit Segfault beenden (2026-11-09, Colima/arm64)
+# → Webserver und Cron neu starten, dann auf Nextcloud warten
+dc restart nc cron >/dev/null
+for i in $(seq 1 60); do
+	curl -s -o /dev/null -w '%{http_code}' --max-time 5 "http://localhost:8090/status.php" 2>/dev/null | grep -q 200 && break
+	[[ $i -eq 60 ]] && { echo "Nextcloud nach Neustart nicht bereit" >&2; exit 1; }
+	sleep 2
+done
 occ app:enable nextnotes >/dev/null || true
 occ upgrade >/dev/null || true
 occ maintenance:repair >/dev/null 2>&1 || true
