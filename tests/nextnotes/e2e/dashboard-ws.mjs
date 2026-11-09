@@ -170,4 +170,5 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	await setScope(api, { scope: 'all' });
 	await setScope(apiB, { scope: 'all' });
 	await setLast(api, ws1);
+	await setLast(apiB, privB);
 });

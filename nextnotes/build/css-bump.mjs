@@ -62,7 +62,7 @@ function withBump(sel, bump) {
 	return head + (head === '' || /[\s>+~]$/.test(head) ? '*' : '') + bump + tail;
 }
 
-function bumpSelector(sel) {
+function bumpSelector(sel, notChrome = false) {
 	const t = sel.replace(/\/\*[\s\S]*?\*\//g, '').trim();
 	if (t === '') return [];
 	// Klasse/ID außerhalb führender html/body/:root-Teile?
@@ -71,7 +71,8 @@ function bumpSelector(sel) {
 	// ::highlight(name): Namen setzt nur App-Code, NC-Kern stylt sie nicht; ohne Zusatz keine Prüfung je Element (M4i-fix)
 	if (/^::highlight\([^()]*\)$/i.test(rest.trim())) return [t];
 	const specific = /[.#]|\[(?:class|id|data-)/i.test(rest.replace(/\[(?!class|id|data-)[^\]]*\]|"[^"]*"|'[^']*'/gi, ''));
-	return specific ? [withBump(t, BUMP_GLOBAL)] : [withBump(t, NOT_NC_CHROME), withBump(t, BUMP_SCOPED)];
+	// notChrome (bundles.json cssNotChrome): Klassen-Regeln zusätzlich ohne Wirkung in der NC-Oberfläche
+	return specific ? [withBump(t, notChrome ? BUMP_GLOBAL + NOT_NC_CHROME : BUMP_GLOBAL)] : [withBump(t, NOT_NC_CHROME), withBump(t, BUMP_SCOPED)];
 }
 
 // Regeln durchlaufen; onRule(selektoren) liefert die neue Selektorliste
@@ -98,8 +99,8 @@ export function mapRules(css, onRule) {
 	return out;
 }
 
-export function bumpSpecificity(css) {
-	return mapRules(css, (sels) => sels.flatMap(bumpSelector).join(','));
+export function bumpSpecificity(css, notChrome = false) {
+	return mapRules(css, (sels) => sels.flatMap((s) => bumpSelector(s, notChrome)).join(','));
 }
 
 // Zahl der Stilregeln (auch in @media usw.)

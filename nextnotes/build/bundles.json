@@ -307,6 +307,10 @@
 		"match": "webfonts/",
 		"reason": "Schrift Inter gestrichen, var(--font-face) (ADR 0016); sonst 404 auf webfonts/"
 	},
+	"cssNotChrome": {
+		"files": ["css/modals/reminders.css"],
+		"reason": "Klassen-Regeln dieser Dateien wirken nicht in der NC-Oberfläche (Kopf, Popover, Dialoge, Toasts); reminders.css: .notification-icon/-heading/-time trafen die Benachrichtigungen-App im Kopf (M7-fix)"
+	},
 	"fontFamilyRewrite": {
 		"from": "Inter",
 		"to": "var(--font-face)",

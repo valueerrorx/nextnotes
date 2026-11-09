@@ -1,25 +1,31 @@
-# M7-fix – Architekt
+# M7-fix – Architekt (Lauf 2: E2E-Matrix-Befunde)
 Status: fertig
+(Lauf 1 – Listen/KaTeX – fertig, Commit ac057cfc)
 
 ## Auftrag
-1. Listenzeichen/-nummern in Notizinhalt wiederherstellen (NC-Reset `ul,ol{list-style:none}`), CSS-Override nach ADR 0017. 2. KaTeX-404 bei `index.php?note=<id>` beheben, Mermaid mitprüfen.
+1. frame.mjs „bob ?workspace=<alice>“ rot nach dashboard-ws (bobs last_opened = Team-WS): Specs reihenfolgeunabhängig. 2. CSS-Leck: Upstream `.notification-*` (reminders.css im Bündel nextnotes-modals) trifft NC-Benachrichtigungen im Kopf.
 
 ## Erledigt
-- Ursache 2: NC lädt Skripte mit `defer`; `math-renderer.js` (in nextnotes-app) rendert sofort (`readyState` = interactive), ruft Upstream-`poznoteEnsureKatex` aus `lazy-libs.js` (seitenrelativ) vor `nextnotes-late.js`. Fehler → `_katexLoading` zurück, serverseitig gerenderte Notiz ohne Mutation bleibt ungerendert. Mermaid: gleiche Lücke bei frühem `setTimeout` möglich.
-- Entscheidung 2: Asset-Helfer (assetUrl, ensureScript, ensureMermaid/Katex) nach `nextnotes-bootstrap.js`; `lazy-libs` nicht mehr laden/bauen (exclude, ersetzt durch Adapter); late.js setzt nur noch `poznoteAssetUrl` nach `globals.js` zurück.
+- Worktree war auf Upstream-main → `git reset --hard nextcloud-port` (746b60d8).
+- Befund 1: App-Semantik `PageFrameService::workspace`: unbekannt/fremd → wie ohne Parameter (default_workspace-Einstellung, sonst last_opened normal, sonst Standard), wie Upstream getWorkspaceFilter; frame.mjs setzt bei alice schon last_opened vorher. dashboard-ws räumt bobs last_opened nicht auf.
+- Befund 2: Quelle `src/public/css/modals/reminders.css:335–365` (bare `.notification-icon/-heading/-time`), Bump global `:not(#nn-0)` ohne NC-Kopf-Ausschluss.
+
+- Fix 2: bundles.json `cssNotChrome.files` [reminders.css]; css-bump.mjs `bumpSelector/bumpSpecificity(…, notChrome)` hängt NOT_NC_CHROME an Klassen-Regeln; build.mjs cssFile reicht es durch. make build Exit 0, Ausgabe geprüft (.notification-icon…:where(:not(:is(#header…)).
+- Fix 1: frame.mjs setzt bobs last_opened = eigener Standard vor ?workspace=<A>; dashboard-ws räumt bobs last_opened zurück (privB).
+- Betroffene Specs: frame, dashboard-ws, material-reminder, material-m6b, teams-m5d (lib/readonly).
+
+- Instanz nextnotes-m7fix (sqlite, 11201) up/install/enable Exit 0.
+- run-e2e dashboard-ws frame hell+dunkel: grün (frame 142). bobs last_opened danach „Notizen“. frame allein mit bobs last_opened = Team-WS: grün.
+- frame.mjs erzeugt eigene NC-Benachrichtigung (occ notification:generate), sonst sieht der Regel-Scan das Leck nur nach Vorläufern.
+- Gegenprobe ohne Fix (cssNotChrome leer): frame hell+dunkel ROT, 6 Fehler je Theme (.notification-icon/-heading/-time); frame allein (Benachrichtigungen gelöscht) ebenfalls ROT. Fix wiederhergestellt, build, install.
+
+- run-e2e sqlite dashboard-ws frame material-reminder material-m6b teams-m5d hell+dunkel: grün (42/142/45/144/95 je Theme).
+- make -C nextnotes build Exit 0; make -C nextnotes check-upstream grün.
+- ADR 0017 Nachtrag M7-fix (Option d: Wächter je Datei). Kein src/-Patch → kein SPEC §11.1/upstream-patches.txt; kein Upstream-Bug (Port-Kollision) → kein §11.2.
+- Instanz nextnotes-m7fix abgebaut (down.sh all, 0 Container, 0 Volumes); Demo unberührt.
 
 ## Nächster Schritt
-- keiner (Übergabe an Tester: Spec aus Scratchpad nach tests/, assets.mjs:90 anpassen)
+- keiner (Commit im Worktree)
 
 ## Offen
-- Regel: `tests/` darf ich nicht ändern → E2E-Spec als Entwurf im Scratchpad, Tester übernimmt; `tests/nextnotes/e2e/assets.mjs:90` erwartet `lazy-libs` in der Reihenfolge → Tester anpassen.
-- Umsetzung 2: js-src/nextnotes-bootstrap.js (§15 Asset-Helfer, NEXTNOTES.assetUrl), js-src/nextnotes-late.js (nur poznoteAssetUrl zurück), PageAssets.php (lazy-libs raus), bundles.json (jsSingle/exclude/adapterHooks), SPEC §1.4 + §4.3.9. make build Exit 0.
-- Instanz nextnotes-m7fix (9700, sqlite) up + install Exit 0.
-- Befund 1 (Messung vor Fix, sqlite hell): Richtext-ul none/pl 0 (NC-Reset), Richtext-ol none + ::before-Zähler (Upstream-Absicht), Markdown-ul/ol disc/decimal ok. KaTeX nach Fix 2: gerendert, keine 4xx.
-- Umsetzung 1: css-src/nextnotes-layout.css (Regel 0,0,1 `:where(.noteentry,.diary-journal-body,.paste-markdown-preview,.insert-markdown-preview) :is(ul,ol)` → revert), css-src/nextnotes-printview.css (gleiche Regel für Druck/Abgabe-iframe).
-- Spec-Entwurf scratchpad e2e/lists-katex-m7fix.mjs: sqlite hell+dunkel grün (16/16 je Theme), Screenshots ok. Nächster: Gegenprobe KaTeX mit HEAD-JS, dann check-upstream, Abbau.
-- Gegenprobe HEAD-JS (stash, build, install): Formel-Notiz ?note= → 404 js/katex/katex.min.js (lazy-libs.js onerror), nichts gerendert, Spec rot (7 Fehler). Neuer Stand wieder installiert: Spec grün hell+dunkel (28/28). Hinweis: data-math nur an span (Sanitizer), Blockformel als span.math-block.
-- make -C nextnotes check-upstream Exit 0 (grün). Kein src/-Patch → kein Eintrag SPEC §11.1 / upstream-patches.txt; Port-Fehler, kein Upstream-Bug → kein §11.2.
-- Läuft: run-e2e sqlite assets editor smoke-m6 (hell+dunkel), Erwartung: assets.mjs:90 rot wegen lazy-libs in Reihenfolge.
-- run-e2e sqlite assets editor smoke-m6 hell+dunkel: editor 119 ok, smoke-m6 48 ok, assets 81 ok + 1 erwarteter FAIL (Skriptreihenfolge erwartet lazy-libs, Index -1).
-- ADR 0018 Satz zu lazy-libs angepasst. Instanz nextnotes-m7fix abgebaut (down.sh all Exit 0, 0 Container, 0 Volumes).
+- Semantik „unbekannt → Standard“ = Start-Workspace inkl. last_opened: an Lead melden.

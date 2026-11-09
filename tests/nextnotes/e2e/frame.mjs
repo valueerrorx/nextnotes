@@ -6,6 +6,7 @@
 // keine durch den Build ungültig gewordenen CSS-Regeln, Hell/Dunkel-Regeln greifen.
 import { runSpec } from './lib/harness.mjs';
 import { apiClient } from './lib/api.mjs';
+import { occ } from './lib/docker.mjs';
 
 const RUN = `${process.argv[3]}${Date.now().toString(36)}`;
 
@@ -118,6 +119,7 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	ctx.info(`Standard-Workspace: „${WS}“ (Name nach Sprache beim ersten Zugriff)`);
 	ctx.ok(['Notizen', 'Notes'].includes(WS), 'Standard-Workspace vorhanden', WS);
 	await api.must('PUT', '/settings/last_opened_workspace', { value: WS }); // Ausgangslage unabhängig von Vorläufen
+	occ(ctx.base, 'notification:generate', process.env.NN_USER, `Regel-Scan ${RUN}`); // NC-Benachrichtigung im Kopf für den Regel-Scan
 	const WS2 = `Zweit ${RUN}`;
 	await api.workspace(WS2);
 	const fA = `Ordner ${RUN}`;
@@ -411,10 +413,13 @@ await runSpec(import.meta.url, async (ctx, page, context, browser) => {
 	let bodyB = await pageB.content();
 	ctx.ok(r?.status() === 404 && !bodyB.includes(RUN) && !bodyB.includes('nextnotes-root'), 'bob ?note=<alice> → 404, kein Titel/Inhalt', `HTTP ${r?.status()}`);
 	undo404();
+	// Ausgangslage unabhängig von Vorläufen (z. B. dashboard-ws merkt einen Team-Workspace): fremder Schlüssel → Start wie ohne Parameter
+	const apiB = apiClient(ctx, pageB.request, process.env.NN_USER2, process.env.NN_PASS2);
+	const wsB = await apiB.defaultWorkspace();
+	await apiB.must('PUT', '/settings/last_opened_workspace', { value: wsB });
 	r = await pageB.goto(ctx.appUrl(`index.php?workspace=${encodeURIComponent(WS2)}`), { waitUntil: 'networkidle' });
 	bodyB = await pageB.content();
 	const titleB = await pageB.locator('.workspace-title-text').textContent();
-	const wsB = await apiClient(ctx, pageB.request, process.env.NN_USER2, process.env.NN_PASS2).defaultWorkspace();
 	ctx.ok(r?.status() === 200 && titleB === wsB && !bodyB.includes(RUN), 'bob ?workspace=<alice> → 200 eigener Standard, kein A-Marker', `HTTP ${r?.status()} ${titleB}`);
 	r = await pageB.goto(ctx.appUrl(`index.php?workspace=${encodeURIComponent(WS2)}&note=${nDeep}`), { waitUntil: 'load' });
 	ctx.ok(r?.status() === 404, 'bob ?workspace=<A>&note=<A> → 404', `HTTP ${r?.status()}`);

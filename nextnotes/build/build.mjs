@@ -115,7 +115,7 @@ function rewriteFontFamily(css) {
 // Spezifitäts-Zusatz (ADR 0017, css-bump.mjs); Regelzahl gleich, kein Zusatz hinter Pseudo-Element
 function cssFile(rel, outRel) {
 	const before = rewriteUrls(rewriteFontFamily(stripFontFaces(read(rel))), rel, outRel);
-	const after = bumpSpecificity(before);
+	const after = bumpSpecificity(before, (bundles.cssNotChrome?.files ?? []).includes(rel));
 	const errors = checkBumped(before, after);
 	if (errors.length) die(`${rel}: ${errors.slice(0, 5).join('; ')}`);
 	return after;
