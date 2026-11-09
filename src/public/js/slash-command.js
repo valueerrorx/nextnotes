@@ -1656,10 +1656,9 @@
             range.insertNode(emptyLineBefore);
         }
 
-        // Place cursor at the end of the summary text
+        // Select the summary text: typing replaces the placeholder title
         const newRange = document.createRange();
         newRange.selectNodeContents(liveSummary || summary);
-        newRange.collapse(false);
         selection.removeAllRanges();
         selection.addRange(newRange);
 
@@ -6457,8 +6456,11 @@
 
         // Prevent new lines and duplication in toggle title
         document.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') {
-                const header = e.target.closest('.toggle-header');
+            if (e.key === 'Enter' && !e.defaultPrevented) {
+                // The editing host is the target; the caret tells the header (an open menu took Enter already)
+                const anchor = window.getSelection() && window.getSelection().anchorNode;
+                const anchorEl = anchor && (anchor.nodeType === Node.ELEMENT_NODE ? anchor : anchor.parentElement);
+                const header = e.target.closest('.toggle-header') || (anchorEl && anchorEl.closest('.toggle-header'));
                 if (header) {
                     e.preventDefault();
                     e.stopPropagation();

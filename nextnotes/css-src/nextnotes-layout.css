@@ -999,6 +999,20 @@ html[data-theme='dark'] #nextnotes-root.graph-page {
 	color: var(--color-main-text);
 }
 
+/* UI-treeicon (Thomas 2026-11-09): Icons im Baum behalten ihre Größe (Upstream: Flex-Zeile ohne flex-shrink, Icon schrumpft
+   bzw. verschwindet bei langen Namen); lange Namen enden mit „…“. */
+#nextnotes-root #left_col :is(.folder-icon, .note-icon, .favorite-folder-icon) {
+	flex: none;
+	min-width: 1.34em;
+}
+#nextnotes-root #left_col :is(.folder-name, a.links_arbo_left .note-title) {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 /* Hover/Fokus 8 %, aktiv 16 % (+ Hover 22 %) der Primärfarbe und Streifen links: Werte von NcAppNavigationItem (NC 35) */
 #nextnotes-root #icon_sidebar :is(.icon-sidebar-btn, .icon-sidebar-logo):is(:hover, :focus-visible),
 #nextnotes-root #left_col :is(.folder-toggle, a.links_arbo_left):hover {
@@ -1703,4 +1717,43 @@ body.icon-sidebar-collapsed #content #nextnotes-root #iconSidebarToggle {
 	border: 0;
 	background-color: var(--color-primary-element);
 	color: var(--color-primary-element-text);
+}
+
+/* UI-toggle (Thomas 2026-11-09): Aufklappbereich (Upstream .toggle-block, tasks.css) volle Breite als blasse Fläche mit Innenabstand;
+   Inhalt unter dem Titeltext eingerückt (Pfeil 5 px + 10 px Abstand). Nur NC-Theme-Variablen (hell/dunkel). Rich-Text und Markdown-Vorschau. */
+#nextnotes-root details.toggle-block {
+	box-sizing: border-box;
+	width: 100%;
+	margin: 8px 0;
+	padding: 0 16px 0 12px;
+	border-radius: var(--border-radius-large);
+	background-color: var(--color-background-hover);
+}
+#nextnotes-root details.toggle-block[open] {
+	padding-bottom: 12px;
+}
+#nextnotes-root details.toggle-block > summary {
+	padding: 10px 0;
+	margin-bottom: 0;
+}
+/* Inhalt: .toggle-content (Rich-Text) ist div[contenteditable=true], das der NC-Kern (inputs.scss) als Eingabefeld zeichnet
+   (Rahmen, Feldhintergrund, margin 3px, schmal wie ein Feld) – zurück auf Fließtext; Markdown-Vorschau: direkte Kinder */
+#nextnotes-root details.toggle-block > .toggle-content {
+	box-sizing: border-box;
+	width: auto;
+	height: auto;
+	min-height: 1.6em;
+	margin: 0;
+	padding: 0 0 0 15px;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	color: inherit;
+	cursor: text;
+	outline: none;
+	box-shadow: none;
+	text-overflow: clip;
+}
+#nextnotes-root details.toggle-block > :not(summary, .toggle-content) {
+	margin-left: 15px;
 }
