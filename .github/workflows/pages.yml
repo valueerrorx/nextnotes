@@ -1,0 +1,47 @@
+# SPDX-FileCopyrightText: 2026 Thomas Weissel
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Project website: site/ plus nextnotes/screenshots/ to GitHub Pages.
+name: Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'site/**'
+      - 'nextnotes/screenshots/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/configure-pages@v6
+      - name: Assemble site
+        run: |
+          mkdir -p _site
+          cp -R site/. _site/
+          rm -f _site/.gitignore
+          mkdir -p _site/screenshots
+          cp nextnotes/screenshots/*.png _site/screenshots/
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v5

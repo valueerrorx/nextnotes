@@ -1,0 +1,179 @@
+<!doctype html>
+<!-- SPDX-FileCopyrightText: 2026 Thomas Weissel -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Next Notes – notes, team workspaces and assignments for Nextcloud</title>
+<meta name="description" content="Next Notes is a native Nextcloud app for notes, team workspaces, material and assignments. Based on Poznote.">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#00679e">
+<meta property="og:title" content="Next Notes for Nextcloud">
+<meta property="og:description" content="Notes, team workspaces and assignments – inside your own Nextcloud.">
+<meta property="og:image" content="https://valueerrorx.github.io/nextnotes/screenshots/notes-light.png">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="hero">
+	<nav class="topnav wrap" aria-label="Main">
+		<a class="brand" href="#top" id="top">
+			<svg class="brand-icon" viewBox="0 0 32 32" aria-hidden="true"><path fill="currentColor" d="M7 3h13l7 7v17a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm12 2v6h6zM9 15v2h14v-2zm0 5v2h14v-2zm0 5v2h9v-2z"/></svg>
+			Next Notes
+		</a>
+		<ul>
+			<li><a href="#features">Features</a></li>
+			<li><a href="#schools">For schools</a></li>
+			<li><a href="#screenshots">Screenshots</a></li>
+			<li><a href="#install">Install</a></li>
+		</ul>
+	</nav>
+
+	<div class="hero-body wrap">
+		<div class="hero-text">
+			<p class="eyebrow">Native Nextcloud app · beta 0.9.3</p>
+			<h1>Notes, team workspaces and assignments for Nextcloud</h1>
+			<p class="lead">Write notes with formulas, tables and drawings, share workspaces with your class and hand out assignments – all inside your own Nextcloud.</p>
+			<div class="buttons">
+				<a class="btn btn-primary" href="https://github.com/valueerrorx/nextnotes">
+					<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.4-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"/></svg>
+					View on GitHub
+				</a>
+				<a class="btn btn-secondary" href="https://github.com/valueerrorx/nextnotes/blob/main/docs/app/user.md">Documentation <span class="hint">(German)</span></a>
+			</div>
+		</div>
+		<figure class="hero-shot">
+			<picture>
+				<source srcset="screenshots/notes-dark.png" media="(prefers-color-scheme: dark)">
+				<img src="screenshots/notes-light.png" width="1400" height="900" alt="Next Notes inside the Nextcloud interface: workspace sidebar with folders and an open note">
+			</picture>
+		</figure>
+	</div>
+</header>
+
+<main id="main">
+	<section id="features" class="section wrap" aria-labelledby="features-h">
+		<h2 id="features-h">Everything for notes – in your Nextcloud</h2>
+		<p class="section-lead">Next Notes brings a full notes app into Nextcloud: same login, same users, same teams, same storage.</p>
+		<ul class="features">
+			<li class="card">
+				<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/></svg>
+				<h3>Notes and editor</h3>
+				<p>Rich text and Markdown, task lists, Excalidraw drawings, math formulas, diagrams and code. Tables that calculate and a calculator block with function graphs.</p>
+			</li>
+			<li class="card">
+				<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 8l10 5 10-5z"/><path d="m2 13 10 5 10-5"/><path d="m2 17.5 10 5 10-5" opacity=".55"/></svg>
+				<h3>Workspaces and teams</h3>
+				<p>Private workspaces, workspaces shared with single people (read only or edit) and team workspaces of a Nextcloud team. Folders, tags, attachments, revisions and trash.</p>
+			</li>
+			<li class="card">
+				<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 9.5 12 5l10 4.5-10 4.5z"/><path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5"/><path d="M22 9.5V15"/></svg>
+				<h3>Assignments</h3>
+				<p>Hand out a note with a deadline. Every student works on an own copy, submits it and gets it back with feedback and points.</p>
+			</li>
+			<li class="card">
+				<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>
+				<h3>OneNote import</h3>
+				<p>Users bring their OneNote notebooks with images and files into their own workspaces, set up once by the school's administrator.</p>
+			</li>
+			<li class="card">
+				<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18h10.5a4.5 4.5 0 0 0 .6-8.96A6 6 0 0 0 6.4 10.1 4 4 0 0 0 7 18z"/></svg>
+				<h3>Nextcloud integration</h3>
+				<p>Nextcloud login, teams, notifications for reminders and @-mentions, unified search, user migration and <code>occ</code> commands. Light and dark mode follow your theme.</p>
+			</li>
+			<li class="card">
+				<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 4 5.5v6c0 5 3.4 8.6 8 10 4.6-1.4 8-5 8-10v-6z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>
+				<h3>Privacy</h3>
+				<p>Data stays in your Nextcloud database and data directory. No tracking, no third parties, no AI features. Every request is checked against user and team permissions.</p>
+			</li>
+		</ul>
+	</section>
+
+	<section id="schools" class="band" aria-labelledby="schools-h">
+		<div class="section wrap">
+			<h2 id="schools-h">Made for schools</h2>
+			<p class="section-lead">Teachers are team moderators, students are team members. That is all the setup a class needs.</p>
+			<ol class="steps">
+				<li>
+					<h3>Create a team</h3>
+					<p>Create a Nextcloud team for the class in the Contacts app and add the students.</p>
+				</li>
+				<li>
+					<h3>Open a team workspace</h3>
+					<p>Everyone in the team can read and write. Access ends when someone leaves the team.</p>
+				</li>
+				<li>
+					<h3>Publish material</h3>
+					<p>Mark a folder as material: teachers edit it, students read it and can copy notes for themselves.</p>
+				</li>
+				<li>
+					<h3>Hand out and return</h3>
+					<p>Students work on their own copy and submit it before the deadline. Teachers give feedback and points and return it.</p>
+				</li>
+			</ol>
+			<p class="note">Submissions stay with the teachers when a student leaves the team or the account is deleted. They are removed only when a teacher deletes the assignment or the team is deleted.</p>
+		</div>
+	</section>
+
+	<section id="screenshots" class="section wrap" aria-labelledby="shots-h">
+		<h2 id="shots-h">Screenshots</h2>
+		<p class="section-lead">German interface with made-up sample data. Select an image to open it in full size.</p>
+		<div class="gallery">
+			<figure><a href="screenshots/notes-light.png"><img src="screenshots/notes-light.png" width="1400" height="900" loading="lazy" alt="Note with a table and a fraction formula in a private workspace"></a><figcaption>Note with table and formula</figcaption></figure>
+			<figure><a href="screenshots/notes-dark.png"><img src="screenshots/notes-dark.png" width="1400" height="900" loading="lazy" alt="Task list with progress bar in dark mode"></a><figcaption>Task list, dark mode</figcaption></figure>
+			<figure><a href="screenshots/team-workspace-light.png"><img src="screenshots/team-workspace-light.png" width="1400" height="900" loading="lazy" alt="Team workspace of class 4a with a drawing in the material folder"></a><figcaption>Team workspace with material folder</figcaption></figure>
+			<figure><a href="screenshots/team-workspace-dark.png"><img src="screenshots/team-workspace-dark.png" width="1400" height="900" loading="lazy" alt="Worksheet with fraction exercises and a table in the material folder, dark mode"></a><figcaption>Worksheet in the material folder, dark</figcaption></figure>
+			<figure><a href="screenshots/assignments-light.png"><img src="screenshots/assignments-light.png" width="1400" height="900" loading="lazy" alt="Assignments of class 4a with due date and number of submissions"></a><figcaption>Assignments of a class</figcaption></figure>
+			<figure><a href="screenshots/assignment-detail-light.png"><img src="screenshots/assignment-detail-light.png" width="1400" height="900" loading="lazy" alt="Assignment with the submissions of three students, status and points"></a><figcaption>Submissions with status and points</figcaption></figure>
+			<figure><a href="screenshots/assignment-detail-dark.png"><img src="screenshots/assignment-detail-dark.png" width="1400" height="900" loading="lazy" alt="Assignment with submissions in dark mode"></a><figcaption>Assignment, dark</figcaption></figure>
+			<figure><a href="screenshots/excalidraw-light.png"><img src="screenshots/excalidraw-light.png" width="1400" height="900" loading="lazy" alt="Editing an Excalidraw drawing of fractions"></a><figcaption>Excalidraw drawing</figcaption></figure>
+			<figure><a href="screenshots/dashboard-light.png"><img src="screenshots/dashboard-light.png" width="1400" height="900" loading="lazy" alt="Dashboard with the folders of all workspaces"></a><figcaption>Dashboard</figcaption></figure>
+		</div>
+	</section>
+
+	<section id="install" class="band" aria-labelledby="install-h">
+		<div class="section wrap two-col">
+			<div>
+				<h2 id="install-h">Requirements</h2>
+				<ul class="checks">
+					<li>Nextcloud 35</li>
+					<li>PHP 8.3 – 8.5</li>
+					<li>MariaDB/MySQL, PostgreSQL or SQLite</li>
+					<li>Background jobs via system cron</li>
+					<li>Optional: Teams app for team workspaces and assignments, Contacts app to manage teams</li>
+				</ul>
+			</div>
+			<div>
+				<h2>Installation</h2>
+				<ol class="install">
+					<li><strong>App Store</strong> (once published): <em>Apps → Office &amp; text → Next Notes</em>.</li>
+					<li><strong>Release package:</strong> extract <code>nextnotes-&lt;version&gt;.tar.gz</code> into <code>custom_apps/</code> and run <code>occ app:enable nextnotes</code>.</li>
+					<li><strong>From source:</strong> <code>npm ci --prefix nextnotes/build</code> and <code>make -C nextnotes dist</code>.</li>
+				</ol>
+				<p>Read the <a href="https://github.com/valueerrorx/nextnotes/blob/main/docs/app/admin.md">administration guide</a> and the <a href="https://github.com/valueerrorx/nextnotes/blob/main/docs/app/upgrade.md">update notes</a> (both in German).</p>
+			</div>
+		</div>
+	</section>
+
+	<section id="credits" class="section wrap" aria-labelledby="credits-h">
+		<h2 id="credits-h">Based on Poznote</h2>
+		<p class="section-lead">Next Notes is based on <a href="https://github.com/timothepoznanski/poznote">Poznote</a> by Timothé Poznanski. The editor, the notes interface and many ideas come from Poznote; Next Notes replaces its backend with a Nextcloud app and adds teams, material and assignments. Thank you, Timothé!</p>
+		<ul class="licenses">
+			<li>Next Notes code: <a href="https://github.com/valueerrorx/nextnotes/blob/main/nextnotes/COPYING">AGPL-3.0-or-later</a></li>
+			<li>Parts taken from Poznote: <a href="https://github.com/valueerrorx/nextnotes/blob/main/LICENCE">MIT</a></li>
+			<li>Bundled libraries: <a href="https://github.com/valueerrorx/nextnotes/blob/main/nextnotes/THIRD-PARTY-NOTICES.md">third-party notices</a></li>
+		</ul>
+	</section>
+</main>
+
+<footer class="footer">
+	<div class="wrap">
+		<p>© 2026 Thomas Weissel · Next Notes is not affiliated with Nextcloud GmbH or Microsoft.</p>
+		<p><a href="https://github.com/valueerrorx/nextnotes">GitHub</a> · <a href="https://github.com/valueerrorx/nextnotes/issues">Issues</a> · <a href="https://github.com/valueerrorx/nextnotes/blob/main/nextnotes/CHANGELOG.md">Changelog</a> · No cookies, no tracking.</p>
+	</div>
+</footer>
+</body>
+</html>
