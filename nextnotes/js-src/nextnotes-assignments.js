@@ -158,11 +158,60 @@
 		return isStudent(a) ? a.submission.effective_due : a.due_at;
 	}
 
+	// UI-asgdesign: Meta-Angabe als Pille mit Icon
+	function pill(icon, text, className) {
+		var p = el('span', 'nn-asg-pill' + (className ? ' ' + className : ''));
+		var i = el('i', 'lucide ' + icon);
+		i.setAttribute('aria-hidden', 'true');
+		p.appendChild(i);
+		p.appendChild(el('span', 'nn-asg-pill-text', text));
+		return p;
+	}
+
+	function meta() {
+		return el('div', 'nn-asg-meta');
+	}
+
+	// Initialen aus dem Anzeigenamen (Avatar-Ersatz)
+	function initials(name) {
+		var parts = String(name || '?').trim().split(/\s+/).filter(Boolean);
+		return ((parts[0] || '?').charAt(0) + (parts.length > 1 ? parts[parts.length - 1].charAt(0) : '')).toUpperCase();
+	}
+
+	// NC-Avatar über die Kernroute /avatar/{uid}/64[/dark]; ohne uid oder bei Ladefehler Initialen
+	var avatarBase = /apps\/nextnotes\/$/.test(baseUrl) ? baseUrl.replace(/apps\/nextnotes\/$/, 'avatar/') : null;
+	function avatar(name, uid) {
+		var box = el('span', 'nn-asg-avatar');
+		box.setAttribute('aria-hidden', 'true');
+		var fallback = function () { box.textContent = initials(name); };
+		if (uid && avatarBase) {
+			var img = el('img');
+			img.alt = '';
+			img.loading = 'lazy';
+			img.addEventListener('error', fallback);
+			img.src = avatarBase + encodeURIComponent(uid) + '/64' + (document.documentElement.getAttribute('data-theme') === 'dark' ? '/dark' : '');
+			box.appendChild(img);
+		} else {
+			fallback();
+		}
+		return box;
+	}
+
+	function person(text, name, uid) {
+		var p = el('span', 'nn-asg-pill nn-asg-person');
+		p.appendChild(avatar(name, uid));
+		p.appendChild(el('span', 'nn-asg-pill-text', text));
+		return p;
+	}
+
+	// Fälligkeit: überfällig (Fehlerfarbe), bald (≤ 48 h, Warnfarbe), sonst neutral; nur solange offen
+	var SOON = 48 * 3600;
 	function dueSpan(a) {
 		var due = dueOf(a);
 		var open = isStudent(a) ? a.submission.lock === null : a.status !== 'closed';
-		if (due === null || due === undefined) return el('span', 'nn-asg-due', t('noDeadline'));
-		return el('span', 'nn-asg-due' + (due < now() && open ? ' nn-asg-due-passed' : ''), t('due', { date: fmtDate(due) }));
+		if (due === null || due === undefined) return pill('lucide-calendar', t('noDeadline'), 'nn-asg-due');
+		var state = !open ? '' : (due < now() ? ' nn-asg-due-passed' : (due - now() <= SOON ? ' nn-asg-due-soon' : ''));
+		return pill(state === ' nn-asg-due-passed' ? 'lucide-alarm-clock' : 'lucide-calendar', t('due', { date: fmtDate(due) }), 'nn-asg-due' + state);
 	}
 
 	function pointsText(points, max) {
@@ -294,16 +343,18 @@
 		head.appendChild(el('span', 'nn-asg-item-title', a.title));
 		head.appendChild(assignmentChip(a));
 		main.appendChild(head);
-		var meta = el('div', 'nn-asg-item-meta');
-		meta.appendChild(dueSpan(a));
-		meta.appendChild(el('span', 'nn-asg-item-team', a.team_name));
-		if (isStudent(a) && a.submission.status === 'returned' && a.submission.points !== null) meta.appendChild(el('span', '', t('points') + ': ' + pointsText(a.submission.points, a.max_points)));
+		var metaRow = meta();
+		metaRow.appendChild(dueSpan(a));
+		metaRow.appendChild(pill('lucide-users', a.team_name, 'nn-asg-item-team'));
+		if (isStudent(a) && a.submission.status === 'returned' && a.submission.points !== null) metaRow.appendChild(pill('lucide-award', t('points') + ': ' + pointsText(a.submission.points, a.max_points)));
 		if (a.can.review && a.status !== 'draft') {
 			var by = a.submissions_by_status || {};
 			var open = (by.assigned || 0) + (by.reopened || 0);
-			meta.appendChild(el('span', 'nn-asg-counts', [t('countSubmitted', { n: a.submissions_submitted || 0 }), t('countOpen', { n: open }), t('countMissed', { n: by.missed || 0 })].join(' · ')));
+			metaRow.appendChild(pill('lucide-circle-check', t('countSubmitted', { n: a.submissions_submitted || 0 }), 'nn-asg-counts nn-asg-count-submitted'));
+			metaRow.appendChild(pill('lucide-hourglass', t('countOpen', { n: open }), 'nn-asg-counts'));
+			metaRow.appendChild(pill('lucide-alarm-clock', t('countMissed', { n: by.missed || 0 }), 'nn-asg-counts' + (by.missed ? ' nn-asg-count-missed' : '')));
 		}
-		main.appendChild(meta);
+		main.appendChild(metaRow);
 		if (a.not_distributed > 0) main.appendChild(el('div', 'nn-asg-hint', t(a.quota_full ? 'notDistributedQuota' : 'notDistributed', { n: a.not_distributed })));
 		var hint = teamHint(a);
 		if (hint) main.appendChild(hint);
@@ -365,12 +416,12 @@
 		head.appendChild(el('h2', 'nn-asg-detail-title', a.title));
 		head.appendChild(assignmentChip(a));
 		detailEl.appendChild(head);
-		var meta = el('div', 'nn-asg-item-meta');
-		meta.appendChild(el('span', 'nn-asg-due' + (a.due_at < now() && a.status !== 'closed' ? ' nn-asg-due-passed' : ''), t('due', { date: fmtDate(a.due_at) })));
-		meta.appendChild(el('span', '', a.team_name));
-		if (a.max_points !== null) meta.appendChild(el('span', '', t('points') + ': ' + a.max_points));
-		if (a.created_by_name) meta.appendChild(el('span', '', t('owner', { name: a.created_by_name })));
-		detailEl.appendChild(meta);
+		var metaRow = meta();
+		metaRow.appendChild(dueSpan(a));
+		metaRow.appendChild(pill('lucide-users', a.team_name));
+		if (a.max_points !== null) metaRow.appendChild(pill('lucide-award', t('points') + ': ' + a.max_points));
+		if (a.created_by_name) metaRow.appendChild(person(t('owner', { name: a.created_by_name }), a.created_by_name, null));
+		detailEl.appendChild(metaRow);
 
 		var bar = el('div', 'nn-asg-actions');
 		var open = a.status === 'draft' || a.status === 'distributed';
@@ -411,21 +462,28 @@
 		table.appendChild(thead);
 		var tbody = el('tbody');
 		state.subs.forEach(function (s, i) {
-			var tr = el('tr', 'nn-asg-sub');
+			// UI-asgdesign: Zeile als Karte, abgegebene (Feedback offen) hervorgehoben; data-label für die Kartenansicht mobil
+			var tr = el('tr', 'nn-asg-sub' + (s.status === 'submitted' ? ' nn-asg-sub-attention' : ''));
 			tr.setAttribute('data-submission-id', String(s.id));
-			var nameCell = el('td');
+			var nameCell = el('td', 'nn-asg-sub-name');
+			nameCell.appendChild(avatar(s.student_name, s.student_deleted ? null : s.student_uid));
 			var open = button(s.student_name || '?', 'nn-asg-sub-open', function () { openReview(i); });
 			open.setAttribute('aria-label', t('review') + ': ' + (s.student_name || ''));
 			nameCell.appendChild(open);
 			if (s.student_deleted) nameCell.appendChild(el('span', 'nn-asg-tag', t('deleted')));
 			else if (s.left_team_at) nameCell.appendChild(el('span', 'nn-asg-tag', t('left')));
 			tr.appendChild(nameCell);
-			var st = el('td');
+			var st = el('td', 'nn-asg-sub-status');
 			st.appendChild(chip(s.status, t(SUB_LABEL[s.status] || 'stAssigned')));
 			tr.appendChild(st);
-			tr.appendChild(el('td', '', fmtDate(s.submitted_at)));
-			tr.appendChild(el('td', '', s.points === null ? '' : (a.max_points !== null ? s.points + ' / ' + a.max_points : String(s.points))));
-			var fb = el('td');
+			var cell = function (cls, label, text) {
+				var td = el('td', cls, text);
+				if (text) td.setAttribute('data-label', label);
+				return td;
+			};
+			tr.appendChild(cell('nn-asg-sub-date', t('handedInAt'), fmtDate(s.submitted_at)));
+			tr.appendChild(cell('nn-asg-sub-points', t('points'), s.points === null ? '' : (a.max_points !== null ? s.points + ' / ' + a.max_points : String(s.points))));
+			var fb = el('td', 'nn-asg-sub-fb');
 			if (s.feedback) {
 				var i2 = el('i', 'lucide lucide-message-square');
 				i2.title = s.feedback;
@@ -455,6 +513,7 @@
 		nav.appendChild(next);
 		body.appendChild(nav);
 		var title = el('div', 'nn-asg-review-head');
+		title.appendChild(avatar(s.student_name, s.student_deleted ? null : s.student_uid));
 		title.appendChild(el('strong', '', s.student_name || '?'));
 		title.appendChild(chip(s.status, t(SUB_LABEL[s.status] || 'stAssigned')));
 		if (s.submitted_at) title.appendChild(el('span', 'nn-asg-muted', t('handedInAt') + ': ' + fmtDate(s.submitted_at)));
@@ -648,12 +707,12 @@
 		head.appendChild(assignmentChip(a));
 		if (a.team_state !== 'active') head.appendChild(subStatusChip(s));
 		detailEl.appendChild(head);
-		var meta = el('div', 'nn-asg-item-meta');
-		meta.appendChild(dueSpan(a));
-		meta.appendChild(el('span', '', a.team_name));
-		if (a.created_by_name) meta.appendChild(el('span', '', t('from', { name: a.created_by_name })));
-		if (a.max_points !== null) meta.appendChild(el('span', '', t('points') + ': ' + a.max_points));
-		detailEl.appendChild(meta);
+		var metaRow = meta();
+		metaRow.appendChild(dueSpan(a));
+		metaRow.appendChild(pill('lucide-users', a.team_name));
+		if (a.created_by_name) metaRow.appendChild(person(t('from', { name: a.created_by_name }), a.created_by_name, null));
+		if (a.max_points !== null) metaRow.appendChild(pill('lucide-award', t('points') + ': ' + a.max_points));
+		detailEl.appendChild(metaRow);
 		var hint = teamHint(a);
 		if (hint) detailEl.appendChild(hint);
 		var info = s.lock === null ? t('lockOpen') : t(LOCK_TEXT[s.lock] || 'lockLeft', { date: fmtDate(s.submitted_at) });

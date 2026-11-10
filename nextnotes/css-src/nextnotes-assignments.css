@@ -36,6 +36,8 @@
 	margin: 0;
 	padding-inline: calc(var(--default-grid-baseline) * 4);
 	border-radius: var(--border-radius-element);
+	/* UI-asgdesign: Links und Knöpfe gleich groß (Links erbten sonst die Fließtextgröße) */
+	font-size: var(--default-font-size);
 	font-weight: bold;
 	text-decoration: none;
 }
@@ -79,23 +81,33 @@
 	color: var(--color-error-text);
 }
 
-/* Liste: Zeilen wie Teams-Aufgabenliste, Frist prominent */
+/* UI-asgdesign: Aufgaben als Karten (Rahmen, großer Radius, Hover-Fläche) */
 #content #nextnotes-root .nn-asg-items {
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--default-grid-baseline) * 2);
 	margin: 0;
 	padding: 0;
 	list-style: none;
-	border-top: 1px solid var(--color-border);
 }
 
 #content #nextnotes-root .nn-asg-item {
-	border-bottom: 1px solid var(--color-border);
+	overflow: hidden;
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-large);
+	background-color: var(--color-main-background);
+	transition: border-color var(--animation-quick, 100ms) ease;
+}
+
+#content #nextnotes-root .nn-asg-item:has(button.nn-asg-item-main:is(:hover, :focus-visible)) {
+	border-color: var(--color-border-maxcontrast);
 }
 
 #content #nextnotes-root .nn-asg-item-main {
 	display: block;
 	width: 100%;
 	margin: 0;
-	padding: calc(var(--default-grid-baseline) * 3) calc(var(--default-grid-baseline) * 2);
+	padding: calc(var(--default-grid-baseline) * 3) calc(var(--default-grid-baseline) * 4);
 	border: 0;
 	border-radius: 0;
 	background: transparent;
@@ -118,34 +130,118 @@
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: calc(var(--default-grid-baseline) * 3);
+	gap: calc(var(--default-grid-baseline) * 2) calc(var(--default-grid-baseline) * 3);
 }
 
 #content #nextnotes-root .nn-asg-item-title {
+	min-width: 0;
 	font-size: 1.05em;
 	font-weight: bold;
+	overflow-wrap: anywhere;
+}
+
+/* Status-Pille rechts im Kartenkopf */
+#content #nextnotes-root .nn-asg-item-head > .nn-asg-chip {
+	margin-inline-start: auto;
 }
 
 #content #nextnotes-root .nn-asg-detail-title {
 	margin: 0;
 	font-size: 1.4em;
+	overflow-wrap: anywhere;
 }
 
-#content #nextnotes-root .nn-asg-item-meta {
+/* Meta-Leiste: Pillen mit Icon (Frist, Klasse, Punkte, Verantwortlich, Zähler) */
+#content #nextnotes-root .nn-asg-meta {
 	display: flex;
 	flex-wrap: wrap;
-	gap: calc(var(--default-grid-baseline) * 4);
-	margin-top: calc(var(--default-grid-baseline) * 1);
+	align-items: center;
+	gap: calc(var(--default-grid-baseline) * 2);
+	margin-top: calc(var(--default-grid-baseline) * 2);
+}
+
+#content #nextnotes-root .nn-asg-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: calc(var(--default-grid-baseline) * 1.5);
+	max-width: 100%;
+	min-height: calc(var(--default-grid-baseline) * 7);
+	box-sizing: border-box;
+	padding: 2px calc(var(--default-grid-baseline) * 3);
+	border-radius: var(--border-radius-pill);
+	background-color: var(--color-background-dark);
+	color: var(--color-main-text);
+	font-size: 0.9em;
+	line-height: 1.3;
+}
+
+#content #nextnotes-root .nn-asg-pill > .lucide {
+	flex: none;
+	width: 16px;
+	height: 16px;
 	color: var(--color-text-maxcontrast);
 }
 
-#content #nextnotes-root .nn-asg-due {
-	color: var(--color-main-text);
+#content #nextnotes-root .nn-asg-pill-text {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+#content #nextnotes-root .nn-asg-pill.nn-asg-due {
 	font-weight: bold;
 }
 
-#content #nextnotes-root .nn-asg-due.nn-asg-due-passed {
+/* Fälligkeit nach Zustand: überfällig Fehler-, bald (≤ 48 h) Warnfarbe */
+#content #nextnotes-root .nn-asg-pill:is(.nn-asg-due-passed, .nn-asg-count-missed) {
+	background-color: color-mix(in srgb, var(--color-error) 15%, transparent);
 	color: var(--color-error-text);
+}
+
+#content #nextnotes-root .nn-asg-pill.nn-asg-due-soon {
+	background-color: color-mix(in srgb, var(--color-warning) 18%, transparent);
+	color: var(--color-warning-text);
+}
+
+#content #nextnotes-root .nn-asg-pill:is(.nn-asg-due-passed, .nn-asg-due-soon, .nn-asg-count-missed) > .lucide {
+	color: inherit;
+}
+
+#content #nextnotes-root .nn-asg-pill.nn-asg-count-submitted > .lucide {
+	color: var(--color-success-text);
+}
+
+/* Person: NC-Avatar bzw. Initialen */
+#content #nextnotes-root .nn-asg-pill.nn-asg-person {
+	padding-inline-start: 3px;
+}
+
+#content #nextnotes-root .nn-asg-avatar {
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	width: calc(var(--default-grid-baseline) * 5.5);
+	height: calc(var(--default-grid-baseline) * 5.5);
+	overflow: hidden;
+	border-radius: 50%;
+	background-color: var(--color-primary-element-light);
+	color: var(--color-primary-element-light-text);
+	font-size: 0.75em;
+	font-weight: bold;
+	line-height: 1;
+	vertical-align: middle;
+}
+
+#content #nextnotes-root .nn-asg-avatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+#content #nextnotes-root :is(.nn-asg-table, .nn-asg-review-head) .nn-asg-avatar {
+	width: calc(var(--default-grid-baseline) * 8);
+	height: calc(var(--default-grid-baseline) * 8);
+	font-size: 0.85em;
 }
 
 #content #nextnotes-root .nn-asg-hint,
@@ -210,31 +306,71 @@
 	font-size: 0.85em;
 }
 
-/* Abgaben-Tabelle */
+/* UI-asgdesign: Abgaben als Karten (Zeilen mit Fläche und großem Radius; abgegebene mit Primär-Fläche hervorgehoben) */
 #content #nextnotes-root .nn-asg-section {
 	margin: calc(var(--default-grid-baseline) * 4) 0 calc(var(--default-grid-baseline) * 2);
 	font-size: 1.1em;
 }
 
 #content #nextnotes-root .nn-asg-table {
+	--nn-asg-card: var(--color-background-hover);
 	width: 100%;
-	border-collapse: collapse;
+	border-collapse: separate;
+	border-spacing: 0 calc(var(--default-grid-baseline) * 2);
+	margin-block: calc(var(--default-grid-baseline) * -2) 0;
 }
 
 #content #nextnotes-root .nn-asg-table :is(th, td) {
-	padding: calc(var(--default-grid-baseline) * 2);
-	border-bottom: 1px solid var(--color-border);
+	padding: calc(var(--default-grid-baseline) * 2) calc(var(--default-grid-baseline) * 3);
+	border: 0;
 	text-align: start;
 	vertical-align: middle;
 }
 
 #content #nextnotes-root .nn-asg-table th {
+	padding-block: 0;
+	background: transparent;
 	color: var(--color-text-maxcontrast);
+	font-size: 0.9em;
 	font-weight: normal;
 }
 
+#content #nextnotes-root .nn-asg-table tbody tr {
+	--nn-asg-card: var(--color-background-hover);
+}
+
+#content #nextnotes-root .nn-asg-table tbody tr.nn-asg-sub-attention {
+	--nn-asg-card: var(--color-primary-element-light);
+}
+
 #content #nextnotes-root .nn-asg-table tbody tr:hover {
-	background-color: var(--color-background-hover);
+	--nn-asg-card: color-mix(in srgb, var(--color-primary-element) 10%, var(--color-background-hover));
+}
+
+#content #nextnotes-root .nn-asg-table tbody tr.nn-asg-sub-attention:hover {
+	--nn-asg-card: color-mix(in srgb, var(--color-primary-element) 10%, var(--color-primary-element-light));
+}
+
+#content #nextnotes-root .nn-asg-table tbody td {
+	background-color: var(--nn-asg-card);
+}
+
+#content #nextnotes-root .nn-asg-table tbody td:first-child {
+	border-start-start-radius: var(--border-radius-large);
+	border-end-start-radius: var(--border-radius-large);
+}
+
+#content #nextnotes-root .nn-asg-table tbody td:last-child {
+	border-start-end-radius: var(--border-radius-large);
+	border-end-end-radius: var(--border-radius-large);
+}
+
+#content #nextnotes-root .nn-asg-table .nn-asg-avatar {
+	margin-inline-end: calc(var(--default-grid-baseline) * 3);
+}
+
+#content #nextnotes-root .nn-asg-sub-fb .lucide {
+	color: var(--color-text-maxcontrast);
 }
 
 #content #nextnotes-root .nn-asg-sub-open {
@@ -246,6 +382,8 @@
 	font: inherit;
 	font-weight: bold;
 	text-align: start;
+	vertical-align: middle;
+	overflow-wrap: anywhere;
 	cursor: pointer;
 }
 
@@ -415,7 +553,78 @@
 		grid-template-columns: minmax(0, 1fr);
 	}
 
-	#content #nextnotes-root .nn-asg-table :is(th, td):nth-child(3) {
+	/* UI-asgdesign: Abgaben-Karten untereinander (Kopfzeile nur für Screenreader); Name und Status oben, Datum/Punkte/Feedback darunter */
+	#content #nextnotes-root .nn-asg-table,
+	#content #nextnotes-root .nn-asg-table tbody {
+		display: block;
+		margin: 0;
+	}
+
+	#content #nextnotes-root .nn-asg-table thead {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+
+	#content #nextnotes-root .nn-asg-table tbody tr {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto auto auto;
+		align-items: center;
+		gap: calc(var(--default-grid-baseline) * 1) calc(var(--default-grid-baseline) * 3);
+		margin-bottom: calc(var(--default-grid-baseline) * 2);
+		padding: calc(var(--default-grid-baseline) * 2) calc(var(--default-grid-baseline) * 3);
+		border-radius: var(--border-radius-large);
+		background-color: var(--nn-asg-card);
+	}
+
+	#content #nextnotes-root .nn-asg-table tbody td {
+		display: block;
+		min-width: 0;
+		padding: 0;
+		border-radius: 0;
+		background: transparent;
+	}
+
+	#content #nextnotes-root .nn-asg-table tbody td:empty {
 		display: none;
+	}
+
+	#content #nextnotes-root .nn-asg-table .nn-asg-sub-name {
+		display: flex;
+		align-items: center;
+		grid-column: 1 / 4;
+		grid-row: 1;
+	}
+
+	#content #nextnotes-root .nn-asg-table .nn-asg-sub-status {
+		grid-column: 4;
+		grid-row: 1;
+	}
+
+	#content #nextnotes-root .nn-asg-table :is(.nn-asg-sub-date, .nn-asg-sub-points, .nn-asg-sub-fb) {
+		grid-row: 2;
+		color: var(--color-text-maxcontrast);
+		font-size: 0.9em;
+	}
+
+	#content #nextnotes-root .nn-asg-table .nn-asg-sub-date {
+		grid-column: 1;
+		/* unter dem Namen, Avatar-Breite eingerückt */
+		padding-inline-start: calc(var(--default-grid-baseline) * 11);
+	}
+
+	#content #nextnotes-root .nn-asg-table .nn-asg-sub-points {
+		grid-column: 2;
+	}
+
+	#content #nextnotes-root .nn-asg-table .nn-asg-sub-fb {
+		grid-column: 3;
+	}
+
+	#content #nextnotes-root .nn-asg-table td[data-label]::before {
+		content: attr(data-label) ": ";
 	}
 }
