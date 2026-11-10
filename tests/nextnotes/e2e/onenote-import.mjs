@@ -16,7 +16,7 @@ const CODE = `mock.e2e-${RUN}`.replace(/[^A-Za-z0-9._-]/g, '');
 
 await runSpec(import.meta.url, async (ctx, page, context) => {
 	const nc = ncContainer(ctx.base);
-	const sh = (cmd) => execFileSync('docker', ['exec', '-u', 'www-data', nc, 'sh', '-c', cmd], { encoding: 'utf8' }).trim();
+	const sh = (cmd) => execFileSync('docker', ['exec', '-u', 'www-data', nc, 'sh', '-c', cmd], { encoding: 'utf8', maxBuffer: 1 << 28 }).trim();
 	const occ = (...a) => execFileSync('docker', ['exec', '-u', 'www-data', nc, 'php', 'occ', ...a], { encoding: 'utf8' }).trim();
 	if (!sh('curl -fsS --max-time 5 "http://ms-mock/__ctl?op=reset" || echo down').includes('ok')) throw new Error('Mock nicht erreichbar: dev/nextcloud/msmock.sh <env> up');
 	const TAG = RUN.toLowerCase().replace(/[^a-z0-9]/g, '').slice(-12);
