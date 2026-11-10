@@ -40,3 +40,6 @@ Option 1. Ein direkter Edit plus `git merge` ist schlanker als eine Patch-Kette;
 - Kein Upstream-PHP im Paket. Konvertierung HTML↔Markdown über gepflegte Bibliotheken (`league/commonmark`, `league/html-to-markdown`), Parität per Fixture-Tests (SPEC §1.2).
 - Frontend-Bugfixes in `src/` sind Kandidaten für Upstream-PRs; jeder angenommene PR entfernt einen Eintrag aus SPEC §11.1.
 - Je kürzer die Liste in §11.1, desto billiger ein Update. Ziel: < 15 Einträge in v1.
+
+## Nachtrag M7-web (2026-11-10)
+Upstream-Dokumente für Poznote-Nutzer entfallen: `docs/*.md` (außer den eigenen Dateien oben), `docs/*.gif`, `images/`, `CONTRIBUTING.md`, übersetzte READMEs, `tools/docs-i18n.py`. Sie beschreiben den Docker-Betrieb von Poznote und gelten für Next Notes nicht. Bei Upstream-Merges werden Änderungen an diesen Dateien verworfen (Konflikt „geändert/gelöscht“ → gelöscht lassen). `Dockerfile`, `docker*/`, `mcp-server/`, `poznote-chrome-extension/`, `tools/` und `tests/` (Upstream) bleiben, weil die Vergleichsinstanz `dev/upstream` daraus baut.
