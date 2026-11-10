@@ -156,6 +156,26 @@ html.nextnotes-ready #nextnotes-root:is(.nextnotes-subpage, .nextnotes-excalidra
 	box-shadow: none;
 }
 
+/* UI-taskfocus: sichtbarer Fokus der App-Textfelder im NC-Stil (Rahmen + 1-px-Ring in Haupttextfarbe, wirkt wie 2-px-Rahmen).
+   Upstream: Ring rgba(Akzent, .1) unsichtbar, dunkel überstimmt html[data-theme=dark] .x (1,2,1) den :focus-Rahmen (1,2,0); 2,2,0 gewinnt. */
+#content #nextnotes-root :is(.task-input, .task-edit-input, .task-edit-textarea, .task-subitem-input, .searchbar-input):focus {
+	outline: none;
+	border-color: var(--color-main-text);
+	box-shadow: 0 0 0 1px var(--color-main-text);
+}
+
+/* Unterstrich-Feld „Aufgabe hinzufügen“ in eingebetteter Aufgabenliste: Unterstrich statt Rahmen */
+#content #nextnotes-root .noteentry .tasklist-embed-add-input:focus {
+	border-bottom-color: var(--color-main-text);
+}
+
+/* Eingabe-Dialog (ui.js, an body, Rahmen per Inline-Stil): gleicher Fokus */
+#inputModal #inputModalInput:focus {
+	outline: none;
+	border-color: var(--color-main-text) !important;
+	box-shadow: 0 0 0 1px var(--color-main-text);
+}
+
 /* Unterseiten (revisions.php, attachments.php) im NC-Rahmen: Spalte, eigener Scrollbereich */
 #nextnotes-root.nextnotes-subpage {
 	display: block;
