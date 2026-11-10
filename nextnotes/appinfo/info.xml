@@ -47,9 +47,14 @@ Basiert auf Poznote von Timothé Poznanski (MIT).]]></description>
 	<bugs>https://github.com/valueerrorx/nextnotes/issues</bugs>
 	<repository type="git">https://github.com/valueerrorx/nextnotes</repository>
 	<screenshot>https://raw.githubusercontent.com/valueerrorx/nextnotes/main/nextnotes/screenshots/notes-light.png</screenshot>
+	<screenshot>https://raw.githubusercontent.com/valueerrorx/nextnotes/main/nextnotes/screenshots/team-workspace-light.png</screenshot>
+	<screenshot>https://raw.githubusercontent.com/valueerrorx/nextnotes/main/nextnotes/screenshots/assignment-detail-light.png</screenshot>
 	<screenshot>https://raw.githubusercontent.com/valueerrorx/nextnotes/main/nextnotes/screenshots/notes-dark.png</screenshot>
 	<screenshot>https://raw.githubusercontent.com/valueerrorx/nextnotes/main/nextnotes/screenshots/assignments-light.png</screenshot>
-	<screenshot>https://raw.githubusercontent.com/valueerrorx/nextnotes/main/nextnotes/screenshots/team-workspace-light.png</screenshot>
+	<screenshot>https://raw.githubusercontent.com/valueerrorx/nextnotes/main/nextnotes/screenshots/excalidraw-light.png</screenshot>
+	<screenshot>https://raw.githubusercontent.com/valueerrorx/nextnotes/main/nextnotes/screenshots/dashboard-light.png</screenshot>
+	<screenshot>https://raw.githubusercontent.com/valueerrorx/nextnotes/main/nextnotes/screenshots/team-workspace-dark.png</screenshot>
+	<screenshot>https://raw.githubusercontent.com/valueerrorx/nextnotes/main/nextnotes/screenshots/assignment-detail-dark.png</screenshot>
 	<dependencies>
 		<php min-version="8.3" max-version="8.5"/>
 		<nextcloud min-version="35" max-version="35"/>

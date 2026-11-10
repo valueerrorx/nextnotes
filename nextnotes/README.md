@@ -16,6 +16,11 @@ Based on [Poznote](https://github.com/timothepoznanski/poznote) by Timothé Pozn
 - Import from Microsoft OneNote: users import their notebooks (including images and files) into their own workspaces through Microsoft Graph; requires an app registration in the school's Microsoft Entra tenant ([setup](../docs/app/admin.md#13-onenote-import)).
 - Export as files or ZIP (compatible with Poznote); light and dark mode follow the Nextcloud theme.
 
+## Screenshots
+![Note with table and formula](screenshots/notes-light.png)
+![Team workspace with material folder and drawing](screenshots/team-workspace-light.png)
+![Assignment with submissions](screenshots/assignment-detail-light.png)
+
 ## Requirements
 - Nextcloud 35 only, PHP 8.3–8.5.
 - Background jobs via system cron (recommended; required for the OneNote import).
